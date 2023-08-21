@@ -66,7 +66,7 @@ def get_chat_and_message_id_by_sender_name_and_date(
     result = cursor.execute(query, params).fetchone()
 
     logger.debug(
-        f"get_chta_and_message_id_by_sender_name_and_date result for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}: {result}"
+        f"get_chat_and_message_id_by_sender_name_and_date result for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}: {result}"
     )
 
     return result
@@ -179,6 +179,7 @@ CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("gr
 bot_token = config_XML_root.find("bot_token").text
 bot_name = config_XML_root.find("bot_name").text
 log_group = config_XML_root.find("log_group").text
+techno_log_group = config_XML_root.find("techno_log_group").text
 
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group)
@@ -186,15 +187,16 @@ print("Using channels: " + str(CHANNEL_IDS))
 
 API_TOKEN = bot_token
 LOG_GROUP_ID = int(log_group)  # Ensure this is an integer
+TECHNO_LOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
 
 # Uncomment this to get the chat ID of a group or channel
-# @dp.message_handler(commands=["getid"])
-# async def cmd_getid(message: types.Message):
-#     await message.answer(f"This chat's ID is: {message.chat.id}")
+@dp.message_handler(commands=["getid"])
+async def cmd_getid(message: types.Message):
+    await message.answer(f"This chat's ID is: {message.chat.id}")
 
 
 recent_messages = (
@@ -360,7 +362,7 @@ async def ban_and_delete(message: types.Message):
                     f"Failed to ban and delete messages in chat {chat_id}. Error: {inner_e}"
                 )
                 await bot.send_message(
-                    LOG_GROUP_ID,
+                    TECHNO_LOG_GROUP_ID,
                     f"Failed to ban and delete messages in chat {chat_id}. Error: {inner_e}",
                 )
         # select all messages from the user in the chat
@@ -383,7 +385,7 @@ async def ban_and_delete(message: types.Message):
                     f"Failed to delete message {message_id} in chat {chat_id}. Error: {inner_e}"
                 )
                 await bot.send_message(
-                    LOG_GROUP_ID,
+                    TECHNO_LOG_GROUP_ID,
                     f"Failed to delete message {message_id} in chat {chat_id}. Error: {inner_e}",
                 )
 
@@ -401,7 +403,7 @@ if __name__ == "__main__":
 
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    start_log_message = f"Bot started at {current_time}"
+    start_log_message = f"\nBot started at {current_time}\n{'-' * 20}\n"
     logger.info(start_log_message)
 
     executor.start_polling(dp, skip_updates=True)

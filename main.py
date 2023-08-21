@@ -208,21 +208,21 @@ recent_messages = (
 
 @dp.message_handler(lambda message: message.forward_date is not None)
 async def handle_forwarded_reports(message: types.Message):
-    logger.debug(f"Received forwarded message {message}")
+    # logger.debug(f"Received forwarded message {message}")
 
     # Fetch original user information from the recent messages database
     # (author_id, username, first_name, last_name, post_date, origin_chat_id, origin_message_id)
 
-    finded_message_data = get_chat_and_message_id_by_sender_name_and_date(
+    found_message_data = get_chat_and_message_id_by_sender_name_and_date(
         (message.forward_sender_name and message.forward_sender_name.split(" ")[0])
         or message.forward_from.first_name,
         (message.forward_sender_name and message.forward_sender_name.split()[1])
         or message.forward_from.last_name,
         message.forward_date,
     )
-    logger.debug(f"Message data: {finded_message_data}")
+    logger.debug(f"Message data: {found_message_data}")
 
-    if not finded_message_data:
+    if not found_message_data:
         await message.answer(
             "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
         )
@@ -248,7 +248,7 @@ async def handle_forwarded_reports(message: types.Message):
             message.from_user.last_name,
             message.forward_date if message.forward_date else None,
             received_date,
-            str(finded_message_data),
+            str(found_message_data),
         ),
     )
 
@@ -256,7 +256,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Construct a link to the original message (assuming it's a supergroup or channel)
     # TODO: message_link - should point to the orgigin and not to the bot report direct chat
-    message_link = f"https://t.me/{finded_message_data[2]}/{finded_message_data[1]}"
+    message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
 
     # Log the information with the link
     log_info = (
@@ -276,7 +276,7 @@ async def handle_forwarded_reports(message: types.Message):
 async def store_recent_messages(message: types.Message):
     try:
         # Log the full message object for debugging
-        logger.debug(f"Received message object: {message}")
+        # logger.debug(f"Received message object: {message}")
 
         cursor.execute(
             """
@@ -304,7 +304,7 @@ async def store_recent_messages(message: types.Message):
 @dp.message_handler(commands=["ban"], chat_id=LOG_GROUP_ID)
 async def ban_and_delete(message: types.Message):
     try:
-        logger.debug("ban triggered.")
+        # logger.debug("ban triggered.")
 
         command_args = message.text.split()
         logger.debug(f"Command arguments received: {command_args}")

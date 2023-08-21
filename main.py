@@ -260,9 +260,9 @@ async def handle_forwarded_reports(message: types.Message):
     log_info = (
         f"Date-Time: {message.date}\n"  # Using message.date here
         f"Forwarded from user: {message.forward_sender_name}\n"
-        f"Reported by\nUser: {message.from_user.username or 'Unknown'}\nUser ID: {message.from_user.id}\n"
+        f"Reported by\nUser: {message.from_user.username or 'Unknown'}\n"
         f"[Link to the reported message]({message_link})\n"
-        f"Use /ban_and_delete {new_message_id} to take action."
+        f"Use /ban {new_message_id} to take action."
     )
     await bot.send_message(LOG_GROUP_ID, log_info, parse_mode="Markdown")
 
@@ -299,10 +299,10 @@ async def store_recent_messages(message: types.Message):
         logger.error(f"Error storing recent message: {e}")
 
 
-@dp.message_handler(commands=["ban_and_delete"], chat_id=LOG_GROUP_ID)
+@dp.message_handler(commands=["ban"], chat_id=LOG_GROUP_ID)
 async def ban_and_delete(message: types.Message):
     try:
-        logger.debug("ban_and_delete triggered.")
+        logger.debug("ban triggered.")
 
         command_args = message.text.split()
         logger.debug(f"Command arguments received: {command_args}")
@@ -392,7 +392,7 @@ async def ban_and_delete(message: types.Message):
         )
 
     except Exception as e:
-        logger.error(f"Error in ban_and_delete function: {e}")
+        logger.error(f"Error in ban function: {e}")
         await message.reply(f"Error: {e}")
 
 

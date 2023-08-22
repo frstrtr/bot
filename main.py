@@ -194,9 +194,9 @@ dp = Dispatcher(bot)
 
 
 # Uncomment this to get the chat ID of a group or channel
-@dp.message_handler(commands=["getid"])
-async def cmd_getid(message: types.Message):
-    await message.answer(f"This chat's ID is: {message.chat.id}")
+# @dp.message_handler(commands=["getid"])
+# async def cmd_getid(message: types.Message):
+#     await message.answer(f"This chat's ID is: {message.chat.id}")
 
 
 recent_messages = (
@@ -302,7 +302,7 @@ async def store_recent_messages(message: types.Message):
 
 
 @dp.message_handler(commands=["ban"], chat_id=LOG_GROUP_ID)
-async def ban_and_delete(message: types.Message):
+async def ban(message: types.Message):
     try:
         # logger.debug("ban triggered.")
 
@@ -400,7 +400,10 @@ async def ban_and_delete(message: types.Message):
 
 if __name__ == "__main__":
     from aiogram import executor
+
+    # Locale test
     print('Locale test: ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮËйцукенгшщзхъфывапролджэячсмитьбюё')
+
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start_log_message = f"\nBot started at {current_time}\n{'-' * 20}\n"

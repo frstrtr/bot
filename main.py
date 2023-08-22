@@ -400,7 +400,7 @@ async def ban_and_delete(message: types.Message):
 
 if __name__ == "__main__":
     from aiogram import executor
-
+    print('Locale test: ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮËйцукенгшщзхъфывапролджэячсмитьбюё')
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start_log_message = f"\nBot started at {current_time}\n{'-' * 20}\n"

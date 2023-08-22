@@ -183,6 +183,7 @@ techno_log_group = config_XML_root.find("techno_log_group").text
 
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group)
+print("Using techno log group: " + techno_log_group)
 print("Using channels: " + str(CHANNEL_IDS))
 
 API_TOKEN = bot_token

@@ -175,16 +175,21 @@ channels_root = channels_XML.getroot()
 # Extract group IDs from XML
 CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("group")]
 
+#Extract group names from XML
+CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("group")]
+
 # Get config data
 bot_token = config_XML_root.find("bot_token").text
 bot_name = config_XML_root.find("bot_name").text
 log_group = config_XML_root.find("log_group").text
+log_group_name = config_XML_root.find("log_group_name").text
 techno_log_group = config_XML_root.find("techno_log_group").text
+techno_log_group_name = config_XML_root.find("techno_log_group_name").text
 
 print("Using bot: " + bot_name)
-print("Using log group: " + log_group)
-print("Using techno log group: " + techno_log_group)
-print("Using channels: " + str(CHANNEL_IDS))
+print("Using log group: " + log_group_name + ", id:" + log_group)
+print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log_group)
+print("Using channels: " + str(CHANNEL_NAMES))
 
 API_TOKEN = bot_token
 LOG_GROUP_ID = int(log_group)  # Ensure this is an integer
@@ -230,9 +235,7 @@ async def handle_forwarded_reports(message: types.Message):
         return
 
     # Save both the original message_id and the forwarded message's date
-    # TODO: we dont need the forwarded message date, since it is equal to the original message date
     received_date = message.date if message.date else None
-    # TODO: wrong information written to DB - check if this is the correct way to do it
     new_message_id = int(str(message.chat.id) + str(message.message_id))
     cursor.execute(
         """
@@ -256,7 +259,6 @@ async def handle_forwarded_reports(message: types.Message):
     conn.commit()
 
     # Construct a link to the original message (assuming it's a supergroup or channel)
-    # TODO: message_link - should point to the orgigin and not to the bot report direct chat
     message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
 
     # Log the information with the link

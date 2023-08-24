@@ -223,7 +223,7 @@ async def handle_forwarded_reports(message: types.Message):
         (sender_full_name and sender_full_name[0])
         or message.forward_from.first_name,
         (sender_full_name and len(sender_full_name) > 1 and sender_full_name[1])
-        or message.forward_from.last_name,
+        or "",
         message.forward_date,
     )
     logger.debug(f"Message data: {found_message_data}")

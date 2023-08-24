@@ -218,11 +218,11 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Fetch original user information from the recent messages database
     # (author_id, username, first_name, last_name, post_date, origin_chat_id, origin_message_id)
-
+    sender_full_name  = message.forward_sender_name and message.forward_sender_name.split(" ");
     found_message_data = get_chat_and_message_id_by_sender_name_and_date(
-        (message.forward_sender_name and message.forward_sender_name.split(" ")[0])
+        (sender_full_name and sender_full_name[0])
         or message.forward_from.first_name,
-        (message.forward_sender_name and message.forward_sender_name.split()[1])
+        (sender_full_name and len(sender_full_name) > 1 and sender_full_name[1])
         or message.forward_from.last_name,
         message.forward_date,
     )

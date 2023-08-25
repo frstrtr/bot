@@ -212,7 +212,7 @@ recent_messages = (
 # get info about chats where bot present
 
 
-@dp.message_handler(lambda message: message.forward_date is not None, lambda message: message.chat.id != LOG_GROUP_ID)
+@dp.message_handler(lambda message: (message.forward_date is not None and message.chat.id != LOG_GROUP_ID))
 async def handle_forwarded_reports(message: types.Message):
     # logger.debug(f"Received forwarded message {message}")
     # Fetch original user information from the recent messages database

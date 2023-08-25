@@ -1,3 +1,5 @@
 *.xml
 *.log
 *.db
+test.py
+.vscode/settings.json

@@ -3,8 +3,6 @@ import sqlite3
 from aiogram import Bot, Dispatcher, types
 import xml.etree.ElementTree as ET
 import logging
-import asyncio
-
 
 
 # Setting up SQLite Database
@@ -214,13 +212,9 @@ recent_messages = (
 # get info about chats where bot present
 
 
-@dp.message_handler(lambda message: message.forward_date is not None)
+@dp.message_handler(lambda message: message.forward_date is not None and message.chat.id != LOG_GROUP_ID)
 async def handle_forwarded_reports(message: types.Message):
     # logger.debug(f"Received forwarded message {message}")
-    if message.chat.id != LOG_GROUP_ID:
-        logger.debug(f"This message is not for reporting. Just forwarded: {message}.")
-        asyncio.run(store_recent_messages(message))
-        return
     # Fetch original user information from the recent messages database
     # (author_id, username, first_name, last_name, post_date, origin_chat_id, origin_message_id)
     sender_full_name  = message.forward_sender_name and message.forward_sender_name.split(" ");

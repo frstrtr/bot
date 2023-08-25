@@ -215,7 +215,9 @@ recent_messages = (
 @dp.message_handler(lambda message: message.forward_date is not None)
 async def handle_forwarded_reports(message: types.Message):
     # logger.debug(f"Received forwarded message {message}")
-
+    if message.chat.id != LOG_GROUP_ID:
+        logger.debug(f"This message is not for reporting. Just forwarded: {message}.")
+        return
     # Fetch original user information from the recent messages database
     # (author_id, username, first_name, last_name, post_date, origin_chat_id, origin_message_id)
     sender_full_name  = message.forward_sender_name and message.forward_sender_name.split(" ");

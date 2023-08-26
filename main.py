@@ -1,8 +1,8 @@
 import datetime
 import sqlite3
-from aiogram import Bot, Dispatcher, types
 import xml.etree.ElementTree as ET
 import logging
+from aiogram import Bot, Dispatcher, types
 
 
 # Setting up SQLite Database
@@ -32,14 +32,6 @@ cursor.execute(
 )
 
 conn.commit()
-
-# If adding the forwarded_message_data column for the first time, uncomment below
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN forwarded_message_data INTEGER")
-# conn.commit()
-
-# Add this for the forward_date as well if running the script for the first time after the changes
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN forward_date INTEGER")
-# conn.commit()
 
 
 def get_chat_and_message_id_by_sender_name_and_date(
@@ -175,7 +167,7 @@ channels_root = channels_XML.getroot()
 # Extract group IDs from XML
 CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("group")]
 
-#Extract group names from XML
+# Extract group names from XML
 CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("group")]
 
 # Get config data
@@ -212,23 +204,25 @@ recent_messages = (
 # get info about chats where bot present
 
 
-@dp.message_handler(lambda message: message.forward_date is not None and message.chat.id not in CHANNEL_IDS)
+@dp.message_handler(
+    lambda message: message.forward_date is not None
+    and message.chat.id not in CHANNEL_IDS
+)
 async def handle_forwarded_reports(message: types.Message):
-    # logger.debug(f"Received forwarded message {message}")
-    # Fetch original user information from the recent messages database
-    # (author_id, username, first_name, last_name, post_date, origin_chat_id, origin_message_id)
+    logger.debug(f"Received forwarded message for the investigation: {message}")
 
-    sender_full_name  = message.forward_sender_name and message.forward_sender_name.split(" ");
+    sender_full_name = (
+        message.forward_sender_name and message.forward_sender_name.split(" ")
+    )
     found_message_data = get_chat_and_message_id_by_sender_name_and_date(
-        (sender_full_name and sender_full_name[0])
-        or message.forward_from.first_name,
-        (sender_full_name and len(sender_full_name) > 1 and sender_full_name[1])
-        or "",
+        (sender_full_name and sender_full_name[0]) or message.forward_from.first_name,
+        (sender_full_name and len(sender_full_name) > 1 and sender_full_name[1]) or "",
         message.forward_date,
     )
     logger.debug(f"Message data: {found_message_data}")
 
     if not found_message_data:
+        logger.debug("Could not retrieve the author's user ID. Please ensure you're reporting recent messages.")
         await message.answer(
             "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
         )
@@ -327,6 +321,10 @@ async def ban(message: types.Message):
         logger.debug(
             f"Database query result for forwarded_message_data {report_msg_id}: {result}"
         )
+        await bot.send_message(
+            TECHNO_LOG_GROUP_ID,
+            f"Database query result for forwarded_message_data {report_msg_id}: {result}",
+        )
 
         if not result:
             await message.reply("Error: Report not found in database.")
@@ -339,7 +337,10 @@ async def ban(message: types.Message):
 
         author_id = eval(forwarded_message_data)[3]
         logger.debug(f"Author ID retrieved for original message: {author_id}")
-
+        await bot.send_message(
+            TECHNO_LOG_GROUP_ID,
+            f"Author ID retrieved for original message: {author_id}",
+        )
         if not author_id:
             await message.reply(
                 "Could not retrieve the author's user ID from the report."
@@ -359,6 +360,10 @@ async def ban(message: types.Message):
                 )
                 logger.debug(
                     f"User {author_id} banned and their messages deleted from chat {chat_id}."
+                )
+                await bot.send_message(
+                    TECHNO_LOG_GROUP_ID,
+                    f"User {author_id} banned and their messages deleted from chat {chat_id}.",
                 )
             except Exception as inner_e:
                 logger.error(
@@ -405,11 +410,13 @@ if __name__ == "__main__":
     from aiogram import executor
 
     # Locale test
-    print('Locale test: ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮËйцукенгшщзхъфывапролджэячсмитьбюё')
+    print(
+        "Console locale test: ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮËйцукенгшщзхъфывапролджэячсмитьбюё"
+    )
 
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    start_log_message = f"\nBot started at {current_time}\n{'-' * 20}\n"
+    start_log_message = f"\nBot started at {current_time}\n{'-' * 40}\n"
     logger.info(start_log_message)
 
     executor.start_polling(dp, skip_updates=True)

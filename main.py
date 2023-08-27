@@ -191,8 +191,8 @@ print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log
 print("Using channels: " + str(CHANNEL_NAMES))
 
 API_TOKEN = bot_token
-LOG_GROUP_ID = int(log_group)  # Ensure this is an integer
-TECHNO_LOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
+ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
+TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
@@ -217,6 +217,7 @@ recent_messages = (
 )
 async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Received forwarded message for the investigation: {message}")
+    await bot.send_message(TECHNOLOG_GROUP_ID, message, parse_mode="Markdown")
 
     sender_full_name = (
         message.forward_sender_name and message.forward_sender_name.split(" ")
@@ -267,14 +268,13 @@ async def handle_forwarded_reports(message: types.Message):
     # Log the information with the link
     log_info = (
         f"Date-Time: {message.date}\n"  # Using message.date here
-        f"Forwarded from user: {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
-        f"Forwarded from user @{message.forward_from.username or 'Unknown'}\n"
-        f"Forwarded from chat: {message.chat.title}\n"
-        f"Reported by user: {message.from_user.username or 'Unknown'}\n"
+        f"Forwarded from @{message.forward_from.username or 'Unknown'} : {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
+        f"tg://user?id={message.forward_from.id}\n"
+        f"Reported by admin @{message.from_user.username or 'Unknown'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
     )
-    await bot.send_message(LOG_GROUP_ID, log_info, parse_mode="Markdown")
+    await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
@@ -309,7 +309,7 @@ async def store_recent_messages(message: types.Message):
         logger.error(f"Error storing recent message: {e}")
 
 
-@dp.message_handler(commands=["ban"], chat_id=LOG_GROUP_ID)
+@dp.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
 async def ban(message: types.Message):
     try:
         # logger.debug("ban triggered.")
@@ -333,7 +333,7 @@ async def ban(message: types.Message):
             f"Database query result for forwarded_message_data {report_msg_id}: {result}"
         )
         await bot.send_message(
-            TECHNO_LOG_GROUP_ID,
+            TECHNOLOG_GROUP_ID,
             f"Database query result for forwarded_message_data {report_msg_id}: {result}",
         )
 
@@ -349,7 +349,7 @@ async def ban(message: types.Message):
         author_id = eval(forwarded_message_data)[3]
         logger.debug(f"Author ID retrieved for original message: {author_id}")
         await bot.send_message(
-            TECHNO_LOG_GROUP_ID,
+            TECHNOLOG_GROUP_ID,
             f"Author ID retrieved for original message: {author_id}",
         )
         if not author_id:
@@ -375,7 +375,7 @@ async def ban(message: types.Message):
                     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
                 )
                 await bot.send_message(
-                    TECHNO_LOG_GROUP_ID,
+                    TECHNOLOG_GROUP_ID,
                     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
                 )
             except Exception as inner_e:
@@ -383,7 +383,7 @@ async def ban(message: types.Message):
                     f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
                 )
                 await bot.send_message(
-                    TECHNO_LOG_GROUP_ID,
+                    TECHNOLOG_GROUP_ID,
                     f"Failed to ban and delete messages in chat {chat_id}. Error: {inner_e}",
                 )
         # select all messages from the user in the chat
@@ -406,7 +406,7 @@ async def ban(message: types.Message):
                     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
                 )
                 await bot.send_message(
-                    TECHNO_LOG_GROUP_ID,
+                    TECHNOLOG_GROUP_ID,
                     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                 )
         logger.debug(

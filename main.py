@@ -213,7 +213,8 @@ recent_messages = (
 
 @dp.message_handler(
     lambda message: message.forward_date is not None
-    and message.chat.id not in CHANNEL_IDS
+    and message.chat.id not in CHANNEL_IDS,
+    content_types=types.ContentTypes.ANY,
 )
 async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Received forwarded message for the investigation: {message}")
@@ -420,6 +421,17 @@ async def ban(message: types.Message):
     except Exception as e:
         logger.error(f"Error in ban function: {e}")
         await message.reply(f"Error: {e}")
+
+# Dedug function to check if the bot is running and have unhandled messages
+# Uncomment to use
+# @dp.message_handler(content_types=types.ContentTypes.ANY)
+# async def log_all_unhandled_messages(message: types.Message):
+#     try:
+#         logger.debug(f"Received UNHANDLED message object: {message}")
+#         return
+#     except Exception as e:
+#         logger.error(f"Error in log_all_unhandled_messages function: {e}")
+#         await message.reply(f"Error: {e}")
 
 
 if __name__ == "__main__":

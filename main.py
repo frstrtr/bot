@@ -170,6 +170,13 @@ CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("gr
 # Extract group names from XML
 CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("group")]
 
+# add channels to dict for logging
+channels_dict = {}
+for group in channels_root.findall("group"):
+    channel_id = int(group.find("id").text)
+    channel_name = group.find("name").text
+    channels_dict[channel_id] = channel_name
+
 # Get config data
 bot_token = config_XML_root.find("bot_token").text
 bot_name = config_XML_root.find("bot_name").text
@@ -222,7 +229,9 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Message data: {found_message_data}")
 
     if not found_message_data:
-        logger.debug("Could not retrieve the author's user ID. Please ensure you're reporting recent messages.")
+        logger.debug(
+            "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
+        )
         await message.answer(
             "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
         )
@@ -258,7 +267,9 @@ async def handle_forwarded_reports(message: types.Message):
     # Log the information with the link
     log_info = (
         f"Date-Time: {message.date}\n"  # Using message.date here
-        f"Forwarded from user: {message.forward_sender_name or message.forward_from.first_name}\n"
+        f"Forwarded from user: {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
+        f"Forwarded from user @{message.forward_from.username or 'Unknown'}\n"
+        f"Forwarded from chat: {message.chat.title}\n"
         f"Reported by user: {message.from_user.username or 'Unknown'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
@@ -349,7 +360,9 @@ async def ban(message: types.Message):
 
         # Attempting to ban user from channels
         for chat_id in CHANNEL_IDS:
-            logger.debug(f"Attempting to ban user {author_id} from chat {chat_id}")
+            logger.debug(
+                f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
+            )
 
             try:
                 await bot.ban_chat_member(
@@ -359,15 +372,15 @@ async def ban(message: types.Message):
                     revoke_messages=True,
                 )
                 logger.debug(
-                    f"User {author_id} banned and their messages deleted from chat {chat_id}."
+                    f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
                 )
                 await bot.send_message(
                     TECHNO_LOG_GROUP_ID,
-                    f"User {author_id} banned and their messages deleted from chat {chat_id}.",
+                    f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
                 )
             except Exception as inner_e:
                 logger.error(
-                    f"Failed to ban and delete messages in chat {chat_id}. Error: {inner_e}"
+                    f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
                 )
                 await bot.send_message(
                     TECHNO_LOG_GROUP_ID,
@@ -375,28 +388,30 @@ async def ban(message: types.Message):
                 )
         # select all messages from the user in the chat
         query = """
-            SELECT chat_id, message_id
+            SELECT chat_id, message_id, user_name
             FROM recent_messages 
             WHERE user_id = :author_id
             """
         params = {"author_id": author_id}
         result = cursor.execute(query, params).fetchall()
         # delete them one by one
-        for chat_id, message_id in result:
+        for chat_id, message_id, user_name in result:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=message_id)
                 logger.debug(
-                    f"Message {message_id} deleted from chat {chat_id} for user {author_id}."
+                    f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
                 )
             except Exception as inner_e:
                 logger.error(
-                    f"Failed to delete message {message_id} in chat {chat_id}. Error: {inner_e}"
+                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
                 )
                 await bot.send_message(
                     TECHNO_LOG_GROUP_ID,
-                    f"Failed to delete message {message_id} in chat {chat_id}. Error: {inner_e}",
+                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                 )
-
+        logger.debug(
+            f"User {author_id} banned and their messages deleted where applicable."
+        )
         await message.reply(
             "Action taken: User banned and their messages deleted where applicable."
         )

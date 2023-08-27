@@ -269,9 +269,10 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Log the information with the link
     log_info = (
-        f"Date-Time: {message.date}\n"  # Using message.date here
+        f"Report timestamp: {message.date}\n"  # Using message.date here
         f"Forwarded from @{message.forward_from.username or 'Unknown'} : {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
-        f"tg://user?id={message.forward_from.id}\n"
+        f"[UserID based link](tg://user?id={message.forward_from.id})\n"
+        f"User ID: {message.forward_from.id}\n"
         f"Reported by admin @{message.from_user.username or 'Unknown'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."

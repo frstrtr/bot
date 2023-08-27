@@ -217,7 +217,8 @@ recent_messages = (
 )
 async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Received forwarded message for the investigation: {message}")
-    await bot.send_message(TECHNOLOG_GROUP_ID, message, parse_mode="Markdown")
+    await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
+    await bot.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
 
     sender_full_name = (
         message.forward_sender_name and message.forward_sender_name.split(" ")

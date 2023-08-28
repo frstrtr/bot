@@ -269,7 +269,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
-        username = message.forward_from.username or "Unknown"
+        username = message.forward_from.username or "UNKNOWN"
         first_name = message.forward_from.first_name or ""
         last_name = message.forward_from.last_name or ""
     else:

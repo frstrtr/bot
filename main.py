@@ -267,16 +267,37 @@ async def handle_forwarded_reports(message: types.Message):
     # Construct a link to the original message (assuming it's a supergroup or channel)
     message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
 
+    # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
+    if message.forward_from:
+        username = message.forward_from.username or "Unknown"
+        first_name = message.forward_from.first_name or ""
+        last_name = message.forward_from.last_name or ""
+    else:
+        username = "Unknown"
+        first_name = ""
+        last_name = ""
+
+    # Initialize user_id and user_link with default values
+    user_id = "Not available"
+    user_link = "User link not available"
+
+    # Check if message.forward_from exists and update user_id and user_link if it does
+    if message.forward_from:
+        user_id = message.forward_from.id
+        user_link = f"[UserID based link](tg://user?id={user_id})"
+
     # Log the information with the link
     log_info = (
         f"Report timestamp: {message.date}\n"  # Using message.date here
-        f"Forwarded from @{message.forward_from.username or 'Unknown'} : {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
-        f"[UserID based link](tg://user?id={message.forward_from.id})\n"
-        f"User ID: {message.forward_from.id}\n"
+        # f"Forwarded from @{message.forward_from.username or 'Unknown'} : {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
+        f"Forwarded from @{username} : {message.forward_sender_name or first_name} {last_name}\n"
+        f"{user_link}\n"
+        f"User ID: {user_id}\n"
         f"Reported by admin @{message.from_user.username or 'Unknown'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
     )
+
     await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 
     # Send a thank you note to the user
@@ -422,6 +443,7 @@ async def ban(message: types.Message):
     except Exception as e:
         logger.error(f"Error in ban function: {e}")
         await message.reply(f"Error: {e}")
+
 
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use

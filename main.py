@@ -311,7 +311,7 @@ async def handle_forwarded_reports(message: types.Message):
 async def store_recent_messages(message: types.Message):
     try:
         # Log the full message object for debugging
-        logger.debug(f"Received message object: {message}")
+        # logger.debug(f"Received message object: {message}")
 
         cursor.execute(
             """

@@ -454,14 +454,14 @@ async def ban(message: types.Message):
 
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
-@dp.message_handler(content_types=types.ContentTypes.ANY)
-async def log_all_unhandled_messages(message: types.Message):
-    try:
-        logger.debug(f"Received UNHANDLED message object: {message}")
-        return
-    except Exception as e:
-        logger.error(f"Error in log_all_unhandled_messages function: {e}")
-        await message.reply(f"Error: {e}")
+# @dp.message_handler(content_types=types.ContentTypes.ANY)
+# async def log_all_unhandled_messages(message: types.Message):
+#     try:
+#         logger.debug(f"Received UNHANDLED message object: {message}")
+#         return
+#     except Exception as e:
+#         logger.error(f"Error in log_all_unhandled_messages function: {e}")
+#         await message.reply(f"Error: {e}")
 
 
 # TODO if failed to delete message  since the message is not found - delete corresponding record in the table

@@ -273,7 +273,7 @@ async def handle_forwarded_reports(message: types.Message):
         first_name = message.forward_from.first_name or ""
         last_name = message.forward_from.last_name or ""
     else:
-        username = "Unknown"
+        username = "UNKNOWN"
         first_name = ""
         last_name = ""
 

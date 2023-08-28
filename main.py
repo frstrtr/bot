@@ -312,10 +312,10 @@ async def handle_forwarded_reports(message: types.Message):
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
     )
-    # Escape markdown characters
-    log_info = escape_markdown(log_info)
     logger.debug("Report banner content:")
     logger.debug(log_info)
+    # Escape markdown characters
+    log_info = escape_markdown(log_info)
     await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="Markdown")
     await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 

@@ -282,6 +282,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username
     username = found_message_data[4]
+    escaped_username = username.replace("_", "\\_")
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -290,7 +291,7 @@ async def handle_forwarded_reports(message: types.Message):
     log_info = (
         f"Report timestamp: {message.date}\n"  # Using message.date here
         f"Spam message timestamp: {message.forward_date}\n"  # Using received_date here
-        f"Forwarded from @{username} : {message.forward_sender_name or first_name} {last_name}\n"
+        f"Forwarded from @{escaped_username} : {message.forward_sender_name or first_name} {last_name}\n"
         f"[Spammer ID based link](tg://user?id={user_id})\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
         f"Spammer ID: {user_id}\n"
@@ -300,7 +301,7 @@ async def handle_forwarded_reports(message: types.Message):
     )
     logger.debug("Report banner content:")
     logger.debug(log_info)
-    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="MarkdownV2")
+    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="Markdown")
     await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 
     # Send a thank you note to the user

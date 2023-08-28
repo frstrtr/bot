@@ -2,15 +2,15 @@ import datetime
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
+import json
 from aiogram import Bot, Dispatcher, types
+
+MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
 
 # Setting up SQLite Database
 conn = sqlite3.connect("messages.db")
 cursor = conn.cursor()
-
-
-# Modified the table to include forward_date, received_date
 
 
 cursor.execute(
@@ -46,7 +46,7 @@ def get_chat_and_message_id_by_sender_name_and_date(
     )
 
     query = """
-        SELECT chat_id, message_id, chat_username, user_id
+        SELECT chat_id, message_id, chat_username, user_id, user_name
         FROM recent_messages 
         WHERE user_first_name = :sender_first_name AND received_date = :message_forward_date
         """
@@ -58,7 +58,7 @@ def get_chat_and_message_id_by_sender_name_and_date(
     result = cursor.execute(query, params).fetchone()
 
     logger.debug(
-        f"get_chat_and_message_id_by_sender_name_and_date result for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}: {result}"
+        f"get_chat_and_message_id_by_sender_name_and_date result for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}\nResult: {result}"
     )
 
     return result
@@ -219,6 +219,11 @@ recent_messages = (
 async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Received forwarded message for the investigation: {message}")
     await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
+    message_as_json = json.dumps(message.to_python(), indent=4)
+    # Truncate and add an indicator that the message has been truncated
+    if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+        message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+    await bot.send_message(TECHNOLOG_GROUP_ID, message_as_json)
     await bot.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
 
     sender_full_name = (
@@ -269,31 +274,27 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
-        username = message.forward_from.username or "UNKNOWN"
         first_name = message.forward_from.first_name or ""
         last_name = message.forward_from.last_name or ""
     else:
-        username = "UNKNOWN"
         first_name = ""
         last_name = ""
 
-    # Initialize user_id and user_link with default values
-    user_id = "Not available"
-    user_link = "User link not available"
+    # Get the username
+    username = found_message_data[4]
 
-    # Check if message.forward_from exists and update user_id and user_link if it does
-    if message.forward_from:
-        user_id = message.forward_from.id
-        user_link = f"[UserID based link](tg://user?id={user_id})"
+    # Initialize user_id and user_link with default values
+    user_id = found_message_data[3]
 
     # Log the information with the link
     log_info = (
         f"Report timestamp: {message.date}\n"  # Using message.date here
-        # f"Forwarded from @{message.forward_from.username or 'Unknown'} : {message.forward_sender_name or message.forward_from.first_name} {' ' or message.forward_from.last_name}\n"
+        f"Spam message timestamp: {message.forward_date}\n"  # Using received_date here
         f"Forwarded from @{username} : {message.forward_sender_name or first_name} {last_name}\n"
-        f"{user_link}\n"
-        f"User ID: {user_id}\n"
-        f"Reported by admin @{message.from_user.username or 'Unknown'}\n"
+        f"[Spammer ID based link](tg://user?id={user_id})\n"
+        f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
+        f"Spammer ID: {user_id}\n"
+        f"Reported by admin @{message.from_user.username or 'UNKNOWN'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
     )
@@ -304,11 +305,13 @@ async def handle_forwarded_reports(message: types.Message):
     await message.answer("Thank you for the report. We will investigate it.")
 
 
-@dp.message_handler(lambda message: message.chat.id in CHANNEL_IDS)
+@dp.message_handler(
+    lambda message: message.chat.id in CHANNEL_IDS, content_types=types.ContentTypes.ANY
+)
 async def store_recent_messages(message: types.Message):
     try:
         # Log the full message object for debugging
-        # logger.debug(f"Received message object: {message}")
+        logger.debug(f"Received message object: {message}")
 
         cursor.execute(
             """
@@ -347,9 +350,8 @@ async def ban(message: types.Message):
         report_msg_id = int(command_args[1])
         logger.debug(f"Report message ID parsed: {report_msg_id}")
 
-        # TODO: Fetch original chat_id and message_id using the forwarded_message_data
         cursor.execute(
-            "SELECT chat_id, message_id, forwarded_message_data FROM recent_messages WHERE message_id = ?",
+            "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
             (report_msg_id,),
         )
         result = cursor.fetchone()
@@ -365,9 +367,14 @@ async def ban(message: types.Message):
             await message.reply("Error: Report not found in database.")
             return
 
-        original_chat_id, original_message_id, forwarded_message_data = result
+        (
+            original_chat_id,
+            original_message_id,
+            forwarded_message_data,
+            original_message_timestamp,
+        ) = result
         logger.debug(
-            f"Original chat ID: {original_chat_id}, Original message ID: {original_message_id}"
+            f"Original chat ID: {original_chat_id}, Original message ID: {original_message_id}, Forwarded message data: {forwarded_message_data}, Original message timestamp: {original_message_timestamp}"
         )
 
         author_id = eval(forwarded_message_data)[3]
@@ -408,7 +415,7 @@ async def ban(message: types.Message):
                 )
                 await bot.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"Failed to ban and delete messages in chat {chat_id}. Error: {inner_e}",
+                    f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                 )
         # select all messages from the user in the chat
         query = """
@@ -447,16 +454,18 @@ async def ban(message: types.Message):
 
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
-# @dp.message_handler(content_types=types.ContentTypes.ANY)
-# async def log_all_unhandled_messages(message: types.Message):
-#     try:
-#         logger.debug(f"Received UNHANDLED message object: {message}")
-#         return
-#     except Exception as e:
-#         logger.error(f"Error in log_all_unhandled_messages function: {e}")
-#         await message.reply(f"Error: {e}")
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def log_all_unhandled_messages(message: types.Message):
+    try:
+        logger.debug(f"Received UNHANDLED message object: {message}")
+        return
+    except Exception as e:
+        logger.error(f"Error in log_all_unhandled_messages function: {e}")
+        await message.reply(f"Error: {e}")
 
 
+# TODO if failed to delete message  since the message is not found - delete corresponding record in the table
+# TODO if succed to delete message also remove this record from the DB
 if __name__ == "__main__":
     from aiogram import executor
 

@@ -7,6 +7,15 @@ from aiogram import Bot, Dispatcher, types
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
+# fix for markdown escaping
+def escape_markdown(text: str) -> str:
+    # Characters that need to be escaped in markdown
+    characters = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+
+    for char in characters:
+        text = text.replace(char, '\\' + char)
+
+    return text
 
 # Setting up SQLite Database
 conn = sqlite3.connect("messages.db")
@@ -203,12 +212,17 @@ dp = Dispatcher(bot)
 # async def cmd_getid(message: types.Message):
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
+# @dp.message_handler(commands=["sendtest"])
+# async def cmd_getid(message: types.Message):
+#     # await message.answer(f"This chat's ID is: {message.chat.id}")
+#     TEST_GROUP_ID = "-TestGroupID" # Test group ID
+#     bug_text = "_test"
+#     await bot.send_message(TEST_GROUP_ID, bug_text, parse_mode="Markdown")
+
 
 recent_messages = (
     {}
 )  # To store the recent messages in the format {chat_id: {message_id: user_id}}
-
-# get info about chats where bot present
 
 
 @dp.message_handler(
@@ -282,10 +296,13 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username
     username = found_message_data[4]
+<<<<<<< HEAD
     if username:
         escaped_username = username.replace("_", "\\_")
     else:
         escaped_username = "Unknown"
+=======
+>>>>>>> 28d4e54e91cf31c7c19726a669fd19a10b830f17
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -294,7 +311,7 @@ async def handle_forwarded_reports(message: types.Message):
     log_info = (
         f"Report timestamp: {message.date}\n"  # Using message.date here
         f"Spam message timestamp: {message.forward_date}\n"  # Using received_date here
-        f"Forwarded from @{escaped_username} : {message.forward_sender_name or first_name} {last_name}\n"
+        f"Forwarded from @{username} : {message.forward_sender_name or first_name} {last_name}\n"
         f"[Spammer ID based link](tg://user?id={user_id})\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
         f"Spammer ID: {user_id}\n"
@@ -304,6 +321,8 @@ async def handle_forwarded_reports(message: types.Message):
     )
     logger.debug("Report banner content:")
     logger.debug(log_info)
+    # Escape markdown characters
+    log_info = escape_markdown(log_info)
     await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="Markdown")
     await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 

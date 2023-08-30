@@ -296,31 +296,31 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username
     username = found_message_data[4]
-    if username:
-        escaped_username = username.replace("_", "\\_")
-    else:
-        escaped_username = "UNKNOWON"
+    if not username:
+        username = "UNKNOWON"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
 
     # Log the information with the link
     log_info = (
-        f"Report timestamp: {message.date}\n"  # Using message.date here
-        f"Spam message timestamp: {message.forward_date}\n"  # Using received_date here
+        f"Report timestamp: {message.date}\n"
+        f"Spam message timestamp: {message.forward_date}\n"
         f"Reaction time: {message.date - message.forward_date}\n"
-        f"Forwarded from @{escaped_username} : {message.forward_sender_name or first_name} {last_name}\n"
-        f"[Spammer ID based link](tg://user?id={user_id})\n"
+        f"Forwarded from <a href='tg://user?id={user_id}'>@{username}</a> : "
+        f"{message.forward_sender_name or first_name} {last_name}\n"
+        f"<a href='tg://user?id={user_id}'>Spammer ID based link</a>\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
-        f"Reported by admin @{message.from_user.username or 'UNKNOWN'}\n"
-        f"[Link to the reported message]({message_link})\n"
-        f"Use /ban {new_message_id} to take action."
+        f"Reported by admin <a href='tg://user?id={message.from_user.id}'>"
+        f"@{message.from_user.username or 'UNKNOWN'}</a>\n"
+        f"<a href='{message_link}'>Link to the reported message</a>\n"
+        f"Use /ban <b>{new_message_id}</b> to take action.\n"
     )
     logger.debug("Report banner content:")
     logger.debug(log_info)
 
-    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="Markdown")
-    await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
+    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
+    await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="HTML")
 
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")

@@ -282,7 +282,10 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username
     username = found_message_data[4]
-    escaped_username = username.replace("_", "\\_")
+    if username:
+        escaped_username = username.replace("_", "\\_")
+    else:
+        escaped_username = "Unknown"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]

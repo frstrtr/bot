@@ -8,14 +8,14 @@ from aiogram import Bot, Dispatcher, types
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
 # fix for markdown escaping
-def escape_markdown(text: str) -> str:
-    # Characters that need to be escaped in markdown
-    characters = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+# def escape_markdown(text: str) -> str:
+#     # Characters that need to be escaped in markdown
+#     characters = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 
-    for char in characters:
-        text = text.replace(char, '\\' + char)
+#     for char in characters:
+#         text = text.replace(char, '\\' + char)
 
-    return text
+#     return text
 
 # Setting up SQLite Database
 conn = sqlite3.connect("messages.db")
@@ -213,7 +213,7 @@ dp = Dispatcher(bot)
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
 # @dp.message_handler(commands=["sendtest"])
-# async def cmd_getid(message: types.Message):
+# async def cmd_sendtest(message: types.Message):
 #     # await message.answer(f"This chat's ID is: {message.chat.id}")
 #     TEST_GROUP_ID = "-TestGroupID" # Test group ID
 #     bug_text = "_test"
@@ -296,13 +296,10 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username
     username = found_message_data[4]
-<<<<<<< HEAD
     if username:
         escaped_username = username.replace("_", "\\_")
     else:
-        escaped_username = "Unknown"
-=======
->>>>>>> 28d4e54e91cf31c7c19726a669fd19a10b830f17
+        escaped_username = "UNKNOWON"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -311,18 +308,17 @@ async def handle_forwarded_reports(message: types.Message):
     log_info = (
         f"Report timestamp: {message.date}\n"  # Using message.date here
         f"Spam message timestamp: {message.forward_date}\n"  # Using received_date here
-        f"Forwarded from @{username} : {message.forward_sender_name or first_name} {last_name}\n"
+        f"Reaction time: {message.date - message.forward_date}\n"
+        f"Forwarded from @{escaped_username} : {message.forward_sender_name or first_name} {last_name}\n"
         f"[Spammer ID based link](tg://user?id={user_id})\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
-        f"Spammer ID: {user_id}\n"
         f"Reported by admin @{message.from_user.username or 'UNKNOWN'}\n"
         f"[Link to the reported message]({message_link})\n"
         f"Use /ban {new_message_id} to take action."
     )
     logger.debug("Report banner content:")
     logger.debug(log_info)
-    # Escape markdown characters
-    log_info = escape_markdown(log_info)
+
     await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="Markdown")
     await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="Markdown")
 
@@ -493,11 +489,6 @@ async def ban(message: types.Message):
 # TODO if succed to delete message also remove this record from the DB
 if __name__ == "__main__":
     from aiogram import executor
-
-    # Locale test
-    print(
-        "Console locale test: ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮËйцукенгшщзхъфывапролджэячсмитьбюё"
-    )
 
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

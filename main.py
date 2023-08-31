@@ -486,11 +486,11 @@ async def handle_ban(callback_query: CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
 async def reset_ban(callback_query: CallbackQuery):
     """Function to reset the ban button."""
-    *_, message_id_to_ban = callback_query.data.split("_")
+    *_, report_id_to_ban = callback_query.data.split("_")
 
     keyboard = InlineKeyboardMarkup()
     ban_btn = InlineKeyboardButton(
-        "Ban", callback_data=f"confirm_ban_{message_id_to_ban}"
+        "Ban", callback_data=f"confirm_ban_{report_id_to_ban}"
     )
     keyboard.add(ban_btn)
 
@@ -509,17 +509,17 @@ async def reset_ban(callback_query: CallbackQuery):
         message_id=callback_query.message.message_id,
     )
 
-    logger.info(f"Report {message_id_to_ban} action canceled.")
+    logger.info(f"Report {report_id_to_ban} action canceled.")
 
     await bot.send_message(
         ADMIN_GROUP_ID,
-        f"Action canceled: Report {message_id_to_ban} was not processed. "
-        f"Report them again if needed or use /ban {message_id_to_ban} command.",
+        f"Action canceled: Report {report_id_to_ban} was not processed. "
+        f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
     await bot.send_message(
         TECHNOLOG_GROUP_ID,
         f"Cancel button pressed. "
-        f"Action canceled: Report {message_id_to_ban} was not processed. "
+        f"Action canceled: Report {report_id_to_ban} was not processed. "
         f"Report them again if needed.",
     )
 

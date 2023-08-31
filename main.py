@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 import logging
 import json
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
@@ -231,6 +233,7 @@ recent_messages = (
     content_types=types.ContentTypes.ANY,
 )
 async def handle_forwarded_reports(message: types.Message):
+    """Function to handle forwarded messages."""
     logger.debug(f"Received forwarded message for the investigation: {message}")
     await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
     message_as_json = json.dumps(message.to_python(), indent=4)
@@ -320,16 +323,176 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug(log_info)
 
     await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
-    await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="HTML")
+    # show old banner in the admin group in case buttons test fails
+    # await bot.send_message(ADMIN_GROUP_ID, log_info, parse_mode="HTML")
+
+    # Keyboard ban/cancel/confirm buttons
+    keyboard = InlineKeyboardMarkup()
+    ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{new_message_id}")
+    keyboard.add(ban_btn)
+
+    # Show ban banner with buttons in the admin group to confirm or cancel the ban
+    await bot.send_message(
+        ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
+    )
 
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
+async def ask_confirmation(callback_query: CallbackQuery):
+    """Function to ask for confirmation before banning the user."""
+    *_, message_id_to_ban = callback_query.data.split("_")
+
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    confirm_btn = InlineKeyboardButton(
+        "🟢 Confirm", callback_data=f"do_ban_{message_id_to_ban}"
+    )
+    cancel_btn = InlineKeyboardButton(
+        "🔴 Cancel", callback_data=f"reset_ban_{message_id_to_ban}"
+    )
+
+    keyboard.add(confirm_btn, cancel_btn)
+
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.message.chat.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=keyboard,
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
+async def handle_ban(callback_query: CallbackQuery):
+    """Function to ban the user and delete all known to bot messages."""
+    try:
+        *_, message_id_to_ban = callback_query.data.split("_")
+        message_id_to_ban = int(message_id_to_ban)
+
+        cursor.execute(
+            "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
+            (message_id_to_ban,),
+        )
+        result = cursor.fetchone()
+
+        if not result:
+            await callback_query.message.reply("Error: Report not found in database.")
+            return
+
+        (
+            original_chat_id,
+            original_message_id,
+            forwarded_message_data,
+            original_message_timestamp,
+        ) = result
+
+        logger.debug(
+            f"Original chat ID: {original_chat_id}, Original message ID: {original_message_id}, Forwarded message data: {forwarded_message_data}, Original message timestamp: {original_message_timestamp}"
+        )
+
+        author_id = eval(forwarded_message_data)[3]
+        logger.debug(f"Author ID retrieved for original message: {author_id}")
+        await bot.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"Author ID retrieved for original message: {author_id}",
+        )
+        if not author_id:
+            # show error message
+            await callback_query.message.reply(
+                "Could not retrieve the author's user ID from the report."
+            )
+            return
+
+        # Attempting to ban user from channels
+        for chat_id in CHANNEL_IDS:
+            logger.debug(
+                f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
+            )
+
+            try:
+                await bot.ban_chat_member(
+                    chat_id=chat_id,
+                    user_id=author_id,
+                    until_date=None,
+                    revoke_messages=True,
+                )
+                logger.debug(
+                    f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
+                )
+                await bot.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
+                )
+            except Exception as inner_e:
+                logger.error(
+                    f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                )
+                await bot.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                )
+
+        # select all messages from the user in the chat
+        query = """
+            SELECT chat_id, message_id, user_name
+            FROM recent_messages 
+            WHERE user_id = :author_id
+            """
+        params = {"author_id": author_id}
+        result = cursor.execute(query, params).fetchall()
+
+        # delete them one by one
+        for chat_id, message_id, user_name in result:
+            try:
+                await bot.delete_message(chat_id=chat_id, message_id=message_id)
+                logger.debug(
+                    f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
+                )
+            except Exception as inner_e:
+                logger.error(
+                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                )
+                await bot.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                )
+        logger.debug(
+            f"User {author_id} banned and their messages deleted where applicable."
+        )
+        await callback_query.answer(f"User banned! {message_id_to_ban}")
+        await bot.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+        )
+
+    except Exception as e:
+        logger.error(f"Error in handle_ban function: {e}")
+        await callback_query.message.reply(f"Error: {e}")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
+async def reset_ban(callback_query: CallbackQuery):
+    """Function to reset the ban button."""
+    *_, message_id_to_ban = callback_query.data.split("_")
+
+    keyboard = InlineKeyboardMarkup()
+    ban_btn = InlineKeyboardButton(
+        "Ban", callback_data=f"confirm_ban_{message_id_to_ban}"
+    )
+    keyboard.add(ban_btn)
+
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.message.chat.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=keyboard,
+    )
 
 
 @dp.message_handler(
     lambda message: message.chat.id in CHANNEL_IDS, content_types=types.ContentTypes.ANY
 )
 async def store_recent_messages(message: types.Message):
+    """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
         # logger.debug(f"Received message object: {message}")
@@ -357,8 +520,10 @@ async def store_recent_messages(message: types.Message):
         logger.error(f"Error storing recent message: {e}")
 
 
+# TODO: Remove this if the buttons works fine
 @dp.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
 async def ban(message: types.Message):
+    """Function to ban the user and delete all known to bot messages using '/ban reportID' text command."""
     try:
         # logger.debug("ban triggered.")
 

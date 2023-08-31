@@ -229,7 +229,9 @@ recent_messages = (
 
 @dp.message_handler(
     lambda message: message.forward_date is not None
-    and message.chat.id not in CHANNEL_IDS,
+    and message.chat.id not in CHANNEL_IDS
+    and message.chat.id != ADMIN_GROUP_ID
+    and message.chat.id != TECHNOLOG_GROUP_ID,
     content_types=types.ContentTypes.ANY,
 )
 async def handle_forwarded_reports(message: types.Message):

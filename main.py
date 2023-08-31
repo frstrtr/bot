@@ -342,6 +342,7 @@ async def handle_forwarded_reports(message: types.Message):
     await message.answer("Thank you for the report. We will investigate it.")
 
 
+# TODO: Remove buttons and restart ban reporting process in case any button is pressed or any error occurs
 @dp.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
 async def ask_confirmation(callback_query: CallbackQuery):
     """Function to ask for confirmation before banning the user."""
@@ -493,10 +494,33 @@ async def reset_ban(callback_query: CallbackQuery):
     )
     keyboard.add(ban_btn)
 
+    # TODO choose the right behaviour
+
+    # reset to ban button
+    # await bot.edit_message_reply_markup(
+    #     chat_id=callback_query.message.chat.id,
+    #     message_id=callback_query.message.message_id,
+    #     reply_markup=keyboard,
+    # )
+
+    # remove buttons from the admin group
     await bot.edit_message_reply_markup(
         chat_id=callback_query.message.chat.id,
         message_id=callback_query.message.message_id,
-        reply_markup=keyboard,
+    )
+
+    logger.info(f"Report {message_id_to_ban} action canceled.")
+
+    await bot.send_message(
+        ADMIN_GROUP_ID,
+        f"Action canceled: Report {message_id_to_ban} was not processed. "
+        f"Report them again if needed or use /ban {message_id_to_ban} command.",
+    )
+    await bot.send_message(
+        TECHNOLOG_GROUP_ID,
+        f"Cancel button pressed. "
+        f"Action canceled: Report {message_id_to_ban} was not processed. "
+        f"Report them again if needed.",
     )
 
 

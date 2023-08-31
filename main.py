@@ -461,10 +461,20 @@ async def handle_ban(callback_query: CallbackQuery):
         logger.debug(
             f"User {author_id} banned and their messages deleted where applicable."
         )
-        await callback_query.answer(f"User banned! {message_id_to_ban}")
+        await callback_query.answer(
+            f"User banned! {message_id_to_ban}"
+        )  # TODO is it neccecary now?
         await bot.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
+        )
+        await bot.send_message(
+            ADMIN_GROUP_ID,
+            f"Report {message_id_to_ban} action taken: User {author_id} banned and their messages deleted where applicable.",
+        )
+        await bot.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"Report {message_id_to_ban} action taken: User {author_id} banned and their messages deleted where applicable.",
         )
 
     except Exception as e:

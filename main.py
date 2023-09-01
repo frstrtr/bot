@@ -368,6 +368,14 @@ async def ask_confirmation(callback_query: CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
 async def handle_ban(callback_query: CallbackQuery):
     """Function to ban the user and delete all known to bot messages."""
+    
+    # remove buttons from the admin group
+    await bot.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+        )
+    
+    # get the message ID to ban
     try:
         *_, message_id_to_ban = callback_query.data.split("_")
         message_id_to_ban = int(message_id_to_ban)
@@ -462,13 +470,10 @@ async def handle_ban(callback_query: CallbackQuery):
         logger.debug(
             f"User {author_id} banned and their messages deleted where applicable."
         )
-        await callback_query.answer(
-            f"User banned! {message_id_to_ban}"
-        )  # TODO is it neccecary now?
-        await bot.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-        )
+        # await callback_query.answer(
+        #     f"User banned! {message_id_to_ban}"
+        # )  # TODO is it neccecary now?
+
         await bot.send_message(
             ADMIN_GROUP_ID,
             f"Report {message_id_to_ban} action taken: User {author_id} banned and their messages deleted where applicable.",
@@ -488,15 +493,14 @@ async def reset_ban(callback_query: CallbackQuery):
     """Function to reset the ban button."""
     *_, report_id_to_ban = callback_query.data.split("_")
 
-    keyboard = InlineKeyboardMarkup()
-    ban_btn = InlineKeyboardButton(
-        "Ban", callback_data=f"confirm_ban_{report_id_to_ban}"
-    )
-    keyboard.add(ban_btn)
-
     # TODO choose the right behaviour
-
     # reset to ban button
+    # keyboard = InlineKeyboardMarkup()
+    # ban_btn = InlineKeyboardButton(
+    #     "Ban", callback_data=f"confirm_ban_{report_id_to_ban}"
+    # )
+    # keyboard.add(ban_btn)
+
     # await bot.edit_message_reply_markup(
     #     chat_id=callback_query.message.chat.id,
     #     message_id=callback_query.message.message_id,

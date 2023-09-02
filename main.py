@@ -3,6 +3,7 @@ import sqlite3
 import xml.etree.ElementTree as ET
 import logging
 import json
+import subprocess
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.exceptions import (
@@ -39,6 +40,14 @@ cursor.execute(
 
 conn.commit()
 
+def get_latest_commit_info():
+    """Function to get the latest commit info."""
+    try:
+        commit_info = subprocess.check_output(['git', 'show', '-s']).decode('utf-8').strip()
+        return commit_info
+    except Exception as e:
+        print(f"Error getting git commit info: {e}")
+        return None
 
 def get_chat_and_message_id_by_sender_name_and_date(
     sender_first_name, sender_last_name, message_forward_date
@@ -713,6 +722,12 @@ async def ban(message: types.Message):
 # TODO if succed to delete message also remove this record from the DB
 if __name__ == "__main__":
     from aiogram import executor
+
+    commit_info = get_latest_commit_info()
+    if commit_info:
+        logger.info(f"Bot starting with commit info:\n{commit_info}")
+    else:
+        logger.warning("Bot starting without git info.")
 
     # Add this section right after setting up your logger or at the start of your main execution:
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

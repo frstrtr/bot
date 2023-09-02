@@ -5,19 +5,14 @@ import logging
 import json
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.utils.exceptions import (
+    MessageToDeleteNotFound,
+    # MessageCantBeDeleted,
+    RetryAfter,
+)
 
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
-
-# fix for markdown escaping
-# def escape_markdown(text: str) -> str:
-#     # Characters that need to be escaped in markdown
-#     characters = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-
-#     for char in characters:
-#         text = text.replace(char, '\\' + char)
-
-#     return text
 
 # Setting up SQLite Database
 conn = sqlite3.connect("messages.db")
@@ -368,13 +363,13 @@ async def ask_confirmation(callback_query: CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
 async def handle_ban(callback_query: CallbackQuery):
     """Function to ban the user and delete all known to bot messages."""
-    
-    # remove buttons from the admin group
+
+    # remove buttons from the admin group first
     await bot.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-        )
-    
+        chat_id=callback_query.message.chat.id,
+        message_id=callback_query.message.message_id,
+    )
+
     # get the message ID to ban
     try:
         *_, message_id_to_ban = callback_query.data.split("_")
@@ -430,10 +425,11 @@ async def handle_ban(callback_query: CallbackQuery):
                 logger.debug(
                     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
                 )
-                await bot.send_message(
-                    TECHNOLOG_GROUP_ID,
-                    f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
-                )
+                # logging is enough, no need to spam the group
+                # await bot.send_message(
+                #     TECHNOLOG_GROUP_ID,
+                #     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
+                # )
             except Exception as inner_e:
                 logger.error(
                     f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
@@ -454,19 +450,42 @@ async def handle_ban(callback_query: CallbackQuery):
 
         # delete them one by one
         for chat_id, message_id, user_name in result:
-            try:
-                await bot.delete_message(chat_id=chat_id, message_id=message_id)
-                logger.debug(
-                    f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
-                )
-            except Exception as inner_e:
-                logger.error(
-                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
-                )
-                await bot.send_message(
-                    TECHNOLOG_GROUP_ID,
-                    f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
-                )
+            retry_attempts = 3  # number of attempts to delete the message
+            for attempt in range(retry_attempts):
+                try:
+                    await bot.delete_message(chat_id=chat_id, message_id=message_id)
+                    logger.debug(
+                        f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
+                    )
+                    break  # break the loop if the message was deleted successfully
+                except RetryAfter as e:
+                    wait_time = e.timeout  # This gives you the time to wait in seconds
+                    if (
+                        attempt < retry_attempts - 1
+                    ):  # Don't wait after the last attempt
+                        logger.warning(
+                            f"Rate limited. Waiting for {wait_time} seconds."
+                        )
+                        time.sleep(wait_time)
+                except MessageToDeleteNotFound:
+                    logger.warning(
+                        f"Message {message_id} in chat {channels_dict[chat_id]} ({chat_id}) not found for deletion."
+                    )
+                    # logging is enough, no need to spam the group
+                    # await bot.send_message(
+                    #     TECHNOLOG_GROUP_ID,
+                    #     f"Message {message_id} in chat {channels_dict[chat_id]} ({chat_id}) not found for deletion.",
+                    # )
+                    break  # No need to retry in this case
+                # TODO manage the case when the bot is not an admin in the channel
+                except Exception as inner_e:
+                    logger.error(
+                        f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                    )
+                    await bot.send_message(
+                        TECHNOLOG_GROUP_ID,
+                        f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                    )
         logger.debug(
             f"User {author_id} banned and their messages deleted where applicable."
         )

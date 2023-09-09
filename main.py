@@ -194,12 +194,17 @@ async def handle_forwarded_reports(message: types.Message):
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
         sender_full_name = [message.forward_from.first_name]
-        if hasattr(message.forward_from, 'last_name') and message.forward_from.last_name:
+        if (
+            hasattr(message.forward_from, "last_name")
+            and message.forward_from.last_name
+        ):
             sender_full_name.append(message.forward_from.last_name)
         else:
-            sender_full_name.append("") # last name is not available
+            sender_full_name.append("")  # last name is not available
     else:
-        sender_full_name = message.forward_sender_name and message.forward_sender_name.split(" ")
+        sender_full_name = (
+            message.forward_sender_name and message.forward_sender_name.split(" ")
+        )
 
     # Handle the case where the sender's name is not available
     sender_last_name_part = ""
@@ -272,7 +277,7 @@ async def handle_forwarded_reports(message: types.Message):
     # Get the username
     username = found_message_data[4]
     if not username:
-        username = "UNKNOWON"
+        username = "UNKNOWN"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -283,7 +288,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"Spam message timestamp: {message.forward_date}\n"
         f"Reaction time: {message.date - message.forward_date}\n"
         f"Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
-        f"{message.forward_sender_name or first_name} {last_name}\n"
+        f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         f"<a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
         f"Reported by admin <a href='tg://user?id={message.from_user.id}'>"

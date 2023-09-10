@@ -212,6 +212,9 @@ async def handle_forwarded_reports(message: types.Message):
     if sender_full_name and len(sender_full_name) > 1:
         sender_last_name_part = sender_full_name[1]
         sender_first_name_part = sender_full_name[0]
+    else:
+        sender_last_name_part = ""
+        sender_first_name_part = sender_full_name[0]
     # Handle the case where the message is forwarded from a channel
     forward_from_chat_title = None
     if message.forward_from_chat:

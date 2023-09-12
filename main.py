@@ -682,7 +682,7 @@ async def ban(message: types.Message):
 
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
-@dp.message_handler(content_types=types.ContentTypes.ANY)
+@dp.message_handler(lambda message: message.chat.id != ADMIN_GROUP_ID, content_types=types.ContentTypes.ANY) # exclude admin group
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object: {message}")

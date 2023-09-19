@@ -178,6 +178,15 @@ recent_messages = (
 )  # To store the recent messages in the format {chat_id: {message_id: user_id}}
 
 
+async def on_startup(dp: Dispatcher):
+    """Function to handle the bot startup."""
+    bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    bot_start_message = f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+    logger.info(bot_start_message)
+
+    await bot.send_message(TECHNOLOG_GROUP_ID, bot_start_message)
+
+
 @dp.message_handler(
     lambda message: message.forward_date is not None
     and message.chat.id not in CHANNEL_IDS
@@ -713,8 +722,12 @@ async def ban(message: types.Message):
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object: {message}")
-        await bot.send_message(TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object: {message}")
-        await message.send_copy(TECHNOLOG_GROUP_ID) # send all unhandled messages to technolog group
+        await bot.send_message(
+            TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object: {message}"
+        )
+        await message.send_copy(
+            TECHNOLOG_GROUP_ID
+        )  # send all unhandled messages to technolog group
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")
@@ -732,12 +745,7 @@ if __name__ == "__main__":
     else:
         logger.warning("Bot starting without git info.")
 
-    # Add this section right after setting up your logger or at the start of your main execution:
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    start_log_message = f"\nBot started at {current_time}\n{'-' * 40}\n"
-    logger.info(start_log_message)
-
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
 
     # Close SQLite connection
     conn.close()

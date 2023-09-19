@@ -59,17 +59,20 @@ def get_latest_commit_info():
 
 
 def get_spammer_details(
-    sender_first_name,
-    sender_last_name,
+    spammer_id,
+    spammer_first_name,
+    spammer_last_name,
     message_forward_date,
     forward_from_chat_title=None,
 ):
     """Function to get chat ID and message ID by sender name and date."""
-    if not sender_last_name:
-        sender_last_name = ""
+    if not spammer_last_name:
+        spammer_last_name = ""
+    if not spammer_id:
+        spammer_id = ""
 
     logger.debug(
-        f"Getting chat ID and message ID for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}, forwarded from chat title: {forward_from_chat_title}"
+        f"Getting chat ID and message ID for spammer: {spammer_id} : {spammer_first_name} {spammer_last_name}, date: {message_forward_date}, forwarded from chat title: {forward_from_chat_title}"
     )
 
     query = """
@@ -77,20 +80,25 @@ def get_spammer_details(
         FROM recent_messages 
         WHERE (user_first_name = :sender_first_name AND received_date = :message_forward_date)
            OR (from_chat_title = :from_chat_title)
+           OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)
+        ORDER BY received_date DESC
+        LIMIT 1
         """
     params = {
-        "sender_first_name": sender_first_name,
+        "sender_first_name": spammer_first_name,
+        "sender_last_name": spammer_last_name,
         "message_forward_date": message_forward_date,
         "from_chat_title": forward_from_chat_title,
+        "user_id": spammer_id,
     }
 
     result = cursor.execute(query, params).fetchone()
-    if sender_first_name == "":
-        sender_first_name = result[5]  # get spammer first name from db
-        sender_last_name = result[6]  # get spammer last name from db
+    if spammer_first_name == "":
+        spammer_first_name = result[5]  # get spammer first name from db
+        spammer_last_name = result[6]  # get spammer last name from db
 
     logger.debug(
-        f"get_chat_and_message_id_by_sender_name_and_date result for sender: {sender_first_name} {sender_last_name}, date: {message_forward_date}, from chat title: {forward_from_chat_title}\nResult: {result}"
+        f"get_chat_and_message_id_by_sender_name_and_date result for sender: {spammer_id} : {spammer_first_name} {spammer_last_name}, date: {message_forward_date}, from chat title: {forward_from_chat_title}\nResult: {result}"
     )
 
     return result
@@ -193,28 +201,31 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
-        sender_full_name = [message.forward_from.first_name]
+        spammer_full_name = [message.forward_from.first_name]
+        spammer_id = message.forward_from.id
+        if hasattr(message.forward_from, "id") and message.forward_from.id:
+            spammer_id = message.forward_from.id
         if (
             hasattr(message.forward_from, "last_name")
             and message.forward_from.last_name
         ):
-            sender_full_name.append(message.forward_from.last_name)
+            spammer_full_name.append(message.forward_from.last_name)
         else:
-            sender_full_name.append("")  # last name is not available
+            spammer_full_name.append("")  # last name is not available
     else:
-        sender_full_name = (
+        spammer_full_name = (
             message.forward_sender_name and message.forward_sender_name.split(" ")
         )
 
     # Handle the case where the sender's name is not available
-    sender_last_name_part = ""
-    sender_first_name_part = ""
-    if sender_full_name and len(sender_full_name) > 1:
-        sender_last_name_part = sender_full_name[1]
-        sender_first_name_part = sender_full_name[0]
+    spammer_last_name_part = ""
+    spammer_first_name_part = ""
+    if spammer_full_name and len(spammer_full_name) > 1:
+        spammer_last_name_part = spammer_full_name[1]
+        spammer_first_name_part = spammer_full_name[0]
     else:
-        sender_last_name_part = ""
-        sender_first_name_part = sender_full_name[0]
+        spammer_last_name_part = ""
+        spammer_first_name_part = spammer_full_name[0]
     # Handle the case where the message is forwarded from a channel
     forward_from_chat_title = None
     if message.forward_from_chat:
@@ -222,8 +233,9 @@ async def handle_forwarded_reports(message: types.Message):
     # Get the chat ID and message ID of the original message
     try:
         found_message_data = get_spammer_details(
-            sender_first_name_part,
-            sender_last_name_part,
+            spammer_id,
+            spammer_first_name_part,
+            spammer_last_name_part,
             message.forward_date,
             forward_from_chat_title,
         )
@@ -234,11 +246,21 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug(f"Message data: {found_message_data}")
 
     if not found_message_data:
+        # check if we have everything open
+        # try:
+        #     # try if everything is open
+        #     pass
+        #     # Save both the original message_id and the forwarded message's date
+        #     # received_date = message.date if message.date else None
+        #     # report_id = int(str(message.chat.id) + str(message.message_id))
+
+        # except Exception as e:
+        e = "TEST"
         logger.debug(
-            "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
+            f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
         )
         await message.answer(
-            "Could not retrieve the author's user ID. Please ensure you're reporting recent messages."
+            f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
         )
         return
 
@@ -534,7 +556,9 @@ async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
-        # logger.debug(f"Received message object: {message}")
+        # logger.debug(
+        #     f"Received message object: {message}"
+        # )  # TODO remove afer sandboxing
 
         cursor.execute(
             """
@@ -682,7 +706,10 @@ async def ban(message: types.Message):
 
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
-@dp.message_handler(lambda message: message.chat.id != ADMIN_GROUP_ID, content_types=types.ContentTypes.ANY) # exclude admin group
+@dp.message_handler(
+    lambda message: message.chat.id != ADMIN_GROUP_ID,
+    content_types=types.ContentTypes.ANY,
+)  # exclude admin group
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object: {message}")

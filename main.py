@@ -713,6 +713,8 @@ async def ban(message: types.Message):
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object: {message}")
+        await bot.send_message(TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object: {message}")
+        await message.send_copy(TECHNOLOG_GROUP_ID) # send all unhandled messages to technolog group
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")

@@ -240,6 +240,7 @@ async def handle_forwarded_reports(message: types.Message):
     if message.forward_from_chat:
         forward_from_chat_title = message.forward_from_chat.title
     # Get the chat ID and message ID of the original message
+    spammer_id = None # Fast fix for UnboundLocalError: local variable 'spammer_id' referenced before assignment
     try:
         found_message_data = get_spammer_details(
             spammer_id,

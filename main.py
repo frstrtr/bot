@@ -721,13 +721,13 @@ async def ban(message: types.Message):
 )  # exclude admin group
 async def log_all_unhandled_messages(message: types.Message):
     try:
-        logger.debug(f"Received UNHANDLED message object: {message}")
+        logger.debug(f"Received UNHANDLED message object:\n{message}")
         await bot.send_message(
-            TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object: {message}"
+            TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object:\n{message}"
         )
-        await message.send_copy(
+        await message.forward(
             TECHNOLOG_GROUP_ID
-        )  # send all unhandled messages to technolog group
+        )  # forward all unhandled messages to technolog group
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")

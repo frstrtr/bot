@@ -34,6 +34,10 @@ cursor.execute(
         forward_date INTEGER,
         received_date INTEGER,
         from_chat_title TEXT,
+        forwarded_from_id INTEGER,
+        forwarded_from_username TEXT,
+        forwarded_from_first_name TEXT,
+        forwarded_from_last_name TEXT,
         PRIMARY KEY (chat_id, message_id)
     )
     """
@@ -64,6 +68,10 @@ def get_spammer_details(
     spammer_last_name,
     message_forward_date,
     forward_from_chat_title=None,
+    forwarded_from_id=None,
+    forwarded_from_username=None,
+    forwarded_from_first_name=None,
+    forward_from_last_name=None,
 ):
     """Function to get chat ID and message ID by sender name and date."""
     if not spammer_last_name:
@@ -74,25 +82,45 @@ def get_spammer_details(
     logger.debug(
         f"Getting chat ID and message ID for spammer: {spammer_id} : {spammer_first_name} {spammer_last_name}, date: {message_forward_date}, forwarded from chat title: {forward_from_chat_title}"
     )
-
-    query = """
-        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name
-        FROM recent_messages 
-        WHERE (user_first_name = :sender_first_name AND received_date = :message_forward_date)
-           OR (from_chat_title = :from_chat_title)
-           OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)
-        ORDER BY received_date DESC
-        LIMIT 1
+    if not forwarded_from_id:
+        # This is not a forwarded forwarded message
+        query = """
+            SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name
+            FROM recent_messages 
+            WHERE (
+                (user_first_name = :sender_first_name AND received_date = :message_forward_date)
+                OR (from_chat_title = :from_chat_title)
+                OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)
+            )
+            ORDER BY received_date DESC
+            LIMIT 1
         """
-    params = {
-        "sender_first_name": spammer_first_name,
-        "sender_last_name": spammer_last_name,
-        "message_forward_date": message_forward_date,
-        "from_chat_title": forward_from_chat_title,
-        "user_id": spammer_id,
-    }
+        params = {
+            "sender_first_name": spammer_first_name,
+            "sender_last_name": spammer_last_name,
+            "message_forward_date": message_forward_date,
+            "from_chat_title": forward_from_chat_title,
+            "user_id": spammer_id,
+        }
 
-    result = cursor.execute(query, params).fetchone()
+        result = cursor.execute(query, params).fetchone()
+    else:
+        # This is a forwarded forwarded message
+        # forwarded_from_id = spammer_id
+        query = """
+            SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name
+            FROM recent_messages 
+            WHERE (forwarded_from_id = :forwarded_from_id AND forward_date = :forward_date)
+            ORDER BY received_date DESC
+            LIMIT 1
+        """
+        params = {
+            "forward_date": message_forward_date,
+            "forwarded_from_id": forwarded_from_id,
+        }
+
+        result = cursor.execute(query, params).fetchone()
+
     if spammer_first_name == "":
         spammer_first_name = result[5]  # get spammer first name from db
         spammer_last_name = result[6]  # get spammer last name from db
@@ -209,6 +237,7 @@ async def handle_forwarded_reports(message: types.Message):
     await bot.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
+    spammer_id = None  # Fast fix for UnboundLocalError: local variable 'spammer_id' referenced before assignment
     if message.forward_from:
         spammer_full_name = [message.forward_from.first_name]
         spammer_id = message.forward_from.id
@@ -239,19 +268,43 @@ async def handle_forwarded_reports(message: types.Message):
     forward_from_chat_title = None
     if message.forward_from_chat:
         forward_from_chat_title = message.forward_from_chat.title
-    # Get the chat ID and message ID of the original message
-    spammer_id = None # Fast fix for UnboundLocalError: local variable 'spammer_id' referenced before assignment
-    try:
+
+    # If we have spammer_id, we do not need to get it from the database
+    if spammer_id:
+        # Temp solution without database query
         found_message_data = get_spammer_details(
             spammer_id,
             spammer_first_name_part,
             spammer_last_name_part,
             message.forward_date,
             forward_from_chat_title,
+            forwarded_from_id=spammer_id,
+            forwarded_from_username=message.forward_from.username,
+            forwarded_from_first_name=spammer_first_name_part,
+            forward_from_last_name=spammer_last_name_part,
         )
-    except AttributeError as e:
-        logger.error(f"An error occurred while fetching the message data: {e}")
-        found_message_data = None
+        # [
+        #     None,
+        #     None,
+        #     None,
+        #     spammer_id,
+        #     None,
+        #     spammer_first_name_part,
+        #     spammer_last_name_part,
+        # ]
+    else:
+        # Get the chat ID and message ID of the original message
+        try:
+            found_message_data = get_spammer_details(
+                spammer_id,
+                spammer_first_name_part,
+                spammer_last_name_part,
+                message.forward_date,
+                forward_from_chat_title,
+            )
+        except AttributeError as e:
+            logger.error(f"An error occurred while fetching the message data: {e}")
+            found_message_data = None
 
     logger.debug(f"Message data: {found_message_data}")
 
@@ -573,8 +626,8 @@ async def store_recent_messages(message: types.Message):
         cursor.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
-            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, received_date, from_chat_title) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 getattr(message.chat, "id", None),
@@ -587,6 +640,10 @@ async def store_recent_messages(message: types.Message):
                 getattr(message, "forward_date", None),
                 getattr(message, "date", None),
                 getattr(message.forward_from_chat, "title", None),
+                getattr(message.forward_from, "id", None),
+                getattr(message.forward_from, "username", ""),
+                getattr(message.forward_from, "first_name", ""),
+                getattr(message.forward_from, "last_name", ""),
             ),
         )
         conn.commit()

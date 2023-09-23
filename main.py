@@ -73,7 +73,12 @@ def get_spammer_details(
     forwarded_from_first_name=None,
     forward_from_last_name=None,
 ):
-    """Function to get chat ID and message ID by sender name and date."""
+    """Function to get chat ID and message ID by sender name and date
+    or if the message is a forward of a forward then using
+    forwarded_from_id and message_forward_date.
+    forwarded_from_username, forwarded_from_first_name, 
+    forward_from_last_name are used only for forwarded forwarded messages
+    and reserved for future use"""
     if not spammer_last_name:
         spammer_last_name = ""
     if not spammer_id:
@@ -283,15 +288,6 @@ async def handle_forwarded_reports(message: types.Message):
             forwarded_from_first_name=spammer_first_name_part,
             forward_from_last_name=spammer_last_name_part,
         )
-        # [
-        #     None,
-        #     None,
-        #     None,
-        #     spammer_id,
-        #     None,
-        #     spammer_first_name_part,
-        #     spammer_last_name_part,
-        # ]
     else:
         # Get the chat ID and message ID of the original message
         try:

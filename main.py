@@ -256,9 +256,13 @@ async def handle_forwarded_reports(message: types.Message):
         else:
             spammer_full_name.append("")  # last name is not available
     else:
-        spammer_full_name = (
-            message.forward_sender_name and message.forward_sender_name.split(" ")
-        )
+        if message.forward_from_chat:
+            spammer_full_name = [message.forward_from_chat.title]
+            spammer_id = None
+        else:
+            spammer_full_name = (
+                message.forward_sender_name and message.forward_sender_name.split(" ")
+            )
 
     # Handle the case where the sender's name is not available
     spammer_last_name_part = ""

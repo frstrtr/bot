@@ -245,7 +245,7 @@ async def handle_forwarded_reports(message: types.Message):
     spammer_id = None  # Fast fix for UnboundLocalError: local variable 'spammer_id' referenced before assignment
     if message.forward_from:
         spammer_full_name = [message.forward_from.first_name]
-        spammer_id = message.forward_from.id
+        # spammer_id = message.forward_from.id
         if hasattr(message.forward_from, "id") and message.forward_from.id:
             spammer_id = message.forward_from.id
         if (
@@ -274,9 +274,9 @@ async def handle_forwarded_reports(message: types.Message):
     if message.forward_from_chat:
         forward_from_chat_title = message.forward_from_chat.title
 
-    # If we have spammer_id, we do not need to get it from the database
+    # If we have spammer_id and spammer_first_name_part, 
+    # we can get the chat ID and message ID of the original message
     if spammer_id:
-        # Temp solution without database query
         found_message_data = get_spammer_details(
             spammer_id,
             spammer_first_name_part,

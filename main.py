@@ -76,7 +76,7 @@ def get_spammer_details(
     """Function to get chat ID and message ID by sender name and date
     or if the message is a forward of a forward then using
     forwarded_from_id and message_forward_date.
-    forwarded_from_username, forwarded_from_first_name, 
+    forwarded_from_username, forwarded_from_first_name,
     forward_from_last_name are used only for forwarded forwarded messages
     and reserved for future use"""
     if not spammer_last_name:
@@ -214,7 +214,8 @@ recent_messages = (
 async def on_startup(dp: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    bot_start_message = f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+    bot_start_message = (f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+                         "Финальная борьба между роботами и людьми началась...\n")
     logger.info(bot_start_message)
 
     await bot.send_message(TECHNOLOG_GROUP_ID, bot_start_message)
@@ -245,7 +246,6 @@ async def handle_forwarded_reports(message: types.Message):
     spammer_id = None  # Fast fix for UnboundLocalError: local variable 'spammer_id' referenced before assignment
     if message.forward_from:
         spammer_full_name = [message.forward_from.first_name]
-        # spammer_id = message.forward_from.id
         if hasattr(message.forward_from, "id") and message.forward_from.id:
             spammer_id = message.forward_from.id
         if (
@@ -257,9 +257,13 @@ async def handle_forwarded_reports(message: types.Message):
             spammer_full_name.append("")  # last name is not available
     else:
         if message.forward_from_chat:
+            # check if it's a forward from a channel
+            # TODO if it's different from the channel name
+            # rely on the channel name below because it's more reliable
             spammer_full_name = [message.forward_from_chat.title]
             spammer_id = None
         else:
+            # it is open profile
             spammer_full_name = (
                 message.forward_sender_name and message.forward_sender_name.split(" ")
             )
@@ -273,13 +277,16 @@ async def handle_forwarded_reports(message: types.Message):
     else:
         spammer_last_name_part = ""
         spammer_first_name_part = spammer_full_name[0]
+        
     # Handle the case where the message is forwarded from a channel
     forward_from_chat_title = None
     if message.forward_from_chat:
+        # check if it's a forward from a channel
         forward_from_chat_title = message.forward_from_chat.title
 
-    # If we have spammer_id and spammer_first_name_part, 
-    # we can get the chat ID and message ID of the original message
+    found_message_data = None
+
+    # message is forwarded from a user or forwarded forward from a user
     if spammer_id:
         found_message_data = get_spammer_details(
             spammer_id,
@@ -292,32 +299,33 @@ async def handle_forwarded_reports(message: types.Message):
             forwarded_from_first_name=spammer_first_name_part,
             forward_from_last_name=spammer_last_name_part,
         )
-    else:
-        # Get the chat ID and message ID of the original message
-        try:
-            found_message_data = get_spammer_details(
-                spammer_id,
-                spammer_first_name_part,
-                spammer_last_name_part,
-                message.forward_date,
-                forward_from_chat_title,
-            )
-        except AttributeError as e:
-            logger.error(f"An error occurred while fetching the message data: {e}")
-            found_message_data = None
 
-    logger.debug(f"Message data: {found_message_data}")
+    # message is from user with open profile
+    if not found_message_data:
+        forward_from_username = (lambda x: x.username if hasattr(x, "username") and x.username else None)(message.forward_from)
+        found_message_data = get_spammer_details(
+            spammer_id,
+            spammer_first_name_part,
+            spammer_last_name_part,
+            message.forward_date,
+            forward_from_chat_title,
+            forwarded_from_id=None,
+            forwarded_from_username=forward_from_username,
+            forwarded_from_first_name=spammer_first_name_part,
+            forward_from_last_name=spammer_last_name_part,
+        )
+
+    # message is forwarded from a channel
+    if not found_message_data:
+        found_message_data = get_spammer_details(
+            spammer_id,
+            spammer_first_name_part,
+            spammer_last_name_part,
+            message.forward_date,
+            forward_from_chat_title,
+        )
 
     if not found_message_data:
-        # check if we have everything open
-        # try:
-        #     # try if everything is open
-        #     pass
-        #     # Save both the original message_id and the forwarded message's date
-        #     # received_date = message.date if message.date else None
-        #     # report_id = int(str(message.chat.id) + str(message.message_id))
-
-        # except Exception as e:
         e = "TEST"
         logger.debug(
             f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
@@ -326,6 +334,8 @@ async def handle_forwarded_reports(message: types.Message):
             f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
         )
         return
+
+    logger.debug(f"Message data: {found_message_data}")
 
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None

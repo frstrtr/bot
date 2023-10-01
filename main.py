@@ -231,12 +231,13 @@ dp = Dispatcher(bot)
 # async def cmd_getid(message: types.Message):
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
+
 async def on_startup(dp: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
-        "Финальная борьба между роботами и людьми началась...\n"
+        "Финальная битва между людьми и роботами...\n"
     )
     logger.info(bot_start_message)
 
@@ -339,6 +340,9 @@ async def handle_forwarded_reports(message: types.Message):
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
     report_id = int(str(message.chat.id) + str(message.message_id))
+    if report_id:
+        # send report ID to the reporter
+        await message.answer(f"Report ID: {report_id}")
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 

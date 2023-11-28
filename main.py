@@ -200,10 +200,20 @@ CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("gro
 
 # add channels to dict for logging
 channels_dict = {}
+scheduler_dict = {}
+
 for group in channels_root.findall("group"):
     channel_id = int(group.find("id").text)
     channel_name = group.find("name").text
     channels_dict[channel_id] = channel_name
+
+    # Attempt to extract the schedule, if present
+    schedule = group.find('schedule')
+    if schedule is not None and schedule.get('trigger') == "1":
+        start_time = schedule.find('start').text
+        end_time = schedule.find('end').text
+        scheduler_dict[channel_id] = {'start': start_time, 'end': end_time}
+
 
 # Get config data
 bot_token = config_XML_root.find("bot_token").text
@@ -580,17 +590,17 @@ async def reset_ban(callback_query: CallbackQuery):
         message_id=callback_query.message.message_id,
     )
 
-    logger.info(f"Report {report_id_to_ban} button action canceled.")
+    logger.info(f"Report {report_id_to_ban} button ACTION CANCELLED!!!")
 
     await bot.send_message(
         ADMIN_GROUP_ID,
-        f"Button action canceled: Report {report_id_to_ban} was not processed. "
+        f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED!!! "
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
     await bot.send_message(
         TECHNOLOG_GROUP_ID,
-        f"Cancel button pressed. "
-        f"Button action canceled: Report {report_id_to_ban} was not processed. "
+        f"CANCEL button pressed. "
+        f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED. "
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
 

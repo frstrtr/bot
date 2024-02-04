@@ -200,19 +200,19 @@ CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("gro
 
 # add channels to dict for logging
 channels_dict = {}
-scheduler_dict = {}
+# scheduler_dict = {}
 
 for group in channels_root.findall("group"):
     channel_id = int(group.find("id").text)
     channel_name = group.find("name").text
     channels_dict[channel_id] = channel_name
 
-    # Attempt to extract the schedule, if present
-    schedule = group.find('schedule')
-    if schedule is not None and schedule.get('trigger') == "1":
-        start_time = schedule.find('start').text
-        end_time = schedule.find('end').text
-        scheduler_dict[channel_id] = {'start': start_time, 'end': end_time}
+#     # Attempt to extract the schedule, if present
+#     schedule = group.find('schedule')
+#     if schedule is not None and schedule.get('trigger') == "1":
+#         start_time = schedule.find('start').text
+#         end_time = schedule.find('end').text
+#         scheduler_dict[channel_id] = {'start': start_time, 'end': end_time}
 
 
 # Get config data
@@ -226,7 +226,10 @@ techno_log_group_name = config_XML_root.find("techno_log_group_name").text
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
 print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log_group)
-print("Using channels: " + str(CHANNEL_NAMES))
+channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
+print("Using channels: " + ', '.join(channel_info))
+print('\n')
+
 
 API_TOKEN = bot_token
 ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer

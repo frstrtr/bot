@@ -257,6 +257,13 @@ async def on_startup(dp: Dispatcher):
 
     await bot.send_message(TECHNOLOG_GROUP_ID, bot_start_message)
 
+async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
+    """Function to check if the reporter is an admin in the Admin group."""
+    chat_admins = await bot.get_chat_administrators(admin_group_id_check)
+    for admin in chat_admins:
+        if admin.user.id == reporter_user_id:
+            return True
+    return False
 
 @dp.message_handler(
     lambda message: message.forward_date is not None
@@ -425,21 +432,24 @@ async def handle_forwarded_reports(message: types.Message):
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     # And store published bunner message data to provide link to the reportee
     # admin_group_banner_message: Message = None # Type hinting
-    # admin_group_banner_message = await bot.send_message(
-    #     ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
-    # )
-    await bot.send_message(
+    admin_group_banner_message = await bot.send_message(
         ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
     )
+    # await bot.send_message(
+    #     ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
+    # )
 
     # Log the banner message data
-    # logger.debug(f"Admin group banner: {admin_group_banner_message}")
+    logger.debug(f"Admin group banner: {admin_group_banner_message}")
     # Construct link to the published banner and send it to the reporter
-    # banner_link = f"https://t.me/{admin_group_banner_message.chat.username}/{admin_group_banner_message.message_id}"
+    banner_link = f"https://t.me/{admin_group_banner_message.chat.username}/{admin_group_banner_message.message_id}"
     # Log the banner link
-    # logger.debug(f"Banner link: {banner_link}")
-    # Send the banner link to the reporter
-    # await message.answer(f"Admin group banner link: {banner_link}")
+    logger.debug(f"Banner link: {banner_link}")
+    
+    # Check if the reporter is an admin in the admin group:
+    if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+        # Send the banner link to the reporter
+        await message.answer(f"Admin group banner link: {banner_link}")
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))

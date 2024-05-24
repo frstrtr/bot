@@ -5,7 +5,7 @@ import logging
 import json
 import subprocess
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from aiogram.utils.exceptions import (
     MessageToDeleteNotFound,
     # MessageCantBeDeleted,
@@ -422,9 +422,20 @@ async def handle_forwarded_reports(message: types.Message):
     keyboard.add(ban_btn)
 
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
-    await bot.send_message(
+    # And store published bunner message data to provide link to the reportee
+    admin_group_banner_message: Message = None # Type hinting
+    admin_group_banner_message = await bot.send_message(
         ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
     )
+
+    # Log the banner message data
+    logger.debug(f"Admin group banner: {admin_group_banner_message}")
+    # Construct link to the published banner and send it to the reporter
+    banner_link = f"https://t.me/{admin_group_banner_message.chat.username}/{admin_group_banner_message.message_id}"
+    # Log the banner link
+    logger.debug(f"Banner link: {banner_link}")
+    # Send the banner link to the reporter
+    await message.answer(f"Admin group banner link: {banner_link}")
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))

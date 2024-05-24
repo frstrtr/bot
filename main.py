@@ -6,6 +6,7 @@ import json
 import subprocess
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+
 # from aiogram.types import Message
 from aiogram.utils.exceptions import (
     MessageToDeleteNotFound,
@@ -228,8 +229,8 @@ print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
 print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log_group)
 channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
-print("Using channels: " + ', '.join(channel_info))
-print('\n')
+print("Using channels: " + ", ".join(channel_info))
+print("\n")
 
 
 API_TOKEN = bot_token
@@ -257,6 +258,7 @@ async def on_startup(dp: Dispatcher):
 
     await bot.send_message(TECHNOLOG_GROUP_ID, bot_start_message)
 
+
 async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
     """Function to check if the reporter is an admin in the Admin group."""
     chat_admins = await bot.get_chat_administrators(admin_group_id_check)
@@ -264,6 +266,7 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
         if admin.user.id == reporter_user_id:
             return True
     return False
+
 
 @dp.message_handler(
     lambda message: message.forward_date is not None
@@ -442,10 +445,15 @@ async def handle_forwarded_reports(message: types.Message):
     # Log the banner message data
     logger.debug(f"Admin group banner: {admin_group_banner_message}")
     # Construct link to the published banner and send it to the reporter
-    banner_link = f"https://t.me/{admin_group_banner_message.chat.id}/{admin_group_banner_message.message_id}"
+    private_chat_id = int(
+        str(admin_group_banner_message.chat.id)[4:]
+    )  # Remove -100 from the chat ID
+    banner_link = (
+        f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
+    )
     # Log the banner link
     logger.debug(f"Banner link: {banner_link}")
-    
+
     # Check if the reporter is an admin in the admin group:
     if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
         # Send the banner link to the reporter

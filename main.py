@@ -442,7 +442,7 @@ async def handle_forwarded_reports(message: types.Message):
     # Log the banner message data
     logger.debug(f"Admin group banner: {admin_group_banner_message}")
     # Construct link to the published banner and send it to the reporter
-    banner_link = f"https://t.me/{admin_group_banner_message.chat.username}/{admin_group_banner_message.message_id}"
+    banner_link = f"https://t.me/{admin_group_banner_message.chat.id}/{admin_group_banner_message.message_id}"
     # Log the banner link
     logger.debug(f"Banner link: {banner_link}")
     

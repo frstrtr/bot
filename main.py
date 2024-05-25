@@ -443,7 +443,7 @@ async def handle_forwarded_reports(message: types.Message):
     # )
 
     # Log the banner message data
-    logger.debug(f"Admin group banner: {admin_group_banner_message}")
+    # logger.debug(f"Admin group banner: {admin_group_banner_message}")
     # Construct link to the published banner and send it to the reporter
     private_chat_id = int(
         str(admin_group_banner_message.chat.id)[4:]
@@ -452,7 +452,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
     )
     # Log the banner link
-    logger.debug(f"Banner link: {banner_link}")
+    # logger.debug(f"Banner link: {banner_link}")
 
     # Check if the reporter is an admin in the admin group:
     if await is_admin(message.from_user.id, ADMIN_GROUP_ID):

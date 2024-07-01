@@ -79,6 +79,8 @@ def extract_spammer_info(message):
     names = (message.forward_sender_name or "").split(" ", 1)
     first_name = names[0] if names else ""
     last_name = names[1] if len(names) > 1 else ""
+    # Check for the Deleted Account
+    
     return None, first_name, last_name
 
 
@@ -416,6 +418,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         f"<a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
         f"Plain text spammer ID profile link: tg://user?id={user_id}\n"
+        f"<a href='tg://openmessage?user_id={user_id}'>Android profile link</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple) profile link</a>"
         f"Reported by admin <a href='tg://user?id={message.from_user.id}'>"
         f"@{message.from_user.username or 'UNKNOWN'}</a>\n"
         f"<a href='{message_link}'>Link to the reported message</a>\n"

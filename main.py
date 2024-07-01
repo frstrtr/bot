@@ -424,6 +424,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"@{message.from_user.username or 'UNKNOWN'}</a>\n"
         f"<a href='{message_link}'>Link to the reported message</a>\n"
         f"Use /ban <b>{report_id}</b> to take action.\n"
+        f"<a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
     )
     logger.debug("Report banner content:")
     logger.debug(log_info)

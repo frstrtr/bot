@@ -419,7 +419,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         f"<a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
         f"SPAMMER ID profile link:\n"
-        f'Plain text: tg://user?id={user_id}\n"
+        f'Plain text: tg://user?id={user_id}\n'
         f"<a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"<a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}</a>\n"

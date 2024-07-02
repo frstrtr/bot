@@ -404,7 +404,7 @@ async def handle_forwarded_reports(message: types.Message):
     # Get the username
     username = found_message_data[4]
     if not username:
-        username = "UNKNOWN"
+        username = "!_U_N_D_E_F_I_N_E_D_!"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]

@@ -411,22 +411,27 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Log the information with the link
     log_info = (
+
         f"Report timestamp: {message.date}\n"
 
         f"Spam message timestamp: {message.forward_date}\n"
         
         f"Reaction time: {message.date - message.forward_date}\n"
         
-        f"Reported by admin <a href='tg://user?id={message.from_user.id}'>"
+        f"Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
         
         f"Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
-        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
-        
+                
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         
         f"<a href='tg://user?id={user_id}'>Spammer ID based profile link</a>"
+        
         f"SPAMMER ID profile link:\n"
+        
+        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+        
         f"Plain text: tg://user?id={user_id}\n"
+        
         f"<a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"<a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"<a href='{message_link}'>Link to the reported message</a>\n"

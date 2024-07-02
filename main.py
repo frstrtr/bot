@@ -425,10 +425,10 @@ async def handle_forwarded_reports(message: types.Message):
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
                 
         f"💀 SPAMMER ID profile links:\n"
-        f"☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
-        f"☠️ Plain text: tg://user?id={user_id}\n"
-        f"☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
-        f"☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
+        f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
+        f"   ├☠️ Plain text: tg://user?id={user_id}\n"
+        f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
+        f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
 
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"

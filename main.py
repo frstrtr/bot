@@ -80,7 +80,7 @@ def extract_spammer_info(message):
     first_name = names[0] if names else ""
     last_name = names[1] if len(names) > 1 else ""
     # Check for the Deleted Account
-    
+
     return None, first_name, last_name
 
 
@@ -107,9 +107,10 @@ def get_spammer_details(
     spammer_last_name = spammer_last_name or ""
 
     logger.debug(
-        f"Getting chat ID and message ID for spammer: {spammer_id} : {spammer_first_name} {spammer_last_name},\n"
-        f"date: {message_forward_date}, forwarded from chat title: {forward_from_chat_title},\n"
-        f"forward_sender_name: {forward_sender_name}, forwarded_from_id: {forwarded_from_id}\n"
+        f"Getting chat ID and message ID for\n"
+        f"spammerID: {spammer_id} : firstName : {spammer_first_name} : lastName : {spammer_last_name},\n"
+        f"messageForwardDate: {message_forward_date}, forwardedFromChatTitle: {forward_from_chat_title},\n"
+        f"forwardSenderName: {forward_sender_name}, forwardedFromID: {forwarded_from_id}\n"
     )
 
     # Common SQL and parameters for both cases
@@ -148,6 +149,10 @@ def get_spammer_details(
                 "forwarded_from_id": forwarded_from_id,
             }
         )
+
+    # TODO: Deleted Account case
+    # query database by forward_date only
+    # or use message hash future field
 
     query = base_query.format(condition=condition)
     result = cursor.execute(query, params).fetchone()
@@ -352,7 +357,7 @@ async def handle_forwarded_reports(message: types.Message):
         )
 
     if not found_message_data:
-        e = "TEST"
+        e = "Deleted Account?"
         logger.debug(
             f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
         )
@@ -411,25 +416,18 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Log the information with the link
     log_info = (
-
         f"💡 Report timestamp: {message.date}\n"
-
         f"💡 Spam message timestamp: {message.forward_date}\n"
-        
         f"💡 Reaction time: {message.date - message.forward_date}\n"
-        
         f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
         f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
-        
-        f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "                
+        f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
-                
         f"💀 SPAMMER ID profile links:\n"
         f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
         f"   ├☠️ Plain text: tg://user?id={user_id}\n"
         f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
-
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
@@ -837,6 +835,7 @@ async def log_all_unhandled_messages(message: types.Message):
 
 # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
 # TODO if succed to delete message also remove this record from the DB
+
 if __name__ == "__main__":
     from aiogram import executor
 

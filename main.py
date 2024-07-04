@@ -438,9 +438,16 @@ async def handle_forwarded_reports(message: types.Message):
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
 
-    print('##########----------DEBUG----------##########')
-    print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
-    print('##########----------DEBUG----------##########')
+    # print('##########----------DEBUG----------##########')
+    technolog_chat_id = int(
+        str(technnolog_spamMessage_copy.chat.id)[4:]
+    )  # Remove -100 from the chat ID
+    technnolog_spamMessage_copy_link = (
+        f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
+    )
+    # print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
+    
+    # print('##########----------DEBUG----------##########')
 
     # Log the information with the link
     log_info = (
@@ -457,6 +464,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
+        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )

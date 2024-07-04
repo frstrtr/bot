@@ -295,7 +295,7 @@ async def handle_forwarded_reports(message: types.Message):
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
+    technnolog_spamMessage_copy = await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
     message_as_json = json.dumps(message.to_python(), indent=4)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
@@ -437,6 +437,10 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
+
+    print('##########----------DEBUG----------##########')
+    print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
+    print('##########----------DEBUG----------##########')
 
     # Log the information with the link
     log_info = (

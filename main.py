@@ -356,6 +356,10 @@ async def handle_forwarded_reports(message: types.Message):
             forward_from_chat_title,
         )
 
+    print('#########----------DEBUG----------#########')    
+    print(f'Found message data: {found_message_data}')
+    print('#########----------DEBUG----------#########')    
+
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
             e = "Deleted Account?"

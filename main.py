@@ -168,6 +168,9 @@ def get_spammer_details(
     # or use message hash future field
 
     query = base_query.format(condition=condition)
+    print("##########----------DEBUG----------##########")
+    print("Query:", query)
+    print("##########----------DEBUG----------##########")
     result = cursor.execute(query, params).fetchone()
 
     if not spammer_first_name:

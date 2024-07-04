@@ -129,10 +129,8 @@ def get_spammer_details(
         "user_id": spammer_id,
         "forward_sender_name": forward_sender_name,
     }
-    print('##########----------DEBUG----------##########')
-    print('Forward Sender Name:', forward_sender_name)
-    print('##########----------DEBUG----------##########')
-    if not forwarded_from_id:
+
+    if (not forwarded_from_id) and (forward_sender_name != 'Deleted Account'):
         # This is not a forwarded forwarded message
         condition = (
             "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
@@ -142,6 +140,9 @@ def get_spammer_details(
         )
     elif forward_sender_name == 'Deleted Account':
         # Manage Deleted Account by message date only
+        print('##########----------DEBUG----------##########')
+        print('Forward Sender Name:', forward_sender_name)
+        print('##########----------DEBUG----------##########')
         condition = (
             "forward_date = :forward_date"
         )

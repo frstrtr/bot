@@ -129,7 +129,9 @@ def get_spammer_details(
         "user_id": spammer_id,
         "forward_sender_name": forward_sender_name,
     }
-
+    print('##########----------DEBUG----------##########')
+    print('Forward Sender Name:', forward_sender_name)
+    print('##########----------DEBUG----------##########')
     if not forwarded_from_id:
         # This is not a forwarded forwarded message
         condition = (

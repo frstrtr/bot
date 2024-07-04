@@ -357,16 +357,22 @@ async def handle_forwarded_reports(message: types.Message):
         )
 
     if not found_message_data:
-        logger.debug(
-            f'Forward sender name:{forward_sender_name}\n'
-        )
-        e = "Deleted Account?"
-        logger.debug(
-            f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
-        )
-        await message.answer(
-            f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
-        )
+        if forward_sender_name == "Deleted Account":
+            e = "Deleted Account?"
+            logger.debug(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
+            await message.answer(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
+        else:
+            e = "Unhandled exception?"
+            logger.debug(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
+            await message.answer(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
         return
 
     logger.debug(f"Message data: {found_message_data}")

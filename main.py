@@ -375,7 +375,10 @@ async def handle_forwarded_reports(message: types.Message):
                 message.forward_date,
                 forward_sender_name,
                 forward_from_chat_title,
-            ) 
+            )
+            print('##########----------DEBUG----------##########')
+            print('Found Message Data:', found_message_data)
+            print('##########----------DEBUG----------##########')
             e = "Deleted Account?"
             logger.debug(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"

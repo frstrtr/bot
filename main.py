@@ -130,7 +130,7 @@ def get_spammer_details(
         "forward_sender_name": forward_sender_name,
     }
 
-    if (not forwarded_from_id) and (forward_sender_name != 'Deleted Account'):
+    if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
         # This is not a forwarded forwarded message
         condition = (
             "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
@@ -138,22 +138,18 @@ def get_spammer_details(
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
             " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
         )
-    elif forward_sender_name == 'Deleted Account':
+    elif forward_sender_name == "Deleted Account":
         # Manage Deleted Account by message date only
-        print('##########----------DEBUG----------##########')
-        print('Forward Sender Name:', forward_sender_name)
-        print('##########----------DEBUG----------##########')
-        condition = (
-            "forward_date = :forward_date"
-        )
-        params.update(
-            {
-                "forward_date": message_forward_date,
-            }
-        )
-        print('##########----------DEBUG----------##########')
-        print('Query Params:', params)
-        print('##########----------DEBUG----------##########')
+        print("##########----------DEBUG----------##########")
+        print("Forward Sender Name:", forward_sender_name)
+        print("##########----------DEBUG----------##########")
+        condition = "forward_date = :forward_date"
+        params = {
+            "message_forward_date": message_forward_date,
+        }
+        print("##########----------DEBUG----------##########")
+        print("Query Params:", params)
+        print("##########----------DEBUG----------##########")
     else:
         # This is a forwarded forwarded message
         condition = (
@@ -370,7 +366,7 @@ async def handle_forwarded_reports(message: types.Message):
             message.forward_date,
             forward_sender_name,
             forward_from_chat_title,
-        ) 
+        )
 
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
@@ -382,9 +378,9 @@ async def handle_forwarded_reports(message: types.Message):
                 forward_sender_name,
                 forward_from_chat_title,
             )
-            print('##########----------DEBUG----------##########')
-            print('Found Message Data:', found_message_data)
-            print('##########----------DEBUG----------##########')
+            print("##########----------DEBUG----------##########")
+            print("Found Message Data:", found_message_data)
+            print("##########----------DEBUG----------##########")
             e = "Deleted Account?"
             logger.debug(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"

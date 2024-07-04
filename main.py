@@ -141,7 +141,7 @@ def get_spammer_details(
     elif forward_sender_name == 'Deleted Account':
         # Manage Deleted Account by message date only
         condition = (
-            forward_date = :forward_date"
+            "forward_date = :forward_date"
         )
         params.update(
             {

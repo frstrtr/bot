@@ -148,6 +148,9 @@ def get_spammer_details(
                 "forward_date": message_forward_date,
             }
         )
+        print('##########----------DEBUG----------##########')
+        print('Query Params:', params)
+        print('##########----------DEBUG----------##########')
     else:
         # This is a forwarded forwarded message
         condition = (

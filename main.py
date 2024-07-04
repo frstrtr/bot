@@ -144,9 +144,11 @@ def get_spammer_details(
         print("Forward Sender Name:", forward_sender_name)
         print("##########----------DEBUG----------##########")
         condition = "forward_date = :forward_date"
-        params = {
-            "message_forward_date": message_forward_date,
-        }
+        params.update(
+            {
+                "forward_date": message_forward_date,
+            }
+        )
         print("##########----------DEBUG----------##########")
         print("Query Params:", params)
         print("##########----------DEBUG----------##########")

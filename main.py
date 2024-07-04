@@ -145,7 +145,7 @@ def get_spammer_details(
         print("##########----------DEBUG----------##########")
         condition = ("received_date = :message_forward_date")
         params = {
-            "forward_date": message_forward_date,
+            "message_forward_date": message_forward_date,
         }
 
         print("##########----------DEBUG----------##########")

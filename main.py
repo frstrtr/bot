@@ -140,17 +140,11 @@ def get_spammer_details(
         )
     elif forward_sender_name == "Deleted Account":
         # Manage Deleted Account by message date only
-        print("##########----------DEBUG----------##########")
-        print("Forward Sender Name:", forward_sender_name)
-        print("##########----------DEBUG----------##########")
         condition = ("received_date = :message_forward_date")
         params = {
             "message_forward_date": message_forward_date,
         }
 
-        print("##########----------DEBUG----------##########")
-        print("Query Params:", params)
-        print("##########----------DEBUG----------##########")
     else:
         # This is a forwarded forwarded message
         condition = (
@@ -168,9 +162,6 @@ def get_spammer_details(
     # or use message hash future field
 
     query = base_query.format(condition=condition)
-    print("##########----------DEBUG----------##########")
-    print("Query:", query)
-    print("##########----------DEBUG----------##########")
     result = cursor.execute(query, params).fetchone()
 
     if not spammer_first_name:
@@ -382,9 +373,6 @@ async def handle_forwarded_reports(message: types.Message):
                 forward_sender_name,
                 forward_from_chat_title,
             )
-            print("##########----------DEBUG----------##########")
-            print("Found Message Data:", found_message_data)
-            print("##########----------DEBUG----------##########")
             e = "Deleted Account?"
             logger.debug(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"

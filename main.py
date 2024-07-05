@@ -140,7 +140,7 @@ def get_spammer_details(
         )
     elif forward_sender_name == "Deleted Account":
         # Manage Deleted Account by message date only
-        condition = ("received_date = :message_forward_date")
+        condition = "received_date = :message_forward_date"
         params = {
             "message_forward_date": message_forward_date,
         }
@@ -295,7 +295,9 @@ async def handle_forwarded_reports(message: types.Message):
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    technnolog_spamMessage_copy = await bot.forward_message(TECHNOLOG_GROUP_ID, message.chat.id, message.message_id)
+    technnolog_spamMessage_copy = await bot.forward_message(
+        TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
+    )
     message_as_json = json.dumps(message.to_python(), indent=4)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
@@ -365,8 +367,8 @@ async def handle_forwarded_reports(message: types.Message):
 
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
-        #if forward_sender_name == "Tronana App":
-            #forward_sender_name = "Deleted Account"
+            # if forward_sender_name == "Tronana App":
+            # forward_sender_name = "Deleted Account"
             found_message_data = get_spammer_details(
                 spammer_id,
                 spammer_first_name,
@@ -375,12 +377,11 @@ async def handle_forwarded_reports(message: types.Message):
                 forward_sender_name,
                 forward_from_chat_title,
             )
-            e = "Deleted Account?"
             logger.debug(
-                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
             )
             await message.answer(
-                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
             )
         else:
             e = "Renamed Account?"
@@ -391,7 +392,7 @@ async def handle_forwarded_reports(message: types.Message):
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
             )
 
-    if not found_message_data:
+    if not found_message_data:  # Last resort. Give up.
         return
 
     logger.debug(f"Message data: {found_message_data}")
@@ -450,7 +451,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
     )
     # print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
-    
+
     # print('##########----------DEBUG----------##########')
 
     # Log the information with the link

@@ -365,6 +365,8 @@ async def handle_forwarded_reports(message: types.Message):
 
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
+        #if forward_sender_name == "Tronana App":
+            #forward_sender_name = "Deleted Account"
             found_message_data = get_spammer_details(
                 spammer_id,
                 spammer_first_name,
@@ -381,13 +383,15 @@ async def handle_forwarded_reports(message: types.Message):
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
             )
         else:
-            e = "Unhandled exception?"
+            e = "Renamed Account?"
             logger.debug(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
             )
             await message.answer(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
             )
+
+    if not found_message_data:
         return
 
     logger.debug(f"Message data: {found_message_data}")

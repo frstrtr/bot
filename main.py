@@ -479,6 +479,7 @@ async def handle_forwarded_reports(message: types.Message):
     admin_ban_banner = (
         f"💡 Spam message timestamp: {message.forward_date}\n"
         f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
+        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"

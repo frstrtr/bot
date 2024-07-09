@@ -384,7 +384,7 @@ async def handle_forwarded_reports(message: types.Message):
                 f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
             )
         else:
-            e = "Renamed Account?"
+            e = "Renamed Account or wrong chat?"
             logger.debug(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
             )
@@ -476,8 +476,16 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug("Report banner content:")
     logger.debug(log_info)
 
+    admin_ban_banner = (
+        f"💡 Spam message timestamp: {message.forward_date}\n"
+        f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
+        f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
+        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
+        f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+    )
+
     # Send the banner to the admin group
-    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
+    await bot.send_message(TECHNOLOG_GROUP_ID, admin_ban_banner, parse_mode="HTML")
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()

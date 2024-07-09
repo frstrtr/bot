@@ -484,8 +484,8 @@ async def handle_forwarded_reports(message: types.Message):
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
 
-    # Send the banner to the admin group
-    await bot.send_message(TECHNOLOG_GROUP_ID, admin_ban_banner, parse_mode="HTML")
+    # Send the banner to the technolog group
+    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
@@ -496,7 +496,7 @@ async def handle_forwarded_reports(message: types.Message):
     # And store published bunner message data to provide link to the reportee
     # admin_group_banner_message: Message = None # Type hinting
     admin_group_banner_message = await bot.send_message(
-        ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
+        ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
     )
     # await bot.send_message(
     #     ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"

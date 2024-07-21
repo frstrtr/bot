@@ -134,6 +134,7 @@ def get_spammer_details(
         # This is not a forwarded forwarded message
         condition = (
             "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
+            " OR (user_id = :user_id)"
             " OR (from_chat_title = :from_chat_title)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
             " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"

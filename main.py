@@ -265,8 +265,10 @@ dp = Dispatcher(bot)
 async def on_startup(dp: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _commit_info = get_latest_commit_info()
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+        f"Commit info: {_commit_info}\n"
         "Финальная битва между людьми и роботами...\n"
     )
     logger.info(bot_start_message)
@@ -293,6 +295,7 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
 async def handle_forwarded_reports(message: types.Message):
     """Function to handle forwarded messages."""
     logger.debug("############################################################")
+    logger.debug("                                                            ")
     logger.debug("------------------------------------------------------------")
     logger.debug(f"Received forwarded message for the investigation: {message}")
     # Send a thank you note to the user

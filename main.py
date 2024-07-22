@@ -292,6 +292,8 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
 )
 async def handle_forwarded_reports(message: types.Message):
     """Function to handle forwarded messages."""
+    logger.debug("############################################################")
+    logger.debug("------------------------------------------------------------")
     logger.debug(f"Received forwarded message for the investigation: {message}")
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")

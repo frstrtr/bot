@@ -14,7 +14,6 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
-
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
 # Setting up SQLite Database
@@ -256,6 +255,7 @@ TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 TECHNO_LOGGING = 1  #          LOGGING
 TECHNO_ORIGINALS = 21541  #    ORIGINALS
 TECHNO_UNHANDLED = 21525  #    UNHANDLED
+
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
@@ -884,7 +884,7 @@ async def log_all_unhandled_messages(message: types.Message):
         await bot.send_message(
             TECHNOLOG_GROUP_ID,
             f"Received UNHANDLED message object:\n{message}",
-            TECHNO_UNHANDLED,
+            TECHNO_UNHANDLED
         )
         await message.forward(
             TECHNOLOG_GROUP_ID, TECHNO_UNHANDLED

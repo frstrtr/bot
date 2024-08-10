@@ -252,6 +252,11 @@ API_TOKEN = bot_token
 ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
 TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
+
+TECHNO_LOGGING = 1  #          LOGGING
+TECHNO_ORIGINALS = 21541  #    ORIGINALS
+TECHNO_UNHANDLED = 21525  #    UNHANDLED
+
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
@@ -866,17 +871,19 @@ async def ban(message: types.Message):
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
 @dp.message_handler(
-    lambda message: message.chat.id != ADMIN_GROUP_ID,
+    lambda message: message.chat.id not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID],
     content_types=types.ContentTypes.ANY,
-)  # exclude admin group
+)  # exclude admin and technolog group
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object:\n{message}")
         await bot.send_message(
-            TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object:\n{message}"
+            TECHNOLOG_GROUP_ID,
+            f"Received UNHANDLED message object:\n{message}",
+            TECHNO_UNHANDLED,
         )
         await message.forward(
-            TECHNOLOG_GROUP_ID
+            TECHNOLOG_GROUP_ID, TECHNO_UNHANDLED
         )  # forward all unhandled messages to technolog group
         return
     except Exception as e:

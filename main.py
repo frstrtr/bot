@@ -270,8 +270,10 @@ dp = Dispatcher(bot)
 async def on_startup(dp: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _commit_info = get_latest_commit_info()
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+        f"Commit info: {_commit_info}\n"
         "Финальная битва между людьми и роботами...\n"
     )
     logger.info(bot_start_message)
@@ -297,6 +299,9 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
 )
 async def handle_forwarded_reports(message: types.Message):
     """Function to handle forwarded messages."""
+    logger.debug("############################################################")
+    logger.debug("                                                            ")
+    logger.debug("------------------------------------------------------------")
     logger.debug(f"Received forwarded message for the investigation: {message}")
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
@@ -372,9 +377,8 @@ async def handle_forwarded_reports(message: types.Message):
         )
 
     if not found_message_data:
+        # if forward_sender_name == "Name Name2":
         if forward_sender_name == "Deleted Account":
-            # if forward_sender_name == "Tronana App":
-            # forward_sender_name = "Deleted Account"
             found_message_data = get_spammer_details(
                 spammer_id,
                 spammer_first_name,
@@ -483,7 +487,7 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug(log_info)
 
     admin_ban_banner = (
-        f"💡 Spam message timestamp: {message.forward_date}\n"
+        f"💡 Reaction time: {message.date - message.forward_date}\n"
         f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
         f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"

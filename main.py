@@ -247,6 +247,7 @@ TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 TECHNO_LOGGING = 1  #          LOGGING
 TECHNO_ORIGINALS = 21541  #    ORIGINALS
 TECHNO_UNHANDLED = 21525  #    UNHANDLED
+TECHNO_RESTART = 21596  #       RESTART
 
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
@@ -277,7 +278,9 @@ async def on_startup(dp: Dispatcher):
     )
     logger.info(bot_start_message)
 
-    await bot.send_message(TECHNOLOG_GROUP_ID, bot_start_message)
+    await bot.send_message(
+        TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
+    )
 
 
 async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
@@ -880,8 +883,14 @@ async def ban(message: types.Message):
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object:\n{message}")
-        await bot.send_message(TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object:\n{message}", message_thread_id=TECHNO_UNHANDLED)
-        await message.forward(TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED)  # forward all unhandled messages to technolog group
+        await bot.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"Received UNHANDLED message object:\n{message}",
+            message_thread_id=TECHNO_UNHANDLED,
+        )
+        await message.forward(
+            TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
+        )  # forward all unhandled messages to technolog group
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")

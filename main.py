@@ -216,7 +216,7 @@ CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("gro
 
 # add channels to dict for logging
 channels_dict = {}
-# scheduler_dict = {}
+# scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
 
 for group in channels_root.findall("group"):
     channel_id = int(group.find("id").text)
@@ -239,22 +239,21 @@ log_group_name = config_XML_root.find("log_group_name").text
 techno_log_group = config_XML_root.find("techno_log_group").text
 techno_log_group_name = config_XML_root.find("techno_log_group_name").text
 
+API_TOKEN = bot_token
+ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
+TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
+
+# TODO: move to XML credentials files
+TECHNO_LOGGING = 1  #          LOGGING
+TECHNO_ORIGINALS = 21541  #    ORIGINALS
+TECHNO_UNHANDLED = 21525  #    UNHANDLED
+
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
 print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log_group)
 channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
 print("Using channels: " + ", ".join(channel_info))
 print("\n")
-
-
-API_TOKEN = bot_token
-ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
-TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
-
-
-TECHNO_LOGGING = 1  #          LOGGING
-TECHNO_ORIGINALS = 21541  #    ORIGINALS
-TECHNO_UNHANDLED = 21525  #    UNHANDLED
 
 
 bot = Bot(token=API_TOKEN)

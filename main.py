@@ -252,9 +252,9 @@ ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
 TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
 
-TECHNO_LOGGING = int(1)  #          LOGGING
-TECHNO_ORIGINALS = int(21541)  #    ORIGINALS
-TECHNO_UNHANDLED = int(21525)  #    UNHANDLED
+TECHNO_LOGGING = 1  #          LOGGING
+TECHNO_ORIGINALS = 21541  #    ORIGINALS
+TECHNO_UNHANDLED = 21525  #    UNHANDLED
 
 
 bot = Bot(token=API_TOKEN)
@@ -881,8 +881,8 @@ async def ban(message: types.Message):
 async def log_all_unhandled_messages(message: types.Message):
     try:
         logger.debug(f"Received UNHANDLED message object:\n{message}")
-        # await bot.send_message(TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object:\n{message}", TECHNO_UNHANDLED)
-        await message.forward(TECHNOLOG_GROUP_ID, TECHNO_UNHANDLED)  # forward all unhandled messages to technolog group
+        await bot.send_message(TECHNOLOG_GROUP_ID, f"Received UNHANDLED message object:\n{message}", message_thread_id=TECHNO_UNHANDLED)
+        await message.forward(TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED)  # forward all unhandled messages to technolog group
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")

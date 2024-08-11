@@ -103,6 +103,7 @@ def get_spammer_details(
     and reserved for future use"""
 
     spammer_id = spammer_id or None
+    #spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
     logger.debug(
@@ -379,7 +380,6 @@ async def handle_forwarded_reports(message: types.Message):
         )
 
     if not found_message_data:
-        # if forward_sender_name == "Name Name2":
         if forward_sender_name == "Deleted Account":
             found_message_data = get_spammer_details(
                 spammer_id,
@@ -406,6 +406,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     if not found_message_data:  # Last resort. Give up.
         return
+        #pass
 
     logger.debug(f"Message data: {found_message_data}")
 
@@ -454,6 +455,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
+    #user_id=5338846489
 
     # print('##########----------DEBUG----------##########')
     technolog_chat_id = int(

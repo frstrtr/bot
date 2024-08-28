@@ -540,6 +540,9 @@ async def ask_confirmation(callback_query: CallbackQuery):
     """Function to ask for confirmation before banning the user."""
     *_, message_id_to_ban = callback_query.data.split("_")
 
+    # DEBUG:
+    # logger.debug(f"Report {callback_query} confirmed for banning.")
+
     keyboard = InlineKeyboardMarkup(row_width=2)
     confirm_btn = InlineKeyboardButton(
         "🟢 Confirm", callback_data=f"do_ban_{message_id_to_ban}"
@@ -676,13 +679,15 @@ async def handle_ban(callback_query: CallbackQuery):
         logger.debug(
             f"User {author_id} banned and their messages deleted where applicable."
         )
+        button_pressed_by = callback_query.from_user.username
+
         await bot.send_message(
             ADMIN_GROUP_ID,
-            f"Report {message_id_to_ban} action taken: User {author_id} banned and their messages deleted where applicable.",
+            f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User {author_id} banned and their messages deleted where applicable.",
         )
         await bot.send_message(
             TECHNOLOG_GROUP_ID,
-            f"Report {message_id_to_ban} action taken: User {author_id} banned and their messages deleted where applicable.",
+            f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User {author_id} banned and their messages deleted where applicable.",
         )
 
     except Exception as e:
@@ -701,16 +706,21 @@ async def reset_ban(callback_query: CallbackQuery):
         message_id=callback_query.message.message_id,
     )
 
-    logger.info(f"Report {report_id_to_ban} button ACTION CANCELLED!!!")
+    # DEBUG:
+    button_pressed_by = callback_query.from_user.username
+    # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
+
+
+    logger.info("Report %s button ACTION CANCELLED!!!", report_id_to_ban)
 
     await bot.send_message(
         ADMIN_GROUP_ID,
-        f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED!!! "
+        f"Button ACTION CANCELLED by @{button_pressed_by}: Report {report_id_to_ban} WAS NOT PROCESSED!!! "
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
     await bot.send_message(
         TECHNOLOG_GROUP_ID,
-        f"CANCEL button pressed. "
+        f"CANCEL button pressed by @{button_pressed_by}. "
         f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED. "
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )

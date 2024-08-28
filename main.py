@@ -254,7 +254,7 @@ print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
 print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log_group)
 channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
-print("Using channels: " + ", ".join(channel_info))
+print("Monitoring chats: " + ", ".join(channel_info))
 print("\n")
 
 

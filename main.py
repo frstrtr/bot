@@ -293,6 +293,175 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
     return False
 
 
+async def handle_forwarded_reports_with_details(
+    message: types.Message,
+    spammer_id: int,
+    spammer_first_name: str,
+    spammer_last_name: str,
+    forward_from_chat_title: str,
+    forward_from_username: str,
+    forward_sender_name: str,
+    found_message_data: dict,
+):
+    """Function to handle forwarded messages with provided user details."""
+    logger.debug("############################################################")
+    logger.debug("                                                            ")
+    logger.debug("------------------------------------------------------------")
+    logger.debug(f"Received forwarded message for the investigation: {message}")
+    # Send a thank you note to the user
+    await message.answer("Thank you for the report. We will investigate it.")
+    # Forward the message to the admin group
+    technnolog_spamMessage_copy = await bot.forward_message(
+        TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
+    )
+    message_as_json = json.dumps(message.to_python(), indent=4)
+    # Truncate and add an indicator that the message has been truncated
+    if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+        message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+    await bot.send_message(TECHNOLOG_GROUP_ID, message_as_json)
+    await bot.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
+
+    if not found_message_data:
+        if forward_sender_name == "Deleted Account":
+            found_message_data = get_spammer_details(
+                spammer_id,
+                spammer_first_name,
+                spammer_last_name,
+                message.forward_date,
+                forward_sender_name,
+                forward_from_chat_title,
+            )
+            logger.debug(
+                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+            )
+            await message.answer(
+                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+            )
+        else:
+            e = "Renamed Account or wrong chat?"
+            logger.debug(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
+            await message.answer(
+                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+            )
+
+    if not found_message_data:  # Last resort. Give up.
+        return
+
+    logger.debug(f"Message data: {found_message_data}")
+
+    # Save both the original message_id and the forwarded message's date
+    received_date = message.date if message.date else None
+    report_id = int(str(message.chat.id) + str(message.message_id))
+    if report_id:
+        # send report ID to the reporter
+        await message.answer(f"Report ID: {report_id}")
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO recent_messages 
+        (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, received_date, forwarded_message_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            message.chat.id,
+            report_id,
+            message.from_user.id,
+            message.from_user.username,
+            message.from_user.first_name,
+            message.from_user.last_name,
+            message.forward_date if message.forward_date else None,
+            received_date,
+            str(found_message_data),
+        ),
+    )
+
+    conn.commit()
+
+    # Construct a link to the original message (assuming it's a supergroup or channel)
+    message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+
+    # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
+    if message.forward_from:
+        first_name = message.forward_from.first_name or ""
+        last_name = message.forward_from.last_name or ""
+    else:
+        first_name = found_message_data[5]
+        last_name = found_message_data[6]
+
+    # Get the username
+    username = found_message_data[4]
+    if not username:
+        username = "!_U_N_D_E_F_I_N_E_D_!"
+
+    # Initialize user_id and user_link with default values
+    user_id = found_message_data[3]
+
+    technolog_chat_id = int(
+        str(technnolog_spamMessage_copy.chat.id)[4:]
+    )  # Remove -100 from the chat ID
+    technnolog_spamMessage_copy_link = (
+        f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
+    )
+
+    # Log the information with the link
+    log_info = (
+        f"💡 Report timestamp: {message.date}\n"
+        f"💡 Spam message timestamp: {message.forward_date}\n"
+        f"💡 Reaction time: {message.date - message.forward_date}\n"
+        f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
+        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+        f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
+        f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
+        f"💀 SPAMMER ID profile links:\n"
+        f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
+        f"   ├☠️ Plain text: tg://user?id={user_id}\n"
+        f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
+        f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
+        f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
+        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
+        f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
+        f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+    )
+    logger.debug("Report banner content:")
+    logger.debug(log_info)
+
+    admin_ban_banner = (
+        f"💡 Reaction time: {message.date - message.forward_date}\n"
+        f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
+        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+        f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
+        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
+        f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+    )
+
+    # Send the banner to the technolog group
+    await bot.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
+
+    # Keyboard ban/cancel/confirm buttons
+    keyboard = InlineKeyboardMarkup()
+    ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{report_id}")
+    keyboard.add(ban_btn)
+
+    # Show ban banner with buttons in the admin group to confirm or cancel the ban
+    admin_group_banner_message = await bot.send_message(
+        ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
+    )
+
+    # Construct link to the published banner and send it to the reporter
+    private_chat_id = int(
+        str(admin_group_banner_message.chat.id)[4:]
+    )  # Remove -100 from the chat ID
+    banner_link = (
+        f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
+    )
+
+    # Check if the reporter is an admin in the admin group:
+    if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+        # Send the banner link to the reporter
+        await message.answer(f"Admin group banner link: {banner_link}")
+
+
 @dp.message_handler(
     lambda message: message.forward_date is not None
     and message.chat.id not in CHANNEL_IDS

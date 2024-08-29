@@ -913,7 +913,6 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
-
         cursor.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
@@ -940,10 +939,34 @@ async def store_recent_messages(message: types.Message):
         )
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
-        if message.forward_from_chat.type=='channel':
-            #TODO: make automated report to the admin group
-            logger.warning(f"Channel message received: {True}. Sending automated report to the admin group for review...")
-
+        if message.forward_from_chat.type == "channel":
+            # TODO: make automated report to the admin group if the message was forwarded from the channel
+            logger.warning(
+                f"Channel message received: {True}. Sending automated report to the admin group for review..."
+            )
+            # process the message automatically
+            found_message_data = get_spammer_details(
+                message.from_user.id,
+                message.from_user.first_name,
+                message.from_user.last_name,
+                message.forward_date,
+                message.forward_sender_name,
+                message.forward_from_chat.title,
+                forwarded_from_id=message.from_user.id,
+                forwarded_from_username=message.from_user.username,
+                forwarded_from_first_name=message.from_user.first_name,
+                forwarded_from_last_name=message.from_user.last_name,
+            )
+            await handle_forwarded_reports_with_details(
+                message,
+                message.from_user.id,
+                message.from_user.first_name,
+                message.from_user.last_name,
+                message.forward_from_chat.title,
+                message.forward_from.username,
+                message.forward_sender_name,
+                found_message_data,
+            )
             # pass
 
     except Exception as e:

@@ -1140,11 +1140,11 @@ async def log_all_unhandled_messages(message: types.Message):
 if __name__ == "__main__":
     from aiogram import executor
 
-    commit_info = get_latest_commit_info()
-    if commit_info:
-        logger.info("Bot starting with commit info:\n%s", commit_info)
-    else:
-        logger.warning("Bot starting without git info.")
+    # commit_info = get_latest_commit_info()
+    # if commit_info:
+    #     logger.info("Bot starting with commit info:\n%s", commit_info)
+    # else:
+    #     logger.warning("Bot starting without git info.")
 
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
 

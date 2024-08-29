@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import logging
 import json
 import subprocess
+import time
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
@@ -55,11 +56,11 @@ conn.commit()
 def get_latest_commit_info():
     """Function to get the latest commit info."""
     try:
-        commit_info = (
+        _commit_info = (
             subprocess.check_output(["git", "show", "-s"]).decode("utf-8").strip()
         )
-        return commit_info
-    except Exception as e:
+        return _commit_info
+    except subprocess.CalledProcessError as e:
         print(f"Error getting git commit info: {e}")
         return None
 
@@ -91,9 +92,6 @@ def get_spammer_details(
     forward_sender_name="",
     forward_from_chat_title="",
     forwarded_from_id=None,
-    forwarded_from_username="",
-    forwarded_from_first_name="",
-    forwarded_from_last_name="",
 ):
     """Function to get chat ID and message ID by sender name and date
     or if the message is a forward of a forward then using
@@ -107,10 +105,13 @@ def get_spammer_details(
     spammer_last_name = spammer_last_name or ""
 
     logger.debug(
-        f"Getting chat ID and message ID for\n"
-        f"spammerID: {spammer_id} : firstName : {spammer_first_name} : lastName : {spammer_last_name},\n"
-        f"messageForwardDate: {message_forward_date}, forwardedFromChatTitle: {forward_from_chat_title},\n"
-        f"forwardSenderName: {forward_sender_name}, forwardedFromID: {forwarded_from_id}\n"
+        "Getting chat ID and message ID for\n"
+        "spammerID: %s : firstName : %s : lastName : %s,\n"
+        "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "forwardSenderName: %s, forwardedFromID: %s\n",
+        spammer_id, spammer_first_name, spammer_last_name,
+        message_forward_date, forward_from_chat_title,
+        forward_sender_name, forwarded_from_id
     )
 
     # Common SQL and parameters for both cases
@@ -151,7 +152,7 @@ def get_spammer_details(
             "(user_id = :user_id)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
         )
-        # TODO is it neccessary below?
+        #TODO is it neccessary below?
         params.update(
             {
                 "forward_date": message_forward_date,
@@ -184,8 +185,8 @@ def get_spammer_details(
         )  # get names from db
 
     logger.debug(
-        f"Result for sender: {spammer_id} : {spammer_first_name} {spammer_last_name}, "
-        f"date: {message_forward_date}, from chat title: {forward_from_chat_title}\nResult: {result}"
+        "Result for sender: %s : %s %s, date: %s, from chat title: %s\nResult: %s",
+        spammer_id, spammer_first_name, spammer_last_name, message_forward_date, forward_from_chat_title, result
     )
 
     return result
@@ -204,8 +205,8 @@ file_handler = logging.FileHandler("bancop_bot.log")  # For writing logs to a fi
 stream_handler = logging.StreamHandler()  # For writing logs to the console
 
 # Create formatters and add them to handlers
-format_str = "%(message)s"  # Excludes timestamp, logger's name, and log level
-formatter = logging.Formatter(format_str)
+FROMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
+formatter = logging.Formatter(FROMAT_STR)
 file_handler.setFormatter(formatter)
 stream_handler.setFormatter(formatter)
 
@@ -396,11 +397,11 @@ async def handle_forwarded_reports_with_details(
     # Construct a link to the original message (assuming it's a supergroup or channel)
     # Extract the chat ID and remove the '-100' prefix if it exists
     chat_id = str(found_message_data[0])
-    if chat_id.startswith('-100'):
-        chat_id = chat_id[4:] # remove leading -100
-    if found_message_data[2]: # this is public chat
+    if chat_id.startswith("-100"):
+        chat_id = chat_id[4:]  # remove leading -100
+    if found_message_data[2]:  # this is public chat
         message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
-    else: # this is private chat
+    else:  # this is private chat
         # Construct the message link with the modified chat ID
         message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
 
@@ -538,9 +539,6 @@ async def handle_forwarded_reports(message: types.Message):
             forward_sender_name,
             forward_from_chat_title,
             forwarded_from_id=spammer_id,
-            forwarded_from_username=forward_from_username,
-            forwarded_from_first_name=spammer_first_name,
-            forwarded_from_last_name=spammer_last_name,
         )
 
     # For users with open profiles, or if previous fetch didn't work.
@@ -553,9 +551,6 @@ async def handle_forwarded_reports(message: types.Message):
             forward_sender_name,
             forward_from_chat_title,
             forwarded_from_id=None,
-            forwarded_from_username=forward_from_username,
-            forwarded_from_first_name=spammer_first_name,
-            forwarded_from_last_name=spammer_last_name,
         )
 
     # Try getting details for forwarded messages from channels.
@@ -960,11 +955,14 @@ async def store_recent_messages(message: types.Message):
         )
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
-        
+
         # prevent NoneType error if there is no message.forward_from_chat.type
-        chat_type = message.forward_from_chat.type if message.forward_from_chat else None
+        chat_type = (
+            message.forward_from_chat.type if message.forward_from_chat else None
+        )
         if chat_type == "channel":
             # TODO: make automated report to the admin group if the message was forwarded from the channel
+            # TODO prevent automated reports if this is forwarded by admin
             logger.warning(
                 f"Channel message received: {True}. Sending automated report to the admin group for review..."
             )
@@ -977,9 +975,6 @@ async def store_recent_messages(message: types.Message):
                 message.forward_sender_name,
                 message.forward_from_chat.title,
                 forwarded_from_id=message.from_user.id,
-                forwarded_from_username=message.from_user.username,
-                forwarded_from_first_name=message.from_user.first_name,
-                forwarded_from_last_name=message.from_user.last_name,
             )
             await handle_forwarded_reports_with_details(
                 message,
@@ -1122,6 +1117,7 @@ async def ban(message: types.Message):
     content_types=types.ContentTypes.ANY,
 )  # exclude admin and technolog group
 async def log_all_unhandled_messages(message: types.Message):
+    """Function to log all unhandled messages to the technolog group."""
     try:
         logger.debug(f"Received UNHANDLED message object:\n{message}")
         await bot.send_message(
@@ -1146,7 +1142,7 @@ if __name__ == "__main__":
 
     commit_info = get_latest_commit_info()
     if commit_info:
-        logger.info(f"Bot starting with commit info:\n{commit_info}")
+        logger.info("Bot starting with commit info:\n%s", commit_info)
     else:
         logger.warning("Bot starting without git info.")
 

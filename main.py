@@ -960,7 +960,10 @@ async def store_recent_messages(message: types.Message):
         )
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
-        if message.forward_from_chat.type == "channel":
+        
+        # prevent NoneType error if there is no message.forward_from_chat.type
+        chat_type = message.forward_from_chat.type if message.forward_from_chat else None
+        if chat_type == "channel":
             # TODO: make automated report to the admin group if the message was forwarded from the channel
             logger.warning(
                 f"Channel message received: {True}. Sending automated report to the admin group for review..."
@@ -989,6 +992,7 @@ async def store_recent_messages(message: types.Message):
             )
             # pass
 
+    # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:
         logger.error(f"Error storing recent message: {e}")
 

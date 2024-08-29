@@ -103,7 +103,7 @@ def get_spammer_details(
     and reserved for future use"""
 
     spammer_id = spammer_id or None
-    #spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
+    # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
     logger.debug(
@@ -406,7 +406,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     if not found_message_data:  # Last resort. Give up.
         return
-        #pass
+        # pass
 
     logger.debug(f"Message data: {found_message_data}")
 
@@ -455,7 +455,7 @@ async def handle_forwarded_reports(message: types.Message):
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
-    #user_id=5338846489
+    # user_id=5338846489
 
     # print('##########----------DEBUG----------##########')
     technolog_chat_id = int(
@@ -710,7 +710,6 @@ async def reset_ban(callback_query: CallbackQuery):
     button_pressed_by = callback_query.from_user.username
     # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
 
-
     logger.info("Report %s button ACTION CANCELLED!!!", report_id_to_ban)
 
     await bot.send_message(
@@ -732,10 +731,19 @@ async def reset_ban(callback_query: CallbackQuery):
 async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
-        # # Log the full message object for debugging
+        # Log the full message object for debugging
         # logger.debug(
-        #     f"Received message object: {message}"
-        # )  # TODO remove afer sandboxing
+        #     f"\nReceived message object: {message}\n"
+        # )
+        # logger.debug(
+        #     # f"Bot?: {message.from_user.is_bot}\n"
+        #     # f"First Name?: {message.from_user.first_name}\n"
+        #     # f"Username?: {message.from_user.username}\n"
+        #     # f"Author signature?: {message.author_signature}\n"
+        #     f"Forwarded from chat type?: {message.forward_from_chat.type=='channel'}\n"
+        # )
+        # TODO remove afer sandboxing
+
 
         cursor.execute(
             """
@@ -763,6 +771,11 @@ async def store_recent_messages(message: types.Message):
         )
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
+        if message.forward_from_chat.type=='channel':
+            #TODO: make automated report to the admin group
+            logger.warning(f"Channel message received: {True}. Sending automated report to the admin group for review...")
+
+            # pass
 
     except Exception as e:
         logger.error(f"Error storing recent message: {e}")

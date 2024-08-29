@@ -145,6 +145,19 @@ def get_spammer_details(
         params = {
             "message_forward_date": message_forward_date,
         }
+    elif spammer_id:
+        # This is a forwarded forwarded message with known user_id
+        condition = (
+            "(user_id = :user_id)"
+            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
+        )
+        # TODO is it neccessary below?
+        params.update(
+            {
+                "forward_date": message_forward_date,
+                "forwarded_from_id": forwarded_from_id,
+            }
+        )
 
     else:
         # This is a forwarded forwarded message
@@ -158,9 +171,8 @@ def get_spammer_details(
             }
         )
 
-    # TODO: Deleted Account case
-    # query database by forward_date only
-    # or use message hash future field
+    # TODO
+    # use message hash future field
 
     query = base_query.format(condition=condition)
     result = cursor.execute(query, params).fetchone()
@@ -279,6 +291,10 @@ async def on_startup(dp: Dispatcher):
     )
     logger.info(bot_start_message)
 
+    # TODO Leave chats which is not in settings file
+    # await bot.leave_chat(-1002174154456)
+
+    # start message to the Technolog group
     await bot.send_message(
         TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
     )
@@ -299,7 +315,6 @@ async def handle_forwarded_reports_with_details(
     spammer_first_name: str,
     spammer_last_name: str,
     forward_from_chat_title: str,
-    forward_from_username: str,
     forward_sender_name: str,
     found_message_data: dict,
 ):
@@ -308,8 +323,8 @@ async def handle_forwarded_reports_with_details(
     logger.debug("                                                            ")
     logger.debug("------------------------------------------------------------")
     logger.debug(f"Received forwarded message for the investigation: {message}")
-    # Send a thank you note to the user
-    await message.answer("Thank you for the report. We will investigate it.")
+    # Send a thank you note to the user we dont need it for the automated reports anymore
+    # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
     technnolog_spamMessage_copy = await bot.forward_message(
         TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
@@ -354,9 +369,9 @@ async def handle_forwarded_reports_with_details(
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
     report_id = int(str(message.chat.id) + str(message.message_id))
-    if report_id:
-        # send report ID to the reporter
-        await message.answer(f"Report ID: {report_id}")
+    # if report_id:
+    # send report ID to the reporter - no need since this is automated report by condition now
+    # await message.answer(f"Report ID: {report_id}")
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 
@@ -379,7 +394,15 @@ async def handle_forwarded_reports_with_details(
     conn.commit()
 
     # Construct a link to the original message (assuming it's a supergroup or channel)
-    message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+    # Extract the chat ID and remove the '-100' prefix if it exists
+    chat_id = str(found_message_data[0])
+    if chat_id.startswith('-100'):
+        chat_id = chat_id[4:] # remove leading -100
+    if found_message_data[2]: # this is public chat
+        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+    else: # this is private chat
+        # Construct the message link with the modified chat ID
+        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -409,8 +432,7 @@ async def handle_forwarded_reports_with_details(
         f"💡 Report timestamp: {message.date}\n"
         f"💡 Spam message timestamp: {message.forward_date}\n"
         f"💡 Reaction time: {message.date - message.forward_date}\n"
-        f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
-        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+        f"💔 Reported by automated spam detection system\n"
         f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         f"💀 SPAMMER ID profile links:\n"
@@ -428,8 +450,7 @@ async def handle_forwarded_reports_with_details(
 
     admin_ban_banner = (
         f"💡 Reaction time: {message.date - message.forward_date}\n"
-        f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
-        f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+        f"💔 Reported by automated spam detection system\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
@@ -963,7 +984,6 @@ async def store_recent_messages(message: types.Message):
                 message.from_user.first_name,
                 message.from_user.last_name,
                 message.forward_from_chat.title,
-                message.forward_from.username,
                 message.forward_sender_name,
                 found_message_data,
             )
@@ -1115,7 +1135,7 @@ async def log_all_unhandled_messages(message: types.Message):
 
 
 # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
-# TODO if succed to delete message also remove this record from the DB
+# TODO if succeed to delete message also remove this record from the DB
 
 if __name__ == "__main__":
     from aiogram import executor

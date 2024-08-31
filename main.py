@@ -109,9 +109,13 @@ def get_spammer_details(
         "spammerID: %s : firstName : %s : lastName : %s,\n"
         "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
         "forwardSenderName: %s, forwardedFromID: %s\n",
-        spammer_id, spammer_first_name, spammer_last_name,
-        message_forward_date, forward_from_chat_title,
-        forward_sender_name, forwarded_from_id
+        spammer_id,
+        spammer_first_name,
+        spammer_last_name,
+        message_forward_date,
+        forward_from_chat_title,
+        forward_sender_name,
+        forwarded_from_id,
     )
 
     # Common SQL and parameters for both cases
@@ -152,7 +156,7 @@ def get_spammer_details(
             "(user_id = :user_id)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
         )
-        #TODO is it neccessary below?
+        # TODO is it neccessary below?
         params.update(
             {
                 "forward_date": message_forward_date,
@@ -186,7 +190,12 @@ def get_spammer_details(
 
     logger.debug(
         "Result for sender: %s : %s %s, date: %s, from chat title: %s\nResult: %s",
-        spammer_id, spammer_first_name, spammer_last_name, message_forward_date, forward_from_chat_title, result
+        spammer_id,
+        spammer_first_name,
+        spammer_last_name,
+        message_forward_date,
+        forward_from_chat_title,
+        result,
     )
 
     return result
@@ -262,6 +271,13 @@ TECHNO_LOGGING = 1  #          LOGGING
 TECHNO_ORIGINALS = 21541  #    ORIGINALS
 TECHNO_UNHANDLED = 21525  #    UNHANDLED
 TECHNO_RESTART = 21596  #       RESTART
+# TODO: move to XML credentials files
+ALLOWED_FORWARD_CHANNELS = (
+    {"id": -1001843786479, "name": "whales_mauritius"},
+    {"id": -1001359927097, "name": "elena_mauritius"},
+)
+ALLOWED_FORWARD_CHANNEL_IDS = {d['id'] for d in ALLOWED_FORWARD_CHANNELS}
+
 
 print("Using bot: " + bot_name)
 print("Using log group: " + log_group_name + ", id:" + log_group)
@@ -960,32 +976,36 @@ async def store_recent_messages(message: types.Message):
         chat_type = (
             message.forward_from_chat.type if message.forward_from_chat else None
         )
+        # check if it is forward from channel
         if chat_type == "channel":
-            # TODO: make automated report to the admin group if the message was forwarded from the channel
-            # TODO prevent automated reports if this is forwarded by admin
-            logger.warning(
-                f"Channel message received: {True}. Sending automated report to the admin group for review..."
-            )
-            # process the message automatically
-            found_message_data = get_spammer_details(
-                message.from_user.id,
-                message.from_user.first_name,
-                message.from_user.last_name,
-                message.forward_date,
-                message.forward_sender_name,
-                message.forward_from_chat.title,
-                forwarded_from_id=message.from_user.id,
-            )
-            await handle_forwarded_reports_with_details(
-                message,
-                message.from_user.id,
-                message.from_user.first_name,
-                message.from_user.last_name,
-                message.forward_from_chat.title,
-                message.forward_sender_name,
-                found_message_data,
-            )
-            # pass
+            # check for allowed channels for forwards
+            if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
+                # TODO: make automated report to the admin group if the message was forwarded from the channel
+                # TODO: prevent automated reports if this is forwarded by admin
+                # TODO: check if the forwarding user joined more than 3 days ago to prevent spam
+                logger.warning(
+                    f"Channel message received: {True}. Sending automated report to the admin group for review..."
+                )
+                # process the message automatically
+                found_message_data = get_spammer_details(
+                    message.from_user.id,
+                    message.from_user.first_name,
+                    message.from_user.last_name,
+                    message.forward_date,
+                    message.forward_sender_name,
+                    message.forward_from_chat.title,
+                    forwarded_from_id=message.from_user.id,
+                )
+                await handle_forwarded_reports_with_details(
+                    message,
+                    message.from_user.id,
+                    message.from_user.first_name,
+                    message.from_user.last_name,
+                    message.forward_from_chat.title,
+                    message.forward_sender_name,
+                    found_message_data,
+                )
+                # pass
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:

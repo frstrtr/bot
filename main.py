@@ -41,6 +41,8 @@ cursor.execute(
         forwarded_from_username TEXT,
         forwarded_from_first_name TEXT,
         forwarded_from_last_name TEXT,
+        new_chat_member TEXT,
+        left_chat_member TEXT,
         PRIMARY KEY (chat_id, message_id)
     )
     """
@@ -49,7 +51,9 @@ cursor.execute(
 conn.commit()
 
 # If adding new column for the first time, uncomment below
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN from_chat_title TEXT")
+# cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member TEXT")
+# conn.commit()
+# cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member TEXT")
 # conn.commit()
 
 

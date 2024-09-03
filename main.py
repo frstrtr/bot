@@ -41,8 +41,8 @@ cursor.execute(
         forwarded_from_username TEXT,
         forwarded_from_first_name TEXT,
         forwarded_from_last_name TEXT,
-        new_chat_member TEXT,
-        left_chat_member TEXT,
+        new_chat_member BOOL,
+        left_chat_member BOOL,
         PRIMARY KEY (chat_id, message_id)
     )
     """
@@ -51,9 +51,9 @@ cursor.execute(
 conn.commit()
 
 # If adding new column for the first time, uncomment below
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member TEXT")
+# cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
 # conn.commit()
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member TEXT")
+# cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member BOOL")
 # conn.commit()
 
 
@@ -275,13 +275,15 @@ TECHNO_LOGGING = 1  #          LOGGING
 TECHNO_ORIGINALS = 21541  #    ORIGINALS
 TECHNO_UNHANDLED = 21525  #    UNHANDLED
 TECHNO_RESTART = 21596  #       RESTART
+
 # TODO: move to XML credentials files
 ALLOWED_FORWARD_CHANNELS = (
     {"id": -1001843786479, "name": "whales_mauritius"},
     {"id": -1001359927097, "name": "elena_mauritius"},
     {"id": -1001900619969, "name": "mavrikikit"},
 )
-ALLOWED_FORWARD_CHANNEL_IDS = {d['id'] for d in ALLOWED_FORWARD_CHANNELS}
+
+ALLOWED_FORWARD_CHANNEL_IDS = {d["id"] for d in ALLOWED_FORWARD_CHANNELS}
 
 
 print("Using bot: " + bot_name)
@@ -290,6 +292,10 @@ print("Using techno log group: " + techno_log_group_name + ", id: " + techno_log
 channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
 print("Monitoring chats: " + ", ".join(channel_info))
 print("\n")
+print(
+    "Excluding autoreport when forwarded from chats: @"
+    + " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS])
+)
 
 
 bot = Bot(token=API_TOKEN)
@@ -315,6 +321,7 @@ async def on_startup(dp: Dispatcher):
 
     # TODO Leave chats which is not in settings file
     # await bot.leave_chat(-1002174154456)
+    # await bot.leave_chat(-1001876523135) # @lalaland_classy
 
     # start message to the Technolog group
     await bot.send_message(
@@ -953,8 +960,8 @@ async def store_recent_messages(message: types.Message):
         cursor.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
-            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 getattr(message.chat, "id", None),
@@ -972,6 +979,8 @@ async def store_recent_messages(message: types.Message):
                 getattr(message.forward_from, "username", ""),
                 getattr(message.forward_from, "first_name", ""),
                 getattr(message.forward_from, "last_name", ""),
+                len(message.new_chat_members) > 0,
+                bool(getattr(message.left_chat_member, "id", False))
             ),
         )
         conn.commit()

@@ -279,6 +279,7 @@ TECHNO_RESTART = 21596  #       RESTART
 ALLOWED_FORWARD_CHANNELS = (
     {"id": -1001843786479, "name": "whales_mauritius"},
     {"id": -1001359927097, "name": "elena_mauritius"},
+    {"id": -1001900619969, "name": "mavrikikit"},
 )
 ALLOWED_FORWARD_CHANNEL_IDS = {d['id'] for d in ALLOWED_FORWARD_CHANNELS}
 

@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
@@ -308,9 +308,37 @@ dp = Dispatcher(bot)
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
 
+async def take_heuristic_action(message: types.Message, reason):
+    """Function to take heuristically invoked action on the message."""
+
+    logger.warning(
+        "%s. Sending automated report to the admin group for review...", reason
+    )
+
+    # process the message automatically
+    found_message_data = get_spammer_details(
+        message.from_user.id,
+        message.from_user.first_name,
+        message.from_user.last_name,
+        message.forward_date,
+        message.forward_sender_name,
+        message.forward_from_chat.title,
+        forwarded_from_id=message.from_user.id,
+    )
+    await handle_forwarded_reports_with_details(
+        message,
+        message.from_user.id,
+        message.from_user.first_name,
+        message.from_user.last_name,
+        message.forward_from_chat.title,
+        message.forward_sender_name,
+        found_message_data,
+    )
+
+
 async def on_startup(dp: Dispatcher):
     """Function to handle the bot startup."""
-    bot_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _commit_info = get_latest_commit_info()
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
@@ -980,11 +1008,47 @@ async def store_recent_messages(message: types.Message):
                 getattr(message.forward_from, "first_name", ""),
                 getattr(message.forward_from, "last_name", ""),
                 len(message.new_chat_members) > 0,
-                bool(getattr(message.left_chat_member, "id", False))
+                bool(getattr(message.left_chat_member, "id", False)),
             ),
         )
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
+
+        # HEURISTICS
+        # Join date and first message with links or forwards from somewhere
+        # Join date and immediate message after joining
+        # Keywords or sentences
+        # Number of messages in a short period of time
+        # Number of forwards in a short period of time
+        # User reactions for the message
+
+        # search for the user join chat event date using user_id in the DB
+        user_join_chat_date_str = cursor.execute(
+            "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1",
+            (message.from_user.id,),
+        ).fetchone()
+        # if there is no such data assume user joined the chat 3 years ago in seconds
+        user_join_chat_date_str = (
+            user_join_chat_date_str[0] if user_join_chat_date_str else datetime(2020, 9, 6, 22, 30, 16)
+        )
+        print(
+            "USER JOINED: ",
+            user_join_chat_date_str,
+        )
+
+        # Convert the string to a datetime object
+        user_join_chat_date = datetime.strptime(user_join_chat_date_str, "%Y-%m-%d %H:%M:%S")
+
+        # flag true if user joined the chat more than 3 days ago
+        user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
+        print("User is old: ", user_is_old)
+        if not user_is_old:
+            # check if the message is sent less then 10 seconds after joining the chat
+            if (message.date - user_join_chat_date).total_seconds() < 10:
+                # this is possibly a bot
+                print("This is possibly a bot")
+                the_reason = "Message is sent less then 10 seconds after joining the chat"
+                await take_heuristic_action(message, the_reason)
 
         # prevent NoneType error if there is no message.forward_from_chat.type
         chat_type = (
@@ -994,32 +1058,9 @@ async def store_recent_messages(message: types.Message):
         if chat_type == "channel":
             # check for allowed channels for forwards
             if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
-                # TODO: make automated report to the admin group if the message was forwarded from the channel
-                # TODO: prevent automated reports if this is forwarded by admin
-                # TODO: check if the forwarding user joined more than 3 days ago to prevent spam
-                logger.warning(
-                    f"Channel message received: {True}. Sending automated report to the admin group for review..."
-                )
-                # process the message automatically
-                found_message_data = get_spammer_details(
-                    message.from_user.id,
-                    message.from_user.first_name,
-                    message.from_user.last_name,
-                    message.forward_date,
-                    message.forward_sender_name,
-                    message.forward_from_chat.title,
-                    forwarded_from_id=message.from_user.id,
-                )
-                await handle_forwarded_reports_with_details(
-                    message,
-                    message.from_user.id,
-                    message.from_user.first_name,
-                    message.from_user.last_name,
-                    message.forward_from_chat.title,
-                    message.forward_sender_name,
-                    found_message_data,
-                )
-                # pass
+                # this is possibly a spam
+                the_reason = "Message is forwarded from unknown channel"
+                await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:

@@ -349,6 +349,7 @@ async def take_heuristic_action(message: types.Message, reason):
         message.forward_from_chat.title if message.forward_from_chat else None,
         message.forward_sender_name,
         found_message_data,
+        reason=reason,
     )
 
 
@@ -390,6 +391,7 @@ async def handle_forwarded_reports_with_details(
     forward_from_chat_title: str,
     forward_sender_name: str,
     found_message_data: dict,
+    reason: str = "Automated report",
 ):
     """Function to handle forwarded messages with provided user details."""
     logger.debug("############################################################")
@@ -420,15 +422,16 @@ async def handle_forwarded_reports_with_details(
                 forward_from_chat_title,
             )
             logger.debug(
-                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+                "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
             )
             await message.answer(
-                f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+                "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
             )
         else:
             e = "Renamed Account or wrong chat?"
             logger.debug(
-                f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+                "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s",
+                e
             )
             await message.answer(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
@@ -437,7 +440,8 @@ async def handle_forwarded_reports_with_details(
     if not found_message_data:  # Last resort. Give up.
         return
 
-    logger.debug(f"Message data: {found_message_data}")
+    logger.debug("Message data: %s", found_message_data)
+    # logger.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
@@ -500,12 +504,19 @@ async def handle_forwarded_reports_with_details(
         f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
     )
 
+    # fix if message not forwarded and autoreported
+    if message.forward_date:
+        message_report_date = message.forward_date
+    else:
+        message_report_date = datetime.now()
+
     # Log the information with the link
     log_info = (
         f"💡 Report timestamp: {message.date}\n"
-        f"💡 Spam message timestamp: {message.forward_date}\n"
-        f"💡 Reaction time: {message.date - message.forward_date}\n"
+        f"💡 Spam message timestamp: {message_report_date}\n"
+        f"💡 Reaction time: {message_report_date - message.date}\n"
         f"💔 Reported by automated spam detection system\n"
+        f"💔 {reason}\n"
         f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
         f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
         f"💀 SPAMMER ID profile links:\n"
@@ -522,8 +533,9 @@ async def handle_forwarded_reports_with_details(
     logger.debug(log_info)
 
     admin_ban_banner = (
-        f"💡 Reaction time: {message.date - message.forward_date}\n"
+        f"💡 Reaction time: {message_report_date - message.date}\n"
         f"💔 Reported by automated spam detection system\n"
+        f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
@@ -1060,10 +1072,10 @@ async def store_recent_messages(message: types.Message):
             if user_join_chat_date_str
             else "2020-01-01 00:00:00"  # datetime(2020, 1, 1, 0, 0, 0)
         )
-        print(
-            "USER JOINED: ",
-            user_join_chat_date_str,
-        )
+        # print(
+        #     "USER JOINED: ",
+        #     user_join_chat_date_str,
+        # )
 
         # Convert the string to a datetime object
         user_join_chat_date = datetime.strptime(
@@ -1074,9 +1086,9 @@ async def store_recent_messages(message: types.Message):
         user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
         user_is_1hr_old = (message.date - user_join_chat_date).total_seconds() < 3600
         user_is_10sec_old = (message.date - user_join_chat_date).total_seconds() < 10
-        print("User is old: ", user_is_old)
-        print("User is 1hr old: ", user_is_1hr_old)
-        print("User is 10sec old: ", user_is_10sec_old)
+        # print("User is old: ", user_is_old)
+        # print("User is 1hr old: ", user_is_1hr_old)
+        # print("User is 10sec old: ", user_is_10sec_old)
 
         if not user_is_old and not (new_chat_member or left_chat_member):
             # check if the message is sent less then 10 seconds after joining the chat
@@ -1092,7 +1104,7 @@ async def store_recent_messages(message: types.Message):
                 # this is possibly a spam
                 print("This is possibly a spam with links or other entities")
                 if entity_spam_trigger:  # invoke heuristic action
-                    the_reason = "Message is sent less then 1 hour after joining the chat and have %s inside", entity_spam_trigger
+                    the_reason = "Message is sent less then 1 hour after joining the chat and have "+ entity_spam_trigger + " inside"
                     await take_heuristic_action(message, the_reason)
                 else:
                     # prevent NoneType error if there is no message.forward_from_chat.type

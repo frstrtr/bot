@@ -15,6 +15,19 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
+# define automated spam detection message.entities type triggers
+SPAM_TRIGGERS = (
+    "url",
+    "email",
+    "phone_number",
+    "hashtag",
+    "mention",
+    "text_link",
+    "mention_name",
+    "cashtag",
+    "bot_command",
+)
+
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
 # Setting up SQLite Database
@@ -180,7 +193,7 @@ def get_spammer_details(
             }
         )
 
-    # TODO
+    # TODO 
     # use message hash future field
 
     query = base_query.format(condition=condition)
@@ -315,14 +328,17 @@ async def take_heuristic_action(message: types.Message, reason):
         "%s. Sending automated report to the admin group for review...", reason
     )
 
+    # Use the current date if message.forward_date is None
+    forward_date = message.forward_date if message.forward_date else datetime.now()
+
     # process the message automatically
     found_message_data = get_spammer_details(
         message.from_user.id,
         message.from_user.first_name,
         message.from_user.last_name,
-        message.forward_date,
+        forward_date, # to see the script latency and reaction time
         message.forward_sender_name,
-        message.forward_from_chat.title,
+        message.forward_from_chat.title if message.forward_from_chat else None,
         forwarded_from_id=message.from_user.id,
     )
     await handle_forwarded_reports_with_details(
@@ -330,7 +346,7 @@ async def take_heuristic_action(message: types.Message, reason):
         message.from_user.id,
         message.from_user.first_name,
         message.from_user.last_name,
-        message.forward_from_chat.title,
+        message.forward_from_chat.title if message.forward_from_chat else None,
         message.forward_sender_name,
         found_message_data,
     )
@@ -985,6 +1001,9 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
+        new_chat_member = len(message.new_chat_members) > 0
+        left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+
         cursor.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
@@ -1007,8 +1026,8 @@ async def store_recent_messages(message: types.Message):
                 getattr(message.forward_from, "username", ""),
                 getattr(message.forward_from, "first_name", ""),
                 getattr(message.forward_from, "last_name", ""),
-                len(message.new_chat_members) > 0,
-                bool(getattr(message.left_chat_member, "id", False)),
+                new_chat_member,
+                left_chat_member,
             ),
         )
         conn.commit()
@@ -1022,6 +1041,14 @@ async def store_recent_messages(message: types.Message):
         # Number of forwards in a short period of time
         # User reactions for the message
 
+        # check if the message is a spam by checking the entities
+        entity_spam_trigger = None
+        for entity in message.entities:
+            if entity["type"] in SPAM_TRIGGERS:
+                # spam detected
+                entity_spam_trigger = entity["type"]
+
+
         # search for the user join chat event date using user_id in the DB
         user_join_chat_date_str = cursor.execute(
             "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1",
@@ -1029,7 +1056,9 @@ async def store_recent_messages(message: types.Message):
         ).fetchone()
         # if there is no such data assume user joined the chat 3 years ago in seconds
         user_join_chat_date_str = (
-            user_join_chat_date_str[0] if user_join_chat_date_str else datetime(2020, 9, 6, 22, 30, 16)
+            user_join_chat_date_str[0]
+            if user_join_chat_date_str
+            else "2020-01-01 00:00:00"  # datetime(2020, 1, 1, 0, 0, 0)
         )
         print(
             "USER JOINED: ",
@@ -1037,30 +1066,51 @@ async def store_recent_messages(message: types.Message):
         )
 
         # Convert the string to a datetime object
-        user_join_chat_date = datetime.strptime(user_join_chat_date_str, "%Y-%m-%d %H:%M:%S")
+        user_join_chat_date = datetime.strptime(
+            user_join_chat_date_str, "%Y-%m-%d %H:%M:%S"
+        )
 
         # flag true if user joined the chat more than 3 days ago
         user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
+        user_is_1hr_old = (message.date - user_join_chat_date).total_seconds() < 3600
+        user_is_10sec_old = (message.date - user_join_chat_date).total_seconds() < 10
         print("User is old: ", user_is_old)
-        if not user_is_old:
+        print("User is 1hr old: ", user_is_1hr_old)
+        print("User is 10sec old: ", user_is_10sec_old)
+
+        if not user_is_old and not (new_chat_member or left_chat_member):
             # check if the message is sent less then 10 seconds after joining the chat
-            if (message.date - user_join_chat_date).total_seconds() < 10:
+            if user_is_10sec_old:
                 # this is possibly a bot
                 print("This is possibly a bot")
-                the_reason = "Message is sent less then 10 seconds after joining the chat"
+                the_reason = (
+                    "Message is sent less then 10 seconds after joining the chat"
+                )
                 await take_heuristic_action(message, the_reason)
-
-        # prevent NoneType error if there is no message.forward_from_chat.type
-        chat_type = (
-            message.forward_from_chat.type if message.forward_from_chat else None
-        )
-        # check if it is forward from channel
-        if chat_type == "channel":
-            # check for allowed channels for forwards
-            if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
+            # check if the message is sent less then 1 hour after joining the chat
+            elif user_is_1hr_old:
                 # this is possibly a spam
-                the_reason = "Message is forwarded from unknown channel"
-                await take_heuristic_action(message, the_reason)
+                print("This is possibly a spam with links or other entities")
+                if entity_spam_trigger:  # invoke heuristic action
+                    the_reason = "Message is sent less then 1 hour after joining the chat and have %s inside", entity_spam_trigger
+                    await take_heuristic_action(message, the_reason)
+                else:
+                    # prevent NoneType error if there is no message.forward_from_chat.type
+                    chat_type = (
+                        message.forward_from_chat.type
+                        if message.forward_from_chat
+                        else None
+                    )
+                    # check if it is forward from channel
+                    if chat_type == "channel":
+                        # check for allowed channels for forwards
+                        if (
+                            message.forward_from_chat.id
+                            not in ALLOWED_FORWARD_CHANNEL_IDS
+                        ):
+                            # this is possibly a spam
+                            the_reason = "Message is forwarded from unknown channel"
+                            await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:

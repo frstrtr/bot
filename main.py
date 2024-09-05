@@ -1070,8 +1070,8 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
-        # new_chat_member = len(message.new_chat_members) > 0
-        # left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+        new_chat_member = len(message.new_chat_members) > 0
+        left_chat_member = bool(getattr(message.left_chat_member, "id", False))
 
         cursor.execute(
             """

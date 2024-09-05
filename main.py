@@ -995,6 +995,11 @@ async def reset_ban(callback_query: CallbackQuery):
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
 
+# check for users joining/leaving the chat
+@dp.message_handler(content_types=[types.ContentType.NEW_CHAT_MEMBERS, types.ContentType.LEFT_CHAT_MEMBER])
+async def user_joined_chat(message: types.Message):
+    print('Users changed')
+
 
 @dp.message_handler(
     lambda message: message.chat.id in CHANNEL_IDS, content_types=types.ContentTypes.ANY

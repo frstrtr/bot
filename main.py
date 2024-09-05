@@ -406,7 +406,7 @@ async def handle_forwarded_reports_with_details(
     technnolog_spamMessage_copy = await bot.forward_message(
         TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
     )
-    message_as_json = json.dumps(message.to_python(), indent=4)
+    message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -589,7 +589,7 @@ async def handle_forwarded_reports(message: types.Message):
     technnolog_spamMessage_copy = await bot.forward_message(
         TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
     )
-    message_as_json = json.dumps(message.to_python(), indent=4)
+    message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -1005,7 +1005,7 @@ async def store_recent_messages(message: types.Message):
         # Log the full message object for debugging
         # Convert the Message object to a dictionary
         message_dict = message.to_python()
-        formatted_message = json.dumps(message_dict, indent=4)  # Convert back to a JSON string with indentation
+        formatted_message = json.dumps(message_dict, indent=4, ensure_ascii=False)  # Convert back to a JSON string with indentation and human-readable characters
         logger.debug(
             "\nReceived message object:\n %s\n",
             formatted_message,

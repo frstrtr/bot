@@ -1003,8 +1003,9 @@ async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
-        message_json = json.loads(message)  # Parse the JSON string into a Python dictionary
-        formatted_message = json.dumps(message_json, indent=4)  # Convert back to a JSON string with indentation
+        # Convert the Message object to a dictionary
+        message_dict = message.to_python()
+        formatted_message = json.dumps(message_dict, indent=4)  # Convert back to a JSON string with indentation
         logger.debug(
             "\nReceived message object:\n %s\n",
             formatted_message,

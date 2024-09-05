@@ -70,6 +70,19 @@ conn.commit()
 # conn.commit()
 
 
+# Custom filter function to exclude specific content types
+def custom_filter(message: types.Message):
+    """Function to filter messages based on the chat ID and content type."""
+    excluded_content_types = {
+        types.ContentType.NEW_CHAT_MEMBERS,
+        types.ContentType.LEFT_CHAT_MEMBER,
+    }
+    return (
+        message.chat.id in CHANNEL_IDS
+        and message.content_type not in excluded_content_types
+    )
+
+
 def get_latest_commit_info():
     """Function to get the latest commit info."""
     try:
@@ -995,22 +1008,55 @@ async def reset_ban(callback_query: CallbackQuery):
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
     )
 
+
 # check for users joining/leaving the chat
-@dp.message_handler(content_types=[types.ContentType.NEW_CHAT_MEMBERS, types.ContentType.LEFT_CHAT_MEMBER])
-async def user_joined_chat(message: types.Message):
-    print('Users changed')
-
-
 @dp.message_handler(
-    lambda message: message.chat.id in CHANNEL_IDS, content_types=types.ContentTypes.ANY
+    content_types=[
+        types.ContentType.NEW_CHAT_MEMBERS,
+        types.ContentType.LEFT_CHAT_MEMBER,
+    ]
 )
+async def user_joined_chat(message: types.Message):
+    """Function to handle users joining or leaving the chat."""
+    # print("Users changed", message.new_chat_members, message.left_chat_member)
+    
+    # Send user join/left details to the technolog group
+    inout_userid = message.from_id
+    inout_userfirstname = message.from_user.first_name
+    inout_userlastname = message.from_user.last_name or ""  # optional
+    inout_username = message.from_user.username or "!UNDEFINED!"  # optional
+    inout_chatid = str(message.chat.id)[4:]
+    inout_action = "JOINED" if message.new_chat_members else "LEFT"
+    inout_chatname = message.chat.title
+    inout_logmessage = (
+        f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+        f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
+        f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+        f"💡 USER ID profile links:\n"
+        f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+        f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+        f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+        f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+    )
+
+    await bot.send_message(
+        TECHNOLOG_GROUP_ID,
+        inout_logmessage,
+        parse_mode="HTML",
+        message_thread_id=TECHNO_INOUT,
+    )
+
+
+@dp.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
 async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
         # Convert the Message object to a dictionary
         message_dict = message.to_python()
-        formatted_message = json.dumps(message_dict, indent=4, ensure_ascii=False)  # Convert back to a JSON string with indentation and human-readable characters
+        formatted_message = json.dumps(
+            message_dict, indent=4, ensure_ascii=False
+        )  # Convert back to a JSON string with indentation and human-readable characters
         logger.debug(
             "\nReceived message object:\n %s\n",
             formatted_message,
@@ -1024,8 +1070,8 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
-        new_chat_member = len(message.new_chat_members) > 0
-        left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+        # new_chat_member = len(message.new_chat_members) > 0
+        # left_chat_member = bool(getattr(message.left_chat_member, "id", False))
 
         cursor.execute(
             """
@@ -1056,29 +1102,32 @@ async def store_recent_messages(message: types.Message):
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
 
-        if new_chat_member or left_chat_member:
-            # Send user join/left details to the technolog group
-            inout_userid = message.from_id
-            inout_userfirstname = message.from_user.first_name
-            inout_userlastname = message.from_user.last_name or "" # optional
-            inout_username = message.from_user.username or "!UNDEFINED!" # optional
-            inout_chatid = str(message.chat.id)[4:]
-            inout_action = "JOINED" if new_chat_member else "LEFT"
-            inout_chatname = message.chat.title
-            inout_logmessage = (
-                f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-                f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
-                f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n" # https://t.me/c/1902317320/27448/27778
-                f"💡 USER ID profile links:\n"
-                f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-                f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-                f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-                f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-            )
+        # if new_chat_member or left_chat_member:
+        #     # Send user join/left details to the technolog group
+        #     inout_userid = message.from_id
+        #     inout_userfirstname = message.from_user.first_name
+        #     inout_userlastname = message.from_user.last_name or ""  # optional
+        #     inout_username = message.from_user.username or "!UNDEFINED!"  # optional
+        #     inout_chatid = str(message.chat.id)[4:]
+        #     inout_action = "JOINED" if new_chat_member else "LEFT"
+        #     inout_chatname = message.chat.title
+        #     inout_logmessage = (
+        #         f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+        #         f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
+        #         f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+        #         f"💡 USER ID profile links:\n"
+        #         f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+        #         f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+        #         f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+        #         f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+        #     )
 
-            await bot.send_message(
-                TECHNOLOG_GROUP_ID, inout_logmessage, parse_mode="HTML", message_thread_id=TECHNO_INOUT
-            )
+        #     await bot.send_message(
+        #         TECHNOLOG_GROUP_ID,
+        #         inout_logmessage,
+        #         parse_mode="HTML",
+        #         message_thread_id=TECHNO_INOUT,
+        #     )
 
         # HEURISTICS
         # Join date and first message with links or forwards from somewhere

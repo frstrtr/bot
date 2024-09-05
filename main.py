@@ -1059,10 +1059,10 @@ async def store_recent_messages(message: types.Message):
         formatted_message = json.dumps(
             message_dict, indent=4, ensure_ascii=False
         )  # Convert back to a JSON string with indentation and human-readable characters
-        logger.debug(
-            "\nReceived message object:\n %s\n",
-            formatted_message,
-        )
+        # logger.debug(
+        #     "\nReceived message object:\n %s\n",
+        #     formatted_message,
+        # )
         await bot.send_message(TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS)
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"

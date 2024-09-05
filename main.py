@@ -70,7 +70,7 @@ conn.commit()
 # conn.commit()
 
 
-# Custom filter function to exclude specific content types
+# Custom filter function to exclude specific content types and groups for the message handler
 def custom_filter(message: types.Message):
     """Function to filter messages based on the chat ID and content type."""
     excluded_content_types = {
@@ -1020,6 +1020,8 @@ async def user_joined_chat(message: types.Message):
     """Function to handle users joining or leaving the chat."""
     # print("Users changed", message.new_chat_members, message.left_chat_member)
     
+    # TODO add logic to store join/left events in the database
+
     # Send user join/left details to the technolog group
     inout_userid = message.from_id
     inout_userfirstname = message.from_user.first_name
@@ -1061,6 +1063,7 @@ async def store_recent_messages(message: types.Message):
             "\nReceived message object:\n %s\n",
             formatted_message,
         )
+        await bot.send_message(TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS)
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"
         #     # f"First Name?: {message.from_user.first_name}\n"
@@ -1070,6 +1073,7 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
+        # TODO move to the join/left event handler
         new_chat_member = len(message.new_chat_members) > 0
         left_chat_member = bool(getattr(message.left_chat_member, "id", False))
 

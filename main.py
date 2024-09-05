@@ -193,7 +193,7 @@ def get_spammer_details(
             }
         )
 
-    # TODO 
+    # TODO
     # use message hash future field
 
     query = base_query.format(condition=condition)
@@ -284,10 +284,11 @@ ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
 TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
 # TODO: move to XML credentials files
-TECHNO_LOGGING = 1  #          LOGGING
-TECHNO_ORIGINALS = 21541  #    ORIGINALS
-TECHNO_UNHANDLED = 21525  #    UNHANDLED
+TECHNO_LOGGING = 1  #           LOGGING
+TECHNO_ORIGINALS = 21541  #     ORIGINALS
+TECHNO_UNHANDLED = 21525  #     UNHANDLED
 TECHNO_RESTART = 21596  #       RESTART
+TECHNO_INOUT = 27448  #          INOUT
 
 # TODO: move to XML credentials files
 ALLOWED_FORWARD_CHANNELS = (
@@ -309,6 +310,7 @@ print(
     "Excluding autoreport when forwarded from chats: @"
     + " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS])
 )
+print("\n")
 
 
 bot = Bot(token=API_TOKEN)
@@ -336,7 +338,7 @@ async def take_heuristic_action(message: types.Message, reason):
         message.from_user.id,
         message.from_user.first_name,
         message.from_user.last_name,
-        forward_date, # to see the script latency and reaction time
+        forward_date,  # to see the script latency and reaction time
         message.forward_sender_name,
         message.forward_from_chat.title if message.forward_from_chat else None,
         forwarded_from_id=message.from_user.id,
@@ -431,7 +433,7 @@ async def handle_forwarded_reports_with_details(
             e = "Renamed Account or wrong chat?"
             logger.debug(
                 "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s",
-                e
+                e,
             )
             await message.answer(
                 f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
@@ -1045,6 +1047,30 @@ async def store_recent_messages(message: types.Message):
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
 
+        if new_chat_member or left_chat_member:
+            # Send user join/left details to the technolog group
+            inout_userid = message.from_id
+            inout_userfirstname = message.from_user.first_name
+            inout_userlastname = message.from_user.last_name or "" # optional
+            inout_username = message.from_user.username or "!UNDEFINED!" # optional
+            inout_chatid = str(message.chat.id)[4:]
+            inout_action = "JOINED" if new_chat_member else "LEFT"
+            inout_chatname = message.chat.title
+            inout_logmessage = (
+                f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+                f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
+                f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n" # https://t.me/c/1902317320/27448/27778
+                f"💡 USER ID profile links:\n"
+                f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+                f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+                f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+                f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+            )
+
+            await bot.send_message(
+                TECHNOLOG_GROUP_ID, inout_logmessage, parse_mode="HTML", message_thread_id=TECHNO_INOUT
+            )
+
         # HEURISTICS
         # Join date and first message with links or forwards from somewhere
         # Join date and immediate message after joining
@@ -1059,7 +1085,6 @@ async def store_recent_messages(message: types.Message):
             if entity["type"] in SPAM_TRIGGERS:
                 # spam detected
                 entity_spam_trigger = entity["type"]
-
 
         # search for the user join chat event date using user_id in the DB
         user_join_chat_date_str = cursor.execute(
@@ -1104,7 +1129,11 @@ async def store_recent_messages(message: types.Message):
                 # this is possibly a spam
                 print("This is possibly a spam with links or other entities")
                 if entity_spam_trigger:  # invoke heuristic action
-                    the_reason = "Message is sent less then 1 hour after joining the chat and have "+ entity_spam_trigger + " inside"
+                    the_reason = (
+                        "Message is sent less then 1 hour after joining the chat and have "
+                        + entity_spam_trigger
+                        + " inside"
+                    )
                     await take_heuristic_action(message, the_reason)
                 else:
                     # prevent NoneType error if there is no message.forward_from_chat.type

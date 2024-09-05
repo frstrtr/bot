@@ -1019,7 +1019,7 @@ async def reset_ban(callback_query: CallbackQuery):
 async def user_joined_chat(message: types.Message):
     """Function to handle users joining or leaving the chat."""
     # print("Users changed", message.new_chat_members, message.left_chat_member)
-    
+
     # TODO add logic to store join/left events in the database
 
     # Send user join/left details to the technolog group
@@ -1063,7 +1063,9 @@ async def store_recent_messages(message: types.Message):
         #     "\nReceived message object:\n %s\n",
         #     formatted_message,
         # )
-        await bot.send_message(TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS)
+        await bot.send_message(
+            TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
+        )
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"
         #     # f"First Name?: {message.from_user.first_name}\n"

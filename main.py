@@ -1003,9 +1003,9 @@ async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
-        # logger.debug(
-        #     f"\nReceived message object: {message}\n"
-        # )
+        logger.debug(
+            f"\nReceived message object: {message}\n"
+        )
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"
         #     # f"First Name?: {message.from_user.first_name}\n"

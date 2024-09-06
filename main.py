@@ -589,7 +589,7 @@ async def handle_forwarded_reports_with_details(
     keyboard.add(ban_btn)
 
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
-    admin_group_banner_message = await bot.send_message(
+    await bot.send_message(
         ADMIN_GROUP_ID,
         admin_ban_banner,
         reply_markup=keyboard,
@@ -598,12 +598,12 @@ async def handle_forwarded_reports_with_details(
     )
 
     # Construct link to the published banner and send it to the reporter
-    private_chat_id = int(
-        str(admin_group_banner_message.chat.id)[4:]
-    )  # Remove -100 from the chat ID
-    banner_link = (
-        f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
-    )
+    # private_chat_id = int(
+    #     str(admin_group_banner_message.chat.id)[4:]
+    # Remove -100 from the chat ID
+    # banner_link = (
+    #     f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
+    # )
 
     # Check if the reporter is an admin in the admin group:
     # if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
@@ -1271,7 +1271,8 @@ async def store_recent_messages(message: types.Message):
 
         if message_sent_during_night(message):
             the_reason = "Message sent during the night"
-            await take_heuristic_action(message, the_reason)
+            print(f"Message sent during the night: {message}")
+            # await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:

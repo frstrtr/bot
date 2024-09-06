@@ -1016,6 +1016,19 @@ async def reset_ban(callback_query: CallbackQuery):
         types.ContentType.LEFT_CHAT_MEMBER,
     ]
 )
+
+
+# Check for spam indicator: 5 or more entities of type 'custom_emoji'
+def has_custom_emoji_spam(message):
+    """Function to check if a message contains spammy custom emojis."""
+    message_dict = message.to_python()
+    entities = message_dict.get("entities", [])
+    custom_emoji_count = sum(
+        1 for entity in entities if entity.get("type") == "custom_emoji"
+    )
+    return custom_emoji_count >= 5
+
+
 async def user_joined_chat(message: types.Message):
     """Function to handle users joining or leaving the chat."""
     # print("Users changed", message.new_chat_members, message.left_chat_member)
@@ -1066,6 +1079,7 @@ async def store_recent_messages(message: types.Message):
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )
+
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"
         #     # f"First Name?: {message.from_user.first_name}\n"
@@ -1216,6 +1230,12 @@ async def store_recent_messages(message: types.Message):
                             # this is possibly a spam
                             the_reason = "Message is forwarded from unknown channel"
                             await take_heuristic_action(message, the_reason)
+
+        if has_custom_emoji_spam(
+            message
+        ):  # check if the message contains spammy custom emojis
+            the_reason = "Message contains more than 5 spammy custom emojis"
+            await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:

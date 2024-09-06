@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
@@ -72,7 +73,10 @@ conn.commit()
 
 # Custom filter function to exclude specific content types and groups for the message handler
 def custom_filter(message: types.Message):
-    """Function to filter messages based on the chat ID and content type."""
+    """Function to filter messages based on the chat ID and content type.
+    Custom filter function to exclude specific content types and groups for the message handler
+    Do not record join/left chat member events
+    """
     excluded_content_types = {
         types.ContentType.NEW_CHAT_MEMBERS,
         types.ContentType.LEFT_CHAT_MEMBER,
@@ -340,6 +344,22 @@ dp = Dispatcher(bot)
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
 
+def message_sent_during_night(message: types.Message):
+    """Function to check if the message was sent during the night."""
+    # Assume message.date is already a datetime object in UTC
+    message_time = message.date
+
+    # Convert the time to the user's timezone
+    user_timezone = pytz.timezone("Indian/Mauritius")
+    user_time = message_time.astimezone(user_timezone)
+
+    # Get the current time in the user's timezone
+    user_hour = user_time.hour
+
+    # Check if the message was sent during the night
+    return user_hour < 6 and user_hour >= 1
+
+
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
@@ -372,7 +392,7 @@ async def take_heuristic_action(message: types.Message, reason):
     )
 
 
-async def on_startup(dp: Dispatcher):
+async def on_startup(dpst: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _commit_info = get_latest_commit_info()
@@ -478,7 +498,7 @@ async def handle_forwarded_reports_with_details(
             message.chat.id,
             report_id,
             message.from_user.id,
-            mesADMIN_GROUP_IDsage.from_user.username,
+            message.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
             message.forward_date if message.forward_date else None,
@@ -806,7 +826,7 @@ async def handle_forwarded_reports(message: types.Message):
         admin_group_banner_message = await bot.send_message(
             ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
         )
-    else: # send report to AUTOREPORT thread of the admin group
+    else:  # send report to AUTOREPORT thread of the admin group
         admin_group_banner_message = await bot.send_message(
             ADMIN_GROUP_ID,
             admin_ban_banner,
@@ -1169,41 +1189,6 @@ async def store_recent_messages(message: types.Message):
         conn.commit()
         # logger.info(f"Stored recent message: {message}")
 
-        # if new_chat_member or left_chat_member:
-        #     # Send user join/left details to the technolog group
-        #     inout_userid = message.from_id
-        #     inout_userfirstname = message.from_user.first_name
-        #     inout_userlastname = message.from_user.last_name or ""  # optional
-        #     inout_username = message.from_user.username or "!UNDEFINED!"  # optional
-        #     inout_chatid = str(message.chat.id)[4:]
-        #     inout_action = "JOINED" if new_chat_member else "LEFT"
-        #     inout_chatname = message.chat.title
-        #     inout_logmessage = (
-        #         f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-        #         f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
-        #         f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
-        #         f"💡 USER ID profile links:\n"
-        #         f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-        #         f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-        #         f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-        #         f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-        #     )
-
-        #     await bot.send_message(
-        #         TECHNOLOG_GROUP_ID,
-        #         inout_logmessage,
-        #         parse_mode="HTML",
-        #         message_thread_id=TECHNO_INOUT,
-        #     )
-
-        # HEURISTICS
-        # Join date and first message with links or forwards from somewhere
-        # Join date and immediate message after joining
-        # Keywords or sentences
-        # Number of messages in a short period of time
-        # Number of forwards in a short period of time
-        # User reactions for the message
-
         # check if the message is a spam by checking the entities
         entity_spam_trigger = None
         for entity in message.entities:
@@ -1282,6 +1267,10 @@ async def store_recent_messages(message: types.Message):
             message
         ):  # check if the message contains spammy custom emojis
             the_reason = "Message contains more than 5 spammy custom emojis"
+            await take_heuristic_action(message, the_reason)
+
+        if message_sent_during_night(message):
+            the_reason = "Message sent during the night"
             await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave

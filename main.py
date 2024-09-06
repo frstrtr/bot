@@ -1147,6 +1147,8 @@ async def store_recent_messages(message: types.Message):
         #     "\nReceived message object:\n %s\n",
         #     formatted_message,
         # )
+        if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+            formatted_message = formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )

@@ -1107,6 +1107,13 @@ async def store_recent_messages(message: types.Message):
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )
+        # or/and forward the message to the technolog group
+        await bot.forward_message(
+            TECHNOLOG_GROUP_ID,
+            message.chat.id,
+            message.message_id,
+            message_thread_id=TECHNO_ORIGINALS,
+        )
 
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"

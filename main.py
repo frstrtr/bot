@@ -1020,7 +1020,7 @@ def has_custom_emoji_spam(message):
     return custom_emoji_count >= 5
 
 
-# check for users joining/leaving the chat
+# check for users joining/leaving the chat TODO not functional!
 @dp.message_handler(
     content_types=[
         types.ContentType.NEW_CHAT_MEMBERS,
@@ -1032,6 +1032,36 @@ async def user_joined_chat(message: types.Message):
     # print("Users changed", message.new_chat_members, message.left_chat_member)
 
     # TODO add logic to store join/left events in the database
+    new_chat_member = len(message.new_chat_members) > 0
+    left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO recent_messages 
+        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            getattr(message.chat, "id", None),
+            getattr(message.chat, "username", ""),
+            getattr(message, "message_id", None),
+            getattr(message.from_user, "id", None),
+            getattr(message.from_user, "username", ""),
+            getattr(message.from_user, "first_name", ""),
+            getattr(message.from_user, "last_name", ""),
+            getattr(message, "forward_date", None),
+            getattr(message, "forward_sender_name", ""),
+            getattr(message, "date", None),
+            getattr(message.forward_from_chat, "title", None),
+            getattr(message.forward_from, "id", None),
+            getattr(message.forward_from, "username", ""),
+            getattr(message.forward_from, "first_name", ""),
+            getattr(message.forward_from, "last_name", ""),
+            new_chat_member,
+            left_chat_member,
+        ),
+    )
+    conn.commit()
 
     # Send user join/left details to the technolog group
     inout_userid = message.from_id
@@ -1087,10 +1117,6 @@ async def store_recent_messages(message: types.Message):
         # )
         # TODO remove afer sandboxing
 
-        # TODO move to the join/left event handler
-        new_chat_member = len(message.new_chat_members) > 0
-        left_chat_member = bool(getattr(message.left_chat_member, "id", False))
-
         cursor.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
@@ -1113,8 +1139,8 @@ async def store_recent_messages(message: types.Message):
                 getattr(message.forward_from, "username", ""),
                 getattr(message.forward_from, "first_name", ""),
                 getattr(message.forward_from, "last_name", ""),
-                new_chat_member,
-                left_chat_member,
+                None,
+                None,
             ),
         )
         conn.commit()

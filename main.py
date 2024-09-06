@@ -293,7 +293,10 @@ techno_log_group = config_XML_root.find("techno_log_group").text
 techno_log_group_name = config_XML_root.find("techno_log_group_name").text
 
 API_TOKEN = bot_token
+
 ADMIN_GROUP_ID = int(log_group)  # Ensure this is an integer
+ADMIN_AUTOREPORTS = 10921  #     AUTOREPORTS
+
 TECHNOLOG_GROUP_ID = int(techno_log_group)  # Ensure this is an integer
 
 # TODO: move to XML credentials files
@@ -301,7 +304,8 @@ TECHNO_LOGGING = 1  #           LOGGING
 TECHNO_ORIGINALS = 21541  #     ORIGINALS
 TECHNO_UNHANDLED = 21525  #     UNHANDLED
 TECHNO_RESTART = 21596  #       RESTART
-TECHNO_INOUT = 27448  #          INOUT
+TECHNO_INOUT = 27448  #         INOUT
+
 
 # TODO: move to XML credentials files
 ALLOWED_FORWARD_CHANNELS = (
@@ -507,7 +511,7 @@ async def handle_forwarded_reports_with_details(
     # Get the username
     username = found_message_data[4]
     if not username:
-        username = "!_U_N_D_E_F_I_N_E_D_!"
+        username = "!UNDEFINED!"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -566,7 +570,11 @@ async def handle_forwarded_reports_with_details(
 
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     admin_group_banner_message = await bot.send_message(
-        ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
+        ADMIN_GROUP_ID,
+        admin_ban_banner,
+        reply_markup=keyboard,
+        parse_mode="HTML",
+        message_thread_id=ADMIN_AUTOREPORTS,
     )
 
     # Construct link to the published banner and send it to the reporter
@@ -968,6 +976,7 @@ async def handle_ban(callback_query: CallbackQuery):
         await bot.send_message(
             ADMIN_GROUP_ID,
             f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User {author_id} banned and their messages deleted where applicable.",
+            message_thread_id=callback_query.message.message_thread_id,
         )
         await bot.send_message(
             TECHNOLOG_GROUP_ID,
@@ -1000,6 +1009,7 @@ async def reset_ban(callback_query: CallbackQuery):
         ADMIN_GROUP_ID,
         f"Button ACTION CANCELLED by @{button_pressed_by}: Report {report_id_to_ban} WAS NOT PROCESSED!!! "
         f"Report them again if needed or use /ban {report_id_to_ban} command.",
+        message_thread_id=callback_query.message.message_thread_id,
     )
     await bot.send_message(
         TECHNOLOG_GROUP_ID,
@@ -1114,7 +1124,6 @@ async def store_recent_messages(message: types.Message):
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )
-
 
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"

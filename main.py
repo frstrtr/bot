@@ -615,11 +615,11 @@ async def handle_forwarded_reports(message: types.Message):
         message.forward_from_chat.title if message.forward_from_chat else None
     )
 
-    forward_from_username = (
-        getattr(message.forward_from, "username", None)
-        if message.forward_from
-        else None
-    )
+    # forward_from_username = (
+    #     getattr(message.forward_from, "username", None)
+    #     if message.forward_from
+    #     else None
+    # )
 
     found_message_data = None
     forward_sender_name = (
@@ -1095,6 +1095,13 @@ async def store_recent_messages(message: types.Message):
     """Function to store recent messages in the database."""
     try:
         # Log the full message object for debugging
+        # or/and forward the message to the technolog group
+        await bot.forward_message(
+            TECHNOLOG_GROUP_ID,
+            message.chat.id,
+            message.message_id,
+            message_thread_id=TECHNO_ORIGINALS,
+        )
         # Convert the Message object to a dictionary
         message_dict = message.to_python()
         formatted_message = json.dumps(
@@ -1107,13 +1114,7 @@ async def store_recent_messages(message: types.Message):
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )
-        # or/and forward the message to the technolog group
-        await bot.forward_message(
-            TECHNOLOG_GROUP_ID,
-            message.chat.id,
-            message.message_id,
-            message_thread_id=TECHNO_ORIGINALS,
-        )
+
 
         # logger.debug(
         #     # f"Bot?: {message.from_user.is_bot}\n"

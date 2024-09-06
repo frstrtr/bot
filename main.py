@@ -478,7 +478,7 @@ async def handle_forwarded_reports_with_details(
             message.chat.id,
             report_id,
             message.from_user.id,
-            message.from_user.username,
+            mesADMIN_GROUP_IDsage.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
             message.forward_date if message.forward_date else None,
@@ -586,9 +586,9 @@ async def handle_forwarded_reports_with_details(
     )
 
     # Check if the reporter is an admin in the admin group:
-    if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
-        # Send the banner link to the reporter
-        await message.answer(f"Admin group banner link: {banner_link}")
+    # if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+    #     # Send the banner link to the reporter
+    #     await message.answer(f"Admin group banner link: {banner_link}")
 
 
 @dp.message_handler(
@@ -743,7 +743,7 @@ async def handle_forwarded_reports(message: types.Message):
     # Get the username
     username = found_message_data[4]
     if not username:
-        username = "!_U_N_D_E_F_I_N_E_D_!"
+        username = "!UNDEFINED!"
 
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
@@ -802,12 +802,18 @@ async def handle_forwarded_reports(message: types.Message):
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     # And store published bunner message data to provide link to the reportee
     # admin_group_banner_message: Message = None # Type hinting
-    admin_group_banner_message = await bot.send_message(
-        ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
-    )
-    # await bot.send_message(
-    #     ADMIN_GROUP_ID, log_info, reply_markup=keyboard, parse_mode="HTML"
-    # )
+    if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+        admin_group_banner_message = await bot.send_message(
+            ADMIN_GROUP_ID, admin_ban_banner, reply_markup=keyboard, parse_mode="HTML"
+        )
+    else: # send report to AUTOREPORT thread of the admin group
+        admin_group_banner_message = await bot.send_message(
+            ADMIN_GROUP_ID,
+            admin_ban_banner,
+            reply_markup=keyboard,
+            parse_mode="HTML",
+            message_thread_id=ADMIN_AUTOREPORTS,
+        )
 
     # Log the banner message data
     # logger.debug(f"Admin group banner: {admin_group_banner_message}")

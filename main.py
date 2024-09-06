@@ -1138,8 +1138,8 @@ async def store_recent_messages(message: types.Message):
             message.message_id,
             message_thread_id=TECHNO_ORIGINALS,
         )
-        logger.info(f"Forwarded from chat: {message.chat.id}"
-                    f"Forwarded from chat title: {message.chat.title}")
+        logger.info("Forwarded from chat: %s"
+                    "Forwarded from chat title: %s", message.chat.id, message.chat.title)
         # Convert the Message object to a dictionary
         message_dict = message.to_python()
         formatted_message = json.dumps(

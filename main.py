@@ -1009,15 +1009,6 @@ async def reset_ban(callback_query: CallbackQuery):
     )
 
 
-# check for users joining/leaving the chat
-@dp.message_handler(
-    content_types=[
-        types.ContentType.NEW_CHAT_MEMBERS,
-        types.ContentType.LEFT_CHAT_MEMBER,
-    ]
-)
-
-
 # Check for spam indicator: 5 or more entities of type 'custom_emoji'
 def has_custom_emoji_spam(message):
     """Function to check if a message contains spammy custom emojis."""
@@ -1029,6 +1020,13 @@ def has_custom_emoji_spam(message):
     return custom_emoji_count >= 5
 
 
+# check for users joining/leaving the chat
+@dp.message_handler(
+    content_types=[
+        types.ContentType.NEW_CHAT_MEMBERS,
+        types.ContentType.LEFT_CHAT_MEMBER,
+    ]
+)
 async def user_joined_chat(message: types.Message):
     """Function to handle users joining or leaving the chat."""
     # print("Users changed", message.new_chat_members, message.left_chat_member)

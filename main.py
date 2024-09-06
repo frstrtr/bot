@@ -422,6 +422,10 @@ def message_sent_during_night(message: types.Message):
 # Function to check message for predetermined word sentences
 def check_message_for_sentences(message: types.Message):
     """Function to check the message for predetermined word sentences."""
+    # Check if the message contains text
+    if message.text is None:
+        return False
+    
     # Convert the message text to lowercase
     message_text = message.text.lower()
 

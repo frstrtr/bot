@@ -1140,7 +1140,7 @@ async def store_recent_messages(message: types.Message):
             message_thread_id=TECHNO_ORIGINALS,
         )
         logger.info(
-            "Message ID: %s Forwarded from chat: %s Forwarded from chat title: %s",
+            "Message ID: %s Forwarded from chat: %s with title: %s",
             message.message_id,
             message.chat.id,
             message.chat.title,

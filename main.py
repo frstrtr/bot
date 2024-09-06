@@ -235,7 +235,8 @@ def get_spammer_details(
     return result
 
 
-# logging.basicConfig(level=logging.DEBUG) # To debug the bot itself (e.g., to see the messages it receives)
+# logging.basicConfig(level=logging.DEBUG)
+# To debug the bot itself (e.g., to see the messages it receives)
 logger = logging.getLogger(
     __name__
 )  # To debug the script (e.g., to see if the XML is loaded correctly)
@@ -392,7 +393,7 @@ async def take_heuristic_action(message: types.Message, reason):
     )
 
 
-async def on_startup(dpst: Dispatcher):
+async def on_startup(_dp: Dispatcher):
     """Function to handle the bot startup."""
     bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _commit_info = get_latest_commit_info()
@@ -623,11 +624,11 @@ async def handle_forwarded_reports(message: types.Message):
     logger.debug("############################################################")
     logger.debug("                                                            ")
     logger.debug("------------------------------------------------------------")
-    logger.debug(f"Received forwarded message for the investigation: {message}")
+    logger.debug("Received forwarded message for the investigation: %s", message)
     # Send a thank you note to the user
     await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    technnolog_spamMessage_copy = await bot.forward_message(
+    technnolog_spam_message_copy = await bot.forward_message(
         TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
     )
     message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
@@ -771,10 +772,10 @@ async def handle_forwarded_reports(message: types.Message):
 
     # print('##########----------DEBUG----------##########')
     technolog_chat_id = int(
-        str(technnolog_spamMessage_copy.chat.id)[4:]
+        str(technnolog_spam_message_copy.chat.id)[4:]
     )  # Remove -100 from the chat ID
-    technnolog_spamMessage_copy_link = (
-        f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
+    technnolog_spam_message_copy_link = (
+        f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
     )
     # print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
 
@@ -795,7 +796,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
-        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
+        f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
         f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
@@ -807,7 +808,7 @@ async def handle_forwarded_reports(message: types.Message):
         f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
         f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
-        f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
+        f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
 
@@ -1138,8 +1139,12 @@ async def store_recent_messages(message: types.Message):
             message.message_id,
             message_thread_id=TECHNO_ORIGINALS,
         )
-        logger.info("Forwarded from chat: %s"
-                    "Forwarded from chat title: %s", message.chat.id, message.chat.title)
+        logger.info(
+            "Message ID: %s Forwarded from chat: %s Forwarded from chat title: %s",
+            message.message_id,
+            message.chat.id,
+            message.chat.title,
+        )
         # Convert the Message object to a dictionary
         message_dict = message.to_python()
         formatted_message = json.dumps(
@@ -1150,7 +1155,9 @@ async def store_recent_messages(message: types.Message):
         #     formatted_message,
         # )
         if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
-            formatted_message = formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+            formatted_message = (
+                formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+            )
         await bot.send_message(
             TECHNOLOG_GROUP_ID, formatted_message, message_thread_id=TECHNO_ORIGINALS
         )

@@ -15,6 +15,60 @@ from aiogram.utils.exceptions import (
     # MessageCantBeDeleted,
     RetryAfter,
 )
+# List of predetermined sentences to check for
+PREDETERMINED_SENTENCES = [
+    "набираю партнеров",
+    "обучаю бесплатно",
+    "люди в команду",
+    "процент от заработка",
+    "приглашаю партнеров",
+    "перспективной сфере",
+    "пассивная прибыль",
+    "еженедельный доп.доход",
+    "доп заработок",
+    "онлайн основе",
+    "0ФUЦUАЛЬНЫЙ зaрaботок",
+    "oбyчeния для зapaбoткa",
+    "бepy пpoцeнт oт пpибыли",
+    "удаленная.занятость",
+    "ставьте +",
+    "совершеннолетних людей",
+    "пассивное направление",
+    "заработать онлайн",
+    "заинтересованых людей",
+    "новой связки",
+    "места ограничены",
+    "ТPE6УЮТCЯ РЕ6ЯTA",
+    "МУЖЧUHЫ-ЖEHЩUНЫ",
+    "ещё один источник дохода",
+    "нe связaнa с нaрko u uнтum",
+    "лучше порнухи чем здесь не найти",
+    "еженeдельная пpибыль",
+    "белая темка",
+    "в крупную команду",
+    "отправляй + в личные смс",
+    "выплаты ежедневные",
+    "удаленного зapaбoтka",
+    "уделять в день 1-2 часа",
+    "люди для онлайн работы",
+    "приятным ежедневным доходом",
+    "возможность пассивно зарабатывать",
+    "предоставляю  бесплатное обучение",
+    "прибыльное предложение",
+    "хорошим недельным доходом",
+    "люди в команду для заработка",
+    "заработок с помощью крипто-бирж",
+    "КАСАЕТСЯ ВСЕХ В ГРУППЕ",
+    "НУЖНЫ ОТВЕТСТВЕННЫЕ ЛЮДИ",
+    "сфере цифровых валют",
+    "только заинтересованным людям",
+    "заработок возможен",
+    "последние места в команду",
+    "заинтересованным и совершеннолетним",
+    "для взаимовыгодного сотрудничества",
+    "поисках партнёров",
+    "пассивный доход"
+]
 
 # define automated spam detection message.entities type triggers
 SPAM_TRIGGERS = (
@@ -360,6 +414,19 @@ def message_sent_during_night(message: types.Message):
     # Check if the message was sent during the night
     return user_hour < 6 and user_hour >= 1
 
+
+# function to check message for predetermined word sentences:
+# Function to check message for predetermined word sentences
+def check_message_for_sentences(message: types.Message):
+    """Function to check the message for predetermined word sentences."""
+    # Convert the message text to lowercase
+    message_text = message.text.lower()
+
+    # Check if the message contains any of the predetermined sentences
+    for sentence in PREDETERMINED_SENTENCES:
+        if sentence in message_text:
+            return True
+    return False
 
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
@@ -1277,17 +1344,21 @@ async def store_recent_messages(message: types.Message):
         if has_custom_emoji_spam(
             message
         ):  # check if the message contains spammy custom emojis
-            the_reason = "Message contains more than 5 spammy custom emojis"
+            the_reason = "Message contains 5 or more spammy custom emojis"
             await take_heuristic_action(message, the_reason)
 
         if message_sent_during_night(message):
             the_reason = "Message sent during the night"
             print(f"Message sent during the night: {message}")
             # await take_heuristic_action(message, the_reason)
+        
+        if check_message_for_sentences(message):
+            the_reason = "Message contains spammy sentences"
+            await take_heuristic_action(message, the_reason)
 
     # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
     except Exception as e:
-        logger.error(f"Error storing recent message: {e}")
+        logger.error("Error storing recent message: %s", e)
 
 
 # TODO: Remove this if the buttons works fine

@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import pytz
 import sqlite3
 import xml.etree.ElementTree as ET
@@ -75,6 +76,14 @@ PREDETERMINED_SENTENCES = [
     "использования сомнительных платформ",
     "выгода процент",
     "писать только заинтересованным",
+    "вашего финансового проекта",
+    "интересуются финансовыми консультациями",
+    "высокая скорость привлечения",
+    "закажите инвайт прямо сейчас",
+    "места ограничены!",
+    "людей на удалённую",
+    "доход от $1000 в неделю",
+    "совмещайте с основной занятостью"
 ]
 
 # define automated spam detection message.entities type triggers
@@ -442,21 +451,31 @@ def check_message_for_emojis(message: types.Message):
     return False
 
 
-# Function to check if the message text and caption contains 5 or more capital letters in line
+# Function to check if the message text contains 5 or more consecutive capital letters in a line, excluding URLs
 def check_message_for_capital_letters(message: types.Message):
-    """Function to check if the message contains 5 or more capital letters in line."""
-    # Check if the message contains text or caption
+    """Function to check if the message contains 5 or more consecutive capital letters in a line, excluding URLs."""
+    # Check if the message contains text
     if message.text is None:
         return False
 
-    # Initialize a list to hold lines from both text and caption
-    lines = []
+    # Initialize a list to hold lines from the text
+    lines = message.text.split("\n")
 
-    # Add lines from message text if it exists
-    lines.extend(message.text.split("\n"))
+    # Regular expression to match URLs
+    url_pattern = re.compile(r'https?://\S+|www\.\S+')
 
-    # Check if any line contains 5 or more capital letters
-    return any(sum(1 for char in line if char.isupper()) >= 5 for line in lines)
+    # Regular expression to match 5 or more consecutive capital letters
+    capital_pattern = re.compile(r'[A-Z]{5,}')
+
+    # Check if any line contains 5 or more consecutive capital letters, excluding URLs
+    for line in lines:
+        # Remove URLs from the line
+        line_without_urls = re.sub(url_pattern, '', line)
+        # Check if the line contains 5 or more consecutive capital letters
+        if capital_pattern.search(line_without_urls):
+            return True
+
+    return False
 
 
 # Function to check message for predetermined word sentences

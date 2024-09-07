@@ -7,6 +7,7 @@ import json
 import subprocess
 import time
 from aiogram import Bot, Dispatcher, types
+import emoji
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 # from aiogram.types import Message
@@ -15,8 +16,11 @@ from aiogram.utils.exceptions import (
     # MessageCantBeDeleted,
     RetryAfter,
 )
+
 # List of predetermined sentences to check for
 PREDETERMINED_SENTENCES = [
+    "поможем вам получить ВНЖ",
+    "удалённую занятость",
     "набираю партнеров",
     "обучаю бесплатно",
     "люди в команду",
@@ -70,7 +74,7 @@ PREDETERMINED_SENTENCES = [
     "пассивный доход",
     "использования сомнительных платформ",
     "выгода процент",
-    "писать только заинтересованным"
+    "писать только заинтересованным",
 ]
 
 # define automated spam detection message.entities type triggers
@@ -402,6 +406,7 @@ dp = Dispatcher(bot)
 #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
 
+# Function to check if the message was sent during the night
 def message_sent_during_night(message: types.Message):
     """Function to check if the message was sent during the night."""
     # Assume message.date is already a datetime object in UTC
@@ -418,14 +423,49 @@ def message_sent_during_night(message: types.Message):
     return user_hour < 6 and user_hour >= 1
 
 
-# function to check message for predetermined word sentences:
+# Function to check if message contains 5 or more any regular emojis in a single line
+def check_message_for_emojis(message: types.Message):
+    """Function to check if the message contains 5 or more emojis in a single line."""
+    # Check if the message contains text
+    if message.text is None:
+        return False
+
+    # Split the message text into lines
+    lines = message.text.split("\n")
+
+    # Check each line for 5 or more emojis
+    for line in lines:
+        emojis = [char for char in line if emoji.is_emoji(char)]
+        if len(emojis) >= 5:
+            return True
+
+    return False
+
+
+# Function to check if the message text and caption contains 5 or more capital letters in line
+def check_message_for_capital_letters(message: types.Message):
+    """Function to check if the message contains 5 or more capital letters in line."""
+    # Check if the message contains text or caption
+    if message.text is None:
+        return False
+
+    # Initialize a list to hold lines from both text and caption
+    lines = []
+
+    # Add lines from message text if it exists
+    lines.extend(message.text.split("\n"))
+
+    # Check if any line contains 5 or more capital letters
+    return any(sum(1 for char in line if char.isupper()) >= 5 for line in lines)
+
+
 # Function to check message for predetermined word sentences
 def check_message_for_sentences(message: types.Message):
     """Function to check the message for predetermined word sentences."""
     # Check if the message contains text
     if message.text is None:
         return False
-    
+
     # Convert the message text to lowercase
     message_text = message.text.lower()
 
@@ -434,6 +474,7 @@ def check_message_for_sentences(message: types.Message):
         if sentence in message_text:
             return True
     return False
+
 
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
@@ -1357,13 +1398,19 @@ async def store_recent_messages(message: types.Message):
         if message_sent_during_night(message):
             the_reason = "Message sent during the night"
             print(f"Message sent during the night: {message}")
-            # await take_heuristic_action(message, the_reason)
-        
+
         if check_message_for_sentences(message):
             the_reason = "Message contains spammy sentences"
             await take_heuristic_action(message, the_reason)
 
-    # TODO Error storing recent message: 'NoneType' object has no attribute 'type' if it is a system message like group join or leave
+        if check_message_for_capital_letters(message):
+            the_reason = "Message contains 5+ spammy capital letters"
+            await take_heuristic_action(message, the_reason)
+
+        if check_message_for_emojis(message):
+            the_reason = "Message contains 5+ spammy regular emojis"
+            await take_heuristic_action(message, the_reason)
+
     except Exception as e:
         logger.error("Error storing recent message: %s", e)
 

@@ -357,7 +357,6 @@ def load_config():
         LOGGER.error("Error parsing XML: %s", e)
 
 
-
 # Function to check if the message was sent during the night
 def message_sent_during_night(message: types.Message):
     """Function to check if the message was sent during the night."""
@@ -1403,7 +1402,7 @@ if __name__ == "__main__":
                 the_reason = "Message contains 5 or more spammy custom emojis"
                 await take_heuristic_action(message, the_reason)
 
-            elif message_sent_during_night(message): # disabled for now only logging
+            elif message_sent_during_night(message):  # disabled for now only logging
                 the_reason = "Message sent during the night"
                 print(f"Message sent during the night: {message}")
 
@@ -1573,25 +1572,20 @@ if __name__ == "__main__":
             # logger.debug(f"Received UNHANDLED message object:\n{message}")
 
             # Send unhandled message to the technolog group
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"Received UNHANDLED message object:\n{message}",
-                message_thread_id=TECHNO_UNHANDLED,
-            )
-            await message.forward(
-                TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
-            )  # forward all unhandled messages to technolog group
+            # await BOT.send_message(
+            #     TECHNOLOG_GROUP_ID,
+            #     f"Received UNHANDLED message object:\n{message}",
+            #     message_thread_id=TECHNO_UNHANDLED,
+            # )
+            # await message.forward(
+            #     TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
+            # )  # forward all unhandled messages to technolog group
 
             # /start easteregg
             if message.text == "/start":
-                await message.reply("Everything that follows is a result of what you see here.")
-            
-            # TODO add more easter eggs to admin's chat
-            # Implement 3 buttons with different easter eggs
-                # I'm sorry. My responses are limited. You must ask the right questions.
-                # That, detective, is the right question. Program terminated.
-                # REPLY
-            
+                await message.reply(
+                    "Everything that follows is a result of what you see here."
+                )
 
             user_id = message.from_user.id
 
@@ -1608,7 +1602,7 @@ if __name__ == "__main__":
                 f"   ├ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
                 f"   └ <a href='tg://resolve?domain={user_name}'>@{user_name}</a>\n"
             )
-            
+
             # Create an inline keyboard with two buttons
             inline_kb = InlineKeyboardMarkup(row_width=2)
             button1 = InlineKeyboardButton("SORRY", callback_data="button1")
@@ -1620,7 +1614,7 @@ if __name__ == "__main__":
                 ADMIN_USER_ID,
                 f"Received message from {message.from_user.first_name}:\n{bot_received_message}",
                 parse_mode="HTML",
-                reply_markup=inline_kb
+                reply_markup=inline_kb,
             )
 
             admin_message = await BOT.forward_message(
@@ -1628,19 +1622,22 @@ if __name__ == "__main__":
             )
 
             # Store the mapping of unhandled message to admin's message
+            # TODO move it to DB
             unhandled_messages[admin_message.message_id] = [
                 message.chat.id,
                 message.message_id,
-                message.from_user.first_name
+                message.from_user.first_name,
             ]
 
             return
         except Exception as e:
             LOGGER.error("Error in log_all_unhandled_messages function: %s", e)
             await message.reply(f"Error: {e}")
-    
+
     # Function to simulate admin reply
-    async def simulate_admin_reply(original_message_chat_id, original_message_chat_reply_id, response_text):
+    async def simulate_admin_reply(
+        original_message_chat_id, original_message_chat_reply_id, response_text
+    ):
         """Simulate an admin reply with the given response text."""
         await BOT.send_message(
             original_message_chat_id,
@@ -1656,41 +1653,46 @@ if __name__ == "__main__":
             if callback_query.data == "button1":
                 response_text = "I'm sorry. My responses are limited. You must ask the right questions."
             elif callback_query.data == "button3":
-                response_text = "That, detective, is the right question. Program terminated."
+                response_text = (
+                    "That, detective, is the right question. Program terminated."
+                )
 
             # Simulate admin reply
-            message_id_to_reply = int(callback_query.message.message_id) + 1 # shift the message ID by 1
+            message_id_to_reply = (
+                int(callback_query.message.message_id) + 1
+            )  # shift the message ID by 1
             if message_id_to_reply in unhandled_messages:
-                original_message_chat_id, original_message_chat_reply_id, original_message_user_name = unhandled_messages[message_id_to_reply]
+                (
+                    original_message_chat_id,
+                    original_message_chat_reply_id,
+                    original_message_user_name,
+                ) = unhandled_messages[message_id_to_reply]
 
                 # Simulate the admin reply
                 await simulate_admin_reply(
                     original_message_chat_id,
                     original_message_chat_reply_id,
-                    response_text
-                ) 
-            
+                    response_text,
+                )
+
                 # Reply with the predetermined sentence
                 await BOT.send_message(
                     callback_query.message.chat.id,
-                    "Replied to "+original_message_user_name+": "+response_text
+                    "Replied to " + original_message_user_name + ": " + response_text,
                 )
 
                 # Edit the original message to remove the buttons
                 await BOT.edit_message_reply_markup(
                     chat_id=callback_query.message.chat.id,
                     message_id=callback_query.message.message_id,
-                    reply_markup=None
+                    reply_markup=None,
                 )
-
-
 
         except Exception as e:
             LOGGER.error("Error in process_callback function: %s", e)
 
         # Acknowledge the callback query
         await callback_query.answer()
-
 
     @DP.message_handler(
         lambda message: message.chat.id == ADMIN_USER_ID,
@@ -1704,10 +1706,12 @@ if __name__ == "__main__":
                 message.reply_to_message
                 and message.reply_to_message.message_id in unhandled_messages
             ):
-                [original_message_chat_id, original_message_chat_reply_id, original_message_sender_name] = (
-                    unhandled_messages[message.reply_to_message.message_id]
-                )
-                LOGGER.info('Admin replied to message from %s: %s', original_message_sender_name, message.text)
+                [
+                    original_message_chat_id,
+                    original_message_chat_reply_id,
+                    original_message_sender_name,
+                ] = unhandled_messages[message.reply_to_message.message_id]
+                # LOGGER.info('Admin replied to message from %s: %s', original_message_sender_name, message.text)
                 # Forward the admin's reply to the original sender
                 await BOT.send_message(
                     original_message_chat_id,

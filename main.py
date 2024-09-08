@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
@@ -21,14 +22,17 @@ from aiogram.utils.exceptions import (
 
 # Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
-    """Load predetermined sentences from a plain text file and normalize to lowercase."""
-    with open(txt_file, 'r', encoding='utf-8') as file:
-        sentences = [line.strip().lower() for line in file if line.strip()]
-    return sentences
+    """Load predetermined sentences from a plain text file and normalize to lowercase.
+    Return None if the file doesn't exist."""
+    if not os.path.exists(txt_file):
+        return None
 
-# List of predetermined sentences to check for
-PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
-print ("spam_dict.txt loaded>:", PREDETERMINED_SENTENCES)
+    try:
+        with open(txt_file, 'r', encoding='utf-8') as file:
+            sentences = [line.strip().lower() for line in file if line.strip()]
+        return sentences
+    except FileNotFoundError:
+        return None
 
 
 # define automated spam detection message.entities type triggers
@@ -289,6 +293,12 @@ CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("gr
 
 # Extract group names from XML
 CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("group")]
+
+# List of predetermined sentences to check for
+PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
+if not PREDETERMINED_SENTENCES:
+    logger.warning("spam_dict.txt not found. Automated spam detection will not check for predetermined sentences.")
+# print ("spam_dict.txt loaded>:", PREDETERMINED_SENTENCES)
 
 # add channels to dict for logging
 channels_dict = {}

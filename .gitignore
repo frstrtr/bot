@@ -6,3 +6,6 @@ test.py
 .vscode/settings.json
 *.json
 *.old
+
+# Exclude spam_dict.txt from being ignored
+!spam_dict.txt

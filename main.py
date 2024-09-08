@@ -1,12 +1,13 @@
 from datetime import datetime
-import re
-import pytz
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
 import json
 import subprocess
 import time
+
+import re
+import pytz
 from aiogram import Bot, Dispatcher, types
 import emoji
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -18,73 +19,17 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
+# Load predetermined sentences from a plain text file and normalize to lowercase
+def load_predetermined_sentences(txt_file):
+    """Load predetermined sentences from a plain text file and normalize to lowercase."""
+    with open(txt_file, 'r', encoding='utf-8') as file:
+        sentences = [line.strip().lower() for line in file if line.strip()]
+    return sentences
+
 # List of predetermined sentences to check for
-PREDETERMINED_SENTENCES = [
-    "поможем вам получить ВНЖ",
-    "удалённую занятость",
-    "набираю партнеров",
-    "обучаю бесплатно",
-    "люди в команду",
-    "процент от заработка",
-    "приглашаю партнеров",
-    "перспективной сфере",
-    "пассивная прибыль",
-    "еженедельный доп.доход",
-    "доп заработок",
-    "онлайн основе",
-    "0ФUЦUАЛЬНЫЙ зaрaботок",
-    "oбyчeния для зapaбoткa",
-    "бepy пpoцeнт oт пpибыли",
-    "удаленная.занятость",
-    "ставьте +",
-    "совершеннолетних людей",
-    "пассивное направление",
-    "заработать онлайн",
-    "заинтересованых людей",
-    "новой связки",
-    "места ограничены",
-    "ТPE6УЮТCЯ РЕ6ЯTA",
-    "МУЖЧUHЫ-ЖEHЩUНЫ",
-    "ещё один источник дохода",
-    "нe связaнa с нaрko u uнтum",
-    "лучше порнухи чем здесь не найти",
-    "еженeдельная пpибыль",
-    "белая темка",
-    "в крупную команду",
-    "отправляй + в личные смс",
-    "выплаты ежедневные",
-    "удаленного зapaбoтka",
-    "уделять в день 1-2 часа",
-    "люди для онлайн работы",
-    "приятным ежедневным доходом",
-    "возможность пассивно зарабатывать",
-    "предоставляю  бесплатное обучение",
-    "прибыльное предложение",
-    "хорошим недельным доходом",
-    "люди в команду для заработка",
-    "заработок с помощью крипто-бирж",
-    "КАСАЕТСЯ ВСЕХ В ГРУППЕ",
-    "НУЖНЫ ОТВЕТСТВЕННЫЕ ЛЮДИ",
-    "сфере цифровых валют",
-    "только заинтересованным людям",
-    "заработок возможен",
-    "последние места в команду",
-    "заинтересованным и совершеннолетним",
-    "для взаимовыгодного сотрудничества",
-    "поисках партнёров",
-    "пассивный доход",
-    "использования сомнительных платформ",
-    "выгода процент",
-    "писать только заинтересованным",
-    "вашего финансового проекта",
-    "интересуются финансовыми консультациями",
-    "высокая скорость привлечения",
-    "закажите инвайт прямо сейчас",
-    "места ограничены!",
-    "людей на удалённую",
-    "доход от $1000 в неделю",
-    "совмещайте с основной занятостью"
-]
+PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
+print ("spam_dict.txt loaded>:", PREDETERMINED_SENTENCES)
+
 
 # define automated spam detection message.entities type triggers
 SPAM_TRIGGERS = (
@@ -336,6 +281,9 @@ config_XML_root = config_XML.getroot()
 channels_XML = ET.parse("groups.xml")
 channels_root = channels_XML.getroot()
 
+# get from config.xml <admin_id>
+ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
+
 # Extract group IDs from XML
 CHANNEL_IDS = [int(group.find("id").text) for group in channels_root.findall("group")]
 
@@ -345,6 +293,9 @@ CHANNEL_NAMES = [group.find("name").text for group in channels_root.findall("gro
 # add channels to dict for logging
 channels_dict = {}
 # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
+
+# Dictionary to store the mapping of unhandled messages to admin's replies
+unhandled_messages = {}
 
 for group in channels_root.findall("group"):
     channel_id = int(group.find("id").text)
@@ -462,15 +413,15 @@ def check_message_for_capital_letters(message: types.Message):
     lines = message.text.split("\n")
 
     # Regular expression to match URLs
-    url_pattern = re.compile(r'https?://\S+|www\.\S+')
+    url_pattern = re.compile(r"https?://\S+|www\.\S+")
 
     # Regular expression to match 5 or more consecutive capital letters
-    capital_pattern = re.compile(r'[A-Z]{5,}')
+    capital_pattern = re.compile(r"[A-Z]{5,}")
 
     # Check if any line contains 5 or more consecutive capital letters, excluding URLs
     for line in lines:
         # Remove URLs from the line
-        line_without_urls = re.sub(url_pattern, '', line)
+        line_without_urls = re.sub(url_pattern, "", line)
         # Check if the line contains 5 or more consecutive capital letters
         if capital_pattern.search(line_without_urls):
             return True
@@ -1552,16 +1503,40 @@ async def ban(message: types.Message):
         await message.reply(f"Error: {e}")
 
 
+# @dp.message_handler(
+#     lambda message: message.chat.id not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID],
+#     content_types=types.ContentTypes.ANY,
+# )  # exclude admin and technolog group
+# async def log_all_unhandled_messages(message: types.Message):
+#     """Function to log all unhandled messages to the technolog group."""
+#     try:
+#         logger.debug(f"Received UNHANDLED message object:\n{message}")
+#         await bot.send_message(
+#             TECHNOLOG_GROUP_ID,
+#             f"Received UNHANDLED message object:\n{message}",
+#             message_thread_id=TECHNO_UNHANDLED,
+#         )
+#         await message.forward(
+#             TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
+#         )  # forward all unhandled messages to technolog group
+#         return
+#     except Exception as e:
+#         logger.error(f"Error in log_all_unhandled_messages function: {e}")
+#         await message.reply(f"Error: {e}")
+
+
 # Dedug function to check if the bot is running and have unhandled messages
 # Uncomment to use
 @dp.message_handler(
-    lambda message: message.chat.id not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID],
+    lambda message: message.chat.id not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID],
     content_types=types.ContentTypes.ANY,
-)  # exclude admin and technolog group
+)  # exclude admins and technolog group
 async def log_all_unhandled_messages(message: types.Message):
-    """Function to log all unhandled messages to the technolog group."""
+    """Function to log all unhandled messages to the technolog group and admin."""
     try:
-        logger.debug(f"Received UNHANDLED message object:\n{message}")
+        # logger.debug(f"Received UNHANDLED message object:\n{message}")
+
+        # Send unhandled message to the technolog group
         await bot.send_message(
             TECHNOLOG_GROUP_ID,
             f"Received UNHANDLED message object:\n{message}",
@@ -1570,9 +1545,51 @@ async def log_all_unhandled_messages(message: types.Message):
         await message.forward(
             TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
         )  # forward all unhandled messages to technolog group
+
+        # Send unhandled message to the admin's personal chat
+        admin_message = await bot.send_message(
+            ADMIN_USER_ID,
+            f"Received UNHANDLED message from {message.from_user.username}:{message.from_user.first_name}\n",
+        )
+        await bot.forward_message(ADMIN_USER_ID, message.chat.id, message.message_id)
+
+        # Store the mapping of unhandled message to admin's message
+        unhandled_messages[admin_message.message_id] = message.chat.id
+
         return
     except Exception as e:
         logger.error(f"Error in log_all_unhandled_messages function: {e}")
+        await message.reply(f"Error: {e}")
+
+
+@dp.message_handler(
+    lambda message: message.chat.id == ADMIN_USER_ID,
+    content_types=types.ContentTypes.TEXT,
+)
+async def handle_admin_reply(message: types.Message):
+    """Function to handle replies from the admin to unhandled messages."""
+    try:
+        # Check if the message is a reply to an unhandled message
+        if (
+            message.reply_to_message
+            and message.reply_to_message.message_id in unhandled_messages
+        ):
+            original_message_chat_id = unhandled_messages[
+                message.reply_to_message.message_id
+            ]
+
+            # Forward the admin's reply to the original sender
+            await bot.send_message(
+                original_message_chat_id,
+                message.text,
+                reply_to_message_id=message.reply_to_message.message_id
+            )
+
+            # Optionally, you can delete the mapping after the reply is processed
+            del unhandled_messages[message.reply_to_message.message_id]
+
+    except Exception as e:
+        logger.error(f"Error in handle_admin_reply function: {e}")
         await message.reply(f"Error: {e}")
 
 

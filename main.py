@@ -449,6 +449,24 @@ def has_custom_emoji_spam(message):
     return custom_emoji_count >= 5
 
 
+def has_spam_entities(message: types.Message):
+    """
+    Check if the message is a spam by checking the entities.
+
+    Args:
+        message (types.Message): The message to check.
+
+    Returns:
+        bool: True if the message is spam, False otherwise.
+    """
+    if message.entities:
+        for entity in message.entities:
+            if entity["type"] in SPAM_TRIGGERS:
+                # Spam detected
+                return entity["type"]
+    return None
+
+
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
@@ -1306,11 +1324,7 @@ if __name__ == "__main__":
             # logger.info(f"Stored recent message: {message}")
 
             # check if the message is a spam by checking the entities
-            entity_spam_trigger = None
-            for entity in message.entities:
-                if entity["type"] in SPAM_TRIGGERS:
-                    # spam detected
-                    entity_spam_trigger = entity["type"]
+            entity_spam_trigger = has_spam_entities(message)
 
             # search for the user join chat event date using user_id in the DB
             user_join_chat_date_str = cursor.execute(
@@ -1341,7 +1355,7 @@ if __name__ == "__main__":
             user_is_10sec_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 10
-            # print("User is old: ", user_is_old)
+            # print("User is old: ", user_is_omake it external function getting message argument and returning true or falseld)
             # print("User is 1hr old: ", user_is_1hr_old)
             # print("User is 10sec old: ", user_is_10sec_old)
 
@@ -1389,7 +1403,7 @@ if __name__ == "__main__":
                 the_reason = "Message contains 5 or more spammy custom emojis"
                 await take_heuristic_action(message, the_reason)
 
-            elif message_sent_during_night(message):
+            elif message_sent_during_night(message): # disabled for now only logging
                 the_reason = "Message sent during the night"
                 print(f"Message sent during the night: {message}")
 

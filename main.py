@@ -1253,18 +1253,20 @@ if __name__ == "__main__":
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
-            # await BOT.forward_message(
-            #     TECHNOLOG_GROUP_ID,
-            #     message.chat.id,
-            #     message.message_id,
-            #     message_thread_id=TECHNO_ORIGINALS,
-            # )
-            # LOGGER.info(
-            #     "Message ID: %s Forwarded from chat: %s with title: %s",
-            #     message.message_id,
-            #     message.chat.id,
-            #     message.chat.title,
-            # )
+            if message.chat.id == -1001461337235 or message.chat.id == -1001527478834: # mevrikiy or beautymauritius
+                # temporal horse fighting
+                await BOT.forward_message(
+                    TECHNOLOG_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=TECHNO_ORIGINALS,
+                )
+                LOGGER.info(
+                    "Message ID: %s Forwarded from chat: %s with title: %s",
+                    message.message_id,
+                    message.chat.id,
+                    message.chat.title,
+                )
             # Convert the Message object to a dictionary
             message_dict = message.to_python()
             formatted_message = json.dumps(

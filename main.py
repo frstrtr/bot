@@ -59,15 +59,35 @@ conn.commit()
 
 # Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
-    """Load predetermined sentences from a plain text file and normalize to lowercase.
+    """Load predetermined sentences from a plain text file, normalize to lowercase,
+    check for duplicates, rewrite the file excluding duplicates, and log the results.
     Return None if the file doesn't exist."""
     if not os.path.exists(txt_file):
         return None
 
     try:
         with open(txt_file, "r", encoding="utf-8") as file:
-            sentences = [line.strip().lower() for line in file if line.strip()]
-        return sentences
+            lines = [line.strip().lower() for line in file if line.strip()]
+
+        unique_lines = list(set(lines))
+        duplicates = [line for line in lines if lines.count(line) > 1]
+
+        # Rewrite the file with unique lines
+        with open(txt_file, "w", encoding="utf-8") as file:
+            for line in unique_lines:
+                file.write(line + "\n")
+
+        # Log the results
+        LOGGER.info("\nNumber of lines after checking for duplicates: %s", len(unique_lines))
+        LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
+        if duplicates:
+            LOGGER.info("Contents of removed duplicate lines:")
+            for line in set(duplicates):
+                LOGGER.info(line)
+        else:
+            LOGGER.info("No duplicates found in spam dictionary.\n")
+
+        return unique_lines
     except FileNotFoundError:
         return None
 
@@ -1540,29 +1560,7 @@ if __name__ == "__main__":
             LOGGER.error(f"Error in ban function: {e}")
             await message.reply(f"Error: {e}")
 
-    # @dp.message_handler(
-    #     lambda message: message.chat.id not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID],
-    #     content_types=types.ContentTypes.ANY,
-    # )  # exclude admin and technolog group
-    # async def log_all_unhandled_messages(message: types.Message):
-    #     """Function to log all unhandled messages to the technolog group."""
-    #     try:
-    #         logger.debug(f"Received UNHANDLED message object:\n{message}")
-    #         await BOT.send_message(
-    #             TECHNOLOG_GROUP_ID,
-    #             f"Received UNHANDLED message object:\n{message}",
-    #             message_thread_id=TECHNO_UNHANDLED,
-    #         )
-    #         await message.forward(
-    #             TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
-    #         )  # forward all unhandled messages to technolog group
-    #         return
-    #     except Exception as e:
-    #         logger.error(f"Error in log_all_unhandled_messages function: {e}")
-    #         await message.reply(f"Error: {e}")
 
-    # Dedug function to check if the bot is running and have unhandled messages
-    # Uncomment to use
     @DP.message_handler(
         lambda message: message.chat.id
         not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS],
@@ -1598,7 +1596,7 @@ if __name__ == "__main__":
 
             bot_received_message = (
                 f" Profile links:\n"
-                f"   ├ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
+                f"   ├ <a href='tg://user?id={user_id}'>ID based profile link</a>\n"
                 f"   ├ Plain text: tg://user?id={user_id}\n"
                 f"   ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
                 f"   ├ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
@@ -1730,6 +1728,7 @@ if __name__ == "__main__":
 
     # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
     # TODO if succeed to delete message also remove this record from the DB
+    # TODO reply to individual messages by bot in the monitored groups or make posts
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

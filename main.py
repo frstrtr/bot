@@ -447,12 +447,16 @@ def check_message_for_sentences(message: types.Message):
     if message.text is None:
         return False
 
-    # Convert the message text to lowercase
-    message_text = message.text.lower()
+    # Convert the message text to lowercase and tokenize it into words
+    message_words = re.findall(r'\b\w+\b', message.text.lower())
 
     # Check if the message contains any of the predetermined sentences
     for sentence in PREDETERMINED_SENTENCES:
-        if sentence in message_text:
+        # Tokenize the predetermined sentence into words
+        sentence_words = re.findall(r'\b\w+\b', sentence.lower())
+        
+        # Check if all words in the predetermined sentence are in the message words
+        if all(word in message_words for word in sentence_words):
             return True
     return False
 

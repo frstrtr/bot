@@ -1616,7 +1616,7 @@ if __name__ == "__main__":
             #     "\nReceived message object:\n %s\n",
             #     formatted_message,
             # )
-            
+
             if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
                 formatted_message = (
                     formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -1837,6 +1837,7 @@ if __name__ == "__main__":
     # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
     # TODO if succeed to delete message also remove this record from the DB
     # TODO reply to individual messages by bot in the monitored groups or make posts
+    # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

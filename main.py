@@ -60,7 +60,7 @@ conn.commit()
 # Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
-    check for duplicates, rewrite the file excluding duplicates, and log the results.
+    check for duplicates, rewrite the file excluding duplicates if any, and log the results.
     Return None if the file doesn't exist."""
     if not os.path.exists(txt_file):
         return None
@@ -72,20 +72,24 @@ def load_predetermined_sentences(txt_file):
         unique_lines = list(set(lines))
         duplicates = [line for line in lines if lines.count(line) > 1]
 
-        # Rewrite the file with unique lines
-        with open(txt_file, "w", encoding="utf-8") as file:
-            for line in unique_lines:
-                file.write(line + "\n")
+        # Check if there are duplicates
+        if len(unique_lines) != len(lines):
+            # Rewrite the file with unique lines
+            with open(txt_file, "w", encoding="utf-8") as file:
+                for line in unique_lines:
+                    file.write(line + "\n")
 
-        # Log the results
-        LOGGER.info("\nNumber of lines after checking for duplicates: %s", len(unique_lines))
-        LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
-        if duplicates:
-            LOGGER.info("Contents of removed duplicate lines:")
-            for line in set(duplicates):
-                LOGGER.info(line)
+            # Log the results
+            LOGGER.info("\nNumber of lines after checking for duplicates: %s", len(unique_lines))
+            LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
+            if duplicates:
+                LOGGER.info("Contents of removed duplicate lines:")
+                for line in set(duplicates):
+                    LOGGER.info(line)
+            else:
+                LOGGER.info("No duplicates found in spam dictionary.\n")
         else:
-            LOGGER.info("No duplicates found in spam dictionary.\n")
+            LOGGER.info("No duplicates found. File not rewritten.\n")
 
         return unique_lines
     except FileNotFoundError:

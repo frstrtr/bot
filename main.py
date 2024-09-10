@@ -60,21 +60,24 @@ conn.commit()
 # Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
-    check for duplicates, rewrite the file excluding duplicates if any, and log the results.
-    Return None if the file doesn't exist."""
+    remove extra spaces and punctuation marks, check for duplicates, rewrite the file
+    excluding duplicates if any, and log the results. Return None if the file doesn't exist."""
     if not os.path.exists(txt_file):
         return None
-
+    
     try:
         with open(txt_file, "r", encoding="utf-8") as file:
             lines = [line.strip().lower() for line in file if line.strip()]
 
-        unique_lines = list(set(lines))
-        duplicates = [line for line in lines if lines.count(line) > 1]
+        # Normalize lines by removing extra spaces and punctuation marks
+        normalized_lines = [re.sub(r'[^\w\s]', '', line).strip() for line in lines]
 
-        # Check if there are duplicates
-        if len(unique_lines) != len(lines):
-            # Rewrite the file with unique lines
+        unique_lines = list(set(normalized_lines))
+        duplicates = [line for line in normalized_lines if normalized_lines.count(line) > 1]
+
+        # Check if there are duplicates or normalization changes
+        if len(unique_lines) != len(lines) or lines != normalized_lines:
+            # Rewrite the file with unique and normalized lines
             with open(txt_file, "w", encoding="utf-8") as file:
                 for line in unique_lines:
                     file.write(line + "\n")
@@ -89,7 +92,7 @@ def load_predetermined_sentences(txt_file):
             else:
                 LOGGER.info("No duplicates found in spam dictionary.\n")
         else:
-            LOGGER.info("No duplicates found. File not rewritten.\n")
+            LOGGER.info("No duplicates or normalization changes found. File not rewritten.\n")
 
         return unique_lines
     except FileNotFoundError:

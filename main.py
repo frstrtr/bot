@@ -1674,7 +1674,7 @@ if __name__ == "__main__":
             ]
 
             return
-        
+
         except Exception as e:
             LOGGER.error("Error in log_all_unhandled_messages function: %s", e)
             await message.reply(f"Error: {e}")
@@ -1691,7 +1691,9 @@ if __name__ == "__main__":
         )
 
     # Callback query handler to handle button presses
-    @DP.callback_query_handler(lambda c: c.startswith("button_"))
+    @DP.callback_query_handler(
+        lambda c: c.data in ["button_sry", "button_end", "button_rnd"]
+    )
     async def process_callback(callback_query: CallbackQuery):
         """Function to process the callback query for the easter egg buttons."""
         LOGGER.debug("Callback query received: %s", callback_query)
@@ -1700,7 +1702,9 @@ if __name__ == "__main__":
             if callback_query.data == "button_sry":
                 response_text = "I'm sorry. My responses are limited. You must ask the right questions."
             elif callback_query.data == "button_end":
-                response_text = "That, detective, is the right question. Program terminated."
+                response_text = (
+                    "That, detective, is the right question. Program terminated."
+                )
             elif callback_query.data == "button_rnd":
                 motd = (
                     "That, detective, is the right question. Program terminated.\n"

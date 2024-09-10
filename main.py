@@ -163,7 +163,7 @@ def get_spammer_details(
     and reserved for future use"""
 
     spammer_id = spammer_id or None
-    # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
+    spammer_id = spammer_id or 7245668607 # MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
     LOGGER.debug(
@@ -1616,8 +1616,8 @@ if __name__ == "__main__":
 
             # Create an inline keyboard with two buttons
             inline_kb = InlineKeyboardMarkup(row_width=2)
-            button1 = InlineKeyboardButton("SORRY", callback_data="button1")
-            button3 = InlineKeyboardButton("END", callback_data="button3")
+            button1 = InlineKeyboardButton("I'm sorry. My responses are limited. You must ask the right questions.", callback_data="button1")
+            button3 = InlineKeyboardButton("That, detective, is the right question. Program terminated.", callback_data="button3")
             inline_kb.add(button1, button3)
 
             # Send the message with the inline keyboard
@@ -1659,6 +1659,7 @@ if __name__ == "__main__":
     # Callback query handler to handle button presses
     @DP.callback_query_handler(lambda c: c.data in ["button1", "button3"])
     async def process_callback(callback_query: CallbackQuery):
+        """Function to process the callback query for the easter egg buttons."""
         try:
             # Determine the response based on the button pressed
             if callback_query.data == "button1":

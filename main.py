@@ -1293,6 +1293,7 @@ if __name__ == "__main__":
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
+            # TODO remove exceptions
             if (
                 message.chat.id == -1001461337235 or message.chat.id == -1001527478834
             ):  # mevrikiy or beautymauritius
@@ -1309,19 +1310,20 @@ if __name__ == "__main__":
                     message.chat.id,
                     message.chat.title,
                 )
-                # Convert the Message object to a dictionary
-                message_dict = message.to_python()
-                formatted_message = json.dumps(
-                    message_dict, indent=4, ensure_ascii=False
-                )  # Convert back to a JSON string with indentation and human-readable characters
+                # # Convert the Message object to a dictionary
+                # message_dict = message.to_python()
+                # formatted_message = json.dumps(
+                #     message_dict, indent=4, ensure_ascii=False
+                # )  # Convert back to a JSON string with indentation and human-readable characters
                 # logger.debug(
                 #     "\nReceived message object:\n %s\n",
                 #     formatted_message,
                 # )
-                if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
-                    formatted_message = (
-                        formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-                    )
+                # if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+                #     formatted_message = (
+                #         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+                #     )
+
                 # TODO hash JSON to make signature
                 # await BOT.send_message(
                 #     TECHNOLOG_GROUP_ID,
@@ -1600,9 +1602,31 @@ if __name__ == "__main__":
             #     f"Received UNHANDLED message object:\n{message}",
             #     message_thread_id=TECHNO_UNHANDLED,
             # )
-            # await message.forward(
-            #     TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
-            # )  # forward all unhandled messages to technolog group
+            await message.forward(
+                TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
+            )  # forward all unhandled messages to technolog group
+
+            # Convert the Message object to a dictionary
+            message_dict = message.to_python()
+            formatted_message = json.dumps(
+                message_dict, indent=4, ensure_ascii=False
+            )  # Convert back to a JSON string with indentation and human-readable characters
+
+            # LOGGER.debug(
+            #     "\nReceived message object:\n %s\n",
+            #     formatted_message,
+            # )
+            
+            if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+                formatted_message = (
+                    formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+                )
+
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                formatted_message,
+                message_thread_id=TECHNO_UNHANDLED,
+            )
 
             # /start easteregg
             if message.text == "/start":

@@ -1692,7 +1692,8 @@ if __name__ == "__main__":
 
     # Callback query handler to handle button presses
     @DP.callback_query_handler(
-        lambda c: c.data in ["button_sry", "button_end", "button_rnd"]
+        # lambda c: c.data in ["button_sry", "button_end", "button_rnd"]
+        lambda c: c.data.startswith("button_")
     )
     async def process_callback(callback_query: CallbackQuery):
         """Function to process the callback query for the easter egg buttons."""

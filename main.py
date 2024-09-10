@@ -1697,7 +1697,7 @@ if __name__ == "__main__":
     )
     async def process_callback(callback_query: CallbackQuery):
         """Function to process the callback query for the easter egg buttons."""
-        LOGGER.debug("Callback query received: %s", callback_query)
+        # LOGGER.debug("Callback query received: %s", callback_query)
         try:
             # Determine the response based on the button pressed
             if callback_query.data == "button_sry":

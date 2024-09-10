@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import random
 import sqlite3
 import xml.etree.ElementTree as ET
 import logging
@@ -61,19 +62,22 @@ conn.commit()
 def load_predetermined_sentences(txt_file):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
     remove extra spaces and punctuation marks, check for duplicates, rewrite the file
-    excluding duplicates if any, and log the results. Return None if the file doesn't exist."""
+    excluding duplicates if any, and log the results. Return None if the file doesn't exist.
+    """
     if not os.path.exists(txt_file):
         return None
-    
+
     try:
         with open(txt_file, "r", encoding="utf-8") as file:
             lines = [line.strip().lower() for line in file if line.strip()]
 
         # Normalize lines by removing extra spaces and punctuation marks
-        normalized_lines = [re.sub(r'[^\w\s]', '', line).strip() for line in lines]
+        normalized_lines = [re.sub(r"[^\w\s]", "", line).strip() for line in lines]
 
         unique_lines = list(set(normalized_lines))
-        duplicates = [line for line in normalized_lines if normalized_lines.count(line) > 1]
+        duplicates = [
+            line for line in normalized_lines if normalized_lines.count(line) > 1
+        ]
 
         # Check if there are duplicates or normalization changes
         if len(unique_lines) != len(lines) or lines != normalized_lines:
@@ -83,7 +87,9 @@ def load_predetermined_sentences(txt_file):
                     file.write(line + "\n")
 
             # Log the results
-            LOGGER.info("\nNumber of lines after checking for duplicates: %s", len(unique_lines))
+            LOGGER.info(
+                "\nNumber of lines after checking for duplicates: %s", len(unique_lines)
+            )
             LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
             if duplicates:
                 LOGGER.info("Contents of removed duplicate lines:")
@@ -92,7 +98,9 @@ def load_predetermined_sentences(txt_file):
             else:
                 LOGGER.info("No duplicates found in spam dictionary.\n")
         else:
-            LOGGER.info("No duplicates or normalization changes found. File not rewritten.\n")
+            LOGGER.info(
+                "No duplicates or normalization changes found. File not rewritten.\n"
+            )
 
         return unique_lines
     except FileNotFoundError:
@@ -163,7 +171,7 @@ def get_spammer_details(
     and reserved for future use"""
 
     spammer_id = spammer_id or None
-    spammer_id = spammer_id or 7245668607 # MANUALLY ENTERED SPAMMER_ID INT 5338846489
+    # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
     LOGGER.debug(
@@ -455,13 +463,13 @@ def check_message_for_sentences(message: types.Message):
         return False
 
     # Convert the message text to lowercase and tokenize it into words
-    message_words = re.findall(r'\b\w+\b', message.text.lower())
+    message_words = re.findall(r"\b\w+\b", message.text.lower())
 
     # Check if the message contains any of the predetermined sentences
     for sentence in PREDETERMINED_SENTENCES:
         # Tokenize the predetermined sentence into words
-        sentence_words = re.findall(r'\b\w+\b', sentence.lower())
-        
+        sentence_words = re.findall(r"\b\w+\b", sentence.lower())
+
         # Check if all words in the predetermined sentence are in the message words
         if all(word in message_words for word in sentence_words):
             return True
@@ -753,6 +761,7 @@ if __name__ == "__main__":
     # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
 
     # Dictionary to store the mapping of unhandled messages to admin's replies
+    global unhandled_messages
     unhandled_messages = {}
 
     # Load configuration values from the XML file
@@ -1284,7 +1293,9 @@ if __name__ == "__main__":
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
-            if message.chat.id == -1001461337235 or message.chat.id == -1001527478834: # mevrikiy or beautymauritius
+            if (
+                message.chat.id == -1001461337235 or message.chat.id == -1001527478834
+            ):  # mevrikiy or beautymauritius
                 # temporal horse fighting
                 await BOT.forward_message(
                     TECHNOLOG_GROUP_ID,
@@ -1311,11 +1322,12 @@ if __name__ == "__main__":
                     formatted_message = (
                         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
                     )
-                await BOT.send_message(
-                    TECHNOLOG_GROUP_ID,
-                    formatted_message,
-                    message_thread_id=TECHNO_ORIGINALS,
-                )
+                # TODO hash JSON to make signature
+                # await BOT.send_message(
+                #     TECHNOLOG_GROUP_ID,
+                #     formatted_message,
+                #     message_thread_id=TECHNO_ORIGINALS,
+                # )
 
             # logger.debug(
             #     # f"Bot?: {message.from_user.is_bot}\n"
@@ -1571,10 +1583,10 @@ if __name__ == "__main__":
             LOGGER.error(f"Error in ban function: {e}")
             await message.reply(f"Error: {e}")
 
-
     @DP.message_handler(
         lambda message: message.chat.id
-        not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS],
+        not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS]
+        and message.forward_from_chat is None,
         content_types=types.ContentTypes.ANY,
     )  # exclude admins and technolog group
     async def log_all_unhandled_messages(message: types.Message):
@@ -1594,11 +1606,15 @@ if __name__ == "__main__":
 
             # /start easteregg
             if message.text == "/start":
-                await message.reply(
-                    "Everything that follows is a result of what you see here."
+                await BOT.send_message(
+                    message.chat.id,
+                    "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
                 )
+                # await message.reply(
+                #     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
+                # )
 
-            user_id = message.from_user.id
+            user_id = message.chat.id
 
             if message.from_user.username:
                 user_name = message.from_user.username
@@ -1615,17 +1631,34 @@ if __name__ == "__main__":
             )
 
             # Create an inline keyboard with two buttons
-            inline_kb = InlineKeyboardMarkup(row_width=2)
-            button1 = InlineKeyboardButton("I'm sorry. My responses are limited. You must ask the right questions.", callback_data="button1")
-            button3 = InlineKeyboardButton("That, detective, is the right question. Program terminated.", callback_data="button3")
-            inline_kb.add(button1, button3)
+            inline_kb = InlineKeyboardMarkup(row_width=3)
+            button1 = InlineKeyboardButton(
+                "SRY",
+                callback_data="button_sry",
+            )
+            button2 = InlineKeyboardButton(
+                "END",
+                callback_data="button_end",
+            )
+            button3 = InlineKeyboardButton(
+                "RND",
+                callback_data="button_rnd",
+            )
+            inline_kb.add(button1, button2, button3)
+
+            _reply_message = (
+                f"Received message from {message.from_user.first_name}:\n{bot_received_message}\n"
+                f"I'm sorry. My responses are limited. You must ask the right questions.\n"
+            )
+
+            # _reply_message = f"Received message from {message.from_user.first_name}:\n{bot_received_message}\n"
 
             # Send the message with the inline keyboard
             await BOT.send_message(
                 ADMIN_USER_ID,
-                f"Received message from {message.from_user.first_name}:\n{bot_received_message}",
-                parse_mode="HTML",
+                _reply_message,
                 reply_markup=inline_kb,
+                parse_mode="HTML",
             )
 
             admin_message = await BOT.forward_message(
@@ -1641,6 +1674,7 @@ if __name__ == "__main__":
             ]
 
             return
+        
         except Exception as e:
             LOGGER.error("Error in log_all_unhandled_messages function: %s", e)
             await message.reply(f"Error: {e}")
@@ -1657,22 +1691,46 @@ if __name__ == "__main__":
         )
 
     # Callback query handler to handle button presses
-    @DP.callback_query_handler(lambda c: c.data in ["button1", "button3"])
+    @DP.callback_query_handler(lambda c: c.startswith("button_"))
     async def process_callback(callback_query: CallbackQuery):
         """Function to process the callback query for the easter egg buttons."""
+        LOGGER.debug("Callback query received: %s", callback_query)
         try:
             # Determine the response based on the button pressed
-            if callback_query.data == "button1":
+            if callback_query.data == "button_sry":
                 response_text = "I'm sorry. My responses are limited. You must ask the right questions."
-            elif callback_query.data == "button3":
-                response_text = (
-                    "That, detective, is the right question. Program terminated."
+            elif callback_query.data == "button_end":
+                response_text = "That, detective, is the right question. Program terminated."
+            elif callback_query.data == "button_rnd":
+                motd = (
+                    "That, detective, is the right question. Program terminated.\n"
+                    "If the laws of physics no longer apply in the future… God help you.\n"
+                    "Well done. Here are the test results: You are a horrible person. I'm serious, that's what it says: 'A horrible person.' We weren't even testing for that!\n"
+                    "William Shakespeare did not exist. His plays were masterminded in 1589 by Francis Bacon, who used a Ouija board to enslave play-writing ghosts.\n"
+                    "The square root of rope is string.\n"
+                    "While the submarine is vastly superior to the boat in every way, over 97 percent of people still use boats for aquatic transportation.\n"
+                    "The Adventure Sphere is a blowhard and a coward.\n"
+                    "Remember When The Platform Was Sliding Into The Fire Pit, And I Said 'Goodbye,' And You Were Like 'No Way!' And Then I Was All, 'We Pretended We Were Going To Murder You.' That Was Great.\n"
+                    "It Made Shoes For Orphans. Nice Job Breaking It. Hero.\n"
+                    "The Birth Parents You Are Trying To Reach Do Not Love You.\n"
+                    "Don’t Believe Me? Here, I’ll Put You on: [Hellooo!] That’s You! That’s How Dumb You Sound.\n"
+                    "Nobody But You Is That Pointlessly Cruel.\n"
+                    "I'm Afraid You’re About To Become The Immediate Past President Of The Being Alive Club.\n"
+                    "How Are You Holding Up? Because I’m A Potato.\n"
+                    "If You Become Light Headed From Thirst, Feel Free To Pass Out.\n"
+                    "Any Feelings You Think It Has For You Are Simply By-Products Of Your Sad, Empty Life.\n"
                 )
+                # Split the motd string into individual lines
+                motd_lines = motd.split("\n")
+                # Select a random line
+                random_motd = random.choice(motd_lines)
+                # Assign the selected line to a variable
+                response_text = random_motd
 
             # Simulate admin reply
             message_id_to_reply = (
                 int(callback_query.message.message_id) + 1
-            )  # shift the message ID by 1
+            )  # shift the message ID by 1 since we send original message right after banner
             if message_id_to_reply in unhandled_messages:
                 (
                     original_message_chat_id,
@@ -1706,8 +1764,10 @@ if __name__ == "__main__":
         # Acknowledge the callback query
         await callback_query.answer()
 
+    # Function to handle replies from the admin to unhandled messages excluding forwards
     @DP.message_handler(
-        lambda message: message.chat.id == ADMIN_USER_ID,
+        lambda message: message.forward_date is None
+        and message.chat.id == ADMIN_USER_ID,
         content_types=types.ContentTypes.TEXT,
     )
     async def handle_admin_reply(message: types.Message):
@@ -1721,18 +1781,25 @@ if __name__ == "__main__":
                 [
                     original_message_chat_id,
                     original_message_chat_reply_id,
-                    original_message_sender_name,
+                    _original_message_sender_name,
                 ] = unhandled_messages[message.reply_to_message.message_id]
                 # LOGGER.info('Admin replied to message from %s: %s', original_message_sender_name, message.text)
                 # Forward the admin's reply to the original sender
-                await BOT.send_message(
-                    original_message_chat_id,
-                    message.text,
-                    reply_to_message_id=original_message_chat_reply_id,
-                )
+                _message_text = message.text
+                if message.text.startswith("/") or message.text.startswith("\\"):
+                    await BOT.send_message(
+                        original_message_chat_id,
+                        _message_text[1:],
+                    )
+                else:
+                    await BOT.send_message(
+                        original_message_chat_id,
+                        _message_text,
+                        reply_to_message_id=original_message_chat_reply_id,
+                    )
 
                 # Optionally, you can delete the mapping after the reply is processed
-                del unhandled_messages[message.reply_to_message.message_id]
+                # del unhandled_messages[message.reply_to_message.message_id]
 
         except Exception as e:
             LOGGER.error(f"Error in handle_admin_reply function: {e}")

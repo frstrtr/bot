@@ -505,6 +505,14 @@ def has_spam_entities(message: types.Message):
     return None
 
 
+def get_channel_id_by_name(channel_name):
+    """Function to get the channel ID by its name."""
+    for id, name in channels_dict.items():
+        if name == channel_name:
+            return id
+    raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
+
+
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
@@ -1476,7 +1484,7 @@ if __name__ == "__main__":
             # logger.debug("ban triggered.")
 
             command_args = message.text.split()
-            LOGGER.debug(f"Command arguments received: {command_args}")
+            LOGGER.debug("Command arguments received: %s", command_args)
 
             if len(command_args) < 2:
                 raise ValueError("Please provide the message ID of the report.")
@@ -1582,8 +1590,45 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error(f"Error in ban function: {e}")
+            LOGGER.error("Error in ban function: %s", e)
             await message.reply(f"Error: {e}")
+
+    # Handler for the /unban command
+    @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
+    async def unban_user(message: types.Message):
+        """Function to unban the user with userid in all channels listed in CHANNEL_NAMES."""
+        try:
+            command_args = message.text.split()
+            LOGGER.debug("Command arguments received: %s", command_args)
+
+            if len(command_args) < 2:
+                raise ValueError("Please provide the user ID to unban.")
+
+            user_id = int(command_args[1])
+            LOGGER.debug("User ID to unban: %d", user_id)
+
+            for channel_name in CHANNEL_NAMES:
+                channel_id = get_channel_id_by_name(channel_name)
+                if channel_id:
+                    try:
+                        await BOT.unban_chat_member(chat_id=channel_id, user_id=user_id)
+                        LOGGER.info(
+                            "Unbanned user %d in channel %s (ID: %d)", user_id, channel_name, channel_id
+                        )
+                    except Exception as e:
+                        LOGGER.error(
+                            "Failed to unban user %d in channel %s (ID: %d): %s",
+                            user_id, channel_name, channel_id, e
+                        )
+
+            await message.reply(
+                f"User {user_id} has been unbanned in all specified channels."
+            )
+        except ValueError as ve:
+            await message.reply(str(ve))
+        except Exception as e:
+            LOGGER.error("Error in unban_user: %s", e)
+            await message.reply("An error occurred while trying to unban the user.")
 
     @DP.message_handler(
         lambda message: message.chat.id

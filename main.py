@@ -507,9 +507,9 @@ def has_spam_entities(message: types.Message):
 
 def get_channel_id_by_name(channel_name):
     """Function to get the channel ID by its name."""
-    for id, name in channels_dict.items():
+    for _id, name in channels_dict.items():
         if name == channel_name:
-            return id
+            return _id
     raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
 
 
@@ -667,11 +667,11 @@ async def handle_forwarded_reports_with_details(
     chat_id = str(found_message_data[0])
     if chat_id.startswith("-100"):
         chat_id = chat_id[4:]  # remove leading -100
-    if found_message_data[2]:  # this is public chat
-        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
-    else:  # this is private chat
         # Construct the message link with the modified chat ID
         message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
+    if found_message_data[2]:  # this is public chat
+        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+    
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -726,7 +726,6 @@ async def handle_forwarded_reports_with_details(
 
     admin_ban_banner = (
         f"💡 Reaction time: {message_report_date - message.date}\n"
-        f"💔 Reported by automated spam detection system\n"
         f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
@@ -741,6 +740,8 @@ async def handle_forwarded_reports_with_details(
     ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{report_id}")
     keyboard.add(ban_btn)
 
+    # Forward original message to the admin group
+    await BOT.forward_message(ADMIN_GROUP_ID, found_message_data[0], found_message_data[1], message_thread_id=ADMIN_AUTOREPORTS)
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     await BOT.send_message(
         ADMIN_GROUP_ID,
@@ -748,6 +749,7 @@ async def handle_forwarded_reports_with_details(
         reply_markup=keyboard,
         parse_mode="HTML",
         message_thread_id=ADMIN_AUTOREPORTS,
+        disable_web_page_preview=False,
     )
 
     # Construct link to the published banner and send it to the reporter

@@ -1467,13 +1467,17 @@ if __name__ == "__main__":
                 the_reason = "Message contains spammy sentences"
                 await take_heuristic_action(message, the_reason)
 
-            elif check_message_for_capital_letters(message):
-                the_reason = "Message contains 5+ spammy capital letters"
+            elif check_message_for_capital_letters(message) and check_message_for_emojis(message):
+                the_reason = "Message contains 5+ spammy capital letters and 5+ spammy regular emojis"
                 await take_heuristic_action(message, the_reason)
+           
+            # elif check_message_for_capital_letters(message):
+            #     the_reason = "Message contains 5+ spammy capital letters"
+            #     await take_heuristic_action(message, the_reason)
 
-            elif check_message_for_emojis(message):
-                the_reason = "Message contains 5+ spammy regular emojis"
-                await take_heuristic_action(message, the_reason)
+            # elif check_message_for_emojis(message):
+            #     the_reason = "Message contains 5+ spammy regular emojis"
+            #     await take_heuristic_action(message, the_reason)
 
         except Exception as e:
             LOGGER.error("Error storing recent message: %s", e)

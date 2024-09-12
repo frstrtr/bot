@@ -900,6 +900,7 @@ if __name__ == "__main__":
             inout_logmessage,
             message_thread_id=TECHNO_INOUT,
             parse_mode="HTML",
+            disable_web_page_preview=True,
         )
 
         # if not was_member and is_member:

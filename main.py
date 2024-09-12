@@ -1542,7 +1542,7 @@ if __name__ == "__main__":
             # print("User is 1hr old: ", user_is_1hr_old)
             # print("User is 10sec old: ", user_is_10sec_old)
 
-            if not user_is_old:storing recent
+            if not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot

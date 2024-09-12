@@ -286,7 +286,7 @@ def load_config():
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
-    global DP, BOT, LOGGER, channels_dict
+    global DP, BOT, LOGGER, ALLOWED_UPDATES, channels_dict, allowed_content_types
 
     #     # Attempt to extract the schedule, if present
     #     schedule = group.find('schedule')
@@ -323,6 +323,11 @@ def load_config():
     # Add handlers to the logger
     LOGGER.addHandler(file_handler)
     LOGGER.addHandler(stream_handler)
+
+    # Define allowed content types excluding NEW_CHAT_MEMBER and LEFT_CHAT_MEMBER
+    allowed_content_types = list(
+        set(types.ContentTypes.ANY) - {"new_chat_members", "left_chat_member"}
+    )
 
     # List of predetermined sentences to check for
     PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
@@ -392,6 +397,7 @@ def load_config():
 
         BOT = Bot(token=API_TOKEN)
         DP = Dispatcher(BOT)
+        ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 
     except FileNotFoundError as e:
         LOGGER.error("File not found: %s", e.filename)
@@ -600,6 +606,11 @@ async def on_startup(_dp: Dispatcher):
     await BOT.send_message(
         TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
     )
+
+
+async def on_shutdown(_dp):
+    LOGGER.info("Bot is shutting down...")
+    await BOT.close()
 
 
 async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
@@ -831,7 +842,6 @@ if __name__ == "__main__":
     )
     print("\n")
 
-
     # New inout handler TODO add db update
     @DP.chat_member_handler()
     async def greet_chat_members(update: types.ChatMemberUpdated):
@@ -895,7 +905,6 @@ if __name__ == "__main__":
                 update.chat.title,
                 update.chat.id,
             )
-
 
     @DP.message_handler(
         lambda message: message.forward_date is not None
@@ -1038,6 +1047,7 @@ if __name__ == "__main__":
         conn.commit()
 
         # Construct a link to the original message (assuming it's a supergroup or channel)
+        # TODO BUG If message forwarded from the private chat or private chat with topics - need to reconstruct the link differently
         message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
@@ -1335,74 +1345,73 @@ if __name__ == "__main__":
         )
 
     # check for users joining/leaving the chat TODO not functional!
-    # @DP.message_handler(
-    #     content_types=[
-    #         types.ContentType.NEW_CHAT_MEMBERS,
-    #         types.ContentType.LEFT_CHAT_MEMBER,
-    #     ]
-    # )
-    # async def user_joined_chat(message: types.Message):
-    #     """Function to handle users joining or leaving the chat."""
-    #     # print("Users changed", message.new_chat_members, message.left_chat_member)
+    @DP.message_handler(
+        content_types=[
+            types.ContentType.NEW_CHAT_MEMBERS,
+            types.ContentType.LEFT_CHAT_MEMBER,
+        ]
+    )
+    async def user_joined_chat(message: types.Message):
+        """Function to handle users joining or leaving the chat."""
+        # print("Users changed", message.new_chat_members, message.left_chat_member)
 
-    #     # TODO add logic to store join/left events in the database
-    #     new_chat_member = len(message.new_chat_members) > 0
-    #     left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+        # TODO add logic to store join/left events in the database
+        new_chat_member = len(message.new_chat_members) > 0
+        left_chat_member = bool(getattr(message.left_chat_member, "id", False))
 
-    #     cursor.execute(
-    #         """
-    #         INSERT OR REPLACE INTO recent_messages
-    #         (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
-    #         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    #         """,
-    #         (
-    #             getattr(message.chat, "id", None),
-    #             getattr(message.chat, "username", ""),
-    #             getattr(message, "message_id", None),
-    #             getattr(message.from_user, "id", None),
-    #             getattr(message.from_user, "username", ""),
-    #             getattr(message.from_user, "first_name", ""),
-    #             getattr(message.from_user, "last_name", ""),
-    #             getattr(message, "forward_date", None),
-    #             getattr(message, "forward_sender_name", ""),
-    #             getattr(message, "date", None),
-    #             getattr(message.forward_from_chat, "title", None),
-    #             getattr(message.forward_from, "id", None),
-    #             getattr(message.forward_from, "username", ""),
-    #             getattr(message.forward_from, "first_name", ""),
-    #             getattr(message.forward_from, "last_name", ""),
-    #             new_chat_member,
-    #             left_chat_member,
-    #         ),
-    #     )
-    #     conn.commit()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO recent_messages
+            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                getattr(message.chat, "id", None),
+                getattr(message.chat, "username", ""),
+                getattr(message, "message_id", None),
+                getattr(message.from_user, "id", None),
+                getattr(message.from_user, "username", ""),
+                getattr(message.from_user, "first_name", ""),
+                getattr(message.from_user, "last_name", ""),
+                getattr(message, "forward_date", None),
+                getattr(message, "forward_sender_name", ""),
+                getattr(message, "date", None),
+                getattr(message.forward_from_chat, "title", None),
+                getattr(message.forward_from, "id", None),
+                getattr(message.forward_from, "username", ""),
+                getattr(message.forward_from, "first_name", ""),
+                getattr(message.forward_from, "last_name", ""),
+                new_chat_member,
+                left_chat_member,
+            ),
+        )
+        conn.commit()
 
-    #     # Send user join/left details to the technolog group
-    #     inout_userid = message.from_id
-    #     inout_userfirstname = message.from_user.first_name
-    #     inout_userlastname = message.from_user.last_name or ""  # optional
-    #     inout_username = message.from_user.username or "!UNDEFINED!"  # optional
-    #     inout_chatid = str(message.chat.id)[4:]
-    #     inout_action = "JOINED" if message.new_chat_members else "LEFT"
-    #     inout_chatname = message.chat.title
-    #     inout_logmessage = (
-    #         f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-    #         f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
-    #         f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
-    #         f"💡 USER ID profile links:\n"
-    #         f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-    #         f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-    #         f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-    #         f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-    #     )
+        # Send user join/left details to the technolog group
+        inout_userid = message.from_id
+        inout_userfirstname = message.from_user.first_name
+        inout_userlastname = message.from_user.last_name or ""  # optional
+        inout_username = message.from_user.username or "!UNDEFINED!"  # optional
+        inout_chatid = str(message.chat.id)[4:]
+        inout_action = "JOINED" if message.new_chat_members else "LEFT"
+        inout_chatname = message.chat.title
+        inout_logmessage = (
+            f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+            f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
+            f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+            f"💡 USER ID profile links:\n"
+            f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+            f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+            f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+        )
 
-    #     await BOT.send_message(
-    #         TECHNOLOG_GROUP_ID,
-    #         inout_logmessage,
-    #         parse_mode="HTML",
-    #         message_thread_id=TECHNO_INOUT,
-    #     )
-
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            inout_logmessage,
+            parse_mode="HTML",
+            message_thread_id=TECHNO_INOUT,
+        )
 
     @DP.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
     # @DP.message_handler(
@@ -1759,7 +1768,7 @@ if __name__ == "__main__":
         lambda message: message.chat.id
         not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS]
         and message.forward_from_chat is None,
-        content_types=types.ContentTypes.ANY,
+        content_types=allowed_content_types,
     )  # exclude admins and technolog group
     async def log_all_unhandled_messages(message: types.Message):
         """Function to log all unhandled messages to the technolog group and admin."""
@@ -2014,7 +2023,13 @@ if __name__ == "__main__":
     # async def cmd_getid(message: types.Message):
     #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
-    executor.start_polling(DP, skip_updates=True, on_startup=on_startup)
+    executor.start_polling(
+        DP,
+        skip_updates=True,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
+        allowed_updates=ALLOWED_UPDATES,
+    )
 
     # Close SQLite connection
     conn.close()

@@ -873,6 +873,7 @@ if __name__ == "__main__":
             f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
             f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
             f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+            f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         )
 
         if not was_member and is_member:
@@ -884,7 +885,7 @@ if __name__ == "__main__":
                 parse_mode="HTML",
             )
             LOGGER.info(
-                "%s added %s to the chat %s (ID: %d)",
+                "\n%s added %s to the chat %s (ID: %d)",
                 cause_name,
                 member_name,
                 update.chat.title,
@@ -899,7 +900,7 @@ if __name__ == "__main__":
                 parse_mode="HTML",
             )
             LOGGER.info(
-                "%s removed %s from the chat %s (ID: %d)",
+                "\n%s removed %s from the chat %s (ID: %d)",
                 cause_name,
                 member_name,
                 update.chat.title,

@@ -854,8 +854,8 @@ if __name__ == "__main__":
             return
 
         # was_member, is_member = result
-        # cause_name = update.from_user.get_mention(as_html=False)
-        # member_name = update.new_chat_member.user.get_mention(as_html=False)
+        cause_name = update.from_user.get_mention(as_html=False)
+        member_name = update.new_chat_member.user.get_mention(as_html=False)
 
         # Send user join/left details to the technolog group
         # inout_userid = update.from_user.id
@@ -884,6 +884,17 @@ if __name__ == "__main__":
             f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         )
 
+        if inout_status == "kicked":
+            # log kicked actions
+            LOGGER.info(
+                "\n%s added %s to the chat %s (ID: %d)",
+                cause_name,
+                member_name,
+                update.chat.title,
+                update.chat.id,
+            )
+            return
+
         await BOT.send_message(
             TECHNO_LOG_GROUP,
             inout_logmessage,
@@ -898,13 +909,7 @@ if __name__ == "__main__":
         #         message_thread_id=TECHNO_INOUT,
         #         parse_mode="HTML",
         #     )
-        # LOGGER.info(
-        #     "\n%s added %s to the chat %s (ID: %d)",
-        #     cause_name,
-        #     member_name,
-        #     update.chat.title,
-        #     update.chat.id,
-        # )
+        #
         # elif was_member and not is_member:
         #     await BOT.send_message(
         #         TECHNO_LOG_GROUP,

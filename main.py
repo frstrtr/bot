@@ -873,8 +873,8 @@ if __name__ == "__main__":
         inout_status = update.new_chat_member.status
         inout_chatname = update.chat.title
         inout_logmessage = (
-            f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-            f"{inout_userfirstname} {inout_userlastname} STATUS: <b>{inout_status}</b>\n"
+            f"<code>{inout_status}</code> <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+            f"{inout_userfirstname} {inout_userlastname}\n"
             f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"

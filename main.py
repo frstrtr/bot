@@ -857,16 +857,23 @@ if __name__ == "__main__":
         member_name = update.new_chat_member.user.get_mention(as_html=False)
 
         # Send user join/left details to the technolog group
-        inout_userid = update.from_user.id
-        inout_userfirstname = update.from_user.first_name
-        inout_userlastname = update.from_user.last_name or ""  # optional
-        inout_username = update.from_user.username or "!UNDEFINED!"  # optional
+        # inout_userid = update.from_user.id
+        inout_userid = update.old_chat_member.user.id
+        # inout_userfirstname = update.from_user.first_name
+        inout_userfirstname = update.old_chat_member.user.first_name
+        # inout_userlastname = update.from_user.last_name or ""  # optional
+        inout_userlastname = update.old_chat_member.user.last_name or ""  # optional
+        # inout_username = update.from_user.username or "!UNDEFINED!"  # optional
+        inout_username = (
+            update.old_chat_member.user.username or "!UNDEFINED!"
+        )  # optional
         inout_chatid = str(update.chat.id)[4:]
         # inout_action = "JOINED" if message.new_chat_members else "LEFT"
+        inout_status = update.new_chat_member.status
         inout_chatname = update.chat.title
         inout_logmessage = (
             f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-            f"{inout_userfirstname} {inout_userlastname}\n"
+            f"{inout_userfirstname} {inout_userlastname} {inout_status}\n"
             f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"

@@ -843,10 +843,11 @@ if __name__ == "__main__":
     print("\n")
 
     # New inout handler TODO add db update
+    # TODO edit message update check
     @DP.chat_member_handler()
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
-        LOGGER.info("Chat member update received: %s", update)
+        # LOGGER.info("Chat member update received: %s", update)
 
         result = extract_status_change(update)
         if result is None:
@@ -873,7 +874,7 @@ if __name__ == "__main__":
         inout_chatname = update.chat.title
         inout_logmessage = (
             f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-            f"{inout_userfirstname} {inout_userlastname} {inout_status}\n"
+            f"{inout_userfirstname} {inout_userlastname} STATUS: <b>{inout_status}</b>\n"
             f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
@@ -884,35 +885,33 @@ if __name__ == "__main__":
         )
 
         if not was_member and is_member:
-            inout_action = "JOINED\n"
             await BOT.send_message(
                 TECHNO_LOG_GROUP,
-                inout_action + inout_logmessage,
+                inout_logmessage,
                 message_thread_id=TECHNO_INOUT,
                 parse_mode="HTML",
             )
-            LOGGER.info(
-                "\n%s added %s to the chat %s (ID: %d)",
-                cause_name,
-                member_name,
-                update.chat.title,
-                update.chat.id,
-            )
+            # LOGGER.info(
+            #     "\n%s added %s to the chat %s (ID: %d)",
+            #     cause_name,
+            #     member_name,
+            #     update.chat.title,
+            #     update.chat.id,
+            # )
         elif was_member and not is_member:
-            inout_action = "LEFT\n"
             await BOT.send_message(
                 TECHNO_LOG_GROUP,
-                inout_action + inout_logmessage,
+                inout_logmessage,
                 message_thread_id=TECHNO_INOUT,
                 parse_mode="HTML",
             )
-            LOGGER.info(
-                "\n%s removed %s from the chat %s (ID: %d)",
-                cause_name,
-                member_name,
-                update.chat.title,
-                update.chat.id,
-            )
+            # LOGGER.info(
+            #     "\n%s removed %s from the chat %s (ID: %d)",
+            #     cause_name,
+            #     member_name,
+            #     update.chat.title,
+            #     update.chat.id,
+            # )
 
     @DP.message_handler(
         lambda message: message.forward_date is not None
@@ -1543,7 +1542,7 @@ if __name__ == "__main__":
             # print("User is 1hr old: ", user_is_1hr_old)
             # print("User is 10sec old: ", user_is_10sec_old)
 
-            if not user_is_old:
+            if not user_is_old:storing recent
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot
@@ -1610,6 +1609,7 @@ if __name__ == "__main__":
             #     await take_heuristic_action(message, the_reason)
 
         except Exception as e:
+            # TODO BUG FIX Error storing recent message: Message_id_invalid
             LOGGER.error("Error storing recent message: %s", e)
 
     # TODO: Remove this if the buttons works fine

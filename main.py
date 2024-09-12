@@ -872,11 +872,13 @@ if __name__ == "__main__":
         # inout_action = "JOINED" if message.new_chat_members else "LEFT"
         inout_status = update.new_chat_member.status
         inout_chatname = update.chat.title
+        inout_chatusername = update.chat.username
         inout_logmessage = (
-            f"Status: <code>{inout_status}</code>\n<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+            f"Status: <b><code>{inout_status}</code></b>\n"
+            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
             # TODO construct private chat links too
-            f"💡 <a href='https://t.me/{inout_chatname}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+            f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
             f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"

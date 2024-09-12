@@ -1337,7 +1337,7 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_INOUT,
         )
 
-    # New inout handler
+    # New inout handler TODO add db update
     @DP.chat_member_handler()
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""

@@ -8,11 +8,18 @@ import json
 import subprocess
 import time
 
+from typing import Optional, Tuple
 import re
 import pytz
 from aiogram import Bot, Dispatcher, types
 import emoji
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery,
+    ChatMemberUpdated,
+    ChatMemberStatus,
+)
 from aiogram import executor
 
 # from aiogram.types import Message
@@ -392,6 +399,35 @@ def load_config():
         LOGGER.error("Error parsing XML: %s", e)
 
 
+def extract_status_change(
+    chat_member_update: ChatMemberUpdated,
+) -> Optional[Tuple[bool, bool]]:
+    """Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member
+    of the chat and whether the 'new_chat_member' is a member of the chat. Returns None, if
+    the status didn't change.
+    """
+    old_status = chat_member_update.old_chat_member.status
+    new_status = chat_member_update.new_chat_member.status
+
+    if old_status == new_status:
+        return None
+
+    was_member = old_status in [
+        ChatMemberStatus.MEMBER,
+        ChatMemberStatus.OWNER,
+        ChatMemberStatus.ADMINISTRATOR,
+        ChatMemberStatus.RESTRICTED,
+    ]
+    is_member = new_status in [
+        ChatMemberStatus.MEMBER,
+        ChatMemberStatus.OWNER,
+        ChatMemberStatus.ADMINISTRATOR,
+        ChatMemberStatus.RESTRICTED,
+    ]
+
+    return was_member, is_member
+
+
 # Function to check if the message was sent during the night
 def message_sent_during_night(message: types.Message):
     """Function to check if the message was sent during the night."""
@@ -671,7 +707,6 @@ async def handle_forwarded_reports_with_details(
         message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
     if found_message_data[2]:  # this is public chat
         message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
-    
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -741,7 +776,12 @@ async def handle_forwarded_reports_with_details(
     keyboard.add(ban_btn)
 
     # Forward original message to the admin group
-    await BOT.forward_message(ADMIN_GROUP_ID, found_message_data[0], found_message_data[1], message_thread_id=ADMIN_AUTOREPORTS)
+    await BOT.forward_message(
+        ADMIN_GROUP_ID,
+        found_message_data[0],
+        found_message_data[1],
+        message_thread_id=ADMIN_AUTOREPORTS,
+    )
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     await BOT.send_message(
         ADMIN_GROUP_ID,
@@ -1297,6 +1337,68 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_INOUT,
         )
 
+    # New inout handler
+    @DP.chat_member_handler()
+    async def greet_chat_members(update: types.ChatMemberUpdated):
+        """Greets new users in chats and announces when someone leaves"""
+        result = extract_status_change(update)
+        if result is None:
+            return
+
+        was_member, is_member = result
+        cause_name = update.from_user.get_mention(as_html=False)
+        member_name = update.new_chat_member.user.get_mention(as_html=False)
+
+        # Send user join/left details to the technolog group
+        inout_userid = update.from_user.id
+        inout_userfirstname = update.from_user.first_name
+        inout_userlastname = update.from_user.last_name or ""  # optional
+        inout_username = update.from_user.username or "!UNDEFINED!"  # optional
+        inout_chatid = str(update.chat.id)[4:]
+        # inout_action = "JOINED" if message.new_chat_members else "LEFT"
+        inout_chatname = update.chat.title
+        inout_logmessage = (
+            f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+            f"{inout_userfirstname} {inout_userlastname}\n"
+            f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+            f"💡 USER ID profile links:\n"
+            f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+            f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+            f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+        )
+
+        if not was_member and is_member:
+            inout_action = "JOINED\n"
+            await BOT.send_message(
+                TECHNO_LOG_GROUP,
+                inout_action + inout_logmessage,
+                message_thread_id=TECHNO_INOUT,
+                parse_mode="HTML",
+            )
+            LOGGER.info(
+                "%s added %s to the chat %s (ID: %d)",
+                cause_name,
+                member_name,
+                update.chat.title,
+                update.chat.id,
+            )
+        elif was_member and not is_member:
+            inout_action = "LEFT\n"
+            await BOT.send_message(
+                TECHNO_LOG_GROUP,
+                inout_action + inout_logmessage,
+                message_thread_id=TECHNO_INOUT,
+                parse_mode="HTML",
+            )
+            LOGGER.info(
+                "%s removed %s from the chat %s (ID: %d)",
+                cause_name,
+                member_name,
+                update.chat.title,
+                update.chat.id,
+            )
+
     @DP.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
@@ -1467,10 +1569,12 @@ if __name__ == "__main__":
                 the_reason = "Message contains spammy sentences"
                 await take_heuristic_action(message, the_reason)
 
-            elif check_message_for_capital_letters(message) and check_message_for_emojis(message):
+            elif check_message_for_capital_letters(
+                message
+            ) and check_message_for_emojis(message):
                 the_reason = "Message contains 5+ spammy capital letters and 5+ spammy regular emojis"
                 await take_heuristic_action(message, the_reason)
-           
+
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"
             #     await take_heuristic_action(message, the_reason)
@@ -1619,12 +1723,18 @@ if __name__ == "__main__":
                     try:
                         await BOT.unban_chat_member(chat_id=channel_id, user_id=user_id)
                         LOGGER.info(
-                            "Unbanned user %d in channel %s (ID: %d)", user_id, channel_name, channel_id
+                            "Unbanned user %d in channel %s (ID: %d)",
+                            user_id,
+                            channel_name,
+                            channel_id,
                         )
                     except Exception as e:
                         LOGGER.error(
                             "Failed to unban user %d in channel %s (ID: %d): %s",
-                            user_id, channel_name, channel_id, e
+                            user_id,
+                            channel_name,
+                            channel_id,
+                            e,
                         )
 
             await message.reply(

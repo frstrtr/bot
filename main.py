@@ -1760,7 +1760,9 @@ if __name__ == "__main__":
                 channel_id = get_channel_id_by_name(channel_name)
                 if channel_id:
                     try:
-                        await BOT.unban_chat_member(chat_id=channel_id, user_id=user_id)
+                        await BOT.unban_chat_member(
+                            chat_id=channel_id, user_id=user_id, only_if_banned=True
+                        )
                         LOGGER.info(
                             "Unbanned user %d in channel %s (ID: %d)",
                             user_id,

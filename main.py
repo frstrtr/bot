@@ -836,6 +836,8 @@ if __name__ == "__main__":
     @DP.chat_member_handler()
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
+        LOGGER.info("Chat member update received: %s", update)
+
         result = extract_status_change(update)
         if result is None:
             return

@@ -887,7 +887,7 @@ if __name__ == "__main__":
         if inout_status == "kicked":
             # log kicked actions
             LOGGER.info(
-                "\n%s added %s to the chat %s (ID: %d)",
+                "\n%s kicked %s from the chat %s (ID: %d)",
                 cause_name,
                 member_name,
                 update.chat.title,

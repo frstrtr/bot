@@ -278,6 +278,47 @@ def get_spammer_details(
     return result
 
 
+def get_daily_spam_filename():
+    """Function to get the daily spam filename."""
+    # Get today's date
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Construct the filename
+    filename = f"{today}_daily_spam.txt"
+    return filename
+
+
+def save_report_spam_file(message: types.Message):
+    """Function to create or load the daily spam file."""
+    # Get the filename
+    filename = get_daily_spam_filename()
+    # Check if any file with the pattern *_daily_spam.txt exists
+    existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
+
+    reported_spam = message.from_user.id # store user_id if no text or caption
+    if message.text:
+        reported_spam += f"{message.text}\n"
+    elif message.caption:
+        reported_spam += f"{message.caption}\n"
+
+    if existing_files:
+        # Check if the existing file's date is different from today
+        for existing_file in existing_files:
+            if existing_file != filename:
+                # Create a new file with the current date
+                with open(filename, "w") as file:
+                    file.write(reported_spam)
+                return
+            else:
+                # Load the existing file's contents
+                with open(existing_file, "a") as file:
+                    file.write(reported_spam)
+                return
+    else:
+        # Create a new file with the current date
+        with open(filename, "w") as file:
+            file.write(reported_spam)
+
+
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
@@ -335,7 +376,6 @@ def load_config():
         LOGGER.warning(
             "spam_dict.txt not found. Automated spam detection will not check for predetermined sentences."
         )
-    # print ("spam_dict.txt loaded>:", PREDETERMINED_SENTENCES)
 
     try:
 
@@ -633,6 +673,9 @@ async def handle_forwarded_reports_with_details(
     reason: str = "Automated report",
 ):
     """Function to handle forwarded messages with provided user details."""
+    # store spam text and caption to the daily_spam file
+    save_report_spam_file(message)
+
     LOGGER.debug("############################################################")
     LOGGER.debug("                                                            ")
     LOGGER.debug("------------------------------------------------------------")
@@ -891,7 +934,7 @@ if __name__ == "__main__":
         if inout_status == "kicked":
             # log kicked actions
             LOGGER.info(
-                "\n%s kicked %s from the chat %s (ID: %d)",
+                "%s kicked %s from the chat %s (ID: %d)",
                 cause_name,
                 member_name,
                 update.chat.title,
@@ -919,7 +962,9 @@ if __name__ == "__main__":
             (
                 getattr(update.chat, "id", None),
                 getattr(update.chat, "username", ""),
-                getattr(update, "date", None), # primary key to change to prevent overwriting DB
+                getattr(
+                    update, "date", None
+                ),  # primary key to change to prevent overwriting DB
                 getattr(update.old_chat_member.user, "id", None),
                 getattr(update.old_chat_member.user, "username", ""),
                 getattr(update.old_chat_member.user, "first_name", ""),
@@ -970,6 +1015,10 @@ if __name__ == "__main__":
     )
     async def handle_forwarded_reports(message: types.Message):
         """Function to handle forwarded messages."""
+
+        # store spam text and caption to the daily_spam file
+        store_recent_messages(message)
+
         LOGGER.debug("############################################################")
         LOGGER.debug("                                                            ")
         LOGGER.debug("------------------------------------------------------------")
@@ -1403,75 +1452,6 @@ if __name__ == "__main__":
             f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED. "
             f"Report them again if needed or use /ban {report_id_to_ban} command.",
         )
-
-    # check for users joining/leaving the chat TODO not functional!
-    # @DP.message_handler(
-    #     content_types=[
-    #         types.ContentType.NEW_CHAT_MEMBERS,
-    #         types.ContentType.LEFT_CHAT_MEMBER,
-    #     ]
-    # )
-    # async def user_joined_chat(message: types.Message):
-    #     """Function to handle users joining or leaving the chat."""
-        # print("Users changed", message.new_chat_members, message.left_chat_member)
-        # LOGGER.info("%s User_interacted_chat: %s\n", message.from_id, message.chat.id)
-        # TODO add logic to store join/left events in the database
-        # new_chat_member = len(message.new_chat_members) > 0
-        # left_chat_member = bool(getattr(message.left_chat_member, "id", False))
-
-        # cursor.execute(
-        #     """
-        #     INSERT OR REPLACE INTO recent_messages
-        #     (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
-        #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        #     """,
-        #     (
-        #         getattr(message.chat, "id", None),
-        #         getattr(message.chat, "username", ""),
-        #         getattr(message, "message_id", None),
-        #         getattr(message.from_user, "id", None),
-        #         getattr(message.from_user, "username", ""),
-        #         getattr(message.from_user, "first_name", ""),
-        #         getattr(message.from_user, "last_name", ""),
-        #         getattr(message, "forward_date", None),
-        #         getattr(message, "forward_sender_name", ""),
-        #         getattr(message, "date", None),
-        #         getattr(message.forward_from_chat, "title", None),
-        #         getattr(message.forward_from, "id", None),
-        #         getattr(message.forward_from, "username", ""),
-        #         getattr(message.forward_from, "first_name", ""),
-        #         getattr(message.forward_from, "last_name", ""),
-        #         new_chat_member,
-        #         left_chat_member,
-        #     ),
-        # )
-        # conn.commit()
-
-        # # Send user join/left details to the technolog group
-        # inout_userid = message.from_id
-        # inout_userfirstname = message.from_user.first_name
-        # inout_userlastname = message.from_user.last_name or ""  # optional
-        # inout_username = message.from_user.username or "!UNDEFINED!"  # optional
-        # inout_chatid = str(message.chat.id)[4:]
-        # inout_action = "JOINED" if message.new_chat_members else "LEFT"
-        # inout_chatname = message.chat.title
-        # inout_logmessage = (
-        #     f"💡 <a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-        #     f"{inout_userfirstname} {inout_userlastname} {inout_action}\n"
-        #     f"💡 <a href='https://t.me/c/{inout_chatid}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
-        #     f"💡 USER ID profile links:\n"
-        #     f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-        #     f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-        #     f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-        #     f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-        # )
-
-        # await BOT.send_message(
-        #     TECHNOLOG_GROUP_ID,
-        #     inout_logmessage,
-        #     parse_mode="HTML",
-        #     message_thread_id=TECHNO_INOUT,
-        # )
 
     @DP.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
     # @DP.message_handler(
@@ -2085,6 +2065,8 @@ if __name__ == "__main__":
     # TODO if succeed to delete message also remove this record from the DB
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
+    # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
+    # TODO record to text file all reported texts and captions to check for the same in the future
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

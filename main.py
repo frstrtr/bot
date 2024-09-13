@@ -835,7 +835,7 @@ async def save_report_spam_file(message: types.Message):
     # Check if any file with the pattern *_daily_spam.txt exists
     existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
 
-    reported_spam = message.from_user.id # store user_id if no text or caption
+    reported_spam = str(message.from_user.id)+"\n" # store user_id if no text or caption
     if message.text:
         reported_spam += f"{message.text}\n"
     elif message.caption:

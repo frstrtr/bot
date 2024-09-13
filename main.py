@@ -1016,7 +1016,7 @@ if __name__ == "__main__":
         """Function to handle forwarded messages."""
 
         # store spam text and caption to the daily_spam file
-        await store_recent_messages(message)
+        await save_report_spam_file(message)
 
         LOGGER.debug("############################################################")
         LOGGER.debug("                                                            ")

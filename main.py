@@ -287,6 +287,13 @@ def get_daily_spam_filename():
     return filename
 
 
+def get_inout_filename():
+    """Generate the filename for in/out events based on the current date."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    filename = f"{today}_inout.txt"
+    return filename
+
+
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
@@ -828,6 +835,34 @@ async def handle_forwarded_reports_with_details(
     #     await message.answer(f"Admin group banner link: {banner_link}")
 
 
+async def save_inout_event(update: types.ChatMemberUpdated):
+    """Function to record user join/leave events."""
+    filename = get_inout_filename()
+    existing_files = [f for f in os.listdir() if f.endswith("_inout.txt")]
+
+    event_record = (
+        f"{update.old_chat_member.user.id}:"
+        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
+        f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
+        f"{update.from_user.id}:"
+        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))}\n"
+    )
+    LOGGER.debug("Event record: %s", event_record)
+    if existing_files:
+        for existing_file in existing_files:
+            if existing_file != filename:
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(event_record)
+                return
+            else:
+                with open(existing_file, "a", encoding="utf-8") as file:
+                    file.write(event_record)
+                return
+    else:
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(event_record)
+
+
 async def save_report_spam_file(message: types.Message):
     """Function to create or load the daily spam file."""
     # Get the filename
@@ -835,7 +870,9 @@ async def save_report_spam_file(message: types.Message):
     # Check if any file with the pattern *_daily_spam.txt exists
     existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
 
-    reported_spam = str(message.from_user.id)+"\n" # store user_id if no text or caption
+    reported_spam = (
+        str(message.from_user.id) + "\n"
+    )  # store user_id if no text or caption
     if message.text:
         reported_spam += f"{message.text}\n"
     elif message.caption:
@@ -858,6 +895,7 @@ async def save_report_spam_file(message: types.Message):
         # Create a new file with the current date
         with open(filename, "w") as file:
             file.write(reported_spam)
+
 
 if __name__ == "__main__":
 
@@ -890,6 +928,9 @@ if __name__ == "__main__":
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # LOGGER.info("Chat member update received: %s\n", update)
+
+        # Save the event to the inout file
+        await save_inout_event(update)
 
         result = extract_status_change(update)
         if result is None:
@@ -1453,10 +1494,6 @@ if __name__ == "__main__":
         )
 
     @DP.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
-    # @DP.message_handler(
-    #     lambda message: message.chat.id in CHANNEL_IDS,
-    #     content_types=types.ContentTypes.ANY,
-    # )
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         try:

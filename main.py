@@ -287,38 +287,6 @@ def get_daily_spam_filename():
     return filename
 
 
-def save_report_spam_file(message: types.Message):
-    """Function to create or load the daily spam file."""
-    # Get the filename
-    filename = get_daily_spam_filename()
-    # Check if any file with the pattern *_daily_spam.txt exists
-    existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
-
-    reported_spam = message.from_user.id # store user_id if no text or caption
-    if message.text:
-        reported_spam += f"{message.text}\n"
-    elif message.caption:
-        reported_spam += f"{message.caption}\n"
-
-    if existing_files:
-        # Check if the existing file's date is different from today
-        for existing_file in existing_files:
-            if existing_file != filename:
-                # Create a new file with the current date
-                with open(filename, "w") as file:
-                    file.write(reported_spam)
-                return
-            else:
-                # Load the existing file's contents
-                with open(existing_file, "a") as file:
-                    file.write(reported_spam)
-                return
-    else:
-        # Create a new file with the current date
-        with open(filename, "w") as file:
-            file.write(reported_spam)
-
-
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
@@ -674,7 +642,7 @@ async def handle_forwarded_reports_with_details(
 ):
     """Function to handle forwarded messages with provided user details."""
     # store spam text and caption to the daily_spam file
-    save_report_spam_file(message)
+    await save_report_spam_file(message)
 
     LOGGER.debug("############################################################")
     LOGGER.debug("                                                            ")
@@ -860,6 +828,37 @@ async def handle_forwarded_reports_with_details(
     #     await message.answer(f"Admin group banner link: {banner_link}")
 
 
+async def save_report_spam_file(message: types.Message):
+    """Function to create or load the daily spam file."""
+    # Get the filename
+    filename = get_daily_spam_filename()
+    # Check if any file with the pattern *_daily_spam.txt exists
+    existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
+
+    reported_spam = message.from_user.id # store user_id if no text or caption
+    if message.text:
+        reported_spam += f"{message.text}\n"
+    elif message.caption:
+        reported_spam += f"{message.caption}\n"
+
+    if existing_files:
+        # Check if the existing file's date is different from today
+        for existing_file in existing_files:
+            if existing_file != filename:
+                # Create a new file with the current date
+                with open(filename, "w") as file:
+                    file.write(reported_spam)
+                return
+            else:
+                # Load the existing file's contents
+                with open(existing_file, "a") as file:
+                    file.write(reported_spam)
+                return
+    else:
+        # Create a new file with the current date
+        with open(filename, "w") as file:
+            file.write(reported_spam)
+
 if __name__ == "__main__":
 
     # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
@@ -1017,7 +1016,7 @@ if __name__ == "__main__":
         """Function to handle forwarded messages."""
 
         # store spam text and caption to the daily_spam file
-        store_recent_messages(message)
+        await store_recent_messages(message)
 
         LOGGER.debug("############################################################")
         LOGGER.debug("                                                            ")

@@ -1283,9 +1283,9 @@ if __name__ == "__main__":
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
-                LOGGER.debug(
-                    f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
-                )
+                # LOGGER.debug(
+                #     f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
+                # )
 
                 try:
                     await BOT.ban_chat_member(
@@ -1307,10 +1307,15 @@ if __name__ == "__main__":
                     )
 
             # select all messages from the user in the chat
+            # and this is not records about join or leave
+            # and this record have name of the chat TODO private chats do not have names :(
             query = """
                 SELECT chat_id, message_id, user_name
                 FROM recent_messages 
                 WHERE user_id = :author_id
+                AND new_chat_member IS NULL
+                AND left_chat_member IS NULL
+                AND chat_username IS NOT NULL
                 """
             params = {"author_id": author_id}
             result = cursor.execute(query, params).fetchall()
@@ -1674,7 +1679,7 @@ if __name__ == "__main__":
                 raise ValueError("Please provide the message ID of the report.")
 
             report_msg_id = int(command_args[1])
-            LOGGER.debug(f"Report message ID parsed: {report_msg_id}")
+            LOGGER.debug("Report message ID parsed: %d", report_msg_id)
 
             cursor.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
@@ -1717,9 +1722,9 @@ if __name__ == "__main__":
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
-                LOGGER.debug(
-                    f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
-                )
+                # LOGGER.debug(
+                #     f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
+                # )
 
                 try:
                     await BOT.ban_chat_member(
@@ -1744,10 +1749,15 @@ if __name__ == "__main__":
                         f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     )
             # select all messages from the user in the chat
+            # and this is not records about join or leave
+            # and this record have name of the chat TODO private chats do not have names :(
             query = """
                 SELECT chat_id, message_id, user_name
                 FROM recent_messages 
                 WHERE user_id = :author_id
+                AND new_chat_member IS NULL
+                AND left_chat_member IS NULL
+                AND chat_username IS NOT NULL
                 """
             params = {"author_id": author_id}
             result = cursor.execute(query, params).fetchall()
@@ -1762,10 +1772,10 @@ if __name__ == "__main__":
                     LOGGER.error(
                         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
                     )
-                    await BOT.send_message(
-                        TECHNOLOG_GROUP_ID,
-                        f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
-                    )
+                    # await BOT.send_message(
+                    #     TECHNOLOG_GROUP_ID,
+                    #     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                    # )
             LOGGER.debug(
                 f"User {author_id} banned and their messages deleted where applicable."
             )

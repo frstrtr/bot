@@ -871,7 +871,7 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
         f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
         f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
         f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
-        f"{update.from_user.id:<10}"
+        f"{update.from_user.id:<10} "
         f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
     )
 

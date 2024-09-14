@@ -342,17 +342,28 @@ def load_config():
     LOGGER.addHandler(file_handler)
     LOGGER.addHandler(stream_handler)
 
-    # Define allowed content types excluding NEW_CHAT_MEMBER and LEFT_CHAT_MEMBER
-    # Get all attributes of ContentType
-    all_content_types = dir(types.ContentType)
-    # Filter out non-content type attributes and exclude NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
+    # Define allowed content types excluding NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
     allowed_content_types = [
-        attr for attr in all_content_types
-        if not attr.startswith('__') and not callable(getattr(types.ContentType, attr))
-        and attr not in {"NEW_CHAT_MEMBERS", "LEFT_CHAT_MEMBER"}
+        types.ContentType.TEXT,
+        types.ContentType.AUDIO,
+        types.ContentType.DOCUMENT,
+        types.ContentType.GAME,
+        types.ContentType.PHOTO,
+        types.ContentType.STICKER,
+        types.ContentType.VIDEO,
+        types.ContentType.VIDEO_NOTE,
+        types.ContentType.VOICE,
+        types.ContentType.CONTACT,
+        types.ContentType.LOCATION,
+        types.ContentType.VENUE,
+        types.ContentType.POLL,
+        types.ContentType.DICE,
+        types.ContentType.INVOICE,
+        types.ContentType.SUCCESSFUL_PAYMENT,
+        types.ContentType.CONNECTED_WEBSITE,
+        types.ContentType.MIGRATE_TO_CHAT_ID,
+        types.ContentType.MIGRATE_FROM_CHAT_ID
     ]
-    # Convert to list
-    allowed_content_types = list(allowed_content_types)
 
     # List of predetermined sentences to check for
     PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")

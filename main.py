@@ -910,7 +910,9 @@ async def save_report_spam_file(message: types.Message):
         reported_spam += f"{message.text} "
     elif message.caption:
         reported_spam += f"{message.caption} "
-    reported_spam = reported_spam.replace("\n", " ") +"\n"  # replace newlines with spaces and add new line in the end
+    reported_spam = (
+        reported_spam.replace("\n", " ") + "\n"
+    )  # replace newlines with spaces and add new line in the end
 
     # Get the filename
     filename = get_daily_spam_filename()
@@ -1630,11 +1632,34 @@ if __name__ == "__main__":
             user_is_10sec_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 10
-            # print("User is old: ", user_is_omake it external function getting message argument and returning true or falseld)
-            # print("User is 1hr old: ", user_is_1hr_old)
-            # print("User is 10sec old: ", user_is_10sec_old)
 
-            if not user_is_old:
+            if (
+                message.forward_from_chat.type if message.forward_from_chat else None
+            ) == "channel":
+                # check if it is forward from channel
+                # check for allowed channels for forwards
+                if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
+                    # this is possibly a spam
+                    the_reason = "Message is forwarded from unknown channel"
+                    await take_heuristic_action(message, the_reason)
+
+            elif has_custom_emoji_spam(
+                message
+            ):  # check if the message contains spammy custom emojis
+                the_reason = "Message contains 5 or more spammy custom emojis"
+                await take_heuristic_action(message, the_reason)
+
+            elif check_message_for_sentences(message):
+                the_reason = "Message contains spammy sentences"
+                await take_heuristic_action(message, the_reason)
+
+            elif check_message_for_capital_letters(
+                message
+            ) and check_message_for_emojis(message):
+                the_reason = "Message contains 5+ spammy capital letters and 5+ spammy regular emojis"
+                await take_heuristic_action(message, the_reason)
+
+            elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot
@@ -1646,7 +1671,9 @@ if __name__ == "__main__":
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old:
                     # this is possibly a spam
-                    print("This is possibly a spam with links or other entities")
+                    print(
+                        "This is possibly a spam with links or other entities user is 1hr old"
+                    )
                     if entity_spam_trigger:  # invoke heuristic action
                         the_reason = (
                             "Message is sent less then 1 hour after joining the chat and have "
@@ -1654,43 +1681,10 @@ if __name__ == "__main__":
                             + " inside"
                         )
                         await take_heuristic_action(message, the_reason)
-                    else:
-                        # prevent NoneType error if there is no message.forward_from_chat.type
-                        chat_type = (
-                            message.forward_from_chat.type
-                            if message.forward_from_chat
-                            else None
-                        )
-                        # check if it is forward from channel
-                        if chat_type == "channel":
-                            # check for allowed channels for forwards
-                            if (
-                                message.forward_from_chat.id
-                                not in ALLOWED_FORWARD_CHANNEL_IDS
-                            ):
-                                # this is possibly a spam
-                                the_reason = "Message is forwarded from unknown channel"
-                                await take_heuristic_action(message, the_reason)
-
-            if has_custom_emoji_spam(
-                message
-            ):  # check if the message contains spammy custom emojis
-                the_reason = "Message contains 5 or more spammy custom emojis"
-                await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 the_reason = "Message sent during the night"
                 print(f"Message sent during the night: {message}")
-
-            elif check_message_for_sentences(message):
-                the_reason = "Message contains spammy sentences"
-                await take_heuristic_action(message, the_reason)
-
-            elif check_message_for_capital_letters(
-                message
-            ) and check_message_for_emojis(message):
-                the_reason = "Message contains 5+ spammy capital letters and 5+ spammy regular emojis"
-                await take_heuristic_action(message, the_reason)
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

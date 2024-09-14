@@ -904,13 +904,13 @@ async def save_report_spam_file(message: types.Message):
     """Function to create or load the daily spam file."""
 
     reported_spam = (
-        "###" + str(message.from_user.id) + "\n"
+        "###" + str(message.from_user.id) + " "
     )  # store user_id if no text or caption
     if message.text:
-        reported_spam += f"{message.text}\n"
+        reported_spam += f"{message.text} "
     elif message.caption:
-        reported_spam += f"{message.caption}\n"
-    reported_spam += "\n"
+        reported_spam += f"{message.caption} "
+    reported_spam = reported_spam.replace("\n", " ") +"\n"  # replace newlines with spaces and add new line in the end
 
     # Get the filename
     filename = get_daily_spam_filename()

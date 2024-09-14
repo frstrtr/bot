@@ -2114,6 +2114,23 @@ if __name__ == "__main__":
             LOGGER.error(f"Error in handle_admin_reply function: {e}")
             await message.reply(f"Error: {e}")
 
+    # handle user join/left events with message.new_chat_members and message.left_chat_member
+    @DP.message_handler(
+        content_types=[
+            types.ContentType.NEW_CHAT_MEMBERS,
+            types.ContentType.LEFT_CHAT_MEMBER,
+        ]
+    )
+    async def user_changed_message(message: types.Message):
+        """Function to handle users joining or leaving the chat."""
+        # print("Users changed", message.new_chat_members, message.left_chat_member)
+
+        LOGGER.info(
+            "Users changed: %s --> %s",
+            getattr(message, "new_chat_members", ""),
+            getattr(message, "left_chat_member", ""),
+        )
+
     # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
     # TODO if succeed to delete message also remove this record from the DB
     # TODO reply to individual messages by bot in the monitored groups or make posts

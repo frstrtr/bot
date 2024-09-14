@@ -855,15 +855,25 @@ async def lolscheck(user_id):
 async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     """Function to record user join/leave events."""
 
+    # event_record = (
+    #     f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
+    #     f"{update.old_chat_member.user.id}:"
+    #     f"{'💀 ' if lols_spam else '😊 '}"
+    #     f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
+    #     f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
+    #     f"{update.from_user.id}:"
+    #     f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
+    # )
     event_record = (
-        f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
-        f"{update.old_chat_member.user.id}:"
-        f"{'💀 ' if lols_spam else '😊 '}"
-        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
-        f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
-        f"{update.from_user.id}:"
-        f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
-    )
+    f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+    f"{update.old_chat_member.user.id:<10} | "
+    f"{'💀 ' if lols_spam else '😊 '}"
+    f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30} | "
+    f"{update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} | "
+    f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} | "
+    f"{update.from_user.id:<10} | "
+    f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
+)
 
     LOGGER.debug("Event record: %s", event_record)
 

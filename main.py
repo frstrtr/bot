@@ -856,7 +856,7 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     """Function to record user join/leave events."""
 
     event_record = (
-        f"{'💀 ' if lols_spam else '😊 '}\n"
+        f"{'💀 ' if lols_spam else '😊 '}"
         f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
         f"{update.old_chat_member.user.id}:"
         f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
@@ -997,7 +997,7 @@ if __name__ == "__main__":
             inout_chatname = update.chat.title
             inout_chatusername = update.chat.username
             inout_logmessage = (
-                f"{'💀 ' if lols_spam else '😊 '}\n"
+                f"{'💀 ' if lols_spam else '😊 '}"
                 f"<b><code>{inout_status}</code></b>\n"
                 f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
                 f"{inout_userfirstname} {inout_userlastname}\n"

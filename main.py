@@ -2114,7 +2114,9 @@ if __name__ == "__main__":
             LOGGER.error(f"Error in handle_admin_reply function: {e}")
             await message.reply(f"Error: {e}")
 
-    # handle user join/left events with message.new_chat_members and message.left_chat_member
+    # handle user join/left events
+    # with message.new_chat_members and message.left_chat_member
+    # for chats with small amount of members
     @DP.message_handler(
         content_types=[
             types.ContentType.NEW_CHAT_MEMBERS,

@@ -656,7 +656,7 @@ async def handle_forwarded_reports_with_details(
     LOGGER.debug("############################################################")
     LOGGER.debug("                                                            ")
     LOGGER.debug("------------------------------------------------------------")
-    LOGGER.debug(f"Received forwarded message for the investigation: {message}")
+    # LOGGER.debug(f"Received forwarded message for the investigation: {message}")
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group

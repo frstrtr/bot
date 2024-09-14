@@ -973,87 +973,87 @@ if __name__ == "__main__":
             )
             # Stop the function if the user was kicked
             return
+        elif update.from_user.id != 6487528528: # exclude the bot itself
 
-        lols_spam = None
-        if update.from_user.id != 6487528528:  # exclude the bot itself
+            lols_spam = None
             lols_spam = await lolscheck(update.old_chat_member.user.id)
 
             # Save the event to the inout file
             await save_inout_event(update, lols_spam)
 
-        # Send user join/left details to the technolog group
-        # inout_userid = update.from_user.id
-        inout_userid = update.old_chat_member.user.id
-        # inout_userfirstname = update.from_user.first_name
-        inout_userfirstname = update.old_chat_member.user.first_name
-        # inout_userlastname = update.from_user.last_name or ""  # optional
-        inout_userlastname = update.old_chat_member.user.last_name or ""  # optional
-        # inout_username = update.from_user.username or "!UNDEFINED!"  # optional
-        inout_username = (
-            update.old_chat_member.user.username or "!UNDEFINED!"
-        )  # optional
-        # inout_chatid = str(update.chat.id)[4:]
-        # inout_action = "JOINED" if message.new_chat_members else "LEFT"
-        inout_chatname = update.chat.title
-        inout_chatusername = update.chat.username
-        inout_logmessage = (
-            f"{'💀 ' if lols_spam else '😊 '}\n"
-            f"<b><code>{inout_status}</code></b>\n"
-            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
-            f"{inout_userfirstname} {inout_userlastname}\n"
-            # TODO construct private chat links too
-            f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
-            f"💡 USER ID profile links:\n"
-            f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-            f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-            f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-            f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
-        )
+            # Send user join/left details to the technolog group
+            # inout_userid = update.from_user.id
+            inout_userid = update.old_chat_member.user.id
+            # inout_userfirstname = update.from_user.first_name
+            inout_userfirstname = update.old_chat_member.user.first_name
+            # inout_userlastname = update.from_user.last_name or ""  # optional
+            inout_userlastname = update.old_chat_member.user.last_name or ""  # optional
+            # inout_username = update.from_user.username or "!UNDEFINED!"  # optional
+            inout_username = (
+                update.old_chat_member.user.username or "!UNDEFINED!"
+            )  # optional
+            # inout_chatid = str(update.chat.id)[4:]
+            # inout_action = "JOINED" if message.new_chat_members else "LEFT"
+            inout_chatname = update.chat.title
+            inout_chatusername = update.chat.username
+            inout_logmessage = (
+                f"{'💀 ' if lols_spam else '😊 '}\n"
+                f"<b><code>{inout_status}</code></b>\n"
+                f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+                f"{inout_userfirstname} {inout_userlastname}\n"
+                # TODO construct private chat links too
+                f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+                f"💡 USER ID profile links:\n"
+                f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
+                f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
+                f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
+                f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+                f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
+            )
 
-        await BOT.send_message(
-            TECHNO_LOG_GROUP,
-            inout_logmessage,
-            message_thread_id=TECHNO_INOUT,
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-        )
+            await BOT.send_message(
+                TECHNO_LOG_GROUP,
+                inout_logmessage,
+                message_thread_id=TECHNO_INOUT,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
 
-        # Extract the user status change
-        result = extract_status_change(update)
-        if result is None:
-            return
-        was_member, is_member = result
+            # Extract the user status change
+            result = extract_status_change(update)
+            if result is None:
+                return
+            was_member, is_member = result
 
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO recent_messages
-            (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                getattr(update.chat, "id", None),
-                getattr(update.chat, "username", ""),
-                getattr(
-                    update, "date", None
-                ),  # primary key to change to prevent overwriting DB
-                getattr(update.old_chat_member.user, "id", None),
-                getattr(update.old_chat_member.user, "username", ""),
-                getattr(update.old_chat_member.user, "first_name", ""),
-                getattr(update.old_chat_member.user, "last_name", ""),
-                getattr(update, "date", None),
-                getattr(update.from_user, "id", ""),
-                getattr(update, "date", None),
-                getattr(update.chat, "title", None),
-                getattr(update.from_user, "id", None),
-                getattr(update.from_user, "username", ""),
-                getattr(update.from_user, "first_name", ""),
-                getattr(update.from_user, "last_name", ""),
-                is_member,
-                was_member,
-            ),
-        )
-        conn.commit()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO recent_messages
+                (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    getattr(update.chat, "id", None),
+                    getattr(update.chat, "username", ""),
+                    getattr(
+                        update, "date", None
+                    ),  # primary key to change to prevent overwriting DB
+                    getattr(update.old_chat_member.user, "id", None),
+                    getattr(update.old_chat_member.user, "username", ""),
+                    getattr(update.old_chat_member.user, "first_name", ""),
+                    getattr(update.old_chat_member.user, "last_name", ""),
+                    getattr(update, "date", None),
+                    getattr(update.from_user, "id", ""),
+                    getattr(update, "date", None),
+                    getattr(update.chat, "title", None),
+                    getattr(update.from_user, "id", None),
+                    getattr(update.from_user, "username", ""),
+                    getattr(update.from_user, "first_name", ""),
+                    getattr(update.from_user, "last_name", ""),
+                    is_member,
+                    was_member,
+                ),
+            )
+            conn.commit()
 
     @DP.message_handler(
         lambda message: message.forward_date is not None

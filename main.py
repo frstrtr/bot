@@ -285,14 +285,14 @@ def get_daily_spam_filename():
     # Get today's date
     today = datetime.now().strftime("%Y-%m-%d")
     # Construct the filename
-    filename = f"{today}_daily_spam.txt"
+    filename = f"daily_spam_{today}.txt"
     return filename
 
 
 def get_inout_filename():
     """Generate the filename for in/out events based on the current date."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    filename = f"{today}_inout.txt"
+    today = datetime.now().strftime("%d-%m-%Y")
+    filename = f"inout_{today}.txt"
     return filename
 
 
@@ -787,8 +787,8 @@ async def handle_forwarded_reports_with_details(
         f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
-    LOGGER.debug("Report banner content:")
-    LOGGER.debug(log_info)
+    # LOGGER.debug("Report banner content:")
+    # LOGGER.debug(log_info)
 
     admin_ban_banner = (
         f"💡 Reaction time: {message_report_date - message.date}\n"
@@ -852,45 +852,46 @@ async def lolscheck(user_id):
             return "Timeout"
 
 
-async def save_inout_event(update: types.ChatMemberUpdated):
+async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     """Function to record user join/leave events."""
-    if update.from_user.id != 6487528528:  # exclude the bot itself
-        filename = get_inout_filename()
-        existing_files = [f for f in os.listdir() if f.endswith("_inout.txt")]
 
-        lols_spam = await lolscheck(update.old_chat_member.user.id)
+    event_record = (
+        f"{'💀 ' if lols_spam else '😊 '}\n"
+        f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
+        f"{update.old_chat_member.user.id}:"
+        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
+        f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
+        f"{update.from_user.id}:"
+        f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}"
+    )
 
-        event_record = (
-            f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
-            f"{update.old_chat_member.user.id}:"
-            f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
-            f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
-            f"{update.from_user.id}:"
-            f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}"
-            f"{' 💀' if lols_spam else ' 😊'}\n"
-        )
-        LOGGER.debug("Event record: %s", event_record)
-        if existing_files:
-            for existing_file in existing_files:
-                if existing_file != filename:
-                    with open(filename, "w", encoding="utf-8") as file:
-                        file.write(event_record)
-                    return
-                else:
-                    with open(existing_file, "a", encoding="utf-8") as file:
-                        file.write(event_record)
-                    return
-        else:
-            with open(filename, "w", encoding="utf-8") as file:
-                file.write(event_record)
+    LOGGER.debug("Event record: %s", event_record)
+
+    filename = get_inout_filename()
+    existing_files = [f for f in os.listdir() if f.startswith("inout_")]
+
+    # Check if any file with the pattern inout_* exists
+    if existing_files:
+        for existing_file in existing_files:
+            if existing_file != filename:
+                # Create a new file with the current date if the existing file's date is different
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(event_record)
+                return
+            else:
+                # Append the event record to the existing file
+                with open(existing_file, "a", encoding="utf-8") as file:
+                    file.write(event_record)
+                return
+    else:
+        # Create a new file with the current date if there are no existing files with the pattern inout_*
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(event_record)
+        return
 
 
 async def save_report_spam_file(message: types.Message):
     """Function to create or load the daily spam file."""
-    # Get the filename
-    filename = get_daily_spam_filename()
-    # Check if any file with the pattern *_daily_spam.txt exists
-    existing_files = [f for f in os.listdir() if f.endswith("_daily_spam.txt")]
 
     reported_spam = (
         str(message.from_user.id) + "\n"
@@ -900,23 +901,29 @@ async def save_report_spam_file(message: types.Message):
     elif message.caption:
         reported_spam += f"{message.caption}\n"
 
+    # Get the filename
+    filename = get_daily_spam_filename()
+    # Check if any file with the pattern *_daily_spam.txt exists
+    existing_files = [f for f in os.listdir() if f.startswith("daily_spam_")]
+
     if existing_files:
         # Check if the existing file's date is different from today
         for existing_file in existing_files:
             if existing_file != filename:
-                # Create a new file with the current date
-                with open(filename, "w") as file:
+                # Create a new file with the current date if the existing file's date is different
+                with open(filename, "w", encoding="utf-8") as file:
                     file.write(reported_spam)
                 return
             else:
                 # Load the existing file's contents
-                with open(existing_file, "a") as file:
+                with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(reported_spam)
                 return
     else:
         # Create a new file with the current date
-        with open(filename, "w") as file:
+        with open(filename, "w", encoding="utf-8") as file:
             file.write(reported_spam)
+        return
 
 
 if __name__ == "__main__":
@@ -950,18 +957,29 @@ if __name__ == "__main__":
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # LOGGER.info("Chat member update received: %s\n", update)
+        inout_status = update.new_chat_member.status
 
-        # Save the event to the inout file
-        await save_inout_event(update)
+        if inout_status == "kicked" and update.from_user.id != 6487528528:
+            # log kicked actions from anyone except the bot itself
+            cause_name = update.from_user.get_mention(as_html=False)
+            member_name = update.new_chat_member.user.get_mention(as_html=False)
 
-        result = extract_status_change(update)
-        if result is None:
+            LOGGER.info(
+                "%s kicked %s from the chat %s (ID: %d)",
+                cause_name,
+                member_name,
+                update.chat.title,
+                update.chat.id,
+            )
+            # Stop the function if the user was kicked
             return
 
-        was_member, is_member = result
+        lols_spam = None
+        if update.from_user.id != 6487528528:  # exclude the bot itself
+            lols_spam = await lolscheck(update.old_chat_member.user.id)
 
-        cause_name = update.from_user.get_mention(as_html=False)
-        member_name = update.new_chat_member.user.get_mention(as_html=False)
+            # Save the event to the inout file
+            await save_inout_event(update, lols_spam)
 
         # Send user join/left details to the technolog group
         # inout_userid = update.from_user.id
@@ -976,11 +994,11 @@ if __name__ == "__main__":
         )  # optional
         # inout_chatid = str(update.chat.id)[4:]
         # inout_action = "JOINED" if message.new_chat_members else "LEFT"
-        inout_status = update.new_chat_member.status
         inout_chatname = update.chat.title
         inout_chatusername = update.chat.username
         inout_logmessage = (
-            f"Status: <b><code>{inout_status}</code></b>\n"
+            f"{'💀 ' if lols_spam else '😊 '}\n"
+            f"<b><code>{inout_status}</code></b>\n"
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
             # TODO construct private chat links too
@@ -993,17 +1011,6 @@ if __name__ == "__main__":
             f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         )
 
-        if inout_status == "kicked":
-            # log kicked actions
-            LOGGER.info(
-                "%s kicked %s from the chat %s (ID: %d)",
-                cause_name,
-                member_name,
-                update.chat.title,
-                update.chat.id,
-            )
-            return
-
         await BOT.send_message(
             TECHNO_LOG_GROUP,
             inout_logmessage,
@@ -1012,8 +1019,11 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
         )
 
-        # new_chat_member = len(message.new_chat_members) > 0
-        # left_chat_member = bool(getattr(message.left_chat_member, "id", False))
+        # Extract the user status change
+        result = extract_status_change(update)
+        if result is None:
+            return
+        was_member, is_member = result
 
         cursor.execute(
             """
@@ -1044,29 +1054,6 @@ if __name__ == "__main__":
             ),
         )
         conn.commit()
-
-        # if not was_member and is_member:
-        #     await BOT.send_message(
-        #         TECHNO_LOG_GROUP,
-        #         inout_logmessage,
-        #         message_thread_id=TECHNO_INOUT,
-        #         parse_mode="HTML",
-        #     )
-        #
-        # elif was_member and not is_member:
-        #     await BOT.send_message(
-        #         TECHNO_LOG_GROUP,
-        #         inout_logmessage,
-        #         message_thread_id=TECHNO_INOUT,
-        #         parse_mode="HTML",
-        #     )
-        # LOGGER.info(
-        #     "\n%s removed %s from the chat %s (ID: %d)",
-        #     cause_name,
-        #     member_name,
-        #     update.chat.title,
-        #     update.chat.id,
-        # )
 
     @DP.message_handler(
         lambda message: message.forward_date is not None
@@ -1214,6 +1201,9 @@ if __name__ == "__main__":
 
         # Construct a link to the original message (assuming it's a supergroup or channel)
         # TODO BUG If message forwarded from the private chat or private chat with topics - need to reconstruct the link differently
+        # BUG if there is a data instead of channel username - it shows wrong message link!!!
+        # found_message_data[2] is not always a channel username
+        # BUG add checks if its inout event or previous report (better delete reports?)
         message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
@@ -1261,8 +1251,8 @@ if __name__ == "__main__":
             f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
             f"❌ <b>Use /ban {report_id}</b> to take action.\n"
         )
-        LOGGER.debug("Report banner content:")
-        LOGGER.debug(log_info)
+        # LOGGER.debug("Report banner content:")
+        # LOGGER.debug(log_info)
 
         admin_ban_banner = (
             f"💡 Reaction time: {message.date - message.forward_date}\n"
@@ -2124,7 +2114,6 @@ if __name__ == "__main__":
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
-    # TODO record to text file all reported texts and captions to check for the same in the future
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

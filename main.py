@@ -299,7 +299,7 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, SPAM_TRIGGERS
+    global ADMIN_AUTOBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, SPAM_TRIGGERS
     global CHANNEL_NAMES
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -343,9 +343,16 @@ def load_config():
     LOGGER.addHandler(stream_handler)
 
     # Define allowed content types excluding NEW_CHAT_MEMBER and LEFT_CHAT_MEMBER
-    allowed_content_types = list(
-        set(types.ContentTypes.ANY) - {"new_chat_members", "left_chat_member"}
-    )
+    # Get all attributes of ContentType
+    all_content_types = dir(types.ContentType)
+    # Filter out non-content type attributes and exclude NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
+    allowed_content_types = [
+        attr for attr in all_content_types
+        if not attr.startswith('__') and not callable(getattr(types.ContentType, attr))
+        and attr not in {"NEW_CHAT_MEMBERS", "LEFT_CHAT_MEMBER"}
+    ]
+    # Convert to list
+    allowed_content_types = list(allowed_content_types)
 
     # List of predetermined sentences to check for
     PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
@@ -365,6 +372,7 @@ def load_config():
 
         # Assign configuration values to variables
         ADMIN_AUTOREPORTS = int(config_XML_root.find("admin_autoreports").text)
+        ADMIN_AUTOBAN = int(config_XML_root.find("admin_autoban").text)
         TECHNO_LOGGING = int(config_XML_root.find("techno_logging").text)
         TECHNO_ORIGINALS = int(config_XML_root.find("techno_originals").text)
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
@@ -939,6 +947,13 @@ async def save_report_spam_file(message: types.Message):
         return
 
 
+async def lols_autoban(_id):
+    
+    for chat_id in CHANNEL_IDS:
+        await BOT.ban_chat_member(chat_id, _id)
+    LOGGER.info("User %s has been banned from all chats.", _id)
+                
+
 if __name__ == "__main__":
 
     # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
@@ -986,7 +1001,7 @@ if __name__ == "__main__":
             )
             # Stop the function if the user was kicked
             return
-        elif update.from_user.id != 6487528528:  # exclude the bot itself
+        if update.from_user.id != 6487528528:  # exclude the bot itself
 
             lols_spam = None
             lols_spam = await lolscheck(update.old_chat_member.user.id)
@@ -1038,35 +1053,48 @@ if __name__ == "__main__":
                 return
             was_member, is_member = result
 
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO recent_messages
-                (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    getattr(update.chat, "id", None),
-                    getattr(update.chat, "username", ""),
-                    getattr(
-                        update, "date", None
-                    ),  # primary key to change to prevent overwriting DB
-                    getattr(update.old_chat_member.user, "id", None),
-                    getattr(update.old_chat_member.user, "username", ""),
-                    getattr(update.old_chat_member.user, "first_name", ""),
-                    getattr(update.old_chat_member.user, "last_name", ""),
-                    getattr(update, "date", None),
-                    getattr(update.from_user, "id", ""),
-                    getattr(update, "date", None),
-                    getattr(update.chat, "title", None),
-                    getattr(update.from_user, "id", None),
-                    getattr(update.from_user, "username", ""),
-                    getattr(update.from_user, "first_name", ""),
-                    getattr(update.from_user, "last_name", ""),
-                    is_member,
-                    was_member,
-                ),
-            )
-            conn.commit()
+
+            if lols_spam is True:
+                await lols_autoban(update.old_chat_member.user.id)
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    inout_logmessage.replace("member", "KICKED",1).replace("left", "KICKED",1),
+                    message_thread_id=ADMIN_AUTOBAN,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+            
+            # record the event in the database if not lols_spam
+            if not lols_spam:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO recent_messages
+                    (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        getattr(update.chat, "id", None),
+                        getattr(update.chat, "username", ""),
+                        getattr(
+                            update, "date", None
+                        ),  # primary key to change to prevent overwriting DB
+                        getattr(update.old_chat_member.user, "id", None),
+                        getattr(update.old_chat_member.user, "username", ""),
+                        getattr(update.old_chat_member.user, "first_name", ""),
+                        getattr(update.old_chat_member.user, "last_name", ""),
+                        getattr(update, "date", None),
+                        getattr(update.from_user, "id", ""),
+                        getattr(update, "date", None),
+                        getattr(update.chat, "title", None),
+                        getattr(update.from_user, "id", None),
+                        getattr(update.from_user, "username", ""),
+                        getattr(update.from_user, "first_name", ""),
+                        getattr(update.from_user, "last_name", ""),
+                        is_member,
+                        was_member,
+                    ),
+                )
+                conn.commit()
 
     @DP.message_handler(
         lambda message: message.forward_date is not None
@@ -2128,9 +2156,9 @@ if __name__ == "__main__":
         # print("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "Users changed: %s --> %s",
-            getattr(message, "new_chat_members", ""),
+            "Users changed in user_changed_message function: %s --> %s",
             getattr(message, "left_chat_member", ""),
+            getattr(message, "new_chat_members", ""),
         )
 
     # TODO if failed to delete message  since the message is not found - delete corresponding record in the table

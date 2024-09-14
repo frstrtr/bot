@@ -865,15 +865,15 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     #     f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
     # )
     event_record = (
-    f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-    f"{update.old_chat_member.user.id:<10} | "
-    f"{'💀 ' if lols_spam else '😊 '}"
-    f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30} | "
-    f"{update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} | "
-    f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} | "
-    f"{update.from_user.id:<10} | "
-    f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
-)
+        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+        f"{update.old_chat_member.user.id:<10} | "
+        f"{'💀 ' if lols_spam else '😊 '}"
+        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30} | "
+        f"{update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} | "
+        f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} | "
+        f"{update.from_user.id:<10} | "
+        f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
+    )
 
     LOGGER.debug("Event record: %s", event_record)
 
@@ -904,12 +904,13 @@ async def save_report_spam_file(message: types.Message):
     """Function to create or load the daily spam file."""
 
     reported_spam = (
-        str(message.from_user.id) + "\n"
+        "###" + str(message.from_user.id) + "\n"
     )  # store user_id if no text or caption
     if message.text:
         reported_spam += f"{message.text}\n"
     elif message.caption:
         reported_spam += f"{message.caption}\n"
+    reported_spam += "\n"
 
     # Get the filename
     filename = get_daily_spam_filename()
@@ -983,7 +984,7 @@ if __name__ == "__main__":
             )
             # Stop the function if the user was kicked
             return
-        elif update.from_user.id != 6487528528: # exclude the bot itself
+        elif update.from_user.id != 6487528528:  # exclude the bot itself
 
             lols_spam = None
             lols_spam = await lolscheck(update.old_chat_member.user.id)

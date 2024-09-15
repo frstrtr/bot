@@ -303,7 +303,7 @@ def load_config():
     global CHANNEL_NAMES
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
-    global BOT_NAME, BOT_USERID,LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
+    global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, channels_dict, allowed_content_types
 
     #     # Attempt to extract the schedule, if present
@@ -362,7 +362,7 @@ def load_config():
         types.ContentType.SUCCESSFUL_PAYMENT,
         types.ContentType.CONNECTED_WEBSITE,
         types.ContentType.MIGRATE_TO_CHAT_ID,
-        types.ContentType.MIGRATE_FROM_CHAT_ID
+        types.ContentType.MIGRATE_FROM_CHAT_ID,
     ]
 
     # List of predetermined sentences to check for
@@ -904,6 +904,7 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
         # Create a new file with the current date if there are no existing files with the pattern inout_*
         with open(filename, "w", encoding="utf-8") as file:
             file.write(event_record)
+        return
 
 
 async def save_report_spam_file(message: types.Message):
@@ -925,32 +926,28 @@ async def save_report_spam_file(message: types.Message):
     # Check if any file with the pattern *_daily_spam.txt exists
     existing_files = [f for f in os.listdir() if f.startswith("daily_spam_")]
 
+    # Check if any file with the pattern daily_spam_* exists
     if existing_files:
-        # Check if the existing file's date is different from today
         for existing_file in existing_files:
-            if existing_file != filename:
-                # Create a new file with the current date if the existing file's date is different
-                with open(filename, "w", encoding="utf-8") as file:
-                    file.write(reported_spam)
-                return
-            else:
-                # Load the existing file's contents
+            if existing_file == filename:
+                # Append the event record to the existing file
                 with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(reported_spam)
                 return
+        # If no matching file is found, do nothing
     else:
-        # Create a new file with the current date
+        # Create a new file with the current date if there are no existing files with the pattern daily_spam_*
         with open(filename, "w", encoding="utf-8") as file:
             file.write(reported_spam)
         return
 
 
 async def lols_autoban(_id):
-    
+
     for chat_id in CHANNEL_IDS:
         await BOT.ban_chat_member(chat_id, _id)
     LOGGER.info("User %s has been banned from all chats.", _id)
-                
+
 
 if __name__ == "__main__":
 
@@ -1023,7 +1020,7 @@ if __name__ == "__main__":
                 f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
             )
 
-            if update.from_user.id != BOT_USERID: # Do not technolog bot actions
+            if update.from_user.id != BOT_USERID:  # Do not technolog bot actions
                 await BOT.send_message(
                     TECHNO_LOG_GROUP,
                     inout_logmessage,
@@ -1038,17 +1035,20 @@ if __name__ == "__main__":
                 return
             was_member, is_member = result
 
-
-            if lols_spam is True and update.from_user.id != BOT_USERID: # not Timeout exaclty and not caused by the bot itself
+            if (
+                lols_spam is True and update.from_user.id != BOT_USERID
+            ):  # not Timeout exaclty and not caused by the bot itself
                 await lols_autoban(update.old_chat_member.user.id)
                 await BOT.send_message(
                     ADMIN_GROUP_ID,
-                    inout_logmessage.replace("member", "KICKED",1).replace("left", "KICKED",1),
+                    inout_logmessage.replace("member", "KICKED", 1).replace(
+                        "left", "KICKED", 1
+                    ),
                     message_thread_id=ADMIN_AUTOBAN,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
-            
+
             # record the event in the database if not lols_spam
             if not lols_spam:
                 cursor.execute(

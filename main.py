@@ -888,7 +888,7 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
 
     LOGGER.debug("Event record: %s", event_record)
 
-    filename = get_inout_filename()
+    filename = get_inout_filename()  # Get the filename for TODAY
     existing_files = [f for f in os.listdir() if f.startswith("inout_")]
 
     # Check if any file with the pattern inout_* exists
@@ -899,7 +899,10 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
                 with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(event_record)
                 return
-        # If no matching file is found, do nothing
+            else:  # Create a new file with the current date if there are no existing files with the pattern inout_TODAY*
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(event_record)
+                return
     else:
         # Create a new file with the current date if there are no existing files with the pattern inout_*
         with open(filename, "w", encoding="utf-8") as file:
@@ -921,9 +924,9 @@ async def save_report_spam_file(message: types.Message):
         reported_spam.replace("\n", " ") + "\n"
     )  # replace newlines with spaces and add new line in the end
 
-    # Get the filename
+    # Get the filename for TODAY
     filename = get_daily_spam_filename()
-    # Check if any file with the pattern *_daily_spam.txt exists
+    # Check if any file with the pattern daily_spam_* exists
     existing_files = [f for f in os.listdir() if f.startswith("daily_spam_")]
 
     # Check if any file with the pattern daily_spam_* exists
@@ -934,8 +937,12 @@ async def save_report_spam_file(message: types.Message):
                 with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(reported_spam)
                 return
-        # If no matching file is found, do nothing
-    else:
+            else:  # day changed
+                # Create a new file with the current date if there are no existing files with the pattern daily_spam_TODAY*
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(reported_spam)
+                return
+    else:  # No existing files with the pattern daily_spam_*
         # Create a new file with the current date if there are no existing files with the pattern daily_spam_*
         with open(filename, "w", encoding="utf-8") as file:
             file.write(reported_spam)
@@ -995,7 +1002,7 @@ if __name__ == "__main__":
         #     # LOGGER.debug("Ignoring bot's own actions.")
         #     LOGGER.error("BOT actions not filtered out! %s", by_user)
         #     return
-        
+
         inout_status = update.new_chat_member.status
 
         lols_spam = None
@@ -1197,7 +1204,8 @@ if __name__ == "__main__":
             else:
                 e = "Renamed Account or wrong chat?"
                 LOGGER.debug(
-                    "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s", e
+                    "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s",
+                    e,
                 )
                 await message.answer(
                     f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
@@ -1404,7 +1412,10 @@ if __name__ == "__main__":
 
             LOGGER.debug(
                 "Original chat ID: %s, Original message ID: %s, Forwarded message data: %s, Original message timestamp: %s",
-                original_chat_id, report_id, forwarded_message_data, original_message_timestamp
+                original_chat_id,
+                report_id,
+                forwarded_message_data,
+                original_message_timestamp,
             )
 
             author_id = eval(forwarded_message_data)[3]
@@ -1435,12 +1446,16 @@ if __name__ == "__main__":
                     )
                     LOGGER.debug(
                         "User %s banned and their messages deleted from chat %s (%s).",
-                        author_id, channels_dict[chat_id], chat_id
+                        author_id,
+                        channels_dict[chat_id],
+                        chat_id,
                     )
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
-                        channels_dict[chat_id], chat_id, inner_e
+                        channels_dict[chat_id],
+                        chat_id,
+                        inner_e,
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
@@ -1485,7 +1500,9 @@ if __name__ == "__main__":
                     except MessageToDeleteNotFound:
                         LOGGER.warning(
                             "Message %s in chat %s (%s) not found for deletion.",
-                            message_id, channels_dict[chat_id], chat_id
+                            message_id,
+                            channels_dict[chat_id],
+                            chat_id,
                         )
                         break  # No need to retry in this case
                     # TODO manage the case when the bot is not an admin in the channel
@@ -1498,8 +1515,7 @@ if __name__ == "__main__":
                             f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                         )
             LOGGER.debug(
-                "User %s banned and their messages deleted where applicable.",
-                author_id
+                "User %s banned and their messages deleted where applicable.", author_id
             )
             button_pressed_by = callback_query.from_user.username
 
@@ -1547,7 +1563,10 @@ if __name__ == "__main__":
             f"Report them again if needed or use /ban {report_id_to_ban} command.",
         )
 
-    @DP.message_handler(lambda message: message.chat.id in CHANNEL_IDS, content_types=allowed_content_types)
+    @DP.message_handler(
+        lambda message: message.chat.id in CHANNEL_IDS,
+        content_types=allowed_content_types,
+    )
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         try:

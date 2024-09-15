@@ -975,16 +975,18 @@ if __name__ == "__main__":
     print("\n")
 
     # TODO edit message update check
+    # TODO check if user changed his name
     @DP.chat_member_handler(
         lambda update: update.from_user.id != BOT_USERID
     )  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
-        # LOGGER.info("Chat member update received: %s\n", update)
+        LOGGER.info("Chat member update received: %s\n", update)
         if update.from_user.id == BOT_USERID:
             # LOGGER.debug("Ignoring bot's own actions.")
-            LOGGER.error(f"BOT actions not filtered out! {update.from_user.id}")
+            LOGGER.error("BOT actions not filtered out! %s", update.from_user.id)
             return
+        
         inout_status = update.new_chat_member.status
 
         lols_spam = None
@@ -1185,15 +1187,15 @@ if __name__ == "__main__":
                     forward_from_chat_title,
                 )
                 LOGGER.debug(
-                    f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+                    "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
                 )
                 await message.answer(
-                    f"The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
+                    "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
                 )
             else:
                 e = "Renamed Account or wrong chat?"
                 LOGGER.debug(
-                    f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
+                    "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s", e
                 )
                 await message.answer(
                     f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
@@ -1203,7 +1205,7 @@ if __name__ == "__main__":
             return
             # pass
 
-        LOGGER.debug(f"Message data: {found_message_data}")
+        LOGGER.debug("Message data: %s", found_message_data)
 
         # Save both the original message_id and the forwarded message's date
         received_date = message.date if message.date else None
@@ -1399,11 +1401,12 @@ if __name__ == "__main__":
             ) = result
 
             LOGGER.debug(
-                f"Original chat ID: {original_chat_id}, Original message ID: {report_id}, Forwarded message data: {forwarded_message_data}, Original message timestamp: {original_message_timestamp}"
+                "Original chat ID: %s, Original message ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                original_chat_id, report_id, forwarded_message_data, original_message_timestamp
             )
 
             author_id = eval(forwarded_message_data)[3]
-            LOGGER.debug(f"Author ID retrieved for original message: {author_id}")
+            LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Author ID retrieved for original message: {author_id}",
@@ -1429,11 +1432,13 @@ if __name__ == "__main__":
                         revoke_messages=True,
                     )
                     LOGGER.debug(
-                        f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
+                        "User %s banned and their messages deleted from chat %s (%s).",
+                        author_id, channels_dict[chat_id], chat_id
                     )
                 except Exception as inner_e:
                     LOGGER.error(
-                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                        "Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        channels_dict[chat_id], chat_id, inner_e
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
@@ -1472,12 +1477,13 @@ if __name__ == "__main__":
                             attempt < retry_attempts - 1
                         ):  # Don't wait after the last attempt
                             LOGGER.warning(
-                                f"Rate limited. Waiting for {wait_time} seconds."
+                                "Rate limited. Waiting for %s seconds.", wait_time
                             )
                             time.sleep(wait_time)
                     except MessageToDeleteNotFound:
                         LOGGER.warning(
-                            f"Message {message_id} in chat {channels_dict[chat_id]} ({chat_id}) not found for deletion."
+                            "Message %s in chat %s (%s) not found for deletion.",
+                            message_id, channels_dict[chat_id], chat_id
                         )
                         break  # No need to retry in this case
                     # TODO manage the case when the bot is not an admin in the channel
@@ -1490,7 +1496,8 @@ if __name__ == "__main__":
                             f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                         )
             LOGGER.debug(
-                f"User {author_id} banned and their messages deleted where applicable."
+                "User %s banned and their messages deleted where applicable.",
+                author_id
             )
             button_pressed_by = callback_query.from_user.username
 
@@ -1505,7 +1512,7 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error(f"Error in handle_ban function: {e}")
+            LOGGER.error("Error in handle_ban function: %s", e)
             await callback_query.message.reply(f"Error: {e}")
 
     @DP.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))

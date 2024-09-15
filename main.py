@@ -425,9 +425,8 @@ def load_config():
         ADMIN_GROUP_ID = int(config_XML_root.find("log_group").text)
         TECHNOLOG_GROUP_ID = int(config_XML_root.find("techno_log_group").text)
 
-        # BOT_NAME = config_XML_root.find("bot_name").text
-        BOT_NAME = API_TOKEN.split(":")[0]
-        BOT_USERID = config_XML_root.find("bot_userid").text
+        BOT_NAME = config_XML_root.find("bot_name").text
+        BOT_USERID = API_TOKEN.split(":")[0]
         LOG_GROUP = config_XML_root.find("log_group").text
         LOG_GROUP_NAME = config_XML_root.find("log_group_name").text
         TECHNO_LOG_GROUP = config_XML_root.find("techno_log_group").text

@@ -117,19 +117,19 @@ def load_predetermined_sentences(txt_file):
 
 
 # Custom filter function to exclude specific content types and groups for the message handler
-def custom_filter(message: types.Message):
-    """Function to filter messages based on the chat ID and content type.
-    Custom filter function to exclude specific content types and groups for the message handler
-    Do not record join/left chat member events
-    """
-    excluded_content_types = {
-        types.ContentType.NEW_CHAT_MEMBERS,
-        types.ContentType.LEFT_CHAT_MEMBER,
-    }
-    return (
-        message.chat.id in CHANNEL_IDS
-        and message.content_type not in excluded_content_types
-    )
+# def custom_filter(message: types.Message):
+#     """Function to filter messages based on the chat ID and content type.
+#     Custom filter function to exclude specific content types and groups for the message handler
+#     Do not record join/left chat member events
+#     """
+#     excluded_content_types = {
+#         types.ContentType.NEW_CHAT_MEMBERS,
+#         types.ContentType.LEFT_CHAT_MEMBER,
+#     }
+#     return (
+#         message.chat.id in CHANNEL_IDS
+#         and message.content_type not in excluded_content_types
+#     )
 
 
 def get_latest_commit_info():
@@ -1547,7 +1547,7 @@ if __name__ == "__main__":
             f"Report them again if needed or use /ban {report_id_to_ban} command.",
         )
 
-    @DP.message_handler(custom_filter, content_types=types.ContentTypes.ANY)
+    @DP.message_handler(lambda message: message.chat.id in CHANNEL_IDS, content_types=allowed_content_types)
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         try:

@@ -1010,9 +1010,9 @@ if __name__ == "__main__":
         inout_logmessage = (
             f"{'💀 ' if lols_spam else '😊 '}"
             f"<b><code>{inout_status}</code></b>\n"
-            f"by {by_user}\n"
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
+            f"by {by_user}\n"
             # TODO construct private chat links too
             f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"

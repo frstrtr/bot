@@ -961,7 +961,7 @@ if __name__ == "__main__":
     load_config()
 
     print("Using bot: " + BOT_NAME)
-    print("Using bot id: " + BOT_USERID)
+    print("Using bot id: " + str(BOT_USERID))
     print("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
     print(
         "Using techno log group: " + TECHNO_LOG_GROUP_NAME + ", id: " + TECHNO_LOG_GROUP

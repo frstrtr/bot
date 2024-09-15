@@ -1023,13 +1023,14 @@ if __name__ == "__main__":
                 f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
             )
 
-            await BOT.send_message(
-                TECHNO_LOG_GROUP,
-                inout_logmessage,
-                message_thread_id=TECHNO_INOUT,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
+            if update.from_user.id != BOT_USERID: # Do not technolog bot actions
+                await BOT.send_message(
+                    TECHNO_LOG_GROUP,
+                    inout_logmessage,
+                    message_thread_id=TECHNO_INOUT,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
 
             # Extract the user status change
             result = extract_status_change(update)
@@ -1038,7 +1039,7 @@ if __name__ == "__main__":
             was_member, is_member = result
 
 
-            if lols_spam is True:
+            if lols_spam is True and update.from_user.id != BOT_USERID: # not Timeout exaclty and not caused by the bot itself
                 await lols_autoban(update.old_chat_member.user.id)
                 await BOT.send_message(
                     ADMIN_GROUP_ID,

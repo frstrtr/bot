@@ -981,6 +981,10 @@ if __name__ == "__main__":
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # LOGGER.info("Chat member update received: %s\n", update)
+        if update.from_user.id == BOT_USERID:
+            # LOGGER.debug("Ignoring bot's own actions.")
+            LOGGER.error(f"BOT actions not filtered out! {update.from_user.id}")
+            return
         inout_status = update.new_chat_member.status
 
         lols_spam = None

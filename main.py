@@ -303,7 +303,7 @@ def load_config():
     global CHANNEL_NAMES
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
-    global BOT_NAME, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
+    global BOT_NAME, BOT_USERID,LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, channels_dict, allowed_content_types
 
     #     # Attempt to extract the schedule, if present
@@ -426,6 +426,7 @@ def load_config():
         TECHNOLOG_GROUP_ID = int(config_XML_root.find("techno_log_group").text)
 
         BOT_NAME = config_XML_root.find("bot_name").text
+        BOT_USERID = config_XML_root.find("bot_userid").text
         LOG_GROUP = config_XML_root.find("log_group").text
         LOG_GROUP_NAME = config_XML_root.find("log_group_name").text
         TECHNO_LOG_GROUP = config_XML_root.find("techno_log_group").text
@@ -874,15 +875,6 @@ async def lolscheck(user_id):
 async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     """Function to record user join/leave events."""
 
-    # event_record = (
-    #     f"{datetime.now().strftime('%H:%M:%S.%f')}: "  # Date and time with milliseconds
-    #     f"{update.old_chat_member.user.id}:"
-    #     f"{'💀 ' if lols_spam else '😊 '}"
-    #     f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, ''))} "
-    #     f"{update.old_chat_member.status} --> {update.new_chat_member.status} in {'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title} by "
-    #     f"{update.from_user.id}:"
-    #     f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
-    # )
     event_record = (
         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
         f"{update.old_chat_member.user.id:<10} "
@@ -902,21 +894,16 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
     # Check if any file with the pattern inout_* exists
     if existing_files:
         for existing_file in existing_files:
-            if existing_file != filename:
-                # Create a new file with the current date if the existing file's date is different
-                with open(filename, "w", encoding="utf-8") as file:
-                    file.write(event_record)
-                return
-            else:
+            if existing_file == filename:
                 # Append the event record to the existing file
                 with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(event_record)
                 return
+        # If no matching file is found, do nothing
     else:
         # Create a new file with the current date if there are no existing files with the pattern inout_*
         with open(filename, "w", encoding="utf-8") as file:
             file.write(event_record)
-        return
 
 
 async def save_report_spam_file(message: types.Message):
@@ -998,21 +985,7 @@ if __name__ == "__main__":
         # LOGGER.info("Chat member update received: %s\n", update)
         inout_status = update.new_chat_member.status
 
-        if inout_status == "kicked" and update.from_user.id != 6487528528:
-            # log kicked actions from anyone except the bot itself
-            cause_name = update.from_user.get_mention(as_html=False)
-            member_name = update.new_chat_member.user.get_mention(as_html=False)
-
-            LOGGER.info(
-                "%s kicked %s from the chat %s (ID: %d)",
-                cause_name,
-                member_name,
-                update.chat.title,
-                update.chat.id,
-            )
-            # Stop the function if the user was kicked
-            return
-        if update.from_user.id != 6487528528:  # exclude the bot itself
+        if update.from_user.id != BOT_USERID:  # exclude the bot itself
 
             lols_spam = None
             lols_spam = await lolscheck(update.old_chat_member.user.id)

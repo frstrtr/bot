@@ -975,7 +975,9 @@ if __name__ == "__main__":
     print("\n")
 
     # TODO edit message update check
-    @DP.chat_member_handler(lambda update: update.from_user.id != BOT_USERID) # exclude bot's own actions
+    @DP.chat_member_handler(
+        lambda update: update.from_user.id != BOT_USERID
+    )  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # LOGGER.info("Chat member update received: %s\n", update)
@@ -1037,6 +1039,7 @@ if __name__ == "__main__":
             return
         was_member, is_member = result
 
+        # TODO Check lols after user join/leave event in 1hr and ban if spam
         if lols_spam is True:  # not Timeout exaclty
             await lols_autoban(update.old_chat_member.user.id)
             await BOT.send_message(
@@ -1684,8 +1687,10 @@ if __name__ == "__main__":
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old:
                     # this is possibly a spam
-                    print(
-                        "This is possibly a spam with links or other entities user is 1hr old"
+                    LOGGER.info(
+                        "This is possibly a spam with (%s) links or other entities user is 1hr old %s",
+                        entity_spam_trigger,
+                        message.from_user.id,
                     )
                     if entity_spam_trigger:  # invoke heuristic action
                         the_reason = (
@@ -1697,7 +1702,7 @@ if __name__ == "__main__":
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 the_reason = "Message sent during the night"
-                print(f"Message sent during the night: {message}")
+                LOGGER.info(f"Message sent during the night: {message}")
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

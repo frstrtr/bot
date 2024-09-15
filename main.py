@@ -426,7 +426,7 @@ def load_config():
         TECHNOLOG_GROUP_ID = int(config_XML_root.find("techno_log_group").text)
 
         BOT_NAME = config_XML_root.find("bot_name").text
-        BOT_USERID = API_TOKEN.split(":")[0]
+        BOT_USERID = int(API_TOKEN.split(":")[0])
         LOG_GROUP = config_XML_root.find("log_group").text
         LOG_GROUP_NAME = config_XML_root.find("log_group_name").text
         TECHNO_LOG_GROUP = config_XML_root.find("techno_log_group").text
@@ -961,6 +961,7 @@ if __name__ == "__main__":
     load_config()
 
     print("Using bot: " + BOT_NAME)
+    print("Using bot id: " + BOT_USERID)
     print("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
     print(
         "Using techno log group: " + TECHNO_LOG_GROUP_NAME + ", id: " + TECHNO_LOG_GROUP
@@ -981,11 +982,19 @@ if __name__ == "__main__":
     )  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
-        LOGGER.info("Chat member update received: %s\n", update)
-        if update.from_user.id == BOT_USERID:
-            # LOGGER.debug("Ignoring bot's own actions.")
-            LOGGER.error("BOT actions not filtered out! %s", update.from_user.id)
-            return
+        # Who did the action
+        by_username = update.from_user.username or "!UNDEFINED!"  # optional
+        by_userid = update.from_user.id
+        by_userfirstname = update.from_user.first_name
+        by_userlastname = update.from_user.last_name or ""  # optional
+        by_user = f"@{by_username}:{by_userid} {by_userfirstname} {by_userlastname}"
+
+        # LOGGER.info("Chat member update received: %s\n", update)
+
+        # if by_user == BOT_USERID:
+        #     # LOGGER.debug("Ignoring bot's own actions.")
+        #     LOGGER.error("BOT actions not filtered out! %s", by_user)
+        #     return
         
         inout_status = update.new_chat_member.status
 
@@ -994,13 +1003,6 @@ if __name__ == "__main__":
 
         # Save the event to the inout file
         await save_inout_event(update, lols_spam)
-
-        # Who did the action
-        by_username = update.from_user.username or "!UNDEFINED!"  # optional
-        by_userid = update.from_user.id
-        by_userfirstname = update.from_user.first_name
-        by_userlastname = update.from_user.last_name or ""  # optional
-        by_user = f"@{by_username}:{by_userid} {by_userfirstname} {by_userlastname}"
 
         # Whoose this action is about
         inout_userid = update.old_chat_member.user.id

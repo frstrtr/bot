@@ -898,15 +898,18 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
                 # Append the event record to the existing file
                 with open(existing_file, "a", encoding="utf-8") as file:
                     file.write(event_record)
+                    LOGGER.debug("Event record appended to existing inout file: %s", filename)
                 return
             else:  # Create a new file with the current date if there are no existing files with the pattern inout_TODAY*
                 with open(filename, "w", encoding="utf-8") as file:
                     file.write(event_record)
+                    LOGGER.info("New inout file created for new day: %s", filename)
                 return
     else:
         # Create a new file with the current date if there are no existing files with the pattern inout_*
         with open(filename, "w", encoding="utf-8") as file:
             file.write(event_record)
+            LOGGER.info("New inout file created in empty dir: %s", filename)
         return
 
 

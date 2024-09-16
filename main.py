@@ -670,8 +670,19 @@ async def handle_forwarded_reports_with_details(
     reason: str = "Automated report",
 ):
     """Function to handle forwarded messages with provided user details."""
+
+    reported_spam = (
+        "###" + str(message.from_user.id) + " "
+    )  # store user_id if no text or caption
+    if message.text:
+        reported_spam += f"{message.text} "
+    elif message.caption:
+        reported_spam += f"{message.caption} "
+    reported_spam = (
+        reported_spam.replace("\n", " ") + "\n"
+    )  # replace newlines with spaces and add new line in the end
     # store spam text and caption to the daily_spam file
-    await save_report_spam_file(message)
+    await save_report_file("daily_spam_", reported_spam)
 
     LOGGER.debug("############################################################")
     LOGGER.debug("                                                            ")
@@ -872,89 +883,26 @@ async def lolscheck(user_id):
             return "Timeout"
 
 
-async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
-    """Function to record user join/leave events."""
+async def save_report_file(file_type, data):
+    """Function to create or load the daily spam file.
+    var: file_type: str: The type of file to create or load (e.g., daily_spam_)
+    var: data: str: The data to write to the file."""
 
-    event_record = (
-        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-        f"{update.old_chat_member.user.id:<10} "
-        f"{'💀 ' if lols_spam else '😊 '}"
-        f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
-        f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
-        f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
-        f"{update.from_user.id:<10} "
-        f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
-    )
-
-    LOGGER.debug("Event record: %s", event_record)
-
-    filename = get_inout_filename()  # Get the filename for TODAY
-    existing_files = [f for f in os.listdir() if f.startswith("inout_")]
-
-    # Check if any file with the pattern inout_* exists
-    if existing_files:
-        LOGGER.info("Filename for today: %s", filename)
-        LOGGER.info("Existing inout files: %s", existing_files)
-        for existing_file in existing_files:
-            LOGGER.debug("existing_files == filename: %s", existing_file == filename)
-            if existing_file == filename:
-                # Append the event record to the existing file
-                with open(existing_file, "a", encoding="utf-8") as file:
-                    file.write(event_record)
-                    LOGGER.debug(
-                        "Event record appended to existing inout file: %s", filename
-                    )
-                return
-            else:  # Create a new file with the current date if there are no existing files with the pattern inout_TODAY*
-                with open(filename, "w", encoding="utf-8") as file:
-                    file.write(event_record)
-                    LOGGER.info("New inout file created for new day: %s", filename)
-                return
-    else:
-        # Create a new file with the current date if there are no existing files with the pattern inout_*
-        with open(filename, "w", encoding="utf-8") as file:
-            file.write(event_record)
-            LOGGER.info("New inout file created in empty dir: %s", filename)
-        return
-
-
-async def save_report_spam_file(message: types.Message):
-    """Function to create or load the daily spam file."""
-
-    reported_spam = (
-        "###" + str(message.from_user.id) + " "
-    )  # store user_id if no text or caption
-    if message.text:
-        reported_spam += f"{message.text} "
-    elif message.caption:
-        reported_spam += f"{message.caption} "
-    reported_spam = (
-        reported_spam.replace("\n", " ") + "\n"
-    )  # replace newlines with spaces and add new line in the end
-
-    # Get the filename for TODAY
-    filename = get_daily_spam_filename()
-    # Check if any file with the pattern daily_spam_* exists
-    existing_files = [f for f in os.listdir() if f.startswith("daily_spam_")]
+    # Get today's date
+    today = datetime.now().strftime("%d-%m-%Y")
+    # Construct the filename
+    filename = f"{file_type}{today}.txt"
 
     # Check if any file with the pattern daily_spam_* exists
-    if existing_files:
-        for existing_file in existing_files:
-            if existing_file == filename:
-                # Append the event record to the existing file
-                with open(existing_file, "a", encoding="utf-8") as file:
-                    file.write(reported_spam)
-                return
-            else:  # day changed
-                # Create a new file with the current date if there are no existing files with the pattern daily_spam_TODAY*
-                with open(filename, "w", encoding="utf-8") as file:
-                    file.write(reported_spam)
-                return
-    else:  # No existing files with the pattern daily_spam_*
-        # Create a new file with the current date if there are no existing files with the pattern daily_spam_*
+    existing_files = [f for f in os.listdir() if f.startswith(file_type)]
+
+    if filename in existing_files:
+        with open(filename, "a", encoding="utf-8") as file:
+            file.write(data)
+        return  # File found no need to iterate further. exiting
+    else:  # Create a new file with the current date if there are no existing files with the pattern inout_TODAY*
         with open(filename, "w", encoding="utf-8") as file:
-            file.write(reported_spam)
-        return
+            file.write(data)
 
 
 async def lols_autoban(_id):
@@ -1016,8 +964,19 @@ if __name__ == "__main__":
         lols_spam = None
         lols_spam = await lolscheck(update.old_chat_member.user.id)
 
+        event_record = (
+            f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+            f"{update.old_chat_member.user.id:<10} "
+            f"{'💀 ' if lols_spam else '😊 '}"
+            f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
+            f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
+            f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
+            f"{update.from_user.id:<10} "
+            f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
+        )
+
         # Save the event to the inout file
-        await save_inout_event(update, lols_spam)
+        await save_report_file("inout_", event_record)
 
         # Whoose this action is about
         inout_userid = update.old_chat_member.user.id
@@ -1117,8 +1076,19 @@ if __name__ == "__main__":
     async def handle_forwarded_reports(message: types.Message):
         """Function to handle forwarded messages."""
 
+        reported_spam = (
+            "###" + str(message.from_user.id) + " "
+        )  # store user_id if no text or caption
+        if message.text:
+            reported_spam += f"{message.text} "
+        elif message.caption:
+            reported_spam += f"{message.caption} "
+        reported_spam = (
+            reported_spam.replace("\n", " ") + "\n"
+        )  # replace newlines with spaces and add new line in the end
+
         # store spam text and caption to the daily_spam file
-        await save_report_spam_file(message)
+        await save_report_file("daily_spam_", reported_spam)
 
         LOGGER.debug("############################################################")
         LOGGER.debug("                                                            ")

@@ -893,6 +893,7 @@ async def save_inout_event(update: types.ChatMemberUpdated, lols_spam):
 
     # Check if any file with the pattern inout_* exists
     if existing_files:
+        LOGGER.info("Existing inout files: %s", existing_files)
         for existing_file in existing_files:
             if existing_file == filename:
                 # Append the event record to the existing file

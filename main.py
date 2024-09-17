@@ -946,15 +946,15 @@ if __name__ == "__main__":
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # Who did the action
-        by_user = ""
-        if update.from_user.id == update.old_chat_member.user.id:
+        by_user = None
+        if update.from_user.id != update.old_chat_member.user.id:
             # User changed his self status
             by_username = update.from_user.username or "!UNDEFINED!"  # optional
             by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
             by_user = (
-                f"@{by_username}:{by_userid} {by_userfirstname} {by_userlastname}\n"
+                f"@{by_username}({by_userid}): {by_userfirstname} {by_userlastname}\n"
             )
 
         inout_status = update.new_chat_member.status

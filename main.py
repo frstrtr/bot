@@ -921,7 +921,7 @@ async def lols_autoban(_id):
 
 
 # Helper function to check for spam and autoban
-async def check_and_autoban(user_id: int, inout_logmessage: str, lols_spam=True):
+async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam=True):
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity.
@@ -929,6 +929,9 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, lols_spam=True)
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("Check spammer profile", url=_url)
+        )
         await BOT.send_message(
             ADMIN_GROUP_ID,
             inout_logmessage.replace("member", "<i>member</i>--><b>KICKED</b>", 1)
@@ -937,13 +940,14 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, lols_spam=True)
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=inline_kb,
         )
         return True
     return False
 
 
 # Perform checks for spam corutine
-async def perform_checks(user_id: int, inout_logmessage: str):
+async def perform_checks(user_id: int, inout_logmessage: str, _url):
     """Function to perform checks for spam and take action if necessary.
     coroutine: user_id: int: The ID of the user to check for spam.
     coroutine: inout_logmessage: str: The log message for the user's activity."""
@@ -956,19 +960,19 @@ async def perform_checks(user_id: int, inout_logmessage: str):
     await asyncio.sleep(185)  # 3 minutes + 5 seconds
     lols_spam = await lolscheck(user_id)
     LOGGER.debug("180 %s lols_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam):
+    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(605)  # 10 minutes + 5 seconds
     lols_spam = await lolscheck(user_id)
     LOGGER.debug("600 %s lols_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam):
+    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
     lols_spam = await lolscheck(user_id)
     LOGGER.debug("3600 %s lols_spam: %s", user_id, lols_spam)
-    await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam)
+    await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam)
 
 
 if __name__ == "__main__":
@@ -1012,9 +1016,7 @@ if __name__ == "__main__":
             by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
-            by_user = (
-                f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
-            )
+            by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
 
         inout_status = update.new_chat_member.status
 
@@ -1060,8 +1062,9 @@ if __name__ == "__main__":
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
             f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
             f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
-            f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         )
+
+        lols_url = f"<a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>"
 
         await BOT.send_message(
             TECHNO_LOG_GROUP,
@@ -1080,7 +1083,9 @@ if __name__ == "__main__":
         # TODO Check lols after user join/leave event in 1hr and ban if spam
         # TODO add admin info that lols check after time has been changed
         if lols_spam is True:  # not Timeout exactly
-            await check_and_autoban(update.old_chat_member.user.id, inout_logmessage)
+            await check_and_autoban(
+                update.old_chat_member.user.id, inout_logmessage, lols_url
+            )
         else:
             # Schedule the perform_checks coroutine to run in the background
             if inout_status in (
@@ -1090,7 +1095,7 @@ if __name__ == "__main__":
                 # TODO check and exclude checks if user joins other chats same time
                 LOGGER.debug("Scheduling perform_checks coroutine for %s", inout_userid)
                 asyncio.create_task(
-                    perform_checks(update.old_chat_member.user.id, inout_logmessage)
+                    perform_checks(update.old_chat_member.user.id, inout_logmessage, lols_url)
                 )
 
         # record the event in the database if not lols_spam

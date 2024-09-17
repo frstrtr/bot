@@ -800,6 +800,7 @@ async def handle_forwarded_reports_with_details(
         message_report_date = datetime.now()
 
     # Log the information with the link
+    # TODO replace profile spam chack to removable button
     log_info = (
         f"💡 Report timestamp: {message.date}\n"
         f"💡 Spam message timestamp: {message_report_date}\n"
@@ -1077,6 +1078,7 @@ if __name__ == "__main__":
             if (
                 update.new_chat_member.status == ChatMemberStatus.MEMBER
             ):  # only if user joined
+                LOGGER.debug("Scheduling perform_checks coroutine for %s", inout_userid)
                 asyncio.create_task(
                     perform_checks(update.old_chat_member.user.id, inout_logmessage)
                 )

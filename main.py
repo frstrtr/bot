@@ -1061,10 +1061,13 @@ if __name__ == "__main__":
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
             f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+            f"   └ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
         lols_url = f"<a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>"
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("Check spammer profile", url=lols_url)
+        )
 
         await BOT.send_message(
             TECHNO_LOG_GROUP,
@@ -1072,6 +1075,7 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_INOUT,
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=inline_kb,
         )
 
         # Extract the user status change
@@ -1095,7 +1099,9 @@ if __name__ == "__main__":
                 # TODO check and exclude checks if user joins other chats same time
                 LOGGER.debug("Scheduling perform_checks coroutine for %s", inout_userid)
                 asyncio.create_task(
-                    perform_checks(update.old_chat_member.user.id, inout_logmessage, lols_url)
+                    perform_checks(
+                        update.old_chat_member.user.id, inout_logmessage, lols_url
+                    )
                 )
 
         # record the event in the database if not lols_spam

@@ -912,6 +912,57 @@ async def lols_autoban(_id):
     LOGGER.info("User %s has been banned from all chats.", _id)
 
 
+# Helper function to check for spam and autoban
+async def check_and_autoban(user_id: int, inout_logmessage: str, lols_spam=True):
+    """Function to check for spam and take action if necessary.
+    user_id: int: The ID of the user to check for spam.
+    inout_logmessage: str: The log message for the user's activity.
+    lols_spam: bool: The result of the lolscheck function.OR TIMEOUT"""
+
+    if lols_spam is True:  # not Timeout exaclty
+        await lols_autoban(user_id)
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            inout_logmessage.replace("member", "<i>member</i>--><b>KICKED</b>", 1)
+            .replace("left", "<i>left</i>--><b>KICKED</b>", 1)
+            .replace("kicked", "<b>KICKED BY ADMIN<b>", 1),
+            message_thread_id=ADMIN_AUTOBAN,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+        return True
+    return False
+
+
+# Perform checks for spam corutine
+async def perform_checks(user_id: int, inout_logmessage: str):
+    """Function to perform checks for spam and take action if necessary.
+    coroutine: user_id: int: The ID of the user to check for spam.
+    coroutine: inout_logmessage: str: The log message for the user's activity."""
+
+    # immediate check
+    # lols_spam = await lolscheck(user_id)
+    # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
+    #     return
+
+    await asyncio.sleep(185)  # 3 minutes + 5 seconds
+    lols_spam = await lolscheck(user_id)
+    LOGGER.debug("180 %s lols_spam: %s", user_id, lols_spam)
+    if await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam):
+        return
+
+    await asyncio.sleep(605)  # 10 minutes + 5 seconds
+    lols_spam = await lolscheck(user_id)
+    LOGGER.debug("600 %s lols_spam: %s", user_id, lols_spam)
+    if await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam):
+        return
+
+    await asyncio.sleep(3605)  # 1 hour + 5 seconds
+    LOGGER.debug("3600 %s lols_spam: %s", user_id, lols_spam)
+    lols_spam = await lolscheck(user_id)
+    await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam)
+
+
 if __name__ == "__main__":
 
     # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
@@ -993,7 +1044,7 @@ if __name__ == "__main__":
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
             f"{'❌ ' if lols_spam else '🟢 '}"
-            f"<b>{inout_status}</b>\n"
+            f"-->{inout_status}\n"
             f"{by_user if by_user else ''}"
             # TODO construct private chat links too
             f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
@@ -1019,17 +1070,16 @@ if __name__ == "__main__":
         was_member, is_member = result
 
         # TODO Check lols after user join/leave event in 1hr and ban if spam
-        if lols_spam is True:  # not Timeout exaclty
-            await lols_autoban(update.old_chat_member.user.id)
-            await BOT.send_message(
-                ADMIN_GROUP_ID,
-                inout_logmessage.replace("member", "member-->KICKED", 1)
-                .replace("left", "left-->KICKED", 1)
-                .replace("kicked", "KICKED BY ADMIN", 1),
-                message_thread_id=ADMIN_AUTOBAN,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
+        if lols_spam is True:  # not Timeout exactly
+            await check_and_autoban(update.old_chat_member.user.id, inout_logmessage)
+        else:
+            # Schedule the perform_checks coroutine to run in the background
+            if (
+                update.new_chat_member.status == ChatMemberStatus.MEMBER
+            ):  # only if user joined
+                asyncio.create_task(
+                    perform_checks(update.old_chat_member.user.id, inout_logmessage)
+                )
 
         # record the event in the database if not lols_spam
         if not lols_spam:

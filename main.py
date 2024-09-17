@@ -946,37 +946,18 @@ if __name__ == "__main__":
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Greets new users in chats and announces when someone leaves"""
         # Who did the action
-        by_username = update.from_user.username or "!UNDEFINED!"  # optional
-        by_userid = update.from_user.id
-        by_userfirstname = update.from_user.first_name
-        by_userlastname = update.from_user.last_name or ""  # optional
-        by_user = f"@{by_username}:{by_userid} {by_userfirstname} {by_userlastname}"
-
-        # LOGGER.info("Chat member update received: %s\n", update)
-
-        # if by_user == BOT_USERID:
-        #     # LOGGER.debug("Ignoring bot's own actions.")
-        #     LOGGER.error("BOT actions not filtered out! %s", by_user)
-        #     return
+        by_user = ""
+        if update.from_user.id == update.old_chat_member.user.id:
+            # User changed his self status
+            by_username = update.from_user.username or "!UNDEFINED!"  # optional
+            by_userid = update.from_user.id
+            by_userfirstname = update.from_user.first_name
+            by_userlastname = update.from_user.last_name or ""  # optional
+            by_user = (
+                f"@{by_username}:{by_userid} {by_userfirstname} {by_userlastname}\n"
+            )
 
         inout_status = update.new_chat_member.status
-
-        lols_spam = None
-        lols_spam = await lolscheck(update.old_chat_member.user.id)
-
-        event_record = (
-            f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-            f"{update.old_chat_member.user.id:<10} "
-            f"{'💀 ' if lols_spam else '😊 '}"
-            f"{' '.join(f'@{getattr(update.old_chat_member.user, attr)}' if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
-            f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
-            f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
-            f"{update.from_user.id:<10} "
-            f"{' '.join(f'@{getattr(update.from_user, attr)}' if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
-        )
-
-        # Save the event to the inout file
-        await save_report_file("inout_", event_record)
 
         # Whoose this action is about
         inout_userid = update.old_chat_member.user.id
@@ -986,17 +967,34 @@ if __name__ == "__main__":
             update.old_chat_member.user.username or "!UNDEFINED!"
         )  # optional
         # inout_chatid = str(update.chat.id)[4:]
-        # inout_action = "JOINED" if message.new_chat_members else "LEFT"
+        # inout_action = "JOINED" if message.new_chat_memberselse "LEFT"
         inout_chatname = update.chat.title
         inout_chatusername = update.chat.username
 
+        lols_spam = None
+        lols_spam = await lolscheck(update.old_chat_member.user.id)
+
+        event_record = (
+            f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+            f"{inout_userid:<10} "
+            f"{'💀 ' if lols_spam else '😊 '}"
+            f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
+            f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
+            f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
+            f"{update.from_user.id:<10} "
+            f"{' '.join('@' + getattr(update.from_user, attr) if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
+        )
+
+        # Save the event to the inout file
+        await save_report_file("inout_", event_record)
+
         # Construct the log message
         inout_logmessage = (
-            f"{'💀 ' if lols_spam else '😊 '}"
-            f"<b><code>{inout_status}</code></b>\n"
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
-            f"by {by_user}\n"
+            f"{'💀 ' if lols_spam else '😊 '}"
+            f"<b><code>{inout_status}</code></b>\n"
+            f"{by_user if by_user else ''}"
             # TODO construct private chat links too
             f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
@@ -1026,9 +1024,9 @@ if __name__ == "__main__":
             await lols_autoban(update.old_chat_member.user.id)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                inout_logmessage.replace("member", "KICKED", 1).replace(
-                    "left", "KICKED", 1
-                ),
+                inout_logmessage.replace("member", "member-->KICKED", 1)
+                .replace("left", "left-->KICKED", 1)
+                .replace("kicked", "KICKED BY ADMIN", 1),
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,

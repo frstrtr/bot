@@ -14,6 +14,7 @@ import re
 import aiohttp
 import pytz
 from aiogram import Bot, Dispatcher, types
+from aiogram import utils
 import emoji
 from aiogram.types import (
     InlineKeyboardMarkup,
@@ -907,10 +908,12 @@ async def save_report_file(file_type, data):
 
 
 async def lols_autoban(_id):
-
-    for chat_id in CHANNEL_IDS:
-        await BOT.ban_chat_member(chat_id, _id)
-    LOGGER.info("User %s has been banned from all chats.", _id)
+    try:
+        for chat_id in CHANNEL_IDS:
+            await BOT.ban_chat_member(chat_id, _id)
+        LOGGER.info("User %s has been banned from all chats.", _id)
+    except utils.exceptions.BadRequest as e: # if user were Deleted Account while banning
+        LOGGER.error("Error banning user %s in chat %s: %s", _id, chat_id, e)
 
 
 # Helper function to check for spam and autoban

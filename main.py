@@ -1066,7 +1066,7 @@ if __name__ == "__main__":
 
         lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("Check spammer profile", url=lols_url)
+            InlineKeyboardButton("Check lols data", url=lols_url)
         )
 
         await BOT.send_message(

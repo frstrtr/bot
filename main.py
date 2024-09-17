@@ -977,7 +977,7 @@ if __name__ == "__main__":
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
             f"{inout_userid:<10} "
-            f"{'💀 ' if lols_spam else '😊 '}"
+            f"{'❌ ' if lols_spam else '🟢 '}"
             f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
             f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
             f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
@@ -992,16 +992,15 @@ if __name__ == "__main__":
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
             f"{inout_userfirstname} {inout_userlastname}\n"
-            f"{'💀 ' if lols_spam else '😊 '}"
-            f"<b><code>{inout_status}</code></b>\n"
+            f"{'❌ ' if lols_spam else '🟢 '}"
+            f"<b>{inout_status}</b>\n"
             f"{by_user if by_user else ''}"
             # TODO construct private chat links too
             f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"💡 USER ID profile links:\n"
             f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
             f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>\n"
-            f"   └ℹ️ <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+            f"   ├ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
             f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         )
 

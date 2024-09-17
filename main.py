@@ -959,8 +959,8 @@ async def perform_checks(user_id: int, inout_logmessage: str):
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
-    LOGGER.debug("3600 %s lols_spam: %s", user_id, lols_spam)
     lols_spam = await lolscheck(user_id)
+    LOGGER.debug("3600 %s lols_spam: %s", user_id, lols_spam)
     await check_and_autoban(user_id, inout_logmessage, lols_spam=lols_spam)
 
 
@@ -1071,6 +1071,7 @@ if __name__ == "__main__":
         was_member, is_member = result
 
         # TODO Check lols after user join/leave event in 1hr and ban if spam
+        # TODO add admin info that lols check after time has been changed
         if lols_spam is True:  # not Timeout exactly
             await check_and_autoban(update.old_chat_member.user.id, inout_logmessage)
         else:

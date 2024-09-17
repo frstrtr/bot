@@ -908,11 +908,15 @@ async def save_report_file(file_type, data):
 
 
 async def lols_autoban(_id):
+    """Function to ban a user from all chats using the lols bot.
+    id: int: The ID of the user to ban."""
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id)
         LOGGER.info("User %s has been banned from all chats.", _id)
-    except utils.exceptions.BadRequest as e: # if user were Deleted Account while banning
+    except (
+        utils.exceptions.BadRequest
+    ) as e:  # if user were Deleted Account while banning
         LOGGER.error("Error banning user %s in chat %s: %s", _id, chat_id, e)
 
 

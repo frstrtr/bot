@@ -1064,7 +1064,7 @@ if __name__ == "__main__":
             f"   └ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
-        lols_url = f"<a href='https://t.me/lolsbotcatcherbot?start={inout_userid}'>Profile spam check (@lolsbotcatcherbot)</a>"
+        lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("Check spammer profile", url=lols_url)
         )

@@ -647,6 +647,7 @@ async def on_startup(_dp: Dispatcher):
 
 
 async def on_shutdown(_dp):
+    """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down...")
     await BOT.close()
 
@@ -871,6 +872,8 @@ async def handle_forwarded_reports_with_details(
 
 
 async def lolscheck(user_id):
+    """Function to check if a user is in the lols bot database.
+     var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
     # https://api.lols.bot/account?id=
     async with aiohttp.ClientSession() as session:

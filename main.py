@@ -925,7 +925,7 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, lols_spam=True)
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity.
-    lols_spam: bool: The result of the lolscheck function.OR TIMEOUT"""
+    lols_spam: bool: The result of the lolscheck function. OR TIMEOUT"""
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
@@ -1013,7 +1013,7 @@ if __name__ == "__main__":
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
             by_user = (
-                f"@{by_username}({by_userid}): {by_userfirstname} {by_userlastname}\n"
+                f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
             )
 
         inout_status = update.new_chat_member.status
@@ -1038,7 +1038,7 @@ if __name__ == "__main__":
             f"{inout_userid:<10} "
             f"{'❌ ' if lols_spam else '🟢 '}"
             f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
-            f" {update.old_chat_member.status:<15} --> {update.new_chat_member.status:<15} in "
+            f" {update.old_chat_member.status:<15} --> {inout_status:<15} in "
             f"{'@' + update.chat.username + ': ' if update.chat.username else ''}{update.chat.title:<30} by "
             f"{update.from_user.id:<10} "
             f"{' '.join('@' + getattr(update.from_user, attr) if attr == 'username' else str(getattr(update.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.from_user, attr, ''))}\n"
@@ -1083,9 +1083,11 @@ if __name__ == "__main__":
             await check_and_autoban(update.old_chat_member.user.id, inout_logmessage)
         else:
             # Schedule the perform_checks coroutine to run in the background
-            if (
-                update.new_chat_member.status == ChatMemberStatus.MEMBER
-            ):  # only if user joined
+            if inout_status in (
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.KICKED,
+            ):  # only if user joined or kicked by admin
+                # TODO check and exclude checks if user joins other chats same time
                 LOGGER.debug("Scheduling perform_checks coroutine for %s", inout_userid)
                 asyncio.create_task(
                     perform_checks(update.old_chat_member.user.id, inout_logmessage)

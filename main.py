@@ -1743,7 +1743,7 @@ if __name__ == "__main__":
                 if lols_check is True:
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
-                        "User %s identified in %s as a spammer when sending a message in the first 24hrs after registration. Telefragging...",
+                        "User %s identified in %s as a spammer when sending a message during the first 24hrs after registration. Telefragging...",
                         message.from_user.id,
                         message.chat.title,
                     )

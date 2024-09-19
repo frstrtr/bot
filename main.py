@@ -141,7 +141,7 @@ def get_latest_commit_info():
         )
         return _commit_info
     except subprocess.CalledProcessError as e:
-        print(f"Error getting git commit info: {e}")
+        LOGGER.info(f"Error getting git commit info: {e}")
         return None
 
 
@@ -920,7 +920,7 @@ async def lols_autoban(_id):
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
-        LOGGER.error("Error banning user %s in chat %s: %s", _id, chat_id, e)
+        LOGGER.error("Error banning user %s in chat %s: %s. Deleted Account?", _id, chat_id, e)
 
 
 # Helper function to check for spam and autoban
@@ -939,7 +939,7 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
             ADMIN_GROUP_ID,
             inout_logmessage.replace("member", "<i>member</i>--><b>KICKED</b>", 1)
             .replace("left", "<i>left</i>--><b>KICKED</b>", 1)
-            .replace("kicked", "<b>KICKED BY ADMIN<b>", 1),
+            .replace("kicked", "<b>KICKED BY ADMIN</b>", 1),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -989,20 +989,20 @@ if __name__ == "__main__":
     # Load configuration values from the XML file
     load_config()
 
-    print("Using bot: " + BOT_NAME)
-    print("Using bot id: " + str(BOT_USERID))
-    print("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
-    print(
+    LOGGER.info("Using bot: " + BOT_NAME)
+    LOGGER.info("Using bot id: " + str(BOT_USERID))
+    LOGGER.info("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
+    LOGGER.info(
         "Using techno log group: " + TECHNO_LOG_GROUP_NAME + ", id: " + TECHNO_LOG_GROUP
     )
     channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
-    print("Monitoring chats: " + ", ".join(channel_info))
-    print("\n")
-    print(
+    LOGGER.info("Monitoring chats: " + ", ".join(channel_info))
+    LOGGER.info("\n")
+    LOGGER.info(
         "Excluding autoreport when forwarded from chats: @"
         + " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS])
     )
-    print("\n")
+    LOGGER.info("\n")
 
     # TODO edit message update check
     # TODO check if user changed his name
@@ -1324,7 +1324,7 @@ if __name__ == "__main__":
             str(technnolog_spam_message_copy.chat.id)[4:]
         )  # Remove -100 from the chat ID
         technnolog_spam_message_copy_link = f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
-        # print('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
+        # LOGGER.info('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
 
         # print('##########----------DEBUG----------##########')
 
@@ -1713,7 +1713,7 @@ if __name__ == "__main__":
                 if user_join_chat_date_str
                 else "2020-01-01 00:00:00"  # datetime(2020, 1, 1, 0, 0, 0)
             )
-            # print(
+            # LOGGER.info(
             #     "USER JOINED: ",
             #     user_join_chat_date_str,
             # )
@@ -1762,7 +1762,7 @@ if __name__ == "__main__":
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot
-                    print("This is possibly a bot")
+                    LOGGER.info("This is possibly a bot")
                     the_reason = (
                         "Message is sent less then 10 seconds after joining the chat"
                     )
@@ -2226,7 +2226,7 @@ if __name__ == "__main__":
     )
     async def user_changed_message(message: types.Message):
         """Function to handle users joining or leaving the chat."""
-        # print("Users changed", message.new_chat_members, message.left_chat_member)
+        # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
             "Users changed in user_changed_message function: %s --> %s",

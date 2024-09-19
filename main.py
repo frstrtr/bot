@@ -1729,7 +1729,7 @@ if __name__ == "__main__":
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
             user_is_1day_old = (
                 message.date - user_join_chat_date
-            ).total_seconds() < 86400 # 1 days and 5 seconds
+            ).total_seconds() < 86400  # 1 days and 5 seconds
             user_is_1hr_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 3600
@@ -1742,6 +1742,11 @@ if __name__ == "__main__":
                 lols_check = await lolscheck(message.from_user.id)
                 if lols_check is True:
                     # send message to the admin group AuTOREPORT thread
+                    LOGGER.info(
+                        "User %s identified in %s as a spammer when sending a message in the first 24hrs after registration. Telefragging...",
+                        message.from_user.id,
+                        message.chat.title,
+                    )
                     await BOT.forward_message(
                         ADMIN_GROUP_ID,
                         message.chat.id,

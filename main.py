@@ -1102,8 +1102,14 @@ if __name__ == "__main__":
                 ChatMemberStatus.KICKED,
             ):  # only if user joined or kicked by admin
                 # TODO check and exclude checks if user joins other chats same time
+                # Get the current timestamp
+                timestamp = datetime.now().strftime("%H:%M:%S")
+
+                # Log the message with the timestamp
                 LOGGER.debug(
-                    "Scheduling perform_checks coroutine for userID %s", inout_userid
+                    "%s Scheduling perform_checks coroutine for userID %s",
+                    timestamp,
+                    inout_userid,
                 )
                 asyncio.create_task(
                     perform_checks(

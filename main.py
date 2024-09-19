@@ -962,19 +962,19 @@ async def perform_checks(user_id: int, inout_logmessage: str, _url):
 
     await asyncio.sleep(185)  # 3 minutes + 5 seconds
     lols_spam = await lolscheck(user_id)
-    LOGGER.debug("180 %s lols_spam: %s", user_id, lols_spam)
+    LOGGER.debug("3min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(605)  # 10 minutes + 5 seconds
     lols_spam = await lolscheck(user_id)
-    LOGGER.debug("600 %s lols_spam: %s", user_id, lols_spam)
+    LOGGER.debug("10min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
     lols_spam = await lolscheck(user_id)
-    LOGGER.debug("3600 %s lols_spam: %s", user_id, lols_spam)
+    LOGGER.debug("1hr check %s lols_spam: %s", user_id, lols_spam)
     await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam)
 
 
@@ -1100,7 +1100,7 @@ if __name__ == "__main__":
                 ChatMemberStatus.KICKED,
             ):  # only if user joined or kicked by admin
                 # TODO check and exclude checks if user joins other chats same time
-                LOGGER.debug("Scheduling perform_checks coroutine for %s", inout_userid)
+                LOGGER.debug("Scheduling perform_checks coroutine for userID %s", inout_userid)
                 asyncio.create_task(
                     perform_checks(
                         update.old_chat_member.user.id, inout_logmessage, lols_url
@@ -1462,7 +1462,7 @@ if __name__ == "__main__":
             ) = result
 
             LOGGER.debug(
-                "Original chat ID: %s, Original message ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
                 original_chat_id,
                 report_id,
                 forwarded_message_data,
@@ -1470,7 +1470,7 @@ if __name__ == "__main__":
             )
 
             author_id = eval(forwarded_message_data)[3]
-            LOGGER.debug("Author ID retrieved for original message: %s", author_id)
+            # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Author ID retrieved for original message: {author_id}",
@@ -1495,12 +1495,12 @@ if __name__ == "__main__":
                         until_date=None,
                         revoke_messages=True,
                     )
-                    LOGGER.debug(
-                        "User %s banned and their messages deleted from chat %s (%s).",
-                        author_id,
-                        channels_dict[chat_id],
-                        chat_id,
-                    )
+                    # LOGGER.debug(
+                    #     "User %s banned and their messages deleted from chat %s (%s).",
+                    #     author_id,
+                    #     channels_dict[chat_id],
+                    #     chat_id,
+                    # )
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",

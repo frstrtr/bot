@@ -1739,8 +1739,8 @@ if __name__ == "__main__":
 
             # do lols check if user less than 48hr old sending a message
             if user_is_1day_old:
-                lols_check = await lols_check(message.from_user.id)
-                if lols_check is True:
+                lolscheck = await lols_check(message.from_user.id)
+                if lolscheck is True:
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
                         "User %s identified in %s as a spammer when sending a message during the first 24hrs after registration. Telefragging...",

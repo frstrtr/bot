@@ -871,7 +871,7 @@ async def handle_forwarded_reports_with_details(
     #     await message.answer(f"Admin group banner link: {banner_link}")
 
 
-async def lolscheck(user_id):
+async def lols_check(user_id):
     """Function to check if a user is in the lols bot database.
     var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
@@ -930,7 +930,7 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity.
-    lols_spam: bool: The result of the lolscheck function. OR TIMEOUT"""
+    lols_spam: bool: The result of the lols_check function. OR TIMEOUT"""
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
@@ -958,24 +958,24 @@ async def perform_checks(user_id: int, inout_logmessage: str, _url):
     coroutine: inout_logmessage: str: The log message for the user's activity."""
 
     # immediate check
-    # lols_spam = await lolscheck(user_id)
+    # lols_spam = await lols_check(user_id)
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
     #     return
 
     await asyncio.sleep(185)  # 3 minutes + 5 seconds
-    lols_spam = await lolscheck(user_id)
+    lols_spam = await lols_check(user_id)
     LOGGER.debug("3min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(605)  # 10 minutes + 5 seconds
-    lols_spam = await lolscheck(user_id)
+    lols_spam = await lols_check(user_id)
     LOGGER.debug("10min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
-    lols_spam = await lolscheck(user_id)
+    lols_spam = await lols_check(user_id)
     LOGGER.debug("1hr check %s lols_spam: %s", user_id, lols_spam)
     await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam)
 
@@ -1038,7 +1038,7 @@ if __name__ == "__main__":
         inout_chatusername = update.chat.username
 
         lols_spam = None
-        lols_spam = await lolscheck(update.old_chat_member.user.id)
+        lols_spam = await lols_check(update.old_chat_member.user.id)
 
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
@@ -1739,7 +1739,7 @@ if __name__ == "__main__":
 
             # do lols check if user less than 48hr old sending a message
             if user_is_1day_old:
-                lols_check = await lolscheck(message.from_user.id)
+                lols_check = await lols_check(message.from_user.id)
                 if lols_check is True:
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(

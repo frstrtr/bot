@@ -1640,9 +1640,8 @@ if __name__ == "__main__":
                     message_thread_id=TECHNO_ORIGINALS,
                 )
                 LOGGER.info(
-                    "Message ID: %s Forwarded from chat: %s with title: %s",
+                    "Message ID: %s Forwarded from chat: %s",
                     message.message_id,
-                    message.chat.id,
                     message.chat.title,
                 )
                 # # Convert the Message object to a dictionary

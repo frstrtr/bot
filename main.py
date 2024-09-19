@@ -2015,7 +2015,7 @@ if __name__ == "__main__":
         not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS]
         and message.forward_from_chat is None,
         content_types=allowed_content_types,
-    )  # exclude admins and technolog group
+    )  # exclude admins and technolog group, exclude join/left messages
     async def log_all_unhandled_messages(message: types.Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
@@ -2063,16 +2063,41 @@ if __name__ == "__main__":
                 #     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
                 # )
 
-            user_id = message.chat.id
+            # LOGGER.debug("Received message %s", message)
+            LOGGER.debug("-----------DEBUG INFO-----------")
+            LOGGER.debug("From ID: %s", message.from_user.id)
+            LOGGER.debug("From username: %s", message.from_user.username)
+            LOGGER.debug("From first name: %s", message.from_user.first_name)
+
+            LOGGER.debug("Message ID: %s", message.message_id)
+            LOGGER.debug("Message from chat title: %s", message.chat.title)
+            LOGGER.debug("Message Chat ID: %s", message.chat.id)
+            LOGGER.debug("-----------DEBUG INFO-----------")
+
+
+            user_id = message.from_user.id
+
+            user_firstname = message.from_user.first_name
+
+            if message.from_user.last_name:
+                user_lastname = message.from_user.last_name
+            else:
+                user_lastname = ""
+
+            user_full_name = user_firstname + user_lastname
+            user_full_name = f"{user_full_name} ({user_id})"
 
             if message.from_user.username:
                 user_name = message.from_user.username
             else:
-                user_name = user_id
+                user_name = user_full_name
 
             bot_received_message = (
+                f" Message received in chat {message.chat.title} ({message.chat.id})\n"
+                f" Message chat username: {message.chat.username}\n"
+                f" From user {user_full_name}\n"
                 f" Profile links:\n"
-                f"   ├ <a href='tg://user?id={user_id}'>ID based profile link</a>\n"
+                f"   ├ <a href='tg://user?id={user_id}'>{user_full_name} ID based profile link</a>\n"
                 f"   ├ Plain text: tg://user?id={user_id}\n"
                 f"   ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
                 f"   ├ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"

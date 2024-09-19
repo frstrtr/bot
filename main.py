@@ -873,7 +873,7 @@ async def handle_forwarded_reports_with_details(
 
 async def lolscheck(user_id):
     """Function to check if a user is in the lols bot database.
-     var: user_id: int: The ID of the user to check."""
+    var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
     # https://api.lols.bot/account?id=
     async with aiohttp.ClientSession() as session:
@@ -920,7 +920,9 @@ async def lols_autoban(_id):
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
-        LOGGER.error("Error banning user %s in chat %s: %s. Deleted Account?", _id, chat_id, e)
+        LOGGER.error(
+            "Error banning user %s in chat %s: %s. Deleted Account?", _id, chat_id, e
+        )
 
 
 # Helper function to check for spam and autoban
@@ -1100,7 +1102,9 @@ if __name__ == "__main__":
                 ChatMemberStatus.KICKED,
             ):  # only if user joined or kicked by admin
                 # TODO check and exclude checks if user joins other chats same time
-                LOGGER.debug("Scheduling perform_checks coroutine for userID %s", inout_userid)
+                LOGGER.debug(
+                    "Scheduling perform_checks coroutine for userID %s", inout_userid
+                )
                 asyncio.create_task(
                     perform_checks(
                         update.old_chat_member.user.id, inout_logmessage, lols_url
@@ -1566,7 +1570,8 @@ if __name__ == "__main__":
                             f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                         )
             LOGGER.debug(
-                "User %s banned and their messages deleted where applicable.", author_id
+                "User %s banned and their messages deleted where applicable.\n####################################################",
+                author_id,
             )
             button_pressed_by = callback_query.from_user.username
 
@@ -1699,9 +1704,6 @@ if __name__ == "__main__":
             conn.commit()
             # logger.info(f"Stored recent message: {message}")
 
-            # check if the message is a spam by checking the entities
-            entity_spam_trigger = has_spam_entities(message)
-
             # search for the user join chat event date using user_id in the DB
             user_join_chat_date_str = cursor.execute(
                 "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1",
@@ -1725,12 +1727,44 @@ if __name__ == "__main__":
 
             # flag true if user joined the chat more than 3 days ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
+            user_is_1day_old = (
+                message.date - user_join_chat_date
+            ).total_seconds() < 86400 # 1 days and 5 seconds
             user_is_1hr_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 3600
             user_is_10sec_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 10
+
+            # do lols check if user less than 48hr old sending a message
+            if user_is_1day_old:
+                lols_check = await lolscheck(message.from_user.id)
+                if lols_check is True:
+                    # send message to the admin group AuTOREPORT thread
+                    await BOT.forward_message(
+                        ADMIN_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                        message_thread_id=ADMIN_AUTOREPORTS,
+                    )
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        (
+                            f"User {message.from_user.id} is a spammer.\n"
+                            f"Evidance is the message above.\n"
+                            f"From chat: {message.chat.title}\n"
+                            f"NO ACTION REQUIRED, relax, Human!\n"
+                            f"I'll take care of it... (:"
+                        ),
+                        message_thread_id=ADMIN_AUTOREPORTS,
+                    )
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                    await lols_autoban(message.from_user.id)
+                    return
+
+            # check if the message is a spam by checking the entities
+            entity_spam_trigger = has_spam_entities(message)
 
             if (
                 message.forward_from_chat.type if message.forward_from_chat else None

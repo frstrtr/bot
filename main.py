@@ -953,9 +953,9 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
 
 # Perform checks for spam corutine
 async def perform_checks(user_id: int, inout_logmessage: str, _url):
-    """Function to perform checks for spam and take action if necessary.
-    coroutine: user_id: int: The ID of the user to check for spam.
-    coroutine: inout_logmessage: str: The log message for the user's activity."""
+    """Corutine to perform checks for spam and take action if necessary.
+    user_id: int: The ID of the user to check for spam.
+    inout_logmessage: str: The log message for the user's activity."""
 
     # immediate check
     # lols_spam = await lols_check(user_id)
@@ -977,6 +977,12 @@ async def perform_checks(user_id: int, inout_logmessage: str, _url):
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
     lols_spam = await lols_check(user_id)
     LOGGER.debug("1hr check %s lols_spam: %s", user_id, lols_spam)
+    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
+        return
+
+    await asyncio.sleep(7205)  # 2 hour + 5 seconds
+    lols_spam = await lols_check(user_id)
+    LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
     await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam)
 
 
@@ -1636,41 +1642,41 @@ if __name__ == "__main__":
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
             # TODO remove exceptions
-            if (
-                message.chat.id == -1001461337235 or message.chat.id == -1001527478834
-            ):  # mevrikiy or beautymauritius
-                # temporal horse fighting
-                await BOT.forward_message(
-                    TECHNOLOG_GROUP_ID,
-                    message.chat.id,
-                    message.message_id,
-                    message_thread_id=TECHNO_ORIGINALS,
-                )
-                LOGGER.info(
-                    "Message ID: %s Forwarded from chat: %s",
-                    message.message_id,
-                    message.chat.title,
-                )
-                # # Convert the Message object to a dictionary
-                # message_dict = message.to_python()
-                # formatted_message = json.dumps(
-                #     message_dict, indent=4, ensure_ascii=False
-                # )  # Convert back to a JSON string with indentation and human-readable characters
-                # logger.debug(
-                #     "\nReceived message object:\n %s\n",
-                #     formatted_message,
-                # )
-                # if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
-                #     formatted_message = (
-                #         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-                #     )
+            # if (
+            #     message.chat.id == -1001461337235 or message.chat.id == -1001527478834
+            # ):  # mevrikiy or beautymauritius
+            #     # temporal horse fighting
+            #     await BOT.forward_message(
+            #         TECHNOLOG_GROUP_ID,
+            #         message.chat.id,
+            #         message.message_id,
+            #         message_thread_id=TECHNO_ORIGINALS,
+            #     )
+            #     LOGGER.info(
+            #         "Message ID: %s Forwarded from chat: %s",
+            #         message.message_id,
+            #         message.chat.title,
+            #     )
+            # # Convert the Message object to a dictionary
+            # message_dict = message.to_python()
+            # formatted_message = json.dumps(
+            #     message_dict, indent=4, ensure_ascii=False
+            # )  # Convert back to a JSON string with indentation and human-readable characters
+            # logger.debug(
+            #     "\nReceived message object:\n %s\n",
+            #     formatted_message,
+            # )
+            # if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+            #     formatted_message = (
+            #         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+            #     )
 
-                # TODO hash JSON to make signature
-                # await BOT.send_message(
-                #     TECHNOLOG_GROUP_ID,
-                #     formatted_message,
-                #     message_thread_id=TECHNO_ORIGINALS,
-                # )
+            # TODO hash JSON to make signature
+            # await BOT.send_message(
+            #     TECHNOLOG_GROUP_ID,
+            #     formatted_message,
+            #     message_thread_id=TECHNO_ORIGINALS,
+            # )
 
             # logger.debug(
             #     # f"Bot?: {message.from_user.is_bot}\n"
@@ -1733,9 +1739,12 @@ if __name__ == "__main__":
 
             # flag true if user joined the chat more than 3 days ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
-            user_is_1day_old = (
+            user_is_2day_old = (
                 message.date - user_join_chat_date
-            ).total_seconds() < 86400  # 1 days and 5 seconds
+            ).total_seconds() < 172805  # 2 days and 5 seconds
+            # user_is_1day_old = (
+            #     message.date - user_join_chat_date
+            # ).total_seconds() < 86400  # 1 days and 5 seconds
             user_is_1hr_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 3600
@@ -1744,7 +1753,7 @@ if __name__ == "__main__":
             ).total_seconds() < 10
 
             # do lols check if user less than 48hr old sending a message
-            if user_is_1day_old:
+            if user_is_2day_old:
                 lolscheck = await lols_check(message.from_user.id)
                 if lolscheck is True:
                     # send message to the admin group AuTOREPORT thread

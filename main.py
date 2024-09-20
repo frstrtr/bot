@@ -1018,10 +1018,11 @@ if __name__ == "__main__":
         if update.from_user.id != update.old_chat_member.user.id:
             # User changed his self status
             by_username = update.from_user.username or "!UNDEFINED!"  # optional
-            by_userid = update.from_user.id
+            # by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
-            by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
+            # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
+            by_user = f"by @{by_username}: {by_userfirstname} {by_userlastname}\n"
 
         inout_status = update.new_chat_member.status
 
@@ -1056,7 +1057,7 @@ if __name__ == "__main__":
 
         # Construct the log message
         inout_logmessage = (
-            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> : "
+            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
             f"{inout_userfirstname} {inout_userlastname}\n"
             f"{'❌ ' if lols_spam else '🟢 '}"
             f"-->{inout_status}\n"
@@ -1211,7 +1212,7 @@ if __name__ == "__main__":
             else spammer_first_name
         )
 
-        # message is forwarded from a user or forwarded forward from a user
+        # message forwarded from a user or forwarded forward from a user
         if spammer_id:
             found_message_data = get_spammer_details(
                 spammer_id,
@@ -1767,7 +1768,7 @@ if __name__ == "__main__":
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         (
-                            f"User {message.from_user.id} identified as a spammer.\n"
+                            f"User <code>{message.from_user.id}</code> identified as a spammer.\n"
                             f"Evidance is the message from {message.chat.title} above\n"
                             f"NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
@@ -1783,12 +1784,13 @@ if __name__ == "__main__":
 
             if (
                 message.forward_from_chat.type if message.forward_from_chat else None
-            ) == "channel":
+            ) == types.ChatType.CHANNEL:
+                # or (message.forward_origin.type if message.forward_origin else None) == types.ChatType.CHANNEL:
                 # check if it is forward from channel
                 # check for allowed channels for forwards
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
-                    the_reason = "Message is forwarded from unknown channel"
+                    the_reason = "Message forwarded from unknown channel"
                     await take_heuristic_action(message, the_reason)
 
             elif has_custom_emoji_spam(
@@ -1831,6 +1833,11 @@ if __name__ == "__main__":
                             + " inside"
                         )
                         await take_heuristic_action(message, the_reason)
+
+            elif message.via_bot:
+                # check if the message is sent via inline bot comand
+                the_reason = "Message is sent via inline bot"
+                await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 the_reason = "Message sent during the night"
@@ -1919,10 +1926,10 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
                     )
-                    await BOT.send_message(
-                        TECHNOLOG_GROUP_ID,
-                        f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
-                    )
+                    # await BOT.send_message(
+                    #     TECHNOLOG_GROUP_ID,
+                    #     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
+                    # )
                 except Exception as inner_e:
                     LOGGER.error(
                         f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"

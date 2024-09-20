@@ -1758,16 +1758,21 @@ if __name__ == "__main__":
                         message.message_id,
                         message_thread_id=ADMIN_AUTOREPORTS,
                     )
+                    inline_kb = InlineKeyboardMarkup().add(
+                        InlineKeyboardButton(
+                            "Check lols data",
+                            url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
+                        )
+                    )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         (
-                            f"User {message.from_user.id} is a spammer.\n"
-                            f"Evidance is the message above.\n"
-                            f"From chat: {message.chat.title}\n"
-                            f"NO ACTION REQUIRED, relax, Human!\n"
-                            f"I'll take care of it... (:"
+                            f"User {message.from_user.id} identified as a spammer.\n"
+                            f"Evidance is the message from {message.chat.title} above\n"
+                            f"NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
                         message_thread_id=ADMIN_AUTOREPORTS,
+                        reply_markup=inline_kb,
                     )
                     await BOT.delete_message(message.chat.id, message.message_id)
                     await lols_autoban(message.from_user.id)
@@ -2073,7 +2078,6 @@ if __name__ == "__main__":
             LOGGER.debug("Message from chat title: %s", message.chat.title)
             LOGGER.debug("Message Chat ID: %s", message.chat.id)
             LOGGER.debug("-----------DEBUG INFO-----------")
-
 
             user_id = message.from_user.id
 

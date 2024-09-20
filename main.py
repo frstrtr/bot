@@ -1766,7 +1766,7 @@ if __name__ == "__main__":
                         ADMIN_GROUP_ID,
                         message.chat.id,
                         message.message_id,
-                        message_thread_id=ADMIN_AUTOREPORTS,
+                        message_thread_id=ADMIN_AUTOBAN,
                     )
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton(
@@ -1781,7 +1781,7 @@ if __name__ == "__main__":
                             f"Evidance is the message from {message.chat.title} above\n"
                             f"NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
-                        message_thread_id=ADMIN_AUTOREPORTS,
+                        message_thread_id=ADMIN_AUTOBAN,
                         reply_markup=inline_kb,
                     )
                     await BOT.delete_message(message.chat.id, message.message_id)

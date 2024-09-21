@@ -957,6 +957,8 @@ async def perform_checks(user_id: int, inout_logmessage: str, _url):
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity."""
 
+    # TODO aiohttp.client_exceptions.ServerDisconnectedError: Server disconnected
+
     # immediate check
     # lols_spam = await lols_check(user_id)
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
@@ -1107,7 +1109,8 @@ if __name__ == "__main__":
             if inout_status in (
                 ChatMemberStatus.MEMBER,
                 ChatMemberStatus.KICKED,
-            ):  # only if user joined or kicked by admin
+                ChatMemberStatus.RESTRICTED
+            ):  # only if user joined or kicked or restricted by admin
                 # TODO check and exclude checks if user joins other chats same time
                 # Get the current timestamp
                 timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1123,6 +1126,27 @@ if __name__ == "__main__":
                         update.old_chat_member.user.id, inout_logmessage, lols_url
                     )
                 )
+        
+        # TODO check if user joins and leave chat in 1 minute or less
+        # if inout_status == ChatMemberStatus.LEFT:
+        #     last2_join_left_event = cursor.execute(
+        #         """
+        #         SELECT received_date
+        #         FROM recent_messages
+        #         WHERE user_id = ?
+        #         ORDER BY received_date DESC
+        #         LIMIT 2
+        #         """,
+        #         (inout_userid,),
+        #     ).fetchall()
+        #     result = (last2_join_left_event[0][0] - last2_join_left_event[1][0]) < 60
+        #     if result:
+        #         LOGGER.debug("User %s joined and left chat in 1 minute or less", inout_userid)
+        #         await BOT.send_message(
+        #             ADMIN_GROUP_ID,
+        #             f"User {inout_userid} joined and left chat in 1 minute or less",
+        #             message_thread_id=ADMIN_AUTOBAN,
+        #         )
 
         # record the event in the database if not lols_spam
         if not lols_spam:

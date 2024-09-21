@@ -1782,6 +1782,7 @@ if __name__ == "__main__":
                             f"NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
                         message_thread_id=ADMIN_AUTOBAN,
+                        parse_mode="HTML",
                         reply_markup=inline_kb,
                     )
                     await BOT.delete_message(message.chat.id, message.message_id)

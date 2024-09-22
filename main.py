@@ -1109,7 +1109,7 @@ if __name__ == "__main__":
             if inout_status in (
                 ChatMemberStatus.MEMBER,
                 ChatMemberStatus.KICKED,
-                ChatMemberStatus.RESTRICTED
+                ChatMemberStatus.RESTRICTED,
             ):  # only if user joined or kicked or restricted by admin
                 # TODO check and exclude checks if user joins other chats same time
                 # Get the current timestamp
@@ -1126,27 +1126,6 @@ if __name__ == "__main__":
                         update.old_chat_member.user.id, inout_logmessage, lols_url
                     )
                 )
-        
-        # TODO check if user joins and leave chat in 1 minute or less
-        # if inout_status == ChatMemberStatus.LEFT:
-        #     last2_join_left_event = cursor.execute(
-        #         """
-        #         SELECT received_date
-        #         FROM recent_messages
-        #         WHERE user_id = ?
-        #         ORDER BY received_date DESC
-        #         LIMIT 2
-        #         """,
-        #         (inout_userid,),
-        #     ).fetchall()
-        #     result = (last2_join_left_event[0][0] - last2_join_left_event[1][0]) < 60
-        #     if result:
-        #         LOGGER.debug("User %s joined and left chat in 1 minute or less", inout_userid)
-        #         await BOT.send_message(
-        #             ADMIN_GROUP_ID,
-        #             f"User {inout_userid} joined and left chat in 1 minute or less",
-        #             message_thread_id=ADMIN_AUTOBAN,
-        #         )
 
         # record the event in the database if not lols_spam
         if not lols_spam:
@@ -1179,6 +1158,41 @@ if __name__ == "__main__":
                 ),
             )
             conn.commit()
+
+        # checking if user joins and leave chat in 1 minute or less
+        if inout_status == ChatMemberStatus.LEFT:
+            try:
+                last2_join_left_event = cursor.execute(
+                    """
+                    SELECT received_date, new_chat_member, left_chat_member
+                    FROM recent_messages
+                    WHERE user_id = ?
+                    ORDER BY received_date DESC
+                    LIMIT 2
+                    """,
+                    (inout_userid,),
+                ).fetchall()
+                time_diff = (
+                    datetime.strptime(last2_join_left_event[0][0], "%Y-%m-%d %H:%M:%S")
+                    - datetime.strptime(last2_join_left_event[1][0], "%Y-%m-%d %H:%M:%S")
+                ).total_seconds()
+
+                if (
+                    time_diff <= 60
+                    and last2_join_left_event[0][2] == 1
+                    and last2_join_left_event[1][1] == 1
+                ):
+                    LOGGER.debug(
+                        "User %s joined and left chat in 1 minute or less", inout_userid
+                    )
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left chat in 1 minute or less",
+                        message_thread_id=ADMIN_AUTOBAN,
+                        parse_mode="HTML",
+                    )
+            except IndexError:
+                LOGGER.debug("User %s has no previous join/leave events", inout_userid)
 
     @DP.message_handler(
         lambda message: message.forward_date is not None

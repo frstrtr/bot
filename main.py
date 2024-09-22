@@ -1796,7 +1796,7 @@ if __name__ == "__main__":
                 if lolscheck is True:
                     reported_spam = format_spam_report(message)
                     # save to report file spam message
-                    save_report_file("daily_spam_", reported_spam)
+                    await save_report_file("daily_spam_", reported_spam)
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
                         "User %s identified in %s as a spammer when sending a message during the first 24hrs after registration. Telefragging...",

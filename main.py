@@ -607,12 +607,12 @@ async def take_heuristic_action(message: types.Message, reason):
     tobot_forward_date = message.date
 
     # DEBUG
-    LOGGER.debug("DEBUG")
-    LOGGER.debug("Message: %s", message)
-    LOGGER.debug("message.forward_date: %s", message.forward_date)
-    LOGGER.debug("message.date: %s", message.date)
-    LOGGER.debug("forward_date: %s", tobot_forward_date)
-    LOGGER.debug("DEBUG")
+    # LOGGER.debug("DEBUG")
+    # LOGGER.debug("Message: %s", message)
+    # LOGGER.debug("message.forward_date: %s", message.forward_date)
+    # LOGGER.debug("message.date: %s", message.date)
+    # LOGGER.debug("forward_date: %s", tobot_forward_date)
+    # LOGGER.debug("DEBUG")
 
     # process the message automatically
     found_message_data = get_spammer_details(
@@ -917,7 +917,7 @@ async def lols_autoban(_id):
     id: int: The ID of the user to ban."""
     try:
         for chat_id in CHANNEL_IDS:
-            await BOT.ban_chat_member(chat_id, _id)
+            await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
         LOGGER.info("User %s has been banned from all chats.", _id)
     except (
         utils.exceptions.BadRequest
@@ -1541,7 +1541,6 @@ if __name__ == "__main__":
                     await BOT.ban_chat_member(
                         chat_id=chat_id,
                         user_id=author_id,
-                        until_date=None,
                         revoke_messages=True,
                     )
                     # LOGGER.debug(
@@ -1965,7 +1964,6 @@ if __name__ == "__main__":
                     await BOT.ban_chat_member(
                         chat_id=chat_id,
                         user_id=author_id,
-                        until_date=None,
                         revoke_messages=True,
                     )
                     LOGGER.debug(

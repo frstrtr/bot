@@ -37,6 +37,7 @@ from aiogram.utils.exceptions import (
 # conn.commit()
 # cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member BOOL")
 # conn.commit()
+
 # Setting up SQLite Database
 conn = sqlite3.connect("messages.db")
 cursor = conn.cursor()
@@ -115,22 +116,6 @@ def load_predetermined_sentences(txt_file):
         return unique_lines
     except FileNotFoundError:
         return None
-
-
-# Custom filter function to exclude specific content types and groups for the message handler
-# def custom_filter(message: types.Message):
-#     """Function to filter messages based on the chat ID and content type.
-#     Custom filter function to exclude specific content types and groups for the message handler
-#     Do not record join/left chat member events
-#     """
-#     excluded_content_types = {
-#         types.ContentType.NEW_CHAT_MEMBERS,
-#         types.ContentType.LEFT_CHAT_MEMBER,
-#     }
-#     return (
-#         message.chat.id in CHANNEL_IDS
-#         and message.content_type not in excluded_content_types
-#     )
 
 
 def get_latest_commit_info():
@@ -1007,18 +992,18 @@ if __name__ == "__main__":
     # Load configuration values from the XML file
     load_config()
 
-    LOGGER.info("Using bot: " + BOT_NAME)
-    LOGGER.info("Using bot id: " + str(BOT_USERID))
+    LOGGER.info("Using bot: %s", BOT_NAME)
+    LOGGER.info("Using bot id: %s", BOT_USERID)
     LOGGER.info("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
     LOGGER.info(
         "Using techno log group: " + TECHNO_LOG_GROUP_NAME + ", id: " + TECHNO_LOG_GROUP
     )
     channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
-    LOGGER.info("Monitoring chats: " + ", ".join(channel_info))
+    LOGGER.info("Monitoring chats: %s", ", ".join(channel_info))
     LOGGER.info("\n")
     LOGGER.info(
-        "Excluding autoreport when forwarded from chats: @"
-        + " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS])
+        "Excluding autoreport when forwarded from chats: @%s",
+        " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS]),
     )
     LOGGER.info("\n")
 
@@ -1389,7 +1374,7 @@ if __name__ == "__main__":
             f"💡 Spam message timestamp: {message.forward_date}\n"
             f"💡 Reaction time: {message.date - message.forward_date}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
-            f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+            f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
             f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
             f"💀 SPAMMER ID profile links:\n"
@@ -1408,7 +1393,7 @@ if __name__ == "__main__":
         admin_ban_banner = (
             f"💡 Reaction time: {message.date - message.forward_date}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
-            f"@{message.from_user.username or '!_U_N_D_E_F_I_N_E_D_!'}\n"
+            f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
             f"❌ <b>Use /ban {report_id}</b> to take action.\n"

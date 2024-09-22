@@ -593,6 +593,23 @@ def get_channel_id_by_name(channel_name):
     raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
 
 
+def format_spam_report(message: types.Message):
+    """Function to format the message one line for logging."""
+
+    _reported_spam = (
+        "###" + str(message.from_user.id) + " "
+    )  # store user_id if no text or caption
+    if message.text:
+        _reported_spam += f"{message.text} "
+    elif message.caption:
+        _reported_spam += f"{message.caption} "
+    _reported_spam = (
+        _reported_spam.replace("\n", " ") + "\n"
+    )  # replace newlines with spaces and add new line in the end
+
+    return _reported_spam
+
+
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
@@ -673,16 +690,7 @@ async def handle_forwarded_reports_with_details(
 ):
     """Function to handle forwarded messages with provided user details."""
 
-    reported_spam = (
-        "###" + str(message.from_user.id) + " "
-    )  # store user_id if no text or caption
-    if message.text:
-        reported_spam += f"{message.text} "
-    elif message.caption:
-        reported_spam += f"{message.caption} "
-    reported_spam = (
-        reported_spam.replace("\n", " ") + "\n"
-    )  # replace newlines with spaces and add new line in the end
+    reported_spam = format_spam_report(message)
     # store spam text and caption to the daily_spam file
     await save_report_file("daily_spam_", reported_spam)
 
@@ -1174,7 +1182,9 @@ if __name__ == "__main__":
                 ).fetchall()
                 time_diff = (
                     datetime.strptime(last2_join_left_event[0][0], "%Y-%m-%d %H:%M:%S")
-                    - datetime.strptime(last2_join_left_event[1][0], "%Y-%m-%d %H:%M:%S")
+                    - datetime.strptime(
+                        last2_join_left_event[1][0], "%Y-%m-%d %H:%M:%S"
+                    )
                 ).total_seconds()
 
                 if (
@@ -1204,17 +1214,7 @@ if __name__ == "__main__":
     async def handle_forwarded_reports(message: types.Message):
         """Function to handle forwarded messages."""
 
-        reported_spam = (
-            "###" + str(message.from_user.id) + " "
-        )  # store user_id if no text or caption
-        if message.text:
-            reported_spam += f"{message.text} "
-        elif message.caption:
-            reported_spam += f"{message.caption} "
-        reported_spam = (
-            reported_spam.replace("\n", " ") + "\n"
-        )  # replace newlines with spaces and add new line in the end
-
+        reported_spam = format_spam_report(message)
         # store spam text and caption to the daily_spam file
         await save_report_file("daily_spam_", reported_spam)
 
@@ -1794,6 +1794,9 @@ if __name__ == "__main__":
             if user_is_2day_old:
                 lolscheck = await lols_check(message.from_user.id)
                 if lolscheck is True:
+                    reported_spam = format_spam_report(message)
+                    # save to report file spam message
+                    save_report_file("daily_spam_", reported_spam)
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
                         "User %s identified in %s as a spammer when sending a message during the first 24hrs after registration. Telefragging...",

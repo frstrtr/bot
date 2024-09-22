@@ -603,14 +603,23 @@ async def take_heuristic_action(message: types.Message, reason):
     )
 
     # Use the current date if message.forward_date is None
-    forward_date = message.forward_date if message.forward_date else datetime.now()
+    # forward_date = message.forward_date if message.forward_date else datetime.now()
+    tobot_forward_date = message.date
+
+    # DEBUG
+    LOGGER.debug("DEBUG")
+    LOGGER.debug("Message: %s", message)
+    LOGGER.debug("message.forward_date: %s", message.forward_date)
+    LOGGER.debug("message.date: %s", message.date)
+    LOGGER.debug("forward_date: %s", tobot_forward_date)
+    LOGGER.debug("DEBUG")
 
     # process the message automatically
     found_message_data = get_spammer_details(
         message.from_user.id,
         message.from_user.first_name,
         message.from_user.last_name,
-        forward_date,  # to see the script latency and reaction time
+        tobot_forward_date,  # to see the script latency and reaction time
         message.forward_sender_name,
         message.forward_from_chat.title if message.forward_from_chat else None,
         forwarded_from_id=message.from_user.id,

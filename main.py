@@ -798,16 +798,16 @@ async def handle_forwarded_reports_with_details(
     )
 
     # fix if message not forwarded and autoreported
-    if message.forward_date:
-        message_report_date = message.forward_date
-    else:
-        message_report_date = datetime.now()
+    # if message.forward_date:
+    #     message_report_date = message.forward_date
+    # else:
+    message_report_date = datetime.now()
 
     # Log the information with the link
     # TODO replace profile spam chack to removable button
     log_info = (
-        f"💡 Report timestamp: {message.date}\n"
-        f"💡 Spam message timestamp: {message_report_date}\n"
+        f"💡 Report timestamp: {message_report_date}\n"
+        f"💡 Spam message timestamp: {message.date}\n"
         f"💡 Reaction time: {message_report_date - message.date}\n"
         f"💔 Reported by automated spam detection system\n"
         f"💔 {reason}\n"
@@ -1377,11 +1377,13 @@ if __name__ == "__main__":
 
         # print('##########----------DEBUG----------##########')
 
+        message_report_date = datetime.now()
+
         # Log the information with the link
         log_info = (
-            f"💡 Report timestamp: {message.date}\n"
-            f"💡 Spam message timestamp: {message.forward_date}\n"
-            f"💡 Reaction time: {message.date - message.forward_date}\n"
+            f"💡 Report timestamp: {message_report_date}\n"
+            f"💡 Spam message timestamp: {message.date}\n"
+            f"💡 Reaction time: {message_report_date - message.date}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
@@ -1400,7 +1402,7 @@ if __name__ == "__main__":
         # LOGGER.debug(log_info)
 
         admin_ban_banner = (
-            f"💡 Reaction time: {message.date - message.forward_date}\n"
+            f"💡 Reaction time: {message_report_date - message.date}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
@@ -1618,6 +1620,9 @@ if __name__ == "__main__":
                 author_id,
             )
             button_pressed_by = callback_query.from_user.username
+
+            # TODO add the timestamp of the button press and how much time passed since
+            # button_timestamp = datetime.now()
 
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -2362,6 +2367,7 @@ if __name__ == "__main__":
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
+    # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

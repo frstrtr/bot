@@ -578,7 +578,7 @@ def get_channel_id_by_name(channel_name):
     raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
 
 
-def format_spam_report(message: types.Message)->str:
+def format_spam_report(message: types.Message) -> str:
     """Function to format the message one line for logging."""
 
     _reported_spam = (
@@ -1171,7 +1171,7 @@ if __name__ == "__main__":
                     WHERE user_id = ?
                     ORDER BY received_date DESC
                     LIMIT 2
-                    """,https://t.me/tv_advert
+                    """,
                     (inout_userid,),
                 ).fetchall()
                 time_diff = (
@@ -1196,7 +1196,9 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                     )
             except IndexError:
-                LOGGER.debug("User %s left and has no previous join/leave events", inout_userid)
+                LOGGER.debug(
+                    "User %s left and has no previous join/leave events", inout_userid
+                )
 
     @DP.message_handler(
         lambda message: message.forward_date is not None
@@ -1792,7 +1794,9 @@ if __name__ == "__main__":
             if user_is_2day_old:
                 lolscheck = await lols_check(message.from_user.id)
                 if lolscheck is True:
-                    reported_spam = "AUT" + format_spam_report(message)[3:] # replace leading ### with AUT to indicate autoban
+                    reported_spam = (
+                        "AUT" + format_spam_report(message)[3:]
+                    )  # replace leading ### with AUT to indicate autoban
                     # save to report file spam message
                     await save_report_file("daily_spam_", reported_spam)
                     # send message to the admin group AuTOREPORT thread

@@ -1171,7 +1171,7 @@ if __name__ == "__main__":
                     WHERE user_id = ?
                     ORDER BY received_date DESC
                     LIMIT 2
-                    """,
+                    """,https://t.me/tv_advert
                     (inout_userid,),
                 ).fetchall()
                 time_diff = (
@@ -1889,6 +1889,7 @@ if __name__ == "__main__":
                 await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
+                # await BOT.set_message_reaction(message, "🌙") TODO switch to aiogram 3.13.1 or higher
                 the_reason = "Message sent during the night"
                 LOGGER.info(f"Message sent during the night: {message}")
 
@@ -2369,6 +2370,7 @@ if __name__ == "__main__":
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
+    # TODO more attention to the messages from users with IDs > 6 000 000 000
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

@@ -1073,11 +1073,11 @@ if __name__ == "__main__":
             f"-->{inout_status}\n"
             f"{by_user if by_user else ''}"
             # TODO construct private chat links too
-            f"💡 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
-            f"💡 USER ID profile links:\n"
-            f"   ├ℹ️ <a href='tg://user?id={inout_userid}'>USER ID based profile link</a>\n"
-            f"   ├ℹ️ Plain text: tg://user?id={inout_userid}\n"
-            f"   └ℹ️ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
+            f"💬 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+            f"🔗 <b>profile links:</b>\n"
+            f"   ├ <b><a href='tg://user?id={inout_userid}'>id based profile link</a></b>\n"
+            f"   ├ <b>plain text: tg://user?id={inout_userid}</b>\n"
+            f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
         lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"

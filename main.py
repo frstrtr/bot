@@ -185,7 +185,7 @@ def get_spammer_details(
 
     # Common SQL and parameters for both cases
     base_query = """
-        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name
+        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name, received_date
         FROM recent_messages
         WHERE {condition}
         ORDER BY received_date DESC
@@ -734,7 +734,7 @@ async def handle_forwarded_reports_with_details(
     if not found_message_data:  # Last resort. Give up.
         return
 
-    LOGGER.debug("Message data: %s", found_message_data)
+    LOGGER.debug("Found message data: %s", found_message_data)
     # logger.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
@@ -2368,6 +2368,7 @@ if __name__ == "__main__":
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
+    # TODO check profile picture date, if today - check for lols for 2 days
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

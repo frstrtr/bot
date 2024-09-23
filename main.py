@@ -1196,7 +1196,7 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                     )
             except IndexError:
-                LOGGER.debug("User %s has no previous join/leave events", inout_userid)
+                LOGGER.debug("User %s laft and has no previous join/leave events", inout_userid)
 
     @DP.message_handler(
         lambda message: message.forward_date is not None

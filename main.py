@@ -1022,7 +1022,7 @@ if __name__ == "__main__":
         lambda update: update.from_user.id != BOT_USERID
     )  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
-        """Greets new users in chats and announces when someone leaves"""
+        """Checks for change in the chat members statuses and check if they are spammers."""
         # Who did the action
         by_user = None
         if update.from_user.id != update.old_chat_member.user.id:
@@ -1163,7 +1163,7 @@ if __name__ == "__main__":
 
         # checking if user joins and leave chat in 1 minute or less
         if inout_status == ChatMemberStatus.LEFT:
-            try:
+            try:  # check if left less than 1 min after join
                 last2_join_left_event = cursor.execute(
                     """
                     SELECT received_date, new_chat_member, left_chat_member

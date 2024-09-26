@@ -929,13 +929,13 @@ async def lols_autoban(_id):
 
 
 # Helper function to check for spam and autoban
-async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam=True):
+async def check_and_autoban(
+    event_record: str, user_id: int, inout_logmessage: str, _url, lols_spam=True
+):
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity.
     lols_spam: bool: The result of the lols_check function. OR TIMEOUT"""
-
-    await save_report_file("inout_", inout_logmessage.replace("\n", " ") + "\n")
 
     inline_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton("Check spammer profile", url=_url)
@@ -943,6 +943,7 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
+        await save_report_file("inout_", event_record)
 
         if "kicked" or "restricted" in inout_logmessage:
             await BOT.send_message(
@@ -968,7 +969,10 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
             )
         return True
     else:
-        if "kicked" or "restricted" in inout_logmessage:
+        #
+        if ("kicked" or "restricted" in inout_logmessage) and (
+            str(BOT_USERID) not in event_record
+        ):
             # user is not spammer but kicked or restricted by admin
             LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
             await BOT.send_message(
@@ -984,7 +988,7 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
 
 
 # Perform checks for spam corutine
-async def perform_checks(user_id: int, inout_logmessage: str, _url):
+async def perform_checks(event_record: str, user_id: int, inout_logmessage: str, _url):
     """Corutine to perform checks for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity."""
@@ -999,25 +1003,33 @@ async def perform_checks(user_id: int, inout_logmessage: str, _url):
     await asyncio.sleep(185)  # 3 minutes + 5 seconds
     lols_spam = await lols_check(user_id)
     LOGGER.debug("3min check %s lols_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
+    if await check_and_autoban(
+        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+    ):
         return
 
     await asyncio.sleep(605)  # 10 minutes + 5 seconds
     lols_spam = await lols_check(user_id)
     LOGGER.debug("10min check %s lols_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
+    if await check_and_autoban(
+        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+    ):
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
     lols_spam = await lols_check(user_id)
     LOGGER.debug("1hr check %s lols_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam):
+    if await check_and_autoban(
+        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+    ):
         return
 
     await asyncio.sleep(7205)  # 2 hour + 5 seconds
     lols_spam = await lols_check(user_id)
     LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
-    await check_and_autoban(user_id, inout_logmessage, _url, lols_spam=lols_spam)
+    await check_and_autoban(
+        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+    )
 
 
 if __name__ == "__main__":
@@ -1134,7 +1146,7 @@ if __name__ == "__main__":
         # TODO add admin info that lols check after time has been changed
         if lols_spam is True:  # not Timeout exactly
             await check_and_autoban(
-                update.old_chat_member.user.id, inout_logmessage, lols_url
+                event_record, update.old_chat_member.user.id, inout_logmessage, lols_url
             )
         else:
             # Schedule the perform_checks coroutine to run in the background
@@ -1155,7 +1167,10 @@ if __name__ == "__main__":
                 )
                 asyncio.create_task(
                     perform_checks(
-                        update.old_chat_member.user.id, inout_logmessage, lols_url
+                        event_record,
+                        update.old_chat_member.user.id,
+                        inout_logmessage,
+                        lols_url,
                     )
                 )
 

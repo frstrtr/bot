@@ -969,8 +969,10 @@ async def check_and_autoban(
             )
         return True
     else:
-        #
-        if ("kicked" or "restricted" in inout_logmessage) and (
+        # user is not in the lols database
+        LOGGER.debug("inout_logmessage: %s", inout_logmessage)
+        LOGGER.debug("event_record: %s", event_record)
+        if (("kicked" or "restricted") in inout_logmessage) and (
             str(BOT_USERID) not in event_record
         ):
             # user is not spammer but kicked or restricted by admin
@@ -1068,7 +1070,7 @@ if __name__ == "__main__":
         # Who did the action
         by_user = None
         if update.from_user.id != update.old_chat_member.user.id:
-            # User changed his self status
+            # Someone else changed user status
             by_username = update.from_user.username or "!UNDEFINED!"  # optional
             # by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name

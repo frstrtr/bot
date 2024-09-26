@@ -945,7 +945,7 @@ async def check_and_autoban(
         await lols_autoban(user_id)
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
-            await save_report_file("inout_", event_record)
+            await save_report_file("inout_", event_record) # TODO modify by admin
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
@@ -956,7 +956,7 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-        else:
+        else: # done by bot
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
@@ -968,8 +968,7 @@ async def check_and_autoban(
                 reply_markup=inline_kb,
             )
         return True
-    else:
-        # user is not in the lols database
+    else:# user is not in the lols database
         LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         LOGGER.debug("event_record: %s", event_record)
         if ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
@@ -1882,7 +1881,7 @@ if __name__ == "__main__":
                         f"{message.from_id:<10} "
                         f"❌ "
                         f"{' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
-                        f"member --> kicked in "
+                        f" member          --> kicked          in "
                         f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
                     )
                     await save_report_file("inout_", event_record)

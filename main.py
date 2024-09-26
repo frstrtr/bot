@@ -1864,15 +1864,6 @@ if __name__ == "__main__":
                             url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
                         )
                     )
-                    event_record = (
-                        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-                        f"{message.from_id:<10} "
-                        f"❌ "
-                        f"{' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
-                        f"member --> kicked in "
-                        f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
-                    )
-                    await save_report_file("inout_", event_record)
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         (
@@ -1886,6 +1877,15 @@ if __name__ == "__main__":
                     )
                     await BOT.delete_message(message.chat.id, message.message_id)
                     await lols_autoban(message.from_user.id)
+                    event_record = (
+                        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+                        f"{message.from_id:<10} "
+                        f"❌ "
+                        f"{' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
+                        f"member --> kicked in "
+                        f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
+                    )
+                    await save_report_file("inout_", event_record)
                     return
 
             # check if the message is a spam by checking the entities

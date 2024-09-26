@@ -285,7 +285,7 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, SPAM_TRIGGERS
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, SPAM_TRIGGERS
     global CHANNEL_NAMES
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -370,6 +370,7 @@ def load_config():
         # Assign configuration values to variables
         ADMIN_AUTOREPORTS = int(config_XML_root.find("admin_autoreports").text)
         ADMIN_AUTOBAN = int(config_XML_root.find("admin_autoban").text)
+        ADMIN_MANBAN = int(config_XML_root.find("admin_manban").text)
         TECHNO_LOGGING = int(config_XML_root.find("techno_logging").text)
         TECHNO_ORIGINALS = int(config_XML_root.find("techno_originals").text)
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
@@ -934,22 +935,44 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
     inout_logmessage: str: The log message for the user's activity.
     lols_spam: bool: The result of the lols_check function. OR TIMEOUT"""
 
+    await save_report_file("inout_", inout_logmessage.replace("\n", " ") + "\n")
+
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("Check spammer profile", url=_url)
         )
+        if "kicked" or "restricted" in inout_logmessage:
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
+                    "restricted", "<b>RESTRICTED BY ADMIN</b>", 1
+                ),
+                message_thread_id=ADMIN_MANBAN,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=inline_kb,
+            )
+        else:
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                inout_logmessage.replace(
+                    "member", "<i>member</i>--><b>KICKED</b>", 1
+                ).replace("left", "<i>left</i>--><b>KICKED</b>", 1),
+                message_thread_id=ADMIN_AUTOBAN,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=inline_kb,
+            )
+        return True
+    else:
+        LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            inout_logmessage.replace("member", "<i>member</i>--><b>KICKED</b>", 1)
-            .replace("left", "<i>left</i>--><b>KICKED</b>", 1)
-            .replace("kicked", "<b>KICKED BY ADMIN</b>", 1),
-            message_thread_id=ADMIN_AUTOBAN,
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            f"Spammer ID: {user_id} is not now in the lols database.\n"
+            + inout_logmessage,
+            message_thread_id=ADMIN_MANBAN,
         )
-        return True
     return False
 
 

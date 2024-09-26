@@ -943,9 +943,9 @@ async def check_and_autoban(
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
-        await save_report_file("inout_", event_record)
 
-        if "kicked" or "restricted" in inout_logmessage:
+        if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
+            await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(

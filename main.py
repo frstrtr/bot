@@ -937,11 +937,13 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
 
     await save_report_file("inout_", inout_logmessage.replace("\n", " ") + "\n")
 
+    inline_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("Check spammer profile", url=_url)
+    )
+
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("Check spammer profile", url=_url)
-        )
+
         if "kicked" or "restricted" in inout_logmessage:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -966,14 +968,19 @@ async def check_and_autoban(user_id: int, inout_logmessage: str, _url, lols_spam
             )
         return True
     else:
-        LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
-        await BOT.send_message(
-            ADMIN_GROUP_ID,
-            f"Spammer ID: {user_id} is not now in the lols database.\n"
-            + inout_logmessage,
-            message_thread_id=ADMIN_MANBAN,
-        )
-    return False
+        if "kicked" or "restricted" in inout_logmessage:
+            # user is not spammer but kicked or restricted by admin
+            LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                f"Spammer ID: {user_id} is not now in the lols database.\n"
+                + inout_logmessage,
+                message_thread_id=ADMIN_MANBAN,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=inline_kb,
+            )
+        return False
 
 
 # Perform checks for spam corutine

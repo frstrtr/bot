@@ -972,7 +972,7 @@ async def check_and_autoban(
         # user is not in the lols database
         LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         LOGGER.debug("event_record: %s", event_record)
-        if (("kicked" or "restricted") in inout_logmessage) and (
+        if ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
             str(BOT_USERID) not in event_record
         ):
             # user is not spammer but kicked or restricted by admin

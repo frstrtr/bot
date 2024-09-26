@@ -945,7 +945,7 @@ async def check_and_autoban(
         await lols_autoban(user_id)
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
-            await save_report_file("inout_", event_record) # TODO modify by admin
+            await save_report_file("inout_", event_record)  # TODO modify by admin
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
@@ -956,7 +956,7 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-        else: # done by bot
+        else:  # done by bot
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
@@ -968,24 +968,27 @@ async def check_and_autoban(
                 reply_markup=inline_kb,
             )
         return True
-    else:# user is not in the lols database
+
+    elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
+        str(BOT_USERID) not in event_record
+    ):  # user is not in the lols database
+
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         # LOGGER.debug("event_record: %s", event_record)
-        if ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
-            str(BOT_USERID) not in event_record
-        ):
-            # user is not spammer but kicked or restricted by admin
-            LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
-            await BOT.send_message(
-                ADMIN_GROUP_ID,
-                f"User with ID: {user_id} is not now in the lols database but kicked/restricted by admin.\n"
-                + inout_logmessage,
-                message_thread_id=ADMIN_MANBAN,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-                reply_markup=inline_kb,
-            )
-        return False
+        # user is not spammer but kicked or restricted by admin
+        LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            f"User with ID: {user_id} is not now in the lols database but kicked/restricted by admin.\n"
+            + inout_logmessage,
+            message_thread_id=ADMIN_MANBAN,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=inline_kb,
+        )
+        return True
+
+    return False
 
 
 # Perform checks for spam corutine

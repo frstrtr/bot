@@ -874,7 +874,7 @@ async def handle_forwarded_reports_with_details(
     #     await message.answer(f"Admin group banner link: {banner_link}")
 
 
-async def lols_check(user_id):
+async def lols_cas_check(user_id):
     """Function to check if a user is in the lols bot database.
     var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
@@ -886,7 +886,20 @@ async def lols_check(user_id):
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    return data["banned"]
+                    lols = data["banned"]
+                    LOGGER.debug("LOLS CAS checks:")
+                    LOGGER.debug("LOLS data: %s", data)
+            async with session.get(
+                f"https://api.cas.chat/check?user_id={user_id}"
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    cas = data["result"]["offenses"]
+                    LOGGER.debug("CAS data: %s", data)
+            if lols is True or int(cas)>0:
+                return True
+            else:
+                return False
         except asyncio.TimeoutError:
             return "Timeout"
 
@@ -1005,7 +1018,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
     #     return
 
     await asyncio.sleep(185)  # 3 minutes + 5 seconds
-    lols_spam = await lols_check(user_id)
+    lols_spam = await lols_cas_check(user_id)
     LOGGER.debug("3min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(
         event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
@@ -1013,7 +1026,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         return
 
     await asyncio.sleep(605)  # 10 minutes + 5 seconds
-    lols_spam = await lols_check(user_id)
+    lols_spam = await lols_cas_check(user_id)
     LOGGER.debug("10min check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(
         event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
@@ -1021,7 +1034,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         return
 
     await asyncio.sleep(3605)  # 1 hour + 5 seconds
-    lols_spam = await lols_check(user_id)
+    lols_spam = await lols_cas_check(user_id)
     LOGGER.debug("1hr check %s lols_spam: %s", user_id, lols_spam)
     if await check_and_autoban(
         event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
@@ -1029,7 +1042,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         return
 
     await asyncio.sleep(7205)  # 2 hour + 5 seconds
-    lols_spam = await lols_check(user_id)
+    lols_spam = await lols_cas_check(user_id)
     LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
     await check_and_autoban(
         event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
@@ -1095,7 +1108,7 @@ if __name__ == "__main__":
         inout_chatusername = update.chat.username
 
         lols_spam = None
-        lols_spam = await lols_check(update.old_chat_member.user.id)
+        lols_spam = await lols_cas_check(update.old_chat_member.user.id)
 
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
@@ -1841,7 +1854,7 @@ if __name__ == "__main__":
 
             # do lols check if user less than 48hr old sending a message
             if user_is_2day_old:
-                lolscheck = await lols_check(message.from_user.id)
+                lolscheck = await lols_cas_check(message.from_user.id)
                 if lolscheck is True:
                     reported_spam = (
                         "AUT" + format_spam_report(message)[3:]
@@ -2433,6 +2446,7 @@ if __name__ == "__main__":
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
     # TODO more attention to the messages from users with IDs > 6 000 000 000
+    # TODO add cas check https://api.cas.chat/check?user_id=7383025140
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

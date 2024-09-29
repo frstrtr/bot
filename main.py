@@ -875,10 +875,11 @@ async def handle_forwarded_reports_with_details(
 
 
 async def lols_cas_check(user_id):
-    """Function to check if a user is in the lols bot database.
+    """Function to check if a user is in the lols/cas bot database.
     var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
     # https://api.lols.bot/account?id=
+    # https://api.cas.chat/check?user_id=
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(
@@ -887,20 +888,21 @@ async def lols_cas_check(user_id):
                 if resp.status == 200:
                     data = await resp.json()
                     lols = data["banned"]
-                    LOGGER.debug("LOLS CAS checks:")
-                    LOGGER.debug("LOLS data: %s", data)
+                    # LOGGER.debug("LOLS CAS checks:")
+                    # LOGGER.debug("LOLS data: %s", data)
             async with session.get(
                 f"https://api.cas.chat/check?user_id={user_id}"
             ) as resp:
                 if resp.status == 200:
-                    LOGGER.debug("CAS data: %s", data)
+                    # LOGGER.debug("CAS data: %s", data)
                     data = await resp.json()
-                    ok = data['ok']
+                    ok = data["ok"]
                     if ok:
                         cas = data["result"]["offenses"]
+                        LOGGER.debug("CAS offenses: %s", cas)
                     else:
                         cas = 0
-            if lols is True or int(cas)>0:
+            if lols is True or int(cas) > 0:
                 return True
             else:
                 return False

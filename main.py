@@ -895,7 +895,11 @@ async def lols_cas_check(user_id):
                 if resp.status == 200:
                     LOGGER.debug("CAS data: %s", data)
                     data = await resp.json()
-                    cas = data["result"]["offenses"]
+                    ok = data['ok']
+                    if ok:
+                        cas = data["result"]["offenses"]
+                    else:
+                        cas = 0
             if lols is True or int(cas)>0:
                 return True
             else:

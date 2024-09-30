@@ -901,7 +901,7 @@ async def lols_cas_check(user_id):
                     ok = data["ok"]
                     if ok:
                         cas = data["result"]["offenses"]
-                        LOGGER.debug("CAS offenses: %s", cas)
+                        LOGGER.debug("User %s CAS offenses: %s", user_id, cas)
                     else:
                         cas = 0
             if lols is True or int(cas) > 0:

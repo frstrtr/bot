@@ -881,6 +881,8 @@ async def lols_cas_check(user_id):
     # https://api.lols.bot/account?id=
     # https://api.cas.chat/check?user_id=
     async with aiohttp.ClientSession() as session:
+        lols = False
+        cas = 0
         try:
             async with session.get(
                 f"https://api.lols.bot/account?id={user_id}"
@@ -1096,8 +1098,7 @@ if __name__ == "__main__":
             # by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
-            # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
-            by_user = f"by @{by_username}: {by_userfirstname} {by_userlastname}\n"
+            # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_useGhj njgkbdj ,skj ,s jgnbvfkmyj - tckb ,s jyb crfpfkb crjkmrj xfcjd }\n"
 
         inout_status = update.new_chat_member.status
 

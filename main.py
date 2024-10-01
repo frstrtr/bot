@@ -1168,14 +1168,22 @@ if __name__ == "__main__":
             InlineKeyboardButton("Check lols data", url=lols_url)
         )
 
-        await BOT.send_message(
-            TECHNO_LOG_GROUP,
-            inout_logmessage,
-            message_thread_id=TECHNO_INOUT,
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-            reply_markup=inline_kb,
-        )
+        # TODO catch error can't parse entities if name contains special symbols
+        # aiogram.utils.exceptions.CantParseEntities: Can't parse entities: unsupported start tag "3" at byte offset 91
+        try:
+            await BOT.send_message(
+                TECHNO_LOG_GROUP,
+                inout_logmessage,
+                message_thread_id=TECHNO_INOUT,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=inline_kb,
+            )
+        except utils.exceptions.CantParseEntities as e:
+            LOGGER.error("Can't parse entities: %s", e)
+            name = f"{inout_userfirstname} {inout_userlastname}"
+            name_chars_codes = [ord(char) for char in name]
+            LOGGER.error("User name: %s: %s", name, name_chars_codes)
 
         # Extract the user status change
         result = extract_status_change(update)

@@ -1183,7 +1183,7 @@ if __name__ == "__main__":
             LOGGER.error("Can't parse entities: %s", e)
             name = f"{inout_userfirstname} {inout_userlastname}"
             name_chars_codes = [ord(char) for char in name]
-            LOGGER.error("User name: %s: %s", name, name_chars_codes)
+            LOGGER.error("%s User name: %s: %s", inout_userid, name, name_chars_codes)
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -1283,12 +1283,21 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         "User %s joined and left chat in 1 minute or less", inout_userid
                     )
-                    await BOT.send_message(
-                        ADMIN_GROUP_ID,
-                        f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left chat in 1 minute or less",
-                        message_thread_id=ADMIN_AUTOBAN,
-                        parse_mode="HTML",
-                    )
+                    try:
+                        await BOT.send_message(
+                            ADMIN_GROUP_ID,
+                            f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left chat in 1 minute or less",
+                            message_thread_id=ADMIN_AUTOBAN,
+                            parse_mode="HTML",
+                        )
+                    except utils.exceptions.CantParseEntities:
+                        # DEBUG fix if user name contains special symbols
+                        LOGGER.error("Can't parse entities: %s", e)
+                        name = f"{inout_userfirstname} {inout_userlastname}"
+                        name_chars_codes = [ord(char) for char in name]
+                        LOGGER.error(
+                            "%s User name: %s: %s", inout_userid, name, name_chars_codes
+                        )
             except IndexError:
                 LOGGER.debug(
                     "User %s left and has no previous join/leave events", inout_userid

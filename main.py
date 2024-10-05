@@ -32,6 +32,9 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
+# Set to keep track of active user IDs
+active_user_checks = set()
+
 # If adding new column for the first time, uncomment below
 # cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
 # conn.commit()
@@ -1025,52 +1028,57 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
     #     return
 
-    await asyncio.sleep(65)  # 1 minute + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("1min check %s lols_cas_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    ):
-        return
+    try:
 
-    await asyncio.sleep(185)  # 3 minutes + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("3min check %s lols_cas_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    ):
-        return
+        await asyncio.sleep(65)  # 1 minute + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("1min check %s lols_cas_spam: %s", user_id, lols_spam)
+        if await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        ):
+            return
 
-    await asyncio.sleep(605)  # 10 minutes + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("10min check %s lols_cas_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    ):
-        return
+        await asyncio.sleep(185)  # 3 minutes + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("3min check %s lols_cas_spam: %s", user_id, lols_spam)
+        if await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        ):
+            return
 
-    await asyncio.sleep(1805)  # 30 minutes + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("30min check %s lols_cas_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    ):
-        return
+        await asyncio.sleep(605)  # 10 minutes + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("10min check %s lols_cas_spam: %s", user_id, lols_spam)
+        if await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        ):
+            return
 
-    await asyncio.sleep(3605)  # 1 hour + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("1hr check %s lols_cas_spam: %s", user_id, lols_spam)
-    if await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    ):
-        return
+        await asyncio.sleep(1805)  # 30 minutes + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("30min check %s lols_cas_spam: %s", user_id, lols_spam)
+        if await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        ):
+            return
 
-    await asyncio.sleep(7205)  # 2 hour + 5 seconds
-    lols_spam = await lols_cas_check(user_id)
-    LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
-    await check_and_autoban(
-        event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
-    )
+        await asyncio.sleep(3605)  # 1 hour + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("1hr check %s lols_cas_spam: %s", user_id, lols_spam)
+        if await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        ):
+            return
+
+        await asyncio.sleep(7205)  # 2 hour + 5 seconds
+        lols_spam = await lols_cas_check(user_id)
+        LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
+        await check_and_autoban(
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+        )
+    finally:
+        # Remove the user ID from the active set when done
+        active_user_checks.remove(user_id)
 
 
 if __name__ == "__main__":
@@ -1214,14 +1222,24 @@ if __name__ == "__main__":
                     timestamp,
                     inout_userid,
                 )
-                asyncio.create_task(
-                    perform_checks(
-                        event_record,
-                        update.old_chat_member.user.id,
-                        inout_logmessage,
-                        lols_url,
+                # Check if the user ID is already being processed
+                if inout_userid not in active_user_checks:
+                    # Add the user ID to the active set
+                    active_user_checks.add(inout_userid)
+                    asyncio.create_task(
+                        perform_checks(
+                            event_record,
+                            update.old_chat_member.user.id,
+                            inout_logmessage,
+                            lols_url,
+                        )
                     )
-                )
+                else:
+                    LOGGER.debug(
+                        "%s Skipping perform_checks for userID %s as it is already being processed",
+                        timestamp,
+                        inout_userid,
+                    )
 
         # record the event in the database if not lols_spam
         if not lols_spam:
@@ -1291,7 +1309,7 @@ if __name__ == "__main__":
                             parse_mode="HTML",
                         )
                     except utils.exceptions.CantParseEntities:
-                        # DEBUG fix if user name contains special symbols
+                        # TODO DEBUG fix if user name contains special symbols
                         LOGGER.error("Can't parse entities: %s", e)
                         name = f"{inout_userfirstname} {inout_userlastname}"
                         name_chars_codes = [ord(char) for char in name]

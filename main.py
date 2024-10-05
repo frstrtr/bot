@@ -1329,7 +1329,7 @@ if __name__ == "__main__":
                         )
                         await BOT.send_message(
                             ADMIN_GROUP_ID,
-                            f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left {update.chat.title} in 1 minute or less",
+                            f"User (<code>{inout_userid}</code>) @{inout_username} {inout_userfirstname} {inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
                             message_thread_id=ADMIN_AUTOBAN,
                             parse_mode="HTML",
                             reply_markup=inline_kb,

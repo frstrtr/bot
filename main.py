@@ -1308,7 +1308,9 @@ if __name__ == "__main__":
                     and last2_join_left_event[1][1] == 1
                 ):
                     LOGGER.debug(
-                        "User %s joined and left chat in 1 minute or less", inout_userid
+                        "User %s joined and left %s in 1 minute or less",
+                        inout_userid,
+                        update.chat.title,
                     )
                     try:
                         lols_url = (
@@ -1319,7 +1321,7 @@ if __name__ == "__main__":
                         )
                         await BOT.send_message(
                             ADMIN_GROUP_ID,
-                            f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left chat in 1 minute or less",
+                            f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left {update.chat.title} in 1 minute or less",
                             message_thread_id=ADMIN_AUTOBAN,
                             parse_mode="HTML",
                             reply_markup=inline_kb,
@@ -1765,12 +1767,13 @@ if __name__ == "__main__":
 
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User {author_id} banned and their messages deleted where applicable.",
+                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 message_thread_id=callback_query.message.message_thread_id,
+                parse_mode="HTML",
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User {author_id} banned and their messages deleted where applicable.",
+                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
             )
 
         except Exception as e:
@@ -2122,7 +2125,10 @@ if __name__ == "__main__":
                         revoke_messages=True,
                     )
                     LOGGER.debug(
-                        f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id})."
+                        "User %s banned and their messages deleted from chat %s (%s).",
+                        author_id,
+                        channels_dict[chat_id],
+                        chat_id,
                     )
                     # await BOT.send_message(
                     #     TECHNOLOG_GROUP_ID,
@@ -2130,7 +2136,10 @@ if __name__ == "__main__":
                     # )
                 except Exception as inner_e:
                     LOGGER.error(
-                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                        "Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        channels_dict[chat_id],
+                        chat_id,
+                        inner_e,
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
@@ -2154,21 +2163,31 @@ if __name__ == "__main__":
                 try:
                     await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                     LOGGER.debug(
-                        f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
+                        "Message %s deleted from chat %s (%s) for user @%s (%s).",
+                        message_id,
+                        channels_dict[chat_id],
+                        chat_id,
+                        user_name,
+                        author_id,
                     )
                 except Exception as inner_e:
                     LOGGER.error(
-                        f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                        "Failed to delete message %s in chat %s (%s). Error: %s",
+                        message_id,
+                        channels_dict[chat_id],
+                        chat_id,
+                        inner_e,
                     )
                     # await BOT.send_message(
                     #     TECHNOLOG_GROUP_ID,
                     #     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     # )
             LOGGER.debug(
-                f"User {author_id} banned and their messages deleted where applicable."
+                "User %s banned and their messages deleted where applicable.", author_id
             )
             await message.reply(
-                "Action taken: User banned and their messages deleted where applicable."
+                f"Action taken: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                parse_mode="HTML",
             )
 
         except Exception as e:

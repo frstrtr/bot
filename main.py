@@ -1108,9 +1108,9 @@ if __name__ == "__main__":
 
     LOGGER.info("Using bot: %s", BOT_NAME)
     LOGGER.info("Using bot id: %s", BOT_USERID)
-    LOGGER.info("Using log group: " + LOG_GROUP_NAME + ", id:" + LOG_GROUP)
+    LOGGER.info("Using log group: %s, id: %s", LOG_GROUP_NAME, LOG_GROUP)
     LOGGER.info(
-        "Using techno log group: " + TECHNO_LOG_GROUP_NAME + ", id: " + TECHNO_LOG_GROUP
+        "Using techno log group: %s, id: %s", TECHNO_LOG_GROUP_NAME, TECHNO_LOG_GROUP
     )
     channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
     LOGGER.info("Monitoring chats: %s", ", ".join(channel_info))
@@ -1681,7 +1681,8 @@ if __name__ == "__main__":
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Author ID retrieved for original message: {author_id}",
+                f"Author ID retrieved for original message: (<code>{author_id}</code>)",
+                parse_mode="HTML",
             )
             if not author_id:
                 # show error message
@@ -1766,7 +1767,11 @@ if __name__ == "__main__":
                     # TODO manage the case when the bot is not an admin in the channel
                     except Exception as inner_e:
                         LOGGER.error(
-                            f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}"
+                            "Failed to delete message %s in chat %s (%s). Error: %s",
+                            message_id,
+                            channels_dict[chat_id],
+                            chat_id,
+                            inner_e,
                         )
                         await BOT.send_message(
                             TECHNOLOG_GROUP_ID,
@@ -2095,7 +2100,9 @@ if __name__ == "__main__":
             )
             result = cursor.fetchone()
             LOGGER.debug(
-                f"Database query result for forwarded_message_data {report_msg_id}: {result}"
+                "Database query result for forwarded_message_data %d: %s",
+                report_msg_id,
+                result,
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
@@ -2113,11 +2120,15 @@ if __name__ == "__main__":
                 original_message_timestamp,
             ) = result
             LOGGER.debug(
-                f"Original chat ID: {original_chat_id}, Original message ID: {original_message_id}, Forwarded message data: {forwarded_message_data}, Original message timestamp: {original_message_timestamp}"
+                "Original chat ID: %s, Original message ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                original_chat_id,
+                original_message_id,
+                forwarded_message_data,
+                original_message_timestamp,
             )
 
             author_id = eval(forwarded_message_data)[3]
-            LOGGER.debug(f"Author ID retrieved for original message: {author_id}")
+            LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Author ID retrieved for original message: {author_id}",

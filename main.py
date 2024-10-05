@@ -1079,6 +1079,12 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
     finally:
         # Remove the user ID from the active set when done
         active_user_checks.remove(user_id)
+        """Finally Block:
+            The `finally` block ensures that the `user_id` 
+            is removed from the `active_user_checks` set 
+            after all checks are completed or 
+            if the function exits early due to a `return` statement:
+        """
 
 
 if __name__ == "__main__":
@@ -1107,8 +1113,11 @@ if __name__ == "__main__":
     )
     LOGGER.info("\n")
 
-    # TODO edit message update check
+    # TODO edit message update check - check if user edited his message
     # TODO check if user changed his name
+    # TODO check photos date of the joined profile - warn admins if it's just uploaded
+    # TODO check if user changed his name after joining the chat when he sends a message
+
     @DP.chat_member_handler(
         lambda update: update.from_user.id != BOT_USERID
     )  # exclude bot's own actions
@@ -1212,7 +1221,7 @@ if __name__ == "__main__":
                 ChatMemberStatus.KICKED,
                 ChatMemberStatus.RESTRICTED,
             ):  # only if user joined or kicked or restricted by admin
-                # TODO check and exclude checks if user joins other chats same time
+
                 # Get the current timestamp
                 timestamp = datetime.now().strftime("%H:%M:%S")
 
@@ -1302,11 +1311,18 @@ if __name__ == "__main__":
                         "User %s joined and left chat in 1 minute or less", inout_userid
                     )
                     try:
+                        lols_url = (
+                            f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
+                        )
+                        inline_kb = InlineKeyboardMarkup().add(
+                            InlineKeyboardButton("Check user profile", url=lols_url)
+                        )
                         await BOT.send_message(
                             ADMIN_GROUP_ID,
                             f"User (<code>{inout_userid}</code>) {inout_userfirstname} joined and left chat in 1 minute or less",
                             message_thread_id=ADMIN_AUTOBAN,
                             parse_mode="HTML",
+                            reply_markup=inline_kb,
                         )
                     except utils.exceptions.CantParseEntities:
                         # TODO DEBUG fix if user name contains special symbols
@@ -2503,8 +2519,7 @@ if __name__ == "__main__":
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
-    # TODO more attention to the messages from users with IDs > 6 000 000 000
-    # TODO add cas check https://api.cas.chat/check?user_id=7383025140
+    # TODO more attention to the messages from users with IDs > 8 000 000 000
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

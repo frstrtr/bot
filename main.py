@@ -824,7 +824,6 @@ async def handle_forwarded_reports_with_details(
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
-        f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
     # LOGGER.debug("Report banner content:")
@@ -838,8 +837,17 @@ async def handle_forwarded_reports_with_details(
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
 
+    # construct lols check link button
+    inline_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            "Check lols data",
+            url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
+        )
+    )
     # Send the banner to the technolog group
-    await BOT.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
+    await BOT.send_message(
+        TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML", reply_markup=inline_kb
+    )
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
@@ -1536,7 +1544,6 @@ if __name__ == "__main__":
             f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
-            f"ℹ️ <a href='https://t.me/lolsbotcatcherbot?start={user_id}'>Profile spam check (@lolsbotcatcherbot)</a>\n"
             f"❌ <b>Use /ban {report_id}</b> to take action.\n"
         )
         # LOGGER.debug("Report banner content:")
@@ -1551,8 +1558,17 @@ if __name__ == "__main__":
             f"❌ <b>Use /ban {report_id}</b> to take action.\n"
         )
 
+        # construct lols check link button
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "Check lols data",
+                url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
+            )
+        )
         # Send the banner to the technolog group
-        await BOT.send_message(TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML")
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML", reply_markup=inline_kb
+        )
 
         # Keyboard ban/cancel/confirm buttons
         keyboard = InlineKeyboardMarkup()

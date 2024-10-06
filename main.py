@@ -1042,7 +1042,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(65)  # 1 minute + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 1min check lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 01min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1050,7 +1050,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(185)  # 3 minutes + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 3min check lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 03min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1074,7 +1074,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(3605)  # 1 hour + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 1hr check lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 01hrs check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1082,7 +1082,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(7205)  # 2 hour + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 2hr check lols_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 02hrs check lols_spam: %s", user_id, lols_spam)
         await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         )

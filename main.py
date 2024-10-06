@@ -224,7 +224,7 @@ def get_spammer_details(
             "(user_id = :user_id)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
         )
-        # TODO is it neccessary below?
+        # FIXME is it neccessary below?
         params.update(
             {
                 "forward_date": message_forward_date,
@@ -243,9 +243,6 @@ def get_spammer_details(
                 "forwarded_from_id": forwarded_from_id,
             }
         )
-
-    # TODO
-    # use message hash future field
 
     query = base_query.format(condition=condition)
     result = cursor.execute(query, params).fetchone()
@@ -651,7 +648,7 @@ async def on_startup(_dp: Dispatcher):
     )
     LOGGER.info(bot_start_message)
 
-    # TODO Leave chats which is not in settings file
+    # NOTE Leave chats which is not in settings file
     # await BOT.leave_chat(-1002174154456)
     # await BOT.leave_chat(-1001876523135) # @lalaland_classy
 
@@ -808,7 +805,6 @@ async def handle_forwarded_reports_with_details(
     message_report_date = datetime.now()
 
     # Log the information with the link
-    # TODO replace profile spam chack to removable button
     log_info = (
         f"💡 Report timestamp: {message_report_date}\n"
         f"💡 Spam message timestamp: {message.date}\n"
@@ -826,8 +822,6 @@ async def handle_forwarded_reports_with_details(
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use /ban {report_id}</b> to take action.\n"
     )
-    # LOGGER.debug("Report banner content:")
-    # LOGGER.debug(log_info)
 
     admin_ban_banner = (
         f"💡 Reaction time: {message_report_date - message.date}\n"
@@ -977,7 +971,7 @@ async def check_and_autoban(
         await lols_autoban(user_id)
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
-            await save_report_file("inout_", event_record)  # TODO modify by admin
+            await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
@@ -1028,8 +1022,6 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
     """Corutine to perform checks for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
     inout_logmessage: str: The log message for the user's activity."""
-
-    # TODO aiohttp.client_exceptions.ServerDisconnectedError: Server disconnected
 
     # immediate check
     # lols_spam = await lols_check(user_id)
@@ -1084,20 +1076,21 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         )
+
+    except aiohttp.ServerDisconnectedError as e:
+        LOGGER.error("Server DISCONNECTED error while checking for spam. %s", e)
+
     finally:
         # Remove the user ID from the active set when done
+        # Finally Block:
+        # The `finally` block ensures that the `user_id`
+        # is removed from the `active_user_checks` set
+        # after all checks are completed or
+        # if the function exits early due to a `return` statement:
         active_user_checks.remove(user_id)
-        """Finally Block:
-            The `finally` block ensures that the `user_id` 
-            is removed from the `active_user_checks` set 
-            after all checks are completed or 
-            if the function exits early due to a `return` statement:
-        """
 
 
 if __name__ == "__main__":
-
-    # scheduler_dict = {} TODO: Implement scheduler to manage chat closure at night for example
 
     # Dictionary to store the mapping of unhandled messages to admin's replies
     global unhandled_messages
@@ -1120,11 +1113,6 @@ if __name__ == "__main__":
         " @".join([d["name"] for d in ALLOWED_FORWARD_CHANNELS]),
     )
     LOGGER.info("\n")
-
-    # TODO edit message update check - check if user edited his message
-    # TODO check if user changed his name
-    # TODO check photos date of the joined profile - warn admins if it's just uploaded
-    # TODO check if user changed his name after joining the chat when he sends a message
 
     @DP.chat_member_handler(
         lambda update: update.from_user.id != BOT_USERID
@@ -1180,7 +1168,7 @@ if __name__ == "__main__":
             f"{'❌ ' if lols_spam else '🟢 '}"
             f"-->{inout_status}\n"
             f"{by_user if by_user else ''}"
-            # TODO construct private chat links too
+            # FIXME construct private chat links too
             f"💬 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
             f"🔗 <b>profile links:</b>\n"
             f"   ├ <b><a href='tg://user?id={inout_userid}'>id based profile link</a></b>\n"
@@ -1216,8 +1204,7 @@ if __name__ == "__main__":
             return
         was_member, is_member = result
 
-        # TODO Check lols after user join/leave event in 1hr and ban if spam
-        # TODO add admin info that lols check after time has been changed
+        # Check lols after user join/leave event in 2hr and ban if spam
         if lols_spam is True:  # not Timeout exactly
             await check_and_autoban(
                 event_record, update.old_chat_member.user.id, inout_logmessage, lols_url
@@ -1335,7 +1322,7 @@ if __name__ == "__main__":
                             reply_markup=inline_kb,
                         )
                     except utils.exceptions.CantParseEntities:
-                        # TODO DEBUG fix if user name contains special symbols
+                        # FIXME if user name contains special symbols
                         LOGGER.error("Can't parse entities: %s", e)
                         name = f"{inout_userfirstname} {inout_userlastname}"
                         name_chars_codes = [ord(char) for char in name]
@@ -1494,7 +1481,8 @@ if __name__ == "__main__":
         conn.commit()
 
         # Construct a link to the original message (assuming it's a supergroup or channel)
-        # TODO BUG If message forwarded from the private chat or private chat with topics - need to reconstruct the link differently
+        # FIXME If message forwarded from the private chat or private chat with topics -
+        # need to reconstruct the link differently
         # BUG if there is a data instead of channel username - it shows wrong message link!!!
         # found_message_data[2] is not always a channel username
         # BUG add checks if its inout event or previous report (better delete reports?)
@@ -1723,7 +1711,8 @@ if __name__ == "__main__":
 
             # select all messages from the user in the chat
             # and this is not records about join or leave
-            # and this record have name of the chat TODO private chats do not have names :(
+            # and this record have name of the chat
+            # FIXME private chats do not have names :(
             query = """
                 SELECT chat_id, message_id, user_name
                 FROM recent_messages 
@@ -1742,7 +1731,12 @@ if __name__ == "__main__":
                     try:
                         await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                         LOGGER.debug(
-                            f"Message {message_id} deleted from chat {channels_dict[chat_id]} ({chat_id}) for user @{user_name} ({author_id})."
+                            "Message %s deleted from chat %s (%s) for user @%s (%s).",
+                            message_id,
+                            channels_dict[chat_id],
+                            chat_id,
+                            user_name,
+                            author_id,
                         )
                         break  # break the loop if the message was deleted successfully
                     except RetryAfter as e:
@@ -1764,19 +1758,29 @@ if __name__ == "__main__":
                             chat_id,
                         )
                         break  # No need to retry in this case
-                    # TODO manage the case when the bot is not an admin in the channel
-                    except Exception as inner_e:
+                    except utils.exceptions.ChatAdminRequired as inner_e:
                         LOGGER.error(
-                            "Failed to delete message %s in chat %s (%s). Error: %s",
-                            message_id,
+                            "Bot is not an admin in chat %s (%s). Error: %s",
                             channels_dict[chat_id],
                             chat_id,
                             inner_e,
                         )
                         await BOT.send_message(
                             TECHNOLOG_GROUP_ID,
-                            f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                            f"Bot is not an admin in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                         )
+                    # except Exception as inner_e:
+                    #     LOGGER.error(
+                    #         "Failed to delete message %s in chat %s (%s). Error: %s",
+                    #         message_id,
+                    #         channels_dict[chat_id],
+                    #         chat_id,
+                    #         inner_e,
+                    #     )
+                    #     await BOT.send_message(
+                    #         TECHNOLOG_GROUP_ID,
+                    #         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                    #     )
             LOGGER.debug(
                 "User %s banned and their messages deleted where applicable.\n####################################################",
                 author_id,
@@ -1840,7 +1844,6 @@ if __name__ == "__main__":
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
-            # TODO remove exceptions
             # if (
             #     message.chat.id == -1001461337235 or message.chat.id == -1001527478834
             # ):  # mevrikiy or beautymauritius
@@ -1870,7 +1873,7 @@ if __name__ == "__main__":
             #         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
             #     )
 
-            # TODO hash JSON to make signature
+            # NOTE hash JSON to make signature
             # await BOT.send_message(
             #     TECHNOLOG_GROUP_ID,
             #     formatted_message,
@@ -1884,7 +1887,7 @@ if __name__ == "__main__":
             #     # f"Author signature?: {message.author_signature}\n"
             #     f"Forwarded from chat type?: {message.forward_from_chat.type=='channel'}\n"
             # )
-            # TODO remove afer sandboxing
+            # HACK remove afer sandboxing
 
             cursor.execute(
                 """
@@ -2062,7 +2065,8 @@ if __name__ == "__main__":
                 await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
-                # await BOT.set_message_reaction(message, "🌙") TODO switch to aiogram 3.13.1 or higher
+                # await BOT.set_message_reaction(message, "🌙")
+                # NOTE switch to aiogram 3.13.1 or higher
                 the_reason = "Message sent during the night"
                 LOGGER.info(f"Message sent during the night: {message}")
 
@@ -2074,11 +2078,10 @@ if __name__ == "__main__":
             #     the_reason = "Message contains 5+ spammy regular emojis"
             #     await take_heuristic_action(message, the_reason)
 
-        except Exception as e:
-            # TODO BUG FIX Error storing recent message: Message_id_invalid
-            LOGGER.error("Error storing recent message: %s", e)
+        except utils.exceptions.MessageIdInvalid as e:
+            LOGGER.error("Error storing recent message: Message_id_invalid - %s", e)
 
-    # TODO: Remove this if the buttons works fine
+    # NOTE: Manual typing command ban - useful if ban were postponed
     @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
     async def ban(message: types.Message):
         """Function to ban the user and delete all known to bot messages using '/ban reportID' text command."""
@@ -2174,7 +2177,8 @@ if __name__ == "__main__":
                     )
             # select all messages from the user in the chat
             # and this is not records about join or leave
-            # and this record have name of the chat TODO private chats do not have names :(
+            # and this record have name of the chat
+            # NOTE private chats do not have names :(
             query = """
                 SELECT chat_id, message_id, user_name
                 FROM recent_messages 
@@ -2395,7 +2399,7 @@ if __name__ == "__main__":
             )
 
             # Store the mapping of unhandled message to admin's message
-            # TODO move it to DB
+            # XXX move it to DB
             unhandled_messages[admin_message.message_id] = [
                 message.chat.id,
                 message.message_id,
@@ -2558,14 +2562,21 @@ if __name__ == "__main__":
             getattr(message, "new_chat_members", ""),
         )
 
-    # TODO if failed to delete message  since the message is not found - delete corresponding record in the table
-    # TODO if succeed to delete message also remove this record from the DB
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
     # TODO more attention to the messages from users with IDs > 8 000 000 000
+    # TODO save runtime checks states on shutdown to resume after restart
+    # TODO automatically leave chats which is not listed in settings file
+    # TODO edit message update check - check if user edited his message
+    # TODO check if user changed his name
+    # TODO check photos date of the joined profile - warn admins if it's just uploaded
+    # TODO check if user changed his name after joining the chat when he sends a message
+    # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
+    # TODO switch to aiogram 3.13.1 or higher
+    # TODO fix database spammer store and find indexes, instead of date
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

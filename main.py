@@ -1816,6 +1816,7 @@ if __name__ == "__main__":
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                parse_mode="HTML",
             )
 
         except Exception as e:

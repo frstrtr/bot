@@ -981,9 +981,9 @@ async def check_and_autoban(
             await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                inout_logmessage.replace(
-                    "kicked", "<b>KICKED BY ADMIN</b>", 1
-                ).replace("restricted", "<b>RESTRICTED BY ADMIN</b>", 1),
+                inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
+                    "restricted", "<b>RESTRICTED BY ADMIN</b>", 1
+                ),
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -1149,10 +1149,6 @@ if __name__ == "__main__":
         inout_username = (
             update.old_chat_member.user.username or "!UNDEFINED!"
         )  # optional
-        # inout_chatid = str(update.chat.id)[4:]
-        # inout_action = "JOINED" if message.new_chat_memberselse "LEFT"
-        inout_chatname = update.chat.title
-        inout_chatusername = update.chat.username
 
         lols_spam = None
         lols_spam = await lols_cas_check(update.old_chat_member.user.id)
@@ -1174,15 +1170,20 @@ if __name__ == "__main__":
         # Escape special characters in the log message
         escaped_inout_userfirstname = html.escape(inout_userfirstname)
         escaped_inout_userlastname = html.escape(inout_userlastname)
+        # construct chatlink for any type of chat
+        universal_chatlink = (
+            f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
+            if update.chat.username
+            else f'<a href="https://t.me/c/{update.chat.id[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
+        )
         # Construct the log message
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
             f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
             f"{'❌ ' if lols_spam else '🟢 '}"
-            f"-->{inout_status}\n"
+            f"--> {inout_status}\n"
             f"{by_user if by_user else ''}"
-            # FIXME construct private chat links too
-            f"💬 <a href='https://t.me/{inout_chatusername}'>{inout_chatname}</a>\n"  # https://t.me/c/1902317320/27448/27778
+            f"💬 {universal_chatlink}\n"
             f"🔗 <b>profile links:</b>\n"
             f"   ├ <b><a href='tg://user?id={inout_userid}'>id based profile link</a></b>\n"
             f"   ├ <b>plain text: tg://user?id={inout_userid}</b>\n"
@@ -1202,6 +1203,7 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+        LOGGER.info("%s %s", inout_userid, event_record)
 
         # Extract the user status change
         result = extract_status_change(update)

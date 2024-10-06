@@ -1182,8 +1182,8 @@ if __name__ == "__main__":
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
             f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
-            f"{'❌ ' if lols_spam else '🟢 '}"
-            f"--> {inout_status}\n"
+            f"{'❌ --x' if lols_spam else '🟢 -->'}"
+            f" {inout_status}\n"
             f"{by_user if by_user else ''}"
             f"💬 {universal_chatlink}\n"
             f"🔗 <b>profile links:</b>\n"

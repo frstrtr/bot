@@ -1142,6 +1142,8 @@ if __name__ == "__main__":
 
         inout_status = update.new_chat_member.status
 
+        inout_chattitle = update.chat.title
+
         # Whoose this action is about
         inout_userid = update.old_chat_member.user.id
         inout_userfirstname = update.old_chat_member.user.first_name
@@ -1203,7 +1205,7 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        LOGGER.info("%s %s", inout_userid, event_record)
+        LOGGER.info("%s --> %s in %s at %s", inout_userid, inout_status, inout_chattitle, datetime.now().strftime("%H:%M:%S"))
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -1312,11 +1314,7 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         "%s joined and left %s in 1 minute or less",
                         inout_userid,
-                        (
-                            f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
-                            if update.chat.username
-                            else f'<a href="https://t.me/c/{update.chat.id[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
-                        ),
+                        inout_chattitle,
                     )
                     lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
                     inline_kb = InlineKeyboardMarkup().add(
@@ -1325,7 +1323,7 @@ if __name__ == "__main__":
 
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
+                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 1 minute or less",
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,

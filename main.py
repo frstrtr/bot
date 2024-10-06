@@ -8,6 +8,7 @@ import logging
 import json
 import subprocess
 import time
+import html
 
 from typing import Optional, Tuple
 import re
@@ -976,14 +977,16 @@ async def check_and_autoban(
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
-
+        escaped_inout_logmessage = html.escape(
+            inout_logmessage
+        )  # escape special characters if any
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
-                    "restricted", "<b>RESTRICTED BY ADMIN</b>", 1
-                ),
+                escaped_inout_logmessage.replace(
+                    "kicked", "<b>KICKED BY ADMIN</b>", 1
+                ).replace("restricted", "<b>RESTRICTED BY ADMIN</b>", 1),
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -992,7 +995,7 @@ async def check_and_autoban(
         else:  # done by bot
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                inout_logmessage.replace(
+                escaped_inout_logmessage.replace(
                     "member", "<i>member</i>--><b>KICKED</b>", 1
                 ).replace("left", "<i>left</i>--><b>KICKED</b>", 1),
                 message_thread_id=ADMIN_AUTOBAN,
@@ -1191,22 +1194,17 @@ if __name__ == "__main__":
             InlineKeyboardButton("Check lols data", url=lols_url)
         )
 
-        # TODO catch error can't parse entities if name contains special symbols
-        # aiogram.utils.exceptions.CantParseEntities: Can't parse entities: unsupported start tag "3" at byte offset 91
-        try:
-            await BOT.send_message(
-                TECHNO_LOG_GROUP,
-                inout_logmessage,
-                message_thread_id=TECHNO_INOUT,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-                reply_markup=inline_kb,
-            )
-        except utils.exceptions.CantParseEntities as e:
-            LOGGER.error("Can't parse entities: %s", e)
-            name = f"{inout_userfirstname} {inout_userlastname}"
-            name_chars_codes = [ord(char) for char in name]
-            LOGGER.error("%s User name: %s: %s", inout_userid, name, name_chars_codes)
+        escaped_inout_logmessage = html.escape(
+            inout_logmessage
+        )  # escape special characters if any
+        await BOT.send_message(
+            TECHNO_LOG_GROUP,
+            escaped_inout_logmessage,
+            message_thread_id=TECHNO_INOUT,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=inline_kb,
+        )
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -1321,28 +1319,22 @@ if __name__ == "__main__":
                             else f'<a href="https://t.me/c/{update.chat.id[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
                         ),
                     )
-                    try:
-                        lols_url = (
-                            f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
-                        )
-                        inline_kb = InlineKeyboardMarkup().add(
-                            InlineKeyboardButton("Check user profile", url=lols_url)
-                        )
-                        await BOT.send_message(
-                            ADMIN_GROUP_ID,
-                            f"(<code>{inout_userid}</code>) @{inout_username} {inout_userfirstname} {inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
-                            message_thread_id=ADMIN_AUTOBAN,
-                            parse_mode="HTML",
-                            reply_markup=inline_kb,
-                        )
-                    except utils.exceptions.CantParseEntities:
-                        # FIXME if user name contains special symbols
-                        LOGGER.error("Can't parse entities: %s", e)
-                        name = f"{inout_userfirstname} {inout_userlastname}"
-                        name_chars_codes = [ord(char) for char in name]
-                        LOGGER.error(
-                            "%s User name: %s: %s", inout_userid, name, name_chars_codes
-                        )
+                    lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
+                    inline_kb = InlineKeyboardMarkup().add(
+                        InlineKeyboardButton("Check user profile", url=lols_url)
+                    )
+
+                    # escape special characters if any
+                    escaped_inout_userfirstname = html.escape(inout_userfirstname)
+                    escaped_inout_userlastname = html.escape(inout_userlastname)
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
+                        message_thread_id=ADMIN_AUTOBAN,
+                        parse_mode="HTML",
+                        reply_markup=inline_kb,
+                    )
+
             except IndexError:
                 LOGGER.debug(
                     "%s left and has no previous join/leave events", inout_userid

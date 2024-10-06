@@ -2575,7 +2575,7 @@ if __name__ == "__main__":
     # TODO automatically leave chats which is not listed in settings file
     # TODO edit message update check - check if user edited his message
     # TODO check if user changed his name
-    # TODO check photos date of the joined profile - warn admins if it's just uploaded
+    # TODO check photos date and DC location of the joined profile - warn admins if it's just uploaded
     # TODO check if user changed his name after joining the chat when he sends a message
     # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
     # TODO switch to aiogram 3.13.1 or higher

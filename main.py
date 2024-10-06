@@ -1205,7 +1205,13 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        LOGGER.info("%s --> %s in %s at %s", inout_userid, inout_status, inout_chattitle, datetime.now().strftime("%H:%M:%S"))
+        LOGGER.info(
+            "%s --> %s in %s at %s",
+            inout_userid,
+            inout_status,
+            inout_chattitle,
+            datetime.now().strftime("%H:%M:%S"),
+        )
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -1240,13 +1246,15 @@ if __name__ == "__main__":
                 if inout_userid not in active_user_checks:
                     # Add the user ID to the active set
                     active_user_checks.add(inout_userid)
+                    # create task with user_id as name
                     asyncio.create_task(
                         perform_checks(
                             event_record,
                             update.old_chat_member.user.id,
                             inout_logmessage,
                             lols_url,
-                        )
+                        ),
+                        name=str(inout_userid),
                     )
                 else:
                     LOGGER.debug(
@@ -1328,6 +1336,7 @@ if __name__ == "__main__":
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,
+                        disable_web_page_preview=True,
                     )
 
             except IndexError:
@@ -1636,7 +1645,6 @@ if __name__ == "__main__":
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
         )
-
         # get the message ID to ban
         try:
             *_, message_id_to_ban = callback_query.data.split("_")
@@ -1682,6 +1690,12 @@ if __name__ == "__main__":
                     "Could not retrieve the author's user ID from the report."
                 )
                 return
+            # remove userid from the active_user_checks set
+            active_user_checks.remove(author_id)
+            # stop the perform_checks coroutine if it is running for author_id
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(author_id):
+                    task.cancel()
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2150,6 +2164,13 @@ if __name__ == "__main__":
                     "Could not retrieve the author's user ID from the report."
                 )
                 return
+
+            # remove userid from the active_user_checks set
+            active_user_checks.remove(author_id)
+            # stop the perform_checks coroutine if it is running for author_id
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(author_id):
+                    task.cancel()
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:

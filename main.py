@@ -1222,7 +1222,7 @@ if __name__ == "__main__":
         # Check lols after user join/leave event in 2hr and ban if spam
         if lols_spam is True:  # not Timeout exactly
             await check_and_autoban(
-                event_record, update.old_chat_member.user.id, inout_logmessage, lols_url
+                event_record, inout_userid, inout_logmessage, lols_url
             )
             LOGGER.info('%s is banned by lols/cas check', inout_userid)
         else:

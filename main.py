@@ -1494,17 +1494,14 @@ if __name__ == "__main__":
 
         conn.commit()
 
-        # Construct a link to the original message (assuming it's a supergroup or channel)
-        # FIXME If message forwarded from the private chat or private chat with topics -
-        # need to reconstruct the link differently
         # Found message data:
         #        0           1           2            3            4        5           6            7
         #     chat ID       msg #   chat username  user ID     username  first name  last name     date
         # (-1001461337235, 126399, 'mavrikiy',     7283940136, None,     'павел',    'запорожец', '2024-10-06 15:14:57')
         # _______________________________________________________________________________________________________________
-        # BUG if there is a data instead of channel username - it shows wrong message link!!!
-        # found_message_data[2] is not always a channel username
-        # BUG add checks if its inout event or previous report (better delete reports?)
+        # BUG if there is a date instead of channel username - it shows wrong message link!!!
+        # found_message_data[2] is not always a channel username since we put date to the DATABASE
+        # NOTE add checks if its inout event or previous report (better delete reports?)
 
         message_link = construct_message_link(found_message_data)
 

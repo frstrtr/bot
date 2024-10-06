@@ -72,6 +72,23 @@ cursor.execute(
 conn.commit()
 
 
+def construct_message_link(found_message_data):
+    """Construct a link to the original message (assuming it's a supergroup or channel)
+    Extract the chat ID and remove the '-100' prefix if it exists
+    var: found_message_data: list: The spammer data extracted from the found message.
+    """
+    chat_id = str(found_message_data[0])
+    if found_message_data[2]:  # this is public chat with chat.username
+        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+    elif chat_id.startswith(
+        "-100"
+    ):  # this is public chat without chat.username or private chat
+        chat_id = chat_id[4:]  # remove leading -100 for public chats
+        # Construct the message link with the modified chat ID
+        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
+    return message_link
+
+
 # Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
@@ -599,9 +616,7 @@ def format_spam_report(message: types.Message) -> str:
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
-    LOGGER.info(
-        "%s. Sending automated report to the admin group for review...", reason
-    )
+    LOGGER.info("%s. Sending automated report to the admin group for review...", reason)
 
     # Use the current date if message.forward_date is None
     # forward_date = message.forward_date if message.forward_date else datetime.now()
@@ -765,15 +780,7 @@ async def handle_forwarded_reports_with_details(
 
     conn.commit()
 
-    # Construct a link to the original message (assuming it's a supergroup or channel)
-    # Extract the chat ID and remove the '-100' prefix if it exists
-    chat_id = str(found_message_data[0])
-    if chat_id.startswith("-100"):
-        chat_id = chat_id[4:]  # remove leading -100
-        # Construct the message link with the modified chat ID
-        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
-    if found_message_data[2]:  # this is public chat
-        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+    message_link = construct_message_link(found_message_data)
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -1308,7 +1315,11 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         "%s joined and left %s in 1 minute or less",
                         inout_userid,
-                        f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>' if update.chat.username else f'<a href="https://t.me/c/{update.chat.id}">{update.chat.title}</a>',
+                        (
+                            f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
+                            if update.chat.username
+                            else f'<a href="https://t.me/c/{update.chat.id[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
+                        ),
                     )
                     try:
                         lols_url = (
@@ -1486,10 +1497,16 @@ if __name__ == "__main__":
         # Construct a link to the original message (assuming it's a supergroup or channel)
         # FIXME If message forwarded from the private chat or private chat with topics -
         # need to reconstruct the link differently
+        # Found message data:
+        #        0           1           2            3            4        5           6            7
+        #     chat ID       msg #   chat username  user ID     username  first name  last name     date
+        # (-1001461337235, 126399, 'mavrikiy',     7283940136, None,     'павел',    'запорожец', '2024-10-06 15:14:57')
+        # _______________________________________________________________________________________________________________
         # BUG if there is a data instead of channel username - it shows wrong message link!!!
         # found_message_data[2] is not always a channel username
         # BUG add checks if its inout event or previous report (better delete reports?)
-        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
+
+        message_link = construct_message_link(found_message_data)
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         if message.forward_from:

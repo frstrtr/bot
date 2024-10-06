@@ -977,14 +977,11 @@ async def check_and_autoban(
 
     if lols_spam is True:  # not Timeout exaclty
         await lols_autoban(user_id)
-        escaped_inout_logmessage = html.escape(
-            inout_logmessage
-        )  # escape special characters if any
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                escaped_inout_logmessage.replace(
+                inout_logmessage.replace(
                     "kicked", "<b>KICKED BY ADMIN</b>", 1
                 ).replace("restricted", "<b>RESTRICTED BY ADMIN</b>", 1),
                 message_thread_id=ADMIN_MANBAN,
@@ -995,7 +992,7 @@ async def check_and_autoban(
         else:  # done by bot
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                escaped_inout_logmessage.replace(
+                inout_logmessage.replace(
                     "member", "<i>member</i>--><b>KICKED</b>", 1
                 ).replace("left", "<i>left</i>--><b>KICKED</b>", 1),
                 message_thread_id=ADMIN_AUTOBAN,
@@ -1174,10 +1171,13 @@ if __name__ == "__main__":
         # Save the event to the inout file
         await save_report_file("inout_", event_record)
 
+        # Escape special characters in the log message
+        escaped_inout_userfirstname = html.escape(inout_userfirstname)
+        escaped_inout_userlastname = html.escape(inout_userlastname)
         # Construct the log message
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
-            f"{inout_userfirstname} {inout_userlastname}\n"
+            f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
             f"{'❌ ' if lols_spam else '🟢 '}"
             f"-->{inout_status}\n"
             f"{by_user if by_user else ''}"
@@ -1194,12 +1194,9 @@ if __name__ == "__main__":
             InlineKeyboardButton("Check lols data", url=lols_url)
         )
 
-        escaped_inout_logmessage = html.escape(
-            inout_logmessage
-        )  # escape special characters if any
         await BOT.send_message(
             TECHNO_LOG_GROUP,
-            escaped_inout_logmessage,
+            inout_logmessage,
             message_thread_id=TECHNO_INOUT,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -1324,9 +1321,6 @@ if __name__ == "__main__":
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
 
-                    # escape special characters if any
-                    escaped_inout_userfirstname = html.escape(inout_userfirstname)
-                    escaped_inout_userlastname = html.escape(inout_userlastname)
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {update.chat.title} in 1 minute or less",

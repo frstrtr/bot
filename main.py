@@ -1811,9 +1811,9 @@ if __name__ == "__main__":
                 parse_mode="HTML",
             )
 
-        except Exception as e:
+        except utils.exceptions.MessageCantBeDeleted as e:
             LOGGER.error("Error in handle_ban function: %s", e)
-            await callback_query.message.reply(f"Error: {e}")
+            await callback_query.message.reply(f"Error in handle_ban function: {e}")
 
     @DP.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
     async def reset_ban(callback_query: CallbackQuery):

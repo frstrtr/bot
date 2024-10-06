@@ -1224,6 +1224,7 @@ if __name__ == "__main__":
             await check_and_autoban(
                 event_record, update.old_chat_member.user.id, inout_logmessage, lols_url
             )
+            LOGGER.info('%s is banned by lols/cas check', inout_userid)
         else:
             # Schedule the perform_checks coroutine to run in the background
             if inout_status in (

@@ -1224,6 +1224,7 @@ if __name__ == "__main__":
                 ChatMemberStatus.MEMBER,
                 ChatMemberStatus.KICKED,
                 ChatMemberStatus.RESTRICTED,
+                ChatMemberStatus.LEFT,
             ):  # only if user joined or kicked or restricted by admin
 
                 # Get the current timestamp

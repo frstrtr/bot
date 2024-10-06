@@ -906,7 +906,7 @@ async def lols_cas_check(user_id):
                     ok = data["ok"]
                     if ok:
                         cas = data["result"]["offenses"]
-                        LOGGER.info("User %s CAS offenses: %s", user_id, cas)
+                        LOGGER.info("%s CAS offenses: %s", user_id, cas)
                     else:
                         cas = 0
             if lols is True or int(cas) > 0:
@@ -945,7 +945,7 @@ async def lols_autoban(_id):
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
-        LOGGER.info("User %s has been banned from all chats.", _id)
+        LOGGER.info("%s has been banned from all chats.", _id)
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
@@ -997,12 +997,15 @@ async def check_and_autoban(
 
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
         str(BOT_USERID) not in event_record
-    ):  # user is not in the lols database
+    ):  # XXX user is not in the lols database and kicked/restricted by admin
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         # LOGGER.debug("event_record: %s", event_record)
         # user is not spammer but kicked or restricted by admin
-        LOGGER.info("Spammer ID: %s is not now in the lols database.", user_id)
+        LOGGER.info(
+            "%s kicked/restricted by admin, but is not now in the lols database.",
+            user_id,
+        )
         await BOT.send_message(
             ADMIN_GROUP_ID,
             f"User with ID: {user_id} is not now in the lols database but kicked/restricted by admin.\n"
@@ -1032,7 +1035,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(65)  # 1 minute + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("1min check %s lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 1min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1040,7 +1043,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(185)  # 3 minutes + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("3min check %s lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 3min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1048,7 +1051,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(605)  # 10 minutes + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("10min check %s lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 10min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1056,7 +1059,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(1805)  # 30 minutes + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("30min check %s lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 30min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1064,7 +1067,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(3605)  # 1 hour + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("1hr check %s lols_cas_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 1hr check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         ):
@@ -1072,7 +1075,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 
         await asyncio.sleep(7205)  # 2 hour + 5 seconds
         lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("2hr check %s lols_spam: %s", user_id, lols_spam)
+        LOGGER.debug("%s 2hr check lols_spam: %s", user_id, lols_spam)
         await check_and_autoban(
             event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
         )
@@ -1222,9 +1225,9 @@ if __name__ == "__main__":
 
                 # Log the message with the timestamp
                 LOGGER.debug(
-                    "%s Scheduling perform_checks coroutine for userID %s",
-                    timestamp,
+                    "%s Scheduling perform_checks coroutine at %s",
                     inout_userid,
+                    timestamp,
                 )
                 # Check if the user ID is already being processed
                 if inout_userid not in active_user_checks:
@@ -1240,9 +1243,9 @@ if __name__ == "__main__":
                     )
                 else:
                     LOGGER.debug(
-                        "%s Skipping perform_checks for userID %s as it is already being processed",
-                        timestamp,
+                        "%s skipping perform_checks as it is already being processed at %s",
                         inout_userid,
+                        timestamp,
                     )
 
         # record the event in the database if not lols_spam
@@ -1331,7 +1334,7 @@ if __name__ == "__main__":
                         )
             except IndexError:
                 LOGGER.debug(
-                    "User %s left and has no previous join/leave events", inout_userid
+                    "%s left and has no previous join/leave events", inout_userid
                 )
 
     @DP.message_handler(
@@ -2540,7 +2543,7 @@ if __name__ == "__main__":
                 # del unhandled_messages[message.reply_to_message.message_id]
 
         except Exception as e:
-            LOGGER.error(f"Error in handle_admin_reply function: {e}")
+            LOGGER.error("Error in handle_admin_reply function: %s", e)
             await message.reply(f"Error: {e}")
 
     # handle user join/left events
@@ -2577,6 +2580,7 @@ if __name__ == "__main__":
     # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
+    # TODO great_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

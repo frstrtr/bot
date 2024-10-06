@@ -599,7 +599,7 @@ def format_spam_report(message: types.Message) -> str:
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
-    LOGGER.warning(
+    LOGGER.info(
         "%s. Sending automated report to the admin group for review...", reason
     )
 
@@ -1306,9 +1306,9 @@ if __name__ == "__main__":
                     and last2_join_left_event[1][1] == 1
                 ):
                     LOGGER.debug(
-                        "User %s joined and left %s in 1 minute or less",
+                        "%s joined and left %s in 1 minute or less",
                         inout_userid,
-                        update.chat.title,
+                        f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>' if update.chat.username else f'<a href="https://t.me/c/{update.chat.id}">{update.chat.title}</a>',
                     )
                     try:
                         lols_url = (
@@ -1319,7 +1319,7 @@ if __name__ == "__main__":
                         )
                         await BOT.send_message(
                             ADMIN_GROUP_ID,
-                            f"User (<code>{inout_userid}</code>) @{inout_username} {inout_userfirstname} {inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
+                            f"(<code>{inout_userid}</code>) @{inout_username} {inout_userfirstname} {inout_userlastname} joined and left {update.chat.title} in 1 minute or less",
                             message_thread_id=ADMIN_AUTOBAN,
                             parse_mode="HTML",
                             reply_markup=inline_kb,
@@ -1968,7 +1968,7 @@ if __name__ == "__main__":
                     await save_report_file("daily_spam_", reported_spam)
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
-                        "User %s identified in %s as a spammer when sending a message during the first 48hrs after registration. Telefragged...",
+                        "%s identified in %s as a spammer when sending a message during the first 48hrs after registration. Telefragged...",
                         message.from_user.id,
                         message.chat.title,
                     )
@@ -2018,45 +2018,47 @@ if __name__ == "__main__":
                 # check for allowed channels for forwards
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
-                    the_reason = "Message forwarded from unknown channel"
+                    the_reason = (
+                        f"{message.from_id} forwarded message from unknown channel"
+                    )
                     await take_heuristic_action(message, the_reason)
 
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
-                the_reason = "Message contains 5 or more spammy custom emojis"
+                the_reason = (
+                    f"{message.from_id} message contains 5 or more spammy custom emojis"
+                )
                 await take_heuristic_action(message, the_reason)
 
             elif check_message_for_sentences(message):
-                the_reason = "Message contains spammy sentences"
+                the_reason = f"{message.from_id} message contains spammy sentences"
                 await take_heuristic_action(message, the_reason)
 
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
-                the_reason = "Message contains 5+ spammy capital letters and 5+ spammy regular emojis"
+                the_reason = f"{message.from_id} message contains 5+ spammy capital letters and 5+ spammy regular emojis"
                 await take_heuristic_action(message, the_reason)
 
             elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot
-                    LOGGER.info("This is possibly a bot")
-                    the_reason = (
-                        "Message is sent less then 10 seconds after joining the chat"
-                    )
+                    LOGGER.info("%s is possibly a bot", message.from_id)
+                    the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
                     await take_heuristic_action(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old:
                     # this is possibly a spam
                     LOGGER.info(
-                        "This is possibly a spam with (%s) links or other entities user is 1hr old %s",
-                        entity_spam_trigger,
+                        "%s possibly sent a spam with (%s) links or other entities in less than 1 hour after joining the chat",
                         message.from_user.id,
+                        entity_spam_trigger,
                     )
                     if entity_spam_trigger:  # invoke heuristic action
                         the_reason = (
-                            "Message is sent less then 1 hour after joining the chat and have "
+                            f"{message.from_id} message sent less then 1 hour after joining the chat and have "
                             + entity_spam_trigger
                             + " inside"
                         )
@@ -2064,14 +2066,16 @@ if __name__ == "__main__":
 
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
-                the_reason = "Message is sent via inline bot"
+                the_reason = f"{message.from_id} message sent via inline bot"
                 await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
-                the_reason = "Message sent during the night"
-                LOGGER.info(f"Message sent during the night: {message}")
+                the_reason = f"{message.from_id} message sent during the night"
+                LOGGER.info(
+                    "%s message sent during the night: %s", message.from_id, message
+                )
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

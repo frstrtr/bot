@@ -993,8 +993,8 @@ async def check_and_autoban(
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
-                    "member", "<i>member</i>--><b>KICKED</b>", 1
-                ).replace("left", "<i>left</i>--><b>KICKED</b>", 1),
+                    "member", "<i>member</i> --> <b>KICKED</b>", 1
+                ).replace("left", "<i>left</i> --> <b>KICKED</b>", 1),
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -1182,7 +1182,7 @@ if __name__ == "__main__":
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
             f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
-            f"{'❌ --x' if lols_spam else '🟢 -->'}"
+            f"{'❌ -->' if lols_spam else '🟢 -->'}"
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"
             f"💬 {universal_chatlink}\n"
@@ -1225,7 +1225,7 @@ if __name__ == "__main__":
                 ChatMemberStatus.KICKED,
                 ChatMemberStatus.RESTRICTED,
                 ChatMemberStatus.LEFT,
-            ):  # only if user joined or kicked or restricted by admin
+            ):  # only if user joined or kicked or restricted or left
 
                 # Get the current timestamp
                 timestamp = datetime.now().strftime("%H:%M:%S")

@@ -948,8 +948,9 @@ async def save_report_file(file_type, data):
 
 
 async def lols_autoban(_id):
-    """Function to ban a user from all chats using the lols bot.
+    """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
+
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
@@ -976,9 +977,9 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
+        await save_report_file("inout_", event_record)
         await lols_autoban(user_id)
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
-            await save_report_file("inout_", event_record)
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
@@ -2012,8 +2013,6 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         reply_markup=inline_kb,
                     )
-                    await BOT.delete_message(message.chat.id, message.message_id)
-                    await lols_autoban(message.from_user.id)
                     event_record = (
                         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                         f"{message.from_id:<10} "
@@ -2021,6 +2020,8 @@ if __name__ == "__main__":
                         f" member          --> kicked          in "
                         f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
                     )
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                    await lols_autoban(message.from_user.id)
                     await save_report_file("inout_", event_record)
                     return
 

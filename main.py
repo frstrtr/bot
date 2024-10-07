@@ -873,20 +873,6 @@ async def handle_forwarded_reports_with_details(
         disable_web_page_preview=False,
     )
 
-    # Construct link to the published banner and send it to the reporter
-    # private_chat_id = int(
-    #     str(admin_group_banner_message.chat.id)[4:]
-    # Remove -100 from the chat ID
-    # banner_link = (
-    #     f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
-    # )
-
-    # Check if the reporter is an admin in the admin group:
-    # if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
-    #     # Send the banner link to the reporter
-    #     await message.answer(f"Admin group banner link: {banner_link}")
-
-
 async def lols_cas_check(user_id):
     """Function to check if a user is in the lols/cas bot database.
     var: user_id: int: The ID of the user to check."""
@@ -1693,12 +1679,24 @@ if __name__ == "__main__":
                 )
                 return
             # remove userid from the active_user_checks set
-            active_user_checks.remove(author_id)
-            # stop the perform_checks coroutine if it is running for author_id
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(author_id):
-                    task.cancel()
+            if author_id in active_user_checks:
+                active_user_checks.remove(author_id)
+                # stop the perform_checks coroutine if it is running for author_id
+                for task in asyncio.all_tasks():
+                    if task.get_name() == str(author_id):
+                        task.cancel()
 
+            # save event to the ban file
+            # TODO: save the event to the inout file
+            # event_record = (
+            #     f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+            #     f"{message.from_id:<10} "
+            #     f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
+            #     f" member          --> kicked          in "
+            #     f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
+            # )
+            # await save_report_file("inout_", event_record)
+            
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
                 # LOGGER.debug(
@@ -1986,11 +1984,12 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     # delete id from the active_user_checks set
-                    active_user_checks.remove(message.from_user.id)
-                    # stop the perform_checks coroutine if it is running for author_id
-                    for task in asyncio.all_tasks():
-                        if task.get_name() == str(message.from_user.id):
-                            task.cancel()
+                    if message.from_user.id in active_user_checks:
+                        active_user_checks.remove(message.from_user.id)
+                        # stop the perform_checks coroutine if it is running for author_id
+                        for task in asyncio.all_tasks():
+                            if task.get_name() == str(message.from_user.id):
+                                task.cancel()
                     # forward the telefragged message to the admin group
                     await BOT.forward_message(
                         ADMIN_GROUP_ID,
@@ -2176,11 +2175,12 @@ if __name__ == "__main__":
                 return
 
             # remove userid from the active_user_checks set
-            active_user_checks.remove(author_id)
-            # stop the perform_checks coroutine if it is running for author_id
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(author_id):
-                    task.cancel()
+            if author_id in active_user_checks:
+                active_user_checks.remove(author_id)
+                # stop the perform_checks coroutine if it is running for author_id
+                for task in asyncio.all_tasks():
+                    if task.get_name() == str(author_id):
+                        task.cancel()
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:

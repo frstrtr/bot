@@ -1225,7 +1225,7 @@ if __name__ == "__main__":
             await check_and_autoban(
                 event_record, inout_userid, inout_logmessage, lols_url
             )
-            LOGGER.info('%s is banned by lols/cas check', inout_userid)
+            LOGGER.info("%s is banned by lols/cas check", inout_userid)
         else:
             # Schedule the perform_checks coroutine to run in the background
             if inout_status in (
@@ -1979,23 +1979,26 @@ if __name__ == "__main__":
             if user_is_2day_old:
                 lolscheck = await lols_cas_check(message.from_user.id)
                 if lolscheck is True:
-                    reported_spam = (
-                        "AUT" + format_spam_report(message)[3:]
-                    )  # replace leading ### with AUT to indicate autoban
-                    # save to report file spam message
-                    await save_report_file("daily_spam_", reported_spam)
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
                         "%s identified in %s as a spammer when sending a message during the first 48hrs after registration. Telefragged...",
                         message.from_user.id,
                         message.chat.title,
                     )
+                    # delete id from the active_user_checks set
+                    active_user_checks.remove(message.from_user.id)
+                    # stop the perform_checks coroutine if it is running for author_id
+                    for task in asyncio.all_tasks():
+                        if task.get_name() == str(message.from_user.id):
+                            task.cancel()
+                    # forward the telefragged message to the admin group
                     await BOT.forward_message(
                         ADMIN_GROUP_ID,
                         message.chat.id,
                         message.message_id,
                         message_thread_id=ADMIN_AUTOBAN,
                     )
+                    # send the telefrag log message to the admin group
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton(
                             "Check lols data",
@@ -2005,14 +2008,16 @@ if __name__ == "__main__":
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         (
-                            f"User <code>{message.from_user.id}</code> identified as a spammer.\n"
-                            f"Evidance is the message from {message.chat.title} above\n"
-                            f"NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
+                            f"User <code>{message.from_user.id}</code> identified as a spammer."
+                            f"Evidance is the message from {message.chat.title} above."
+                            "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,
                     )
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                    await lols_autoban(message.from_user.id)
                     event_record = (
                         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                         f"{message.from_id:<10} "
@@ -2020,8 +2025,11 @@ if __name__ == "__main__":
                         f" member          --> kicked          in "
                         f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
                     )
-                    await BOT.delete_message(message.chat.id, message.message_id)
-                    await lols_autoban(message.from_user.id)
+                    reported_spam = (
+                        "AUT" + format_spam_report(message)[3:]
+                    )  # replace leading ### with AUT to indicate autoban
+                    # save to report file spam message
+                    await save_report_file("daily_spam_", reported_spam)
                     await save_report_file("inout_", event_record)
                     return
 

@@ -964,9 +964,19 @@ async def check_and_autoban(
     message_to_delete=None,
 ):
     """Function to check for spam and take action if necessary.
+
+    event_record: str: The event record to log to inout file.
+
     user_id: int: The ID of the user to check for spam.
+    
     inout_logmessage: str: The log message for the user's activity.
-    lols_spam: bool: The result of the lols_check function. OR TIMEOUT"""
+    
+    lols_spam: bool: The result of the lols_check function. OR TIMEOUT
+
+    _url: str: The URL to the user's profile check for lols check button inline keyboard.
+    
+    message_to_delete: tuple: chat_id, message_id: The message to delete.
+    """
 
     inline_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton("Check spammer profile", url=_url)

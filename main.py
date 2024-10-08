@@ -873,6 +873,7 @@ async def handle_forwarded_reports_with_details(
         disable_web_page_preview=False,
     )
 
+
 async def lols_cas_check(user_id):
     """Function to check if a user is in the lols/cas bot database.
     var: user_id: int: The ID of the user to check."""
@@ -1633,7 +1634,8 @@ if __name__ == "__main__":
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
         )
-        # get the message ID to ban
+        # get the message ID to ban and who pressed the button
+        button_pressed_by = callback_query.from_user.username
         try:
             *_, message_id_to_ban = callback_query.data.split("_")
             message_id_to_ban = int(message_id_to_ban)
@@ -1687,16 +1689,16 @@ if __name__ == "__main__":
                         task.cancel()
 
             # save event to the ban file
-            # TODO: save the event to the inout file
-            # event_record = (
-            #     f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-            #     f"{message.from_id:<10} "
-            #     f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
-            #     f" member          --> kicked          in "
-            #     f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
-            # )
-            # await save_report_file("inout_", event_record)
-            
+            # XXX save the event to the inout file
+            event_record = (
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+                f"{author_id:<10} "
+                f"❌  {' '.join('@' + forwarded_message_data[4] if forwarded_message_data[4] is not None else forwarded_message_data[5]+' '+forwarded_message_data[6]):<30}"
+                f" member          --> kicked          in "
+                f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else ''}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
+            )
+            await save_report_file("inout_", event_record)
+
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
                 # LOGGER.debug(
@@ -1803,7 +1805,6 @@ if __name__ == "__main__":
                 "User %s banned and their messages deleted where applicable.\n####################################################",
                 author_id,
             )
-            button_pressed_by = callback_query.from_user.username
 
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()

@@ -2110,8 +2110,7 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         reply_markup=inline_kb,
                     )
-                    # XXX message id invalid after the message is deleted?
-                    await BOT.delete_message(message.chat.id, message.message_id)
+                    # remove spammer from all groups
                     await lols_autoban(message.from_user.id)
                     event_record = (
                         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
@@ -2126,6 +2125,9 @@ if __name__ == "__main__":
                     # save to report file spam message
                     await save_report_file("daily_spam_", reported_spam)
                     await save_report_file("inout_", "srm" + event_record)
+                    # XXX message id invalid after the message is deleted? Or deleted by other bot?
+                    # TODO shift to delete_messages in aiogram 3.0
+                    await BOT.delete_message(message.chat.id, message.message_id)
                     return
 
             # check if the message is a spam by checking the entities
@@ -2232,8 +2234,9 @@ if __name__ == "__main__":
             #     the_reason = "Message contains 5+ spammy regular emojis"
             #     await take_heuristic_action(message, the_reason)
 
+        # If other user/admin or bot deletes message earlier than this bot we got an error
         except utils.exceptions.MessageIdInvalid as e:
-            LOGGER.error("Error storing recent message: %s Message_id_invalid - %s", message.message_id, e)
+            LOGGER.error("Error storing/deleting recent %s message, %s - someone deleted it already?", message.message_id, e)
 
     # NOTE: Manual typing command ban - useful if ban were postponed
     @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)

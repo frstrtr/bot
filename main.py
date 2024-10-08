@@ -915,9 +915,9 @@ async def lols_cas_check(user_id):
 
 async def save_report_file(file_type, data):
     """Function to create or load the daily spam file.
-    
+
     file_type: str: The type of file to create or load (e.g., daily_spam_)
-    
+
     data: str: The data to write to the file.
     """
 
@@ -959,7 +959,6 @@ async def check_and_autoban(
     event_record: str,
     user_id: int,
     inout_logmessage: str,
-    _url,
     lols_spam=True,
     message_to_delete=None,
 ):
@@ -968,18 +967,18 @@ async def check_and_autoban(
     event_record: str: The event record to log to inout file.
 
     user_id: int: The ID of the user to check for spam.
-    
+
     inout_logmessage: str: The log message for the user's activity.
-    
+
     lols_spam: bool: The result of the lols_check function. OR TIMEOUT
 
-    _url: str: The URL to the user's profile check for lols check button inline keyboard.
-    
     message_to_delete: tuple: chat_id, message_id: The message to delete.
     """
 
+    lols_url = f"https://t.me/lolsbotcatcherbot?start={user_id}"
+
     inline_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Check spammer profile", url=_url)
+        InlineKeyboardButton("Check spammer profile", url=lols_url)
     )
 
     if lols_spam is True:  # not Timeout exaclty
@@ -1038,7 +1037,7 @@ async def check_and_autoban(
 
 # Perform checks for spam corutine
 async def perform_checks(
-    message_to_delete=None, event_record="", user_id=None, inout_logmessage="", _url=""
+    message_to_delete=None, event_record="", user_id=None, inout_logmessage=""
 ):
     """Corutine to perform checks for spam and take action if necessary.
 
@@ -1049,14 +1048,13 @@ async def perform_checks(
     user_id: int: The ID of the user to check for spam.
 
     inout_logmessage: str: The log message for the user's activity.
-
-    _url: str: The URL to the user's profile check for lols check button inline keyboard.
     """
 
     # immediate check
     # lols_spam = await lols_check(user_id)
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
     #     return
+
 
     try:
 
@@ -1067,7 +1065,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         ):
@@ -1080,7 +1077,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         ):
@@ -1093,7 +1089,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         ):
@@ -1106,7 +1101,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         ):
@@ -1119,7 +1113,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         ):
@@ -1132,7 +1125,6 @@ async def perform_checks(
             event_record,
             user_id,
             inout_logmessage,
-            _url,
             lols_spam=lols_spam,
             message_to_delete=message_to_delete,
         )
@@ -1234,7 +1226,7 @@ if __name__ == "__main__":
         )
 
         # Save the event to the inout file
-        await save_report_file("inout_", 'gcm'+event_record)
+        await save_report_file("inout_", "gcm" + event_record)
 
         # Escape special characters in the log message
         escaped_inout_userfirstname = html.escape(inout_userfirstname)
@@ -1289,7 +1281,7 @@ if __name__ == "__main__":
         # Check lols after user join/leave event in 2hr and ban if spam
         if lols_spam is True:  # not Timeout exactly
             await check_and_autoban(
-                event_record, inout_userid, inout_logmessage, lols_url
+                event_record, inout_userid, inout_logmessage, lols_spam
             )
             LOGGER.info("%s is banned by lols/cas check", inout_userid)
         else:
@@ -1317,10 +1309,9 @@ if __name__ == "__main__":
                     # create task with user_id as name
                     asyncio.create_task(
                         perform_checks(
-                            event_record,
-                            update.old_chat_member.user.id,
-                            inout_logmessage,
-                            lols_url,
+                            event_record=event_record,
+                            user_id=update.old_chat_member.user.id,
+                            inout_logmessage=inout_logmessage,
                         ),
                         name=str(inout_userid),
                     )
@@ -1776,7 +1767,7 @@ if __name__ == "__main__":
                 f" member          --> kicked          in "
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else ''}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
             )
-            await save_report_file("inout_", 'hbn'+event_record)
+            await save_report_file("inout_", "hbn" + event_record)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2109,7 +2100,7 @@ if __name__ == "__main__":
                     )  # replace leading ### with AUT to indicate autoban
                     # save to report file spam message
                     await save_report_file("daily_spam_", reported_spam)
-                    await save_report_file("inout_", 'srm'+event_record)
+                    await save_report_file("inout_", "srm" + event_record)
                     return
 
             # check if the message is a spam by checking the entities
@@ -2184,7 +2175,9 @@ if __name__ == "__main__":
                 # start the perform_checks coroutine
                 # get the admin group members
                 admin_group_members = await fetch_admin_group_members()
-                LOGGER.debug("Admin members fetched successfully: %s", admin_group_members)
+                LOGGER.debug(
+                    "Admin members fetched successfully: %s", admin_group_members
+                )
 
                 if (
                     message.from_id not in active_user_checks
@@ -2196,7 +2189,7 @@ if __name__ == "__main__":
                     message_to_delete = message.chat.id, message.message_id
                     asyncio.create_task(
                         perform_checks(
-                            message_to_delete,
+                            message_to_delete=message_to_delete,
                             event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
                             user_id=message.from_id,
                             inout_logmessage=f"{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...",

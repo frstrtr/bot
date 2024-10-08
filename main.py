@@ -967,7 +967,7 @@ async def lols_autoban(_id):
 
 # Helper function to check for spam and autoban
 async def check_and_autoban(
-    event_record: str, user_id: int, inout_logmessage: str, _url, lols_spam=True
+    event_record: str, user_id: int, inout_logmessage: str, _url, lols_spam=True, message_to_delete=None
 ):
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
@@ -981,6 +981,8 @@ async def check_and_autoban(
     if lols_spam is True:  # not Timeout exaclty
         await save_report_file("inout_", event_record)
         await lols_autoban(user_id)
+        if message_to_delete: # delete the message if it exists
+            await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -1031,14 +1033,18 @@ async def check_and_autoban(
 
 
 # Perform checks for spam corutine
-async def perform_checks(event_record: str, user_id: int, inout_logmessage: str, _url):
+async def perform_checks(message_to_delete=None, event_record = '', user_id = None, inout_logmessage = '', _url = ''):
     """Corutine to perform checks for spam and take action if necessary.
+    
+    message_to_delete: tuple: chat_id, message_id: The message to delete.
 
     event_record: str: The event record to log to inout file.
 
     user_id: int: The ID of the user to check for spam.
 
     inout_logmessage: str: The log message for the user's activity.
+
+    _url: str: The URL to the user's profile check for lols check button inline keyboard.
     """
 
     # immediate check
@@ -1052,7 +1058,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 01min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         ):
             return
 
@@ -1060,7 +1066,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 03min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         ):
             return
 
@@ -1068,7 +1074,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 10min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         ):
             return
 
@@ -1076,7 +1082,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 30min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         ):
             return
 
@@ -1084,7 +1090,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 01hrs check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         ):
             return
 
@@ -1092,7 +1098,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 02hrs check lols_spam: %s", user_id, lols_spam)
         await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam
+            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
         )
 
     except aiohttp.ServerDisconnectedError as e:
@@ -2119,9 +2125,9 @@ if __name__ == "__main__":
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
                 the_reason = f"{message.from_id} message sent during the night"
-                LOGGER.info(
-                    "%s message sent during the night: %s", message.from_id, message
-                )
+                # LOGGER.info(
+                #     "%s message sent during the night: %s", message.from_id, message
+                # )
                 # start the perform_checks coroutine
                 if (
                     message.from_id not in active_user_checks
@@ -2130,8 +2136,9 @@ if __name__ == "__main__":
                     active_user_checks.add(message.from_id)
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
+                    message_to_delete = message.chat.id, message.message_id
                     asyncio.create_task(
-                        perform_checks(event_record=f'{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}', user_id=message.from_id, inout_logmessage=f'{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...'),
+                        perform_checks(message_to_delete, event_record=f'{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}', user_id=message.from_id, inout_logmessage=f'{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...'),
                         name=str(message.from_id),
                     )
 

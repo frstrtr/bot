@@ -2209,6 +2209,7 @@ if __name__ == "__main__":
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
+                    LOGGER.debug('%s Message to delete: %s', message.from_id, message_to_delete)
                     asyncio.create_task(
                         perform_checks(
                             message_to_delete=message_to_delete,
@@ -2228,7 +2229,7 @@ if __name__ == "__main__":
             #     await take_heuristic_action(message, the_reason)
 
         except utils.exceptions.MessageIdInvalid as e:
-            LOGGER.error("Error storing recent message: Message_id_invalid - %s", e)
+            LOGGER.error("Error storing recent message: %s Message_id_invalid - %s", message.message_id, e)
 
     # NOTE: Manual typing command ban - useful if ban were postponed
     @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)

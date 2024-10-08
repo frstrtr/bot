@@ -983,7 +983,7 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        await save_report_file("inout_", 'cab'+event_record)
+        # await save_report_file("inout_", 'cab'+event_record)
         await lols_autoban(user_id)
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])

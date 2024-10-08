@@ -2423,7 +2423,7 @@ if __name__ == "__main__":
             # start the perform_checks coroutine
             asyncio.create_task(
                 perform_checks(
-                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual checkrequested by admin {message.from_user.id}",
+                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual check requested by admin {message.from_user.id}",
                     user_id=user_id,
                     inout_logmessage=f"{user_id} manual check requested, checking user activity...",
                 ),

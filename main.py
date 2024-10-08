@@ -1012,7 +1012,7 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            event_record = event_record.replace("member", "kicked", 1).split(" by ")[0] + " by @bancop_bot"
+            event_record = event_record.replace("member", "kicked", 1).split(" by ")[0] + " by Хранитель Порядка\n"
             await save_report_file("inout_", "cbb" + event_record)
         return True
 

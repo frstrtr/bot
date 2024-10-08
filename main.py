@@ -1239,7 +1239,7 @@ if __name__ == "__main__":
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
             f"{inout_userid:<10} "
             f"{'❌  ' if lols_spam else '🟢 '}"
-            f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<30}"
+            f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<32}"
             f"{update.old_chat_member.status:<15} --> {inout_status:<15} in "
             f"{'@' + update.chat.username + ': ' if update.chat.username else '':<20}{update.chat.title:<30} by "
             f"{update.from_user.id:<10} "
@@ -1785,7 +1785,7 @@ if __name__ == "__main__":
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                 f"{author_id:<10} "
-                f"❌  {' '.join('@' + forwarded_message_data[4] if forwarded_message_data[4] is not None else forwarded_message_data[5]+' '+forwarded_message_data[6]):<30}"
+                f"❌  {' '.join('@' + forwarded_message_data[4] if forwarded_message_data[4] is not None else forwarded_message_data[5]+' '+forwarded_message_data[6]):<32}"
                 f" member          --> kicked          in "
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<20}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
             )
@@ -2113,7 +2113,7 @@ if __name__ == "__main__":
                     event_record = (
                         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                         f"{message.from_id:<10} "
-                        f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
+                        f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<32}"
                         f" member          --> kicked          in "
                         f"{'@' + message.chat.username + ': ' if message.chat.username else '':<20}{message.chat.title:<30} by Хранитель Порядков\n"
                     )

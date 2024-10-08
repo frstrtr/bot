@@ -1012,7 +1012,14 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            event_record = event_record.replace("member", "kicked", 1).split(" by ")[0] + " by Хранитель Порядка\n"
+            event_record = (
+                event_record.replace("--> member", "--> kicked", 1)
+                .replace("--> left", "--> kicked", 1)
+                .replace("  member  ", "  kicked  ", 1)
+                .replace("  left  ", "  member  ", 1)
+                .split(" by ")[0]
+                + " by Хранитель Порядка\n"
+            )
             await save_report_file("inout_", "cbb" + event_record)
         return True
 
@@ -2727,6 +2734,7 @@ if __name__ == "__main__":
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
     # TODO great_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
+    # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

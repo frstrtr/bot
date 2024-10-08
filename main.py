@@ -982,7 +982,6 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        # await save_report_file("inout_", 'cab'+event_record)
         await lols_autoban(user_id)
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
@@ -997,7 +996,7 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-        else:  # done by bot
+        else:  # done by bot but not yet detected by lols_cas
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
@@ -1008,6 +1007,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            event_record.replace("member", "member --> KICKED", 1).replace(
+                "left", "left --> KICKED", 1
+            )
+            await save_report_file("inout_", "cab" + event_record)
         return True
 
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
@@ -1129,11 +1132,15 @@ async def perform_checks(
         )
 
     except asyncio.exceptions.CancelledError as e:
-        LOGGER.error("%s Asyncio Cancelled error while checking for spam. %s ", user_id, e)
+        LOGGER.error(
+            "%s Asyncio Cancelled error while checking for spam. %s ", user_id, e
+        )
 
     except aiohttp.ServerDisconnectedError as e:
         LOGGER.error(
-            "%s Aiohttp Server DISCONNECTED error while checking for spam. %s", user_id, e
+            "%s Aiohttp Server DISCONNECTED error while checking for spam. %s",
+            user_id,
+            e,
         )
 
     finally:

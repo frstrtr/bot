@@ -2215,7 +2215,9 @@ if __name__ == "__main__":
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
                     # FIXME remove -100 from public group id?
-                    LOGGER.debug('%s Message to delete: %s', message.from_id, message_to_delete)
+                    LOGGER.debug(
+                        "%s Message to delete: %s", message.from_id, message_to_delete
+                    )
                     asyncio.create_task(
                         perform_checks(
                             message_to_delete=message_to_delete,
@@ -2236,7 +2238,11 @@ if __name__ == "__main__":
 
         # If other user/admin or bot deletes message earlier than this bot we got an error
         except utils.exceptions.MessageIdInvalid as e:
-            LOGGER.error("Error storing/deleting recent %s message, %s - someone deleted it already?", message.message_id, e)
+            LOGGER.error(
+                "Error storing/deleting recent %s message, %s - someone deleted it already?",
+                message.message_id,
+                e,
+            )
 
     # NOTE: Manual typing command ban - useful if ban were postponed
     @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
@@ -2389,19 +2395,23 @@ if __name__ == "__main__":
         except Exception as e:
             LOGGER.error("Error in ban function: %s", e)
             await message.reply(f"Error: {e}")
-    
+
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
         """Function to start lols_cas check 2hrs corutine check the user for spam."""
         try:
             command_args = message.text.split()
-            LOGGER.debug("Command arguments received: %s", command_args)
+            # LOGGER.debug("Command arguments received: %s", command_args)
 
             if len(command_args) < 2:
                 raise ValueError("Please provide the user ID to check.")
 
             user_id = int(command_args[1])
-            LOGGER.debug("%d - User ID to check, requested by admin %d", user_id, message.from_user.id)
+            LOGGER.debug(
+                "%d - User ID to check, requested by admin %d",
+                user_id,
+                message.from_user.id,
+            )
 
             if user_id in active_user_checks:
                 await message.reply("User is already being checked.")
@@ -2412,14 +2422,16 @@ if __name__ == "__main__":
             # start the perform_checks coroutine
             asyncio.create_task(
                 perform_checks(
-                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} manual check",
+                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual checkrequested by admin {message.from_user.id}",
                     user_id=user_id,
                     inout_logmessage=f"{user_id} manual check requested, checking user activity...",
                 ),
                 name=str(user_id),
             )
 
-            await message.reply(f"User {user_id} check 2hrs monitoring activity check started.")
+            await message.reply(
+                f"User {user_id} check 2hrs monitoring activity check started."
+            )
         except ValueError as ve:
             await message.reply(str(ve))
         except Exception as e:

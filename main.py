@@ -1143,7 +1143,7 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error(
-            "%s Asyncio Cancelled error while checking for spam. %s ", user_id, e
+            "%s 2hrs spam checking cancelled. %s ", user_id, e
         )
 
     except aiohttp.ServerDisconnectedError as e:

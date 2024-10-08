@@ -1016,7 +1016,7 @@ async def check_and_autoban(
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)
                 .replace("  member  ", "  kicked  ", 1)
-                .replace("  left  ", "  member  ", 1)
+                .replace("  left  ", "  member", 1)
                 .split(" by ")[0]
                 + " by Хранитель Порядков\n"
             )
@@ -1781,6 +1781,7 @@ if __name__ == "__main__":
 
             # save event to the ban file
             # XXX save the event to the inout file
+            # FIXME chat @name below
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                 f"{author_id:<10} "

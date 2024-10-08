@@ -1055,7 +1055,6 @@ async def perform_checks(
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
     #     return
 
-
     try:
 
         await asyncio.sleep(65)  # 1 minute + 5 seconds
@@ -1129,8 +1128,13 @@ async def perform_checks(
             message_to_delete=message_to_delete,
         )
 
+    except asyncio.exceptions.CancelledError as e:
+        LOGGER.error("%s Asyncio Cancelled error while checking for spam. %s ", user_id, e)
+
     except aiohttp.ServerDisconnectedError as e:
-        LOGGER.error("Server DISCONNECTED error while checking for spam. %s", e)
+        LOGGER.error(
+            "%s Aiohttp Server DISCONNECTED error while checking for spam. %s", user_id, e
+        )
 
     finally:
         # Remove the user ID from the active set when done

@@ -998,7 +998,7 @@ async def check_and_autoban(
             )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
-                + " by @bancop_bot"
+                + " by Хранитель Порядков\n"
             )
             await save_report_file("inout_", "cbk" + event_record)
         else:  # done by bot but not yet detected by lols_cas
@@ -1018,7 +1018,7 @@ async def check_and_autoban(
                 .replace("  member  ", "  kicked  ", 1)
                 .replace("  left  ", "  member  ", 1)
                 .split(" by ")[0]
-                + " by Хранитель Порядка\n"
+                + " by Хранитель Порядков\n"
             )
             await save_report_file("inout_", "cbb" + event_record)
         return True
@@ -2114,7 +2114,7 @@ if __name__ == "__main__":
                         f"{message.from_id:<10} "
                         f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<30}"
                         f" member          --> kicked          in "
-                        f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by @bancop_bot\n"
+                        f"{'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30} by Хранитель Порядков\n"
                     )
                     reported_spam = (
                         "AUT" + format_spam_report(message)[3:]

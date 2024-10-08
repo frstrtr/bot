@@ -2389,8 +2389,43 @@ if __name__ == "__main__":
         except Exception as e:
             LOGGER.error("Error in ban function: %s", e)
             await message.reply(f"Error: {e}")
+    
+    @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
+    async def check_user(message: types.Message):
+        """Function to start lols_cas check 2hrs corutine check the user for spam."""
+        try:
+            command_args = message.text.split()
+            LOGGER.debug("Command arguments received: %s", command_args)
 
-    # Handler for the /unban command
+            if len(command_args) < 2:
+                raise ValueError("Please provide the user ID to check.")
+
+            user_id = int(command_args[1])
+            LOGGER.debug("%d - User ID to check, requested by admin %d", user_id, message.from_user.id)
+
+            if user_id in active_user_checks:
+                await message.reply("User is already being checked.")
+                return
+            else:
+                active_user_checks.add(user_id)
+
+            # start the perform_checks coroutine
+            asyncio.create_task(
+                perform_checks(
+                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} manual check",
+                    user_id=user_id,
+                    inout_logmessage=f"{user_id} manual check requested, checking user activity...",
+                ),
+                name=str(user_id),
+            )
+
+            await message.reply(f"User {user_id} check 2hrs monitoring activity check started.")
+        except ValueError as ve:
+            await message.reply(str(ve))
+        except Exception as e:
+            LOGGER.error("Error in check_user: %s", e)
+            await message.reply("An error occurred while trying to check the user.")
+
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):
         """Function to unban the user with userid in all channels listed in CHANNEL_NAMES."""

@@ -996,9 +996,11 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            event_record.replace("member", "kicked", 1)
-            event_record = event_record.split(" by ")[0] + " by @bancop_bot"
-            await save_report_file("inout_", "cab" + event_record)
+            event_record = (
+                event_record.replace("member", "kicked", 1).split(" by ")[0]
+                + " by @bancop_bot"
+            )
+            await save_report_file("inout_", "cbk" + event_record)
         else:  # done by bot but not yet detected by lols_cas
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -1010,6 +1012,8 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            event_record = event_record.replace("member", "kicked", 1).split(" by ")[0] + " by @bancop_bot"
+            await save_report_file("inout_", "cbb" + event_record)
         return True
 
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (

@@ -2079,7 +2079,7 @@ if __name__ == "__main__":
                         ADMIN_GROUP_ID,
                         (
                             f"User <code>{message.from_user.id}</code> identified as a spammer."
-                            f"Evidance is the message from {message.chat.title} above."
+                            f"Evidance is the message from {message.chat.title} above. "
                             "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),
                         message_thread_id=ADMIN_AUTOBAN,

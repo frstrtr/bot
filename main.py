@@ -34,17 +34,7 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
-# TODO make this function declaration outside of the load_config function
-async def fetch_admin_group_members():
-    try:
-        # Fetch the list of chat administrators
-        admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
-        # Extract user IDs of administrators and populate the set
-        return {admin.user.id for admin in admins if isinstance(admin, ChatMemberAdministrator)}
-    except utils.exceptions.ChatAdminRequired as e:
-        LOGGER.error("Error fetching admin members: %s", e)
-        return set()
-    
+
 # Set to keep track of active user IDs
 active_user_checks = set()
 
@@ -102,7 +92,6 @@ def construct_message_link(found_message_data):
     return message_link
 
 
-# Load predetermined sentences from a plain text file and normalize to lowercase
 def load_predetermined_sentences(txt_file):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
     remove extra spaces and punctuation marks, check for duplicates, rewrite the file
@@ -315,7 +304,7 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, ADMIN_GROUP_MEMBERS,
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID
     global CHANNEL_NAMES, SPAM_TRIGGERS
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -349,8 +338,8 @@ def load_config():
     stream_handler = logging.StreamHandler()  # For writing logs to the console
 
     # Create formatters and add them to handlers
-    FROMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
-    formatter = logging.Formatter(FROMAT_STR)
+    FORMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
+    formatter = logging.Formatter(FORMAT_STR)
     file_handler.setFormatter(formatter)
     stream_handler.setFormatter(formatter)
 
@@ -457,9 +446,6 @@ def load_config():
         LOGGER.error("File not found: %s", e.filename)
     except ET.ParseError as e:
         LOGGER.error("Error parsing XML: %s", e)
-    
-    ADMIN_GROUP_MEMBERS = asyncio.run(fetch_admin_group_members())
-    LOGGER.info("Admin members fetched successfully: %s", ADMIN_GROUP_MEMBERS)
 
 
 def extract_status_change(
@@ -967,7 +953,12 @@ async def lols_autoban(_id):
 
 # Helper function to check for spam and autoban
 async def check_and_autoban(
-    event_record: str, user_id: int, inout_logmessage: str, _url, lols_spam=True, message_to_delete=None
+    event_record: str,
+    user_id: int,
+    inout_logmessage: str,
+    _url,
+    lols_spam=True,
+    message_to_delete=None,
 ):
     """Function to check for spam and take action if necessary.
     user_id: int: The ID of the user to check for spam.
@@ -981,7 +972,7 @@ async def check_and_autoban(
     if lols_spam is True:  # not Timeout exaclty
         await save_report_file("inout_", event_record)
         await lols_autoban(user_id)
-        if message_to_delete: # delete the message if it exists
+        if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await BOT.send_message(
@@ -1033,9 +1024,11 @@ async def check_and_autoban(
 
 
 # Perform checks for spam corutine
-async def perform_checks(message_to_delete=None, event_record = '', user_id = None, inout_logmessage = '', _url = ''):
+async def perform_checks(
+    message_to_delete=None, event_record="", user_id=None, inout_logmessage="", _url=""
+):
     """Corutine to perform checks for spam and take action if necessary.
-    
+
     message_to_delete: tuple: chat_id, message_id: The message to delete.
 
     event_record: str: The event record to log to inout file.
@@ -1058,7 +1051,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 01min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         ):
             return
 
@@ -1066,7 +1064,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 03min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         ):
             return
 
@@ -1074,7 +1077,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 10min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         ):
             return
 
@@ -1082,7 +1090,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 30min check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         ):
             return
 
@@ -1090,7 +1103,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 01hrs check lols_cas_spam: %s", user_id, lols_spam)
         if await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         ):
             return
 
@@ -1098,7 +1116,12 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         lols_spam = await lols_cas_check(user_id)
         LOGGER.debug("%s 02hrs check lols_spam: %s", user_id, lols_spam)
         await check_and_autoban(
-            event_record, user_id, inout_logmessage, _url, lols_spam=lols_spam, message_to_delete=message_to_delete
+            event_record,
+            user_id,
+            inout_logmessage,
+            _url,
+            lols_spam=lols_spam,
+            message_to_delete=message_to_delete,
         )
 
     except aiohttp.ServerDisconnectedError as e:
@@ -1112,6 +1135,23 @@ async def perform_checks(message_to_delete=None, event_record = '', user_id = No
         # after all checks are completed or
         # if the function exits early due to a `return` statement:
         active_user_checks.remove(user_id)
+
+
+# # TODO make this function declaration outside of the load_config function
+async def fetch_admin_group_members():
+    """Function to fetch the list of chat administrators from the admin group."""
+    try:
+        # Fetch the list of chat administrators
+        admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
+        # Extract user IDs of administrators and populate the set
+        return {
+            admin.user.id
+            for admin in admins
+            if isinstance(admin, ChatMemberAdministrator)
+        }
+    except utils.exceptions.ChatAdminRequired as e:
+        LOGGER.error("Error fetching admin members: %s", e)
+        return set()
 
 
 if __name__ == "__main__":
@@ -2129,16 +2169,25 @@ if __name__ == "__main__":
                 #     "%s message sent during the night: %s", message.from_id, message
                 # )
                 # start the perform_checks coroutine
+                # get the admin group members
+                admin_group_members = await fetch_admin_group_members()
+                LOGGER.debug("Admin members fetched successfully: %s", admin_group_members)
+
                 if (
                     message.from_id not in active_user_checks
-                    and message.from_id not in ADMIN_GROUP_MEMBERS
-                ): # check if the user is not in the active_user_checks set and not an admin
+                    and message.from_id not in admin_group_members
+                ):  # check if the user is not in the active_user_checks set and not an admin
                     active_user_checks.add(message.from_id)
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
                     asyncio.create_task(
-                        perform_checks(message_to_delete, event_record=f'{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}', user_id=message.from_id, inout_logmessage=f'{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...'),
+                        perform_checks(
+                            message_to_delete,
+                            event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
+                            user_id=message.from_id,
+                            inout_logmessage=f"{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...",
+                        ),
                         name=str(message.from_id),
                     )
 

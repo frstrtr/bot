@@ -34,6 +34,17 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
+# TODO make this function declaration outside of the load_config function
+async def fetch_admin_group_members():
+    try:
+        # Fetch the list of chat administrators
+        admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
+        # Extract user IDs of administrators and populate the set
+        return {admin.user.id for admin in admins if isinstance(admin, ChatMemberAdministrator)}
+    except utils.exceptions.ChatAdminRequired as e:
+        LOGGER.error("Error fetching admin members: %s", e)
+        return set()
+    
 # Set to keep track of active user IDs
 active_user_checks = set()
 
@@ -447,17 +458,6 @@ def load_config():
     except ET.ParseError as e:
         LOGGER.error("Error parsing XML: %s", e)
     
-    # TODO make this function declaration outside of the load_config function
-    async def fetch_admin_group_members():
-        try:
-            # Fetch the list of chat administrators
-            admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
-            # Extract user IDs of administrators and populate the set
-            return {admin.user.id for admin in admins if isinstance(admin, ChatMemberAdministrator)}
-        except utils.exceptions.ChatAdminRequired as e:
-            LOGGER.error("Error fetching admin members: %s", e)
-            return set()
-
     ADMIN_GROUP_MEMBERS = asyncio.run(fetch_admin_group_members())
     LOGGER.info("Admin members fetched successfully: %s", ADMIN_GROUP_MEMBERS)
 
@@ -1033,8 +1033,13 @@ async def check_and_autoban(
 # Perform checks for spam corutine
 async def perform_checks(event_record: str, user_id: int, inout_logmessage: str, _url):
     """Corutine to perform checks for spam and take action if necessary.
+
+    event_record: str: The event record to log to inout file.
+
     user_id: int: The ID of the user to check for spam.
-    inout_logmessage: str: The log message for the user's activity."""
+
+    inout_logmessage: str: The log message for the user's activity.
+    """
 
     # immediate check
     # lols_spam = await lols_check(user_id)
@@ -2117,15 +2122,16 @@ if __name__ == "__main__":
                 LOGGER.info(
                     "%s message sent during the night: %s", message.from_id, message
                 )
+                # start the perform_checks coroutine
                 if (
                     message.from_id not in active_user_checks
-                    and message.from_id not in ADMIN_USER_ID
                     and message.from_id not in ADMIN_GROUP_MEMBERS
-                ):
+                ): # check if the user is not in the active_user_checks set and not an admin
                     active_user_checks.add(message.from_id)
                     # start the perform_checks coroutine
+                    # TODO need to delete the message if user is spammer
                     asyncio.create_task(
-                        perform_checks(message, the_reason, message.from_id),
+                        perform_checks(event_record=f'{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}', user_id=message.from_id, inout_logmessage=f'{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...'),
                         name=str(message.from_id),
                     )
 

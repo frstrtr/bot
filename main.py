@@ -915,8 +915,11 @@ async def lols_cas_check(user_id):
 
 async def save_report_file(file_type, data):
     """Function to create or load the daily spam file.
-    var: file_type: str: The type of file to create or load (e.g., daily_spam_)
-    var: data: str: The data to write to the file."""
+    
+    file_type: str: The type of file to create or load (e.g., daily_spam_)
+    
+    data: str: The data to write to the file.
+    """
 
     # Get today's date
     today = datetime.now().strftime("%d-%m-%Y")
@@ -970,7 +973,7 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        await save_report_file("inout_", event_record)
+        await save_report_file("inout_", 'cab'+event_record)
         await lols_autoban(user_id)
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
@@ -1221,7 +1224,7 @@ if __name__ == "__main__":
         )
 
         # Save the event to the inout file
-        await save_report_file("inout_", event_record)
+        await save_report_file("inout_", 'gcm'+event_record)
 
         # Escape special characters in the log message
         escaped_inout_userfirstname = html.escape(inout_userfirstname)
@@ -1763,7 +1766,7 @@ if __name__ == "__main__":
                 f" member          --> kicked          in "
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else ''}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
             )
-            await save_report_file("inout_", event_record)
+            await save_report_file("inout_", 'hbn'+event_record)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2096,7 +2099,7 @@ if __name__ == "__main__":
                     )  # replace leading ### with AUT to indicate autoban
                     # save to report file spam message
                     await save_report_file("daily_spam_", reported_spam)
-                    await save_report_file("inout_", event_record)
+                    await save_report_file("inout_", 'srm'+event_record)
                     return
 
             # check if the message is a spam by checking the entities

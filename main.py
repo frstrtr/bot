@@ -996,6 +996,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            # event_record.replace("member", "member --> KICKED", 1).replace(
+            #     "left", "left --> KICKED", 1
+            # )
+            await save_report_file("inout_", "cab" + event_record)
         else:  # done by bot but not yet detected by lols_cas
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -1007,10 +1011,6 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            event_record.replace("member", "member --> KICKED", 1).replace(
-                "left", "left --> KICKED", 1
-            )
-            await save_report_file("inout_", "cab" + event_record)
         return True
 
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
@@ -2089,7 +2089,7 @@ if __name__ == "__main__":
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         (
-                            f"User <code>{message.from_user.id}</code> identified as a spammer."
+                            f"User <code>{message.from_user.id}</code> identified as a spammer. "
                             f"Evidance is the message from {message.chat.title} above. "
                             "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
                         ),

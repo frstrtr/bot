@@ -2072,9 +2072,11 @@ if __name__ == "__main__":
                 if lolscheck is True:
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
-                        "%s identified in %s as a spammer when sending a message during the first 48hrs after registration. Telefragged...",
+                        "%s identified in (%s) %s as a spammer when sending a message (%s) during the first 48hrs after registration. Telefragged...",
                         message.from_user.id,
+                        message.chat.id,
                         message.chat.title,
+                        message.message_id,
                     )
                     # delete id from the active_user_checks set
                     if message.from_user.id in active_user_checks:
@@ -2108,6 +2110,7 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         reply_markup=inline_kb,
                     )
+                    # XXX message id invalid after the message is deleted?
                     await BOT.delete_message(message.chat.id, message.message_id)
                     await lols_autoban(message.from_user.id)
                     event_record = (

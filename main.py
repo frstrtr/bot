@@ -23,6 +23,7 @@ from aiogram.types import (
     CallbackQuery,
     ChatMemberUpdated,
     ChatMemberStatus,
+    ChatMemberAdministrator,
 )
 from aiogram import executor
 
@@ -303,8 +304,8 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, SPAM_TRIGGERS
-    global CHANNEL_NAMES
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, ADMIN_GROUP_MEMBERS,
+    global CHANNEL_NAMES, SPAM_TRIGGERS
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
@@ -445,6 +446,20 @@ def load_config():
         LOGGER.error("File not found: %s", e.filename)
     except ET.ParseError as e:
         LOGGER.error("Error parsing XML: %s", e)
+    
+    # TODO make this function declaration outside of the load_config function
+    async def fetch_admin_group_members():
+        try:
+            # Fetch the list of chat administrators
+            admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
+            # Extract user IDs of administrators and populate the set
+            return {admin.user.id for admin in admins if isinstance(admin, ChatMemberAdministrator)}
+        except utils.exceptions.ChatAdminRequired as e:
+            LOGGER.error("Error fetching admin members: %s", e)
+            return set()
+
+    ADMIN_GROUP_MEMBERS = asyncio.run(fetch_admin_group_members())
+    LOGGER.info("Admin members fetched successfully: %s", ADMIN_GROUP_MEMBERS)
 
 
 def extract_status_change(
@@ -1091,7 +1106,7 @@ async def perform_checks(event_record: str, user_id: int, inout_logmessage: str,
 if __name__ == "__main__":
 
     # Dictionary to store the mapping of unhandled messages to admin's replies
-    global unhandled_messages
+    # global unhandled_messages
     unhandled_messages = {}
 
     # Load configuration values from the XML file
@@ -2102,6 +2117,17 @@ if __name__ == "__main__":
                 LOGGER.info(
                     "%s message sent during the night: %s", message.from_id, message
                 )
+                if (
+                    message.from_id not in active_user_checks
+                    and message.from_id not in ADMIN_USER_ID
+                    and message.from_id not in ADMIN_GROUP_MEMBERS
+                ):
+                    active_user_checks.add(message.from_id)
+                    # start the perform_checks coroutine
+                    asyncio.create_task(
+                        perform_checks(message, the_reason, message.from_id),
+                        name=str(message.from_id),
+                    )
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

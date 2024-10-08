@@ -1160,7 +1160,8 @@ async def perform_checks(
         # is removed from the `active_user_checks` set
         # after all checks are completed or
         # if the function exits early due to a `return` statement:
-        active_user_checks.remove(user_id)
+        if user_id in active_user_checks: # avoid case when manually banned by admin same time
+            active_user_checks.remove(user_id)
 
 
 # # TODO make this function declaration outside of the load_config function

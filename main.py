@@ -2209,6 +2209,7 @@ if __name__ == "__main__":
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
+                    # FIXME remove -100 from public group id?
                     LOGGER.debug('%s Message to delete: %s', message.from_id, message_to_delete)
                     asyncio.create_task(
                         perform_checks(

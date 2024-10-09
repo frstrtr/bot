@@ -702,7 +702,7 @@ async def handle_forwarded_reports_with_details(
 ):
     """Function to handle forwarded messages with provided user details."""
 
-    reported_spam = "ADM"+format_spam_report(message)[3:]
+    reported_spam = "ADM" + format_spam_report(message)[3:]
     # store spam text and caption to the daily_spam file
     await save_report_file("daily_spam_", reported_spam)
 
@@ -814,7 +814,9 @@ async def handle_forwarded_reports_with_details(
     message_report_date = datetime.now()
 
     # Escape the name to prevent HTML injection
-    escaped_name = html.escape(f"{message.forward_sender_name or f'{first_name} {last_name}'}")
+    escaped_name = html.escape(
+        f"{message.forward_sender_name or f'{first_name} {last_name}'}"
+    )
 
     # Log the information with the link
     log_info = (
@@ -1614,7 +1616,9 @@ if __name__ == "__main__":
 
         message_report_date = datetime.now()
         # avoid html tags in the name
-        escaped_name = html.escape(f"{message.forward_sender_name or f'{first_name} {last_name}'}")
+        escaped_name = html.escape(
+            f"{message.forward_sender_name or f'{first_name} {last_name}'}"
+        )
 
         # Log the information with the link
         log_info = (
@@ -1795,6 +1799,9 @@ if __name__ == "__main__":
                 f"❌  {' '.join('@' + forwarded_message_data[4] if forwarded_message_data[4] is not None else forwarded_message_data[5]+' '+forwarded_message_data[6]):<32}"
                 f" member          --> kicked          in "
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
+            )
+            LOGGER.debug(
+                "%s hbn forwared_message_data: %s", author_id, forwarded_message_data
             )
             await save_report_file("inout_", "hbn" + event_record)
 

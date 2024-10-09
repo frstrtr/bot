@@ -952,7 +952,7 @@ async def lols_autoban(_id):
         LOGGER.error(
             "%s - error banning in chat %s: %s. Deleted Account?", _id, chat_id, e
         )
-        # XXX remove check corutine and from monitoring list?
+        # XXX remove _id check corutine and from monitoring list?
 
 
 # Helper function to check for spam and autoban

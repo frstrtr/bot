@@ -950,8 +950,9 @@ async def lols_autoban(_id):
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
         LOGGER.error(
-            "Error banning user %s in chat %s: %s. Deleted Account?", _id, chat_id, e
+            "%s - error banning in chat %s: %s. Deleted Account?", _id, chat_id, e
         )
+        # XXX remove check corutine and from monitoring list?
 
 
 # Helper function to check for spam and autoban
@@ -1142,9 +1143,7 @@ async def perform_checks(
         )
 
     except asyncio.exceptions.CancelledError as e:
-        LOGGER.error(
-            "%s 2hrs spam checking cancelled. %s ", user_id, e
-        )
+        LOGGER.error("%s 2hrs spam checking cancelled. %s ", user_id, e)
 
     except aiohttp.ServerDisconnectedError as e:
         LOGGER.error(
@@ -1160,7 +1159,9 @@ async def perform_checks(
         # is removed from the `active_user_checks` set
         # after all checks are completed or
         # if the function exits early due to a `return` statement:
-        if user_id in active_user_checks: # avoid case when manually banned by admin same time
+        if (
+            user_id in active_user_checks
+        ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
 
 
@@ -1929,23 +1930,33 @@ if __name__ == "__main__":
             message_id=callback_query.message.message_id,
         )
 
-        # DEBUG:
         button_pressed_by = callback_query.from_user.username
+        admin_id = callback_query.from_user.id
+        # DEBUG:
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
 
-        LOGGER.info("Report %s button ACTION CANCELLED!!!", report_id_to_ban)
+        LOGGER.info(
+            "%s Report %s button ACTION CANCELLED by @%s !!!",
+            admin_id,
+            report_id_to_ban,
+            button_pressed_by,
+        )
 
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            f"Button ACTION CANCELLED by @{button_pressed_by}: Report {report_id_to_ban} WAS NOT PROCESSED!!! "
-            f"Report them again if needed or use /ban {report_id_to_ban} command.",
+            f"Button ACTION CANCELLED by @{button_pressed_by}: Report WAS NOT PROCESSED!!! "
+            f"Report them again if needed or use <code>/ban {report_id_to_ban}</code> command.",
             message_thread_id=callback_query.message.message_thread_id,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
         )
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
             f"CANCEL button pressed by @{button_pressed_by}. "
-            f"Button ACTION CANCELLED: Report {report_id_to_ban} WAS NOT PROCESSED. "
-            f"Report them again if needed or use /ban {report_id_to_ban} command.",
+            f"Button ACTION CANCELLED: Report WAS NOT PROCESSED. "
+            f"Report them again if needed or use <code>/ban {report_id_to_ban}</code> command.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
         )
 
     @DP.message_handler(
@@ -2203,9 +2214,11 @@ if __name__ == "__main__":
                 # start the perform_checks coroutine
                 # get the admin group members
                 admin_group_members = await fetch_admin_group_members()
-                LOGGER.debug(
-                    "Admin members fetched successfully: %s", admin_group_members
-                )
+                # LOGGER.debug(
+                #     "%s Admin ids fetched successfully: %s",
+                #     message.from_id,
+                #     admin_group_members,
+                # )
 
                 if (
                     message.from_id not in active_user_checks
@@ -2216,8 +2229,10 @@ if __name__ == "__main__":
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
                     # FIXME remove -100 from public group id?
-                    LOGGER.debug(
-                        "%s Message to delete: %s", message.from_id, message_to_delete
+                    LOGGER.info(
+                        "%s Nightwatch Message to delete: %s",
+                        message.from_id,
+                        message_to_delete,
                     )
                     asyncio.create_task(
                         perform_checks(
@@ -2792,6 +2807,7 @@ if __name__ == "__main__":
     # TODO fix database spammer store and find indexes, instead of date
     # TODO great_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
     # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
+    # TODO if user is admin - add ban/cancel button to the personal message to admin
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

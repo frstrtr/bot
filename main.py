@@ -2451,7 +2451,7 @@ if __name__ == "__main__":
             )
 
             await message.reply(
-                f"User {user_id} check 2hrs monitoring activity check started."
+                f"User {user_id} 2hrs monitoring activity check started."
             )
         except ValueError as ve:
             await message.reply(str(ve))

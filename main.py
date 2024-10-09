@@ -702,7 +702,7 @@ async def handle_forwarded_reports_with_details(
 ):
     """Function to handle forwarded messages with provided user details."""
 
-    reported_spam = format_spam_report(message)
+    reported_spam = "ADM"+format_spam_report(message)[3:]
     # store spam text and caption to the daily_spam file
     await save_report_file("daily_spam_", reported_spam)
 

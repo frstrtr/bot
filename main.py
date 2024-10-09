@@ -813,6 +813,9 @@ async def handle_forwarded_reports_with_details(
     # else:
     message_report_date = datetime.now()
 
+    # Escape the name to prevent HTML injection
+    escaped_name = html.escape(f"{message.forward_sender_name or f'{first_name} {last_name}'}")
+
     # Log the information with the link
     log_info = (
         f"💡 Report timestamp: {message_report_date}\n"
@@ -821,7 +824,7 @@ async def handle_forwarded_reports_with_details(
         f"💔 Reported by automated spam detection system\n"
         f"💔 {reason}\n"
         f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
-        f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
+        f"{escaped_name}\n"
         f"💀 SPAMMER ID profile links:\n"
         f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
         f"   ├☠️ Plain text: tg://user?id={user_id}\n"
@@ -1610,6 +1613,8 @@ if __name__ == "__main__":
         # print('##########----------DEBUG----------##########')
 
         message_report_date = datetime.now()
+        # avoid html tags in the name
+        escaped_name = html.escape(f"{message.forward_sender_name or f'{first_name} {last_name}'}")
 
         # Log the information with the link
         log_info = (
@@ -1619,7 +1624,7 @@ if __name__ == "__main__":
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
-            f"{message.forward_sender_name or f'{first_name} {last_name}'}\n"
+            f"{escaped_name}\n"
             f"💀 SPAMMER ID profile links:\n"
             f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
             f"   ├☠️ Plain text: tg://user?id={user_id}\n"

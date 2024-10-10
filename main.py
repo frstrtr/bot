@@ -1361,13 +1361,22 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        LOGGER.info(
-            "%s --> %s in %s at %s",
-            inout_userid,
-            inout_status,
-            inout_chattitle,
-            datetime.now().strftime("%H:%M:%S"),
-        )
+        if inout_status == ChatMemberStatus.KICKED:
+            LOGGER.info(
+                "\033[91m%s --> %s in %s at %s\033[0m",
+                inout_userid,
+                inout_status,
+                inout_chattitle,
+                datetime.now().strftime("%H:%M:%S"),
+            )
+        else:
+            LOGGER.info(
+                "%s --> %s in %s at %s",
+                inout_userid,
+                inout_status,
+                inout_chattitle,
+                datetime.now().strftime("%H:%M:%S"),
+            )
 
         # Extract the user status change
         result = extract_status_change(update)

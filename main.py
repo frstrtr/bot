@@ -1008,6 +1008,26 @@ async def check_and_autoban(
                 + " by Хранитель Порядков\n"
             )
             await save_report_file("inout_", "cbk" + event_record)
+        elif "manual check requested" in inout_logmessage:
+            # XXX it was /check id command
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                inout_logmessage.replace(
+                    "manual check requested,",
+                    "<b>manually kicked from all chats with /check id command while</b>",
+                    1,
+                )
+                + " please check for the other spammer messages!",
+                message_thread_id=ADMIN_MANBAN,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=inline_kb,
+            )
+            event_record = (
+                event_record.replace("member", "kicked", 1).split(" by ")[0]
+                + " by Хранитель Порядков\n"
+            )
+            await save_report_file("inout_", "cbk" + event_record)
         else:  # done by bot but not yet detected by lols_cas
             await BOT.send_message(
                 ADMIN_GROUP_ID,
@@ -2431,7 +2451,7 @@ if __name__ == "__main__":
                 perform_checks(
                     event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual check requested by admin {message.from_user.id}",
                     user_id=user_id,
-                    inout_logmessage=f"{user_id} manual check requested, checking user activity...",
+                    inout_logmessage=f"{user_id} manual check requested, checking user activity requested by admin {message.from_id}...",
                 ),
                 name=str(user_id),
             )

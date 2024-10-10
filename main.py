@@ -1320,7 +1320,7 @@ if __name__ == "__main__":
                     )
                 else:
                     LOGGER.debug(
-                        "%s skipping perform_checks as it is already being processed at %s",
+                        "\033[93m%s skipping perform_checks as it is already being processed at %s\033[0m",
                         inout_userid,
                         timestamp,
                     )

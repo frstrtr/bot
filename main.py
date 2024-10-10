@@ -2181,16 +2181,16 @@ if __name__ == "__main__":
                 message.date - user_join_chat_date
             ).total_seconds() < 10
 
+            # check if the message is a spam by checking the entities
+            entity_spam_trigger = has_spam_entities(message)
+
             # do lols check if user less than 48hr old sending a message
             if user_is_2day_old:
                 the_reason = f"\033[91m{message.from_id} identified in ({message.chat.id}) {message.chat.title} as a spammer when sending a message ({message.message_id}) during the first 48hrs after registration. Telefragged...\033[0m\n"
                 await check_n_ban(message, the_reason)
                 return
 
-            # check if the message is a spam by checking the entities
-            entity_spam_trigger = has_spam_entities(message)
-
-            if (
+            elif (
                 message.forward_from_chat.type if message.forward_from_chat else None
             ) == types.ChatType.CHANNEL:
                 # or (message.forward_origin.type if message.forward_origin else None) == types.ChatType.CHANNEL:
@@ -2199,7 +2199,7 @@ if __name__ == "__main__":
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
                     the_reason = f"{message.from_id} forwarded message {message.message_id} from unknown channel in chat ({message.chat.id}) {message.chat.title}\n"
-                    if check_n_ban(message, the_reason):
+                    if await check_n_ban(message, the_reason):
                         return
                     else:
                         LOGGER.info(
@@ -2226,7 +2226,7 @@ if __name__ == "__main__":
 
             elif check_message_for_sentences(message):
                 the_reason = f"{message.from_id} message contains spammy sentences"
-                if check_n_ban(message, the_reason):
+                if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(
@@ -2255,7 +2255,7 @@ if __name__ == "__main__":
                 if user_is_10sec_old:
                     # this is possibly a bot
                     the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
-                    if check_n_ban(message, the_reason):
+                    if await check_n_ban(message, the_reason):
                         return
                     else:
                         LOGGER.info("%s is possibly a bot", message.from_id)
@@ -2281,7 +2281,7 @@ if __name__ == "__main__":
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
                 the_reason = f"{message.from_id} message sent via inline bot"
-                if check_n_ban(message, the_reason):
+                if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(
@@ -2304,7 +2304,7 @@ if __name__ == "__main__":
                 #     message.from_id,
                 #     admin_group_members,
                 # )
-                if check_n_ban(message, the_reason):
+                if await check_n_ban(message, the_reason):
                     return
                 elif message.from_id not in active_user_checks:
                     # check if the user is not in the active_user_checks already

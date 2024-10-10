@@ -2184,8 +2184,9 @@ if __name__ == "__main__":
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(message)
 
-            # do lols check if user less than 48hr old sending a message
-            if user_is_2day_old:
+            if (
+                user_is_2day_old
+            ):  # do lols check if user less than 48hr old sending a message
                 the_reason = f"\033[91m{message.from_id} identified in ({message.chat.id}) {message.chat.title} as a spammer when sending a message ({message.message_id}) during the first 48hrs after registration. Telefragged...\033[0m\n"
                 await check_n_ban(message, the_reason)
                 return

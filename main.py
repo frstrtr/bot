@@ -89,6 +89,9 @@ def construct_message_link(found_message_data):
         chat_id = chat_id[4:]  # remove leading -100 for public chats
         # Construct the message link with the modified chat ID
         message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
+    else:
+        # Construct the message link with the full chat ID since chat is private
+        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
     return message_link
 
 
@@ -1075,6 +1078,78 @@ async def check_and_autoban(
     return False
 
 
+async def check_n_ban(message: types.Message, reason: str):
+    """ "Helper function to check for spam and take action if necessary if heuristics check finds it suspicious.
+
+    message: types.Message: The message to check for spam.
+
+    reason: str: The reason for the check.
+    """
+    lolscheck = await lols_cas_check(message.from_user.id)
+    if lolscheck is True:
+        # send message to the admin group AUTOREPORT thread
+        LOGGER.info(
+            reason,
+            message.from_user.id,
+            message.chat.id,
+            message.chat.title,
+            message.message_id,
+        )
+        # delete id from the active_user_checks set
+        if message.from_user.id in active_user_checks:
+            active_user_checks.remove(message.from_user.id)
+            # stop the perform_checks coroutine if it is running for author_id
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(message.from_user.id):
+                    task.cancel()
+        # forward the telefragged message to the admin group
+        await BOT.forward_message(
+            ADMIN_GROUP_ID,
+            message.chat.id,
+            message.message_id,
+            message_thread_id=ADMIN_AUTOBAN,
+        )
+        # send the telefrag log message to the admin group
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "Check lols data",
+                url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
+            )
+        )
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            (
+                f"User <code>{message.from_user.id}</code> identified as a spammer. "
+                f"Evidance is the message from {message.chat.title} above. "
+                "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
+            ),
+            message_thread_id=ADMIN_AUTOBAN,
+            parse_mode="HTML",
+            reply_markup=inline_kb,
+        )
+        # remove spammer from all groups
+        await lols_autoban(message.from_user.id)
+        event_record = (
+            f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
+            f"{message.from_id:<10} "
+            f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<32}"
+            f" member          --> kicked          in "
+            f"{'@' + message.chat.username + ': ' if message.chat.username else '':<24}{message.chat.title:<30} by Хранитель Порядков\n"
+        )
+        reported_spam = (
+            "AUT" + format_spam_report(message)[3:]
+        )  # replace leading ### with AUT to indicate autoban
+        # save to report file spam message
+        await save_report_file("daily_spam_", reported_spam)
+        await save_report_file("inout_", "srm" + event_record)
+        # XXX message id invalid after the message is deleted? Or deleted by other bot?
+        # TODO shift to delete_messages in aiogram 3.0
+        await BOT.delete_message(message.chat.id, message.message_id)
+        return True
+    else:
+        return False
+
+
 # Perform checks for spam corutine
 async def perform_checks(
     message_to_delete=None, event_record="", user_id=None, inout_logmessage=""
@@ -2021,9 +2096,9 @@ if __name__ == "__main__":
             # HACK remove afer sandboxing
 
             # check if sender is an admin in the channel or admin group and skip the message
-            if await is_admin(
-                message.from_user.id, message.chat.id
-            ) and await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+            if await is_admin(message.from_user.id, message.chat.id) and await is_admin(
+                message.from_user.id, ADMIN_GROUP_ID
+            ):
                 LOGGER.debug(
                     "\033[93m%s is admin, skipping the message %s in the chat %s\033[0m",
                     message.from_user.id,
@@ -2099,67 +2174,9 @@ if __name__ == "__main__":
 
             # do lols check if user less than 48hr old sending a message
             if user_is_2day_old:
-                lolscheck = await lols_cas_check(message.from_user.id)
-                if lolscheck is True:
-                    # send message to the admin group AuTOREPORT thread
-                    LOGGER.info(
-                        "\033[91m%s identified in (%s) %s as a spammer when sending a message (%s) during the first 48hrs after registration. Telefragged...\033[0m",
-                        message.from_user.id,
-                        message.chat.id,
-                        message.chat.title,
-                        message.message_id,
-                    )
-                    # delete id from the active_user_checks set
-                    if message.from_user.id in active_user_checks:
-                        active_user_checks.remove(message.from_user.id)
-                        # stop the perform_checks coroutine if it is running for author_id
-                        for task in asyncio.all_tasks():
-                            if task.get_name() == str(message.from_user.id):
-                                task.cancel()
-                    # forward the telefragged message to the admin group
-                    await BOT.forward_message(
-                        ADMIN_GROUP_ID,
-                        message.chat.id,
-                        message.message_id,
-                        message_thread_id=ADMIN_AUTOBAN,
-                    )
-                    # send the telefrag log message to the admin group
-                    inline_kb = InlineKeyboardMarkup().add(
-                        InlineKeyboardButton(
-                            "Check lols data",
-                            url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
-                        )
-                    )
-                    await BOT.send_message(
-                        ADMIN_GROUP_ID,
-                        (
-                            f"User <code>{message.from_user.id}</code> identified as a spammer. "
-                            f"Evidance is the message from {message.chat.title} above. "
-                            "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
-                        ),
-                        message_thread_id=ADMIN_AUTOBAN,
-                        parse_mode="HTML",
-                        reply_markup=inline_kb,
-                    )
-                    # remove spammer from all groups
-                    await lols_autoban(message.from_user.id)
-                    event_record = (
-                        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-                        f"{message.from_id:<10} "
-                        f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<32}"
-                        f" member          --> kicked          in "
-                        f"{'@' + message.chat.username + ': ' if message.chat.username else '':<24}{message.chat.title:<30} by Хранитель Порядков\n"
-                    )
-                    reported_spam = (
-                        "AUT" + format_spam_report(message)[3:]
-                    )  # replace leading ### with AUT to indicate autoban
-                    # save to report file spam message
-                    await save_report_file("daily_spam_", reported_spam)
-                    await save_report_file("inout_", "srm" + event_record)
-                    # XXX message id invalid after the message is deleted? Or deleted by other bot?
-                    # TODO shift to delete_messages in aiogram 3.0
-                    await BOT.delete_message(message.chat.id, message.message_id)
-                    return
+                the_reason = f"\033[91m{message.from_id} identified in ({message.chat.id}) {message.chat.title} as a spammer when sending a message ({message.message_id}) during the first 48hrs after registration. Telefragged...\033[0m\n"
+                await check_n_ban(message, the_reason)
+                return
 
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(message)
@@ -2172,56 +2189,96 @@ if __name__ == "__main__":
                 # check for allowed channels for forwards
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
-                    the_reason = (
-                        f"{message.from_id} forwarded message from unknown channel"
-                    )
-                    await take_heuristic_action(message, the_reason)
+                    the_reason = f"{message.from_id} forwarded message {message.message_id} from unknown channel in chat ({message.chat.id}) {message.chat.title}\n"
+                    if check_n_ban(message, the_reason):
+                        return
+                    else:
+                        LOGGER.info(
+                            "\033[93m%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
+                            message.from_user.id,
+                            message.chat.title,
+                        )
+                        await take_heuristic_action(message, the_reason)
 
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
-                the_reason = (
-                    f"{message.from_id} message contains 5 or more spammy custom emojis"
-                )
-                await take_heuristic_action(message, the_reason)
+                the_reason = f"{message.from_id} message {message.message_id} contains 5 or more spammy custom emojis in chat ({message.chat.id}) {message.chat.title}/n"
+
+                if check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "\033[93m%s possibly sent a spam with 5+ spammy custom emojis in chat %s\033[0m",
+                        message.from_user.id,
+                        message.chat.title,
+                    )
+                    await take_heuristic_action(message, the_reason)
 
             elif check_message_for_sentences(message):
                 the_reason = f"{message.from_id} message contains spammy sentences"
-                await take_heuristic_action(message, the_reason)
+                if check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "\033[93m%s possibly sent a spam with spammy sentences in chat %s\033[0m",
+                        message.from_user.id,
+                        message.chat.title,
+                    )
+                    await take_heuristic_action(message, the_reason)
 
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
                 the_reason = f"{message.from_id} message contains 5+ spammy capital letters and 5+ spammy regular emojis"
-                await take_heuristic_action(message, the_reason)
+                if check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "\033[93m%s possibly sent a spam with 5+ spammy capital letters and 5+ spammy regular emojis in chat %s\033[0m",
+                        message.from_user.id,
+                        message.chat.title,
+                    )
+                    await take_heuristic_action(message, the_reason)
 
             elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
                 if user_is_10sec_old:
                     # this is possibly a bot
-                    LOGGER.info("%s is possibly a bot", message.from_id)
                     the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
-                    await take_heuristic_action(message, the_reason)
+                    if check_n_ban(message, the_reason):
+                        return
+                    else:
+                        LOGGER.info("%s is possibly a bot", message.from_id)
+                        await take_heuristic_action(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
-                elif user_is_1hr_old:
+                elif user_is_1hr_old and entity_spam_trigger:
                     # this is possibly a spam
-                    LOGGER.info(
-                        "%s possibly sent a spam with (%s) links or other entities in less than 1 hour after joining the chat",
-                        message.from_user.id,
-                        entity_spam_trigger,
+                    the_reason = (
+                        f"{message.from_id} message sent less then 1 hour after joining the chat and have "
+                        + entity_spam_trigger
+                        + " inside"
                     )
-                    if entity_spam_trigger:  # invoke heuristic action
-                        the_reason = (
-                            f"{message.from_id} message sent less then 1 hour after joining the chat and have "
-                            + entity_spam_trigger
-                            + " inside"
+                    if check_n_ban(message, the_reason):
+                        return
+                    else:
+                        LOGGER.info(
+                            "%s possibly sent a spam with (%s) links or other entities in less than 1 hour after joining the chat",
+                            message.from_user.id,
+                            entity_spam_trigger,
                         )
                         await take_heuristic_action(message, the_reason)
 
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
                 the_reason = f"{message.from_id} message sent via inline bot"
-                await take_heuristic_action(message, the_reason)
+                if check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "%s possibly sent a spam via inline bot", message.from_id
+                    )
+                    await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
@@ -2238,8 +2295,9 @@ if __name__ == "__main__":
                 #     message.from_id,
                 #     admin_group_members,
                 # )
-
-                if message.from_id not in active_user_checks:
+                if check_n_ban(message, the_reason):
+                    return
+                elif message.from_id not in active_user_checks:
                     # check if the user is not in the active_user_checks already
                     active_user_checks.add(message.from_id)
                     # start the perform_checks coroutine

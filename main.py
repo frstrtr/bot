@@ -2187,7 +2187,7 @@ if __name__ == "__main__":
             if (
                 user_is_2day_old
             ):  # do lols check if user less than 48hr old sending a message
-                the_reason = f"\033[91m{message.from_id} identified in ({message.chat.id}) {message.chat.title} as a spammer when sending a message ({message.message_id}) during the first 48hrs after registration. Telefragged...\033[0m\n"
+                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first 48hrs after registration. Telefragged...\033[0m"
                 await check_n_ban(message, the_reason)
                 return
 
@@ -2199,7 +2199,9 @@ if __name__ == "__main__":
                 # check for allowed channels for forwards
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
-                    the_reason = f"{message.from_id} forwarded message {message.message_id} from unknown channel in chat ({message.chat.id}) {message.chat.title}\n"
+                    the_reason = (
+                        f"{message.from_id} forwarded message from unknown channel"
+                    )
                     if await check_n_ban(message, the_reason):
                         return
                     else:
@@ -2213,7 +2215,9 @@ if __name__ == "__main__":
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
-                the_reason = f"{message.from_id} message {message.message_id} contains 5 or more spammy custom emojis in chat ({message.chat.id}) {message.chat.title}/n"
+                the_reason = (
+                    f"{message.from_id} message contains 5 or more spammy custom emojis"
+                )
 
                 if check_n_ban(message, the_reason):
                     return

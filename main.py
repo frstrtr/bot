@@ -2025,6 +2025,10 @@ if __name__ == "__main__":
             # )
             # HACK remove afer sandboxing
 
+            #check if sender is an admin in the channel or admin group and skip the message
+            if not await is_admin(message.from_user.id, message.chat.id) and not await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+                return
+
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages 
@@ -2225,17 +2229,15 @@ if __name__ == "__main__":
                 # )
                 # start the perform_checks coroutine
                 # get the admin group members
-                admin_group_members = await fetch_admin_group_members()
+                # admin_group_members = await fetch_admin_group_members()
                 # LOGGER.debug(
                 #     "%s Admin ids fetched successfully: %s",
                 #     message.from_id,
                 #     admin_group_members,
                 # )
 
-                if (
-                    message.from_id not in active_user_checks
-                    and message.from_id not in admin_group_members
-                ):  # check if the user is not in the active_user_checks set and not an admin
+                if message.from_id not in active_user_checks:
+                    # check if the user is not in the active_user_checks already
                     active_user_checks.add(message.from_id)
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
@@ -2704,6 +2706,8 @@ if __name__ == "__main__":
                 random_motd = random.choice(motd_lines)
                 # Assign the selected line to a variable
                 response_text = random_motd
+            else:
+                response_text = "I'm sorry. My responses are limited. You must ask the right questions."
 
             # Simulate admin reply
             message_id_to_reply = (

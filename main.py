@@ -2025,8 +2025,9 @@ if __name__ == "__main__":
                 message.from_user.id, ADMIN_GROUP_ID
             ):
                 LOGGER.debug(
-                    "%s is admin, skipping the message in the chat %s",
+                    "%s is admin, skipping the message %s in the chat %s",
                     message.from_user.id,
+                    message.message_id,
                     message.chat.title,
                 )
                 return

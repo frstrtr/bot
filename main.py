@@ -2021,9 +2021,15 @@ if __name__ == "__main__":
             # HACK remove afer sandboxing
 
             # check if sender is an admin in the channel or admin group and skip the message
-            if not await is_admin(
+            if await is_admin(
                 message.from_user.id, message.chat.id
-            ) and not await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+            ) and await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+                LOGGER.debug(
+                    "%s is admin, skipping the message %s in the chat %s",
+                    message.from_user.id,
+                    message.message_id,
+                    message.chat.title,
+                )
                 return
 
             cursor.execute(

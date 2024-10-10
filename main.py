@@ -915,7 +915,7 @@ async def lols_cas_check(user_id):
             else:
                 return False
         except asyncio.TimeoutError:
-            return "Timeout"
+            return None
 
 
 async def save_report_file(file_type, data):
@@ -950,7 +950,8 @@ async def lols_autoban(_id):
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
-        LOGGER.info("%s has been banned from all chats.", _id)
+        # RED color for the log
+        LOGGER.info("\033[91m%s has been banned from all chats.\033[0m", _id)
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
@@ -1074,78 +1075,52 @@ async def perform_checks(
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
     #     return
 
+    # Define a dictionary to map lols_spam values to ANSI color codes
+    color_map = {
+        False: "\033[92m",  # Green for False
+        True: "\033[91m",  # Red for True
+        None: "\033[93m",  # Yellow for None or other values
+    }
+
     try:
 
-        await asyncio.sleep(65)  # 1 minute + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 01min check lols_cas_spam: %s", user_id, lols_spam)
-        if await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        ):
-            return
+        # List of sleep times in seconds
+        sleep_times = [
+            65,
+            185,
+            605,
+            1805,
+            3605,
+            7205,
+        ]  # 1min, 3min, 10min, 30min, 1hr, 2hrs
 
-        await asyncio.sleep(185)  # 3 minutes + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 03min check lols_cas_spam: %s", user_id, lols_spam)
-        if await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        ):
-            return
+        for sleep_time in sleep_times:
 
-        await asyncio.sleep(605)  # 10 minutes + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 10min check lols_cas_spam: %s", user_id, lols_spam)
-        if await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        ):
-            return
+            await asyncio.sleep(sleep_time)
+            lols_spam = await lols_cas_check(user_id)
 
-        await asyncio.sleep(1805)  # 30 minutes + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 30min check lols_cas_spam: %s", user_id, lols_spam)
-        if await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        ):
-            return
+            # Get the color code based on the value of lols_spam
+            color_code = color_map.get(
+                lols_spam, "\033[93m"
+            )  # Default to yellow if lols_spam is not in the map
 
-        await asyncio.sleep(3605)  # 1 hour + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 01hrs check lols_cas_spam: %s", user_id, lols_spam)
-        if await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        ):
-            return
+            # Log the message with the appropriate color
+            LOGGER.debug(
+                "%s%s %02dmin check lols_cas_spam: %s\033[0m",
+                color_code,
+                user_id,
+                sleep_time // 60,
+                lols_spam,
+            )
 
-        await asyncio.sleep(7205)  # 2 hour + 5 seconds
-        lols_spam = await lols_cas_check(user_id)
-        LOGGER.debug("%s 02hrs check lols_spam: %s", user_id, lols_spam)
-        await check_and_autoban(
-            event_record,
-            user_id,
-            inout_logmessage,
-            lols_spam=lols_spam,
-            message_to_delete=message_to_delete,
-        )
+            if await check_and_autoban(
+                event_record,
+                user_id,
+                inout_logmessage,
+                lols_spam=lols_spam,
+                message_to_delete=message_to_delete,
+            ):
+                return
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error("%s 2hrs spam checking cancelled. %s ", user_id, e)
@@ -1239,13 +1214,12 @@ if __name__ == "__main__":
             update.old_chat_member.user.username or "!UNDEFINED!"
         )  # optional
 
-        lols_spam = None
         lols_spam = await lols_cas_check(update.old_chat_member.user.id)
 
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
             f"{inout_userid:<10} "
-            f"{'❌  ' if lols_spam else '🟢 '}"
+            f"{'❌  ' if lols_spam is True else '🟢 ' if lols_spam is False else '❓ '}"
             f"{' '.join('@' + getattr(update.old_chat_member.user, attr) if attr == 'username' else str(getattr(update.old_chat_member.user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(update.old_chat_member.user, attr, '')):<32}"
             f" {update.old_chat_member.status:<15} --> {inout_status:<15} in "
             f"{'@' + update.chat.username + ': ' if update.chat.username else '':<24}{update.chat.title:<30} by "
@@ -1269,7 +1243,7 @@ if __name__ == "__main__":
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
             f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
-            f"{'❌ -->' if lols_spam else '🟢 -->'}"
+            f"{'❌ -->' if lols_spam is True else '🟢 -->' if lols_spam is False else '❓ '}"
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"
             f"💬 {universal_chatlink}\n"
@@ -1311,7 +1285,8 @@ if __name__ == "__main__":
             await check_and_autoban(
                 event_record, inout_userid, inout_logmessage, lols_spam
             )
-            LOGGER.info("%s is banned by lols/cas check", inout_userid)
+            # RED color for banned users
+            LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", inout_userid)
         else:
             # Schedule the perform_checks coroutine to run in the background
             if inout_status in (
@@ -2025,8 +2000,10 @@ if __name__ == "__main__":
             # )
             # HACK remove afer sandboxing
 
-            #check if sender is an admin in the channel or admin group and skip the message
-            if not await is_admin(message.from_user.id, message.chat.id) and not await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+            # check if sender is an admin in the channel or admin group and skip the message
+            if not await is_admin(
+                message.from_user.id, message.chat.id
+            ) and not await is_admin(message.from_user.id, ADMIN_GROUP_ID):
                 return
 
             cursor.execute(
@@ -2100,7 +2077,7 @@ if __name__ == "__main__":
                 if lolscheck is True:
                     # send message to the admin group AuTOREPORT thread
                     LOGGER.info(
-                        "%s identified in (%s) %s as a spammer when sending a message (%s) during the first 48hrs after registration. Telefragged...",
+                        "\033[91m%s identified in (%s) %s as a spammer when sending a message (%s) during the first 48hrs after registration. Telefragged...\033[0m",
                         message.from_user.id,
                         message.chat.id,
                         message.chat.title,

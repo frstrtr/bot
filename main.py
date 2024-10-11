@@ -679,7 +679,13 @@ async def on_startup(_dp: Dispatcher):
 
 async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
-    LOGGER.info("Bot is shutting down...")
+    LOGGER.info("Bot is shutting down... Performing final spammer check...")
+    for i in active_user_checks:
+        LOGGER.debug("%s shutdown check for spam...", i)
+        check_and_autoban(
+            'on_shutdown event', i, 'on_shutdown inout', lols_cas_check(i) is True
+        )
+
     await BOT.close()
 
 
@@ -1031,7 +1037,7 @@ async def check_and_autoban(
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
-            )
+            )close
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"

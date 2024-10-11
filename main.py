@@ -834,6 +834,8 @@ async def handle_forwarded_reports_with_details(
         first_name = found_message_data[5]
         last_name = found_message_data[6]
 
+    message_timestamp = datetime.strptime(found_message_data[7], "%Y-%m-%d %H:%M:%S")
+
     # Get the username
     username = found_message_data[4]
     if not username:
@@ -864,7 +866,7 @@ async def handle_forwarded_reports_with_details(
     log_info = (
         f"💡 Report timestamp: {message_report_date}\n"
         f"💡 Spam message timestamp: {message.date}\n"
-        f"💡 Reaction time: {message_report_date - message.date}\n"
+        f"💡 Reaction time: {message_report_date - message_timestamp}\n"
         f"💔 Reported by automated spam detection system\n"
         f"💔 {reason}\n"
         f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
@@ -880,7 +882,7 @@ async def handle_forwarded_reports_with_details(
     )
 
     admin_ban_banner = (
-        f"💡 Reaction time: {message_report_date - message.date}\n"
+        f"💡 Reaction time: {message_report_date - message_timestamp}\n"
         f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
@@ -1715,6 +1717,10 @@ if __name__ == "__main__":
             first_name = found_message_data[5]
             last_name = found_message_data[6]
 
+        massage_timestamp = datetime.strptime(
+            found_message_data[7], "%Y-%m-%d %H:%M:%S"
+        )  # convert to datetime object
+
         # Get the username
         username = found_message_data[4]
         if not username:
@@ -1743,7 +1749,7 @@ if __name__ == "__main__":
         log_info = (
             f"💡 Report timestamp: {message_report_date}\n"
             f"💡 Spam message timestamp: {message.date}\n"
-            f"💡 Reaction time: {message_report_date - message.date}\n"
+            f"💡 Reaction time: {message_report_date - massage_timestamp}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"💀 Forwarded from <a href='tg://resolve?domain={username}'>@{username}</a> : "
@@ -1761,7 +1767,7 @@ if __name__ == "__main__":
         # LOGGER.debug(log_info)
 
         admin_ban_banner = (
-            f"💡 Reaction time: {message_report_date - message.date}\n"
+            f"💡 Reaction time: {message_report_date - massage_timestamp}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"

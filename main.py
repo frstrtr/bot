@@ -679,6 +679,19 @@ async def on_startup(_dp: Dispatcher):
     )
 
 
+async def sequential_shutdown_tasks(_id):
+    """# Define the new coroutine that runs two async functions sequentially"""
+    # First async function
+    lols_cas_result = await lols_cas_check(_id) is True
+    # Second async function
+    await check_and_autoban(
+        str(_id) + "on_shutdown inout",
+        _id,
+        "<code>(" + str(_id) + ")</code> banned on_shutdown event",
+        lols_cas_result,
+    )
+
+
 async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
@@ -689,19 +702,10 @@ async def on_shutdown(_dp):
     # Iterate over active user checks and create a task for each check
     for _id in active_user_checks:
         LOGGER.info("%s shutdown check for spam...", _id)
-        
-        # Gather the result of the await call separately
-        lols_cas_result = await lols_cas_check(_id) is True
-        
-        # Create the task without awaiting it immediately
+
+        # Create the task for the sequential coroutine without awaiting it immediately
         task = asyncio.create_task(
-            check_and_autoban(
-                str(_id) + "on_shutdown inout",
-                _id,
-                "<code>(" + str(_id) + ")</code> banned on_shutdown event",
-                lols_cas_result,
-            ),
-            name=str(_id) + "shutdown",
+            sequential_shutdown_tasks(_id), name=str(_id) + "shutdown"
         )
         tasks.append(task)
 

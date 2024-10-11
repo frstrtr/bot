@@ -689,12 +689,17 @@ async def on_shutdown(_dp):
     # Iterate over active user checks and create a task for each check
     for _id in active_user_checks:
         LOGGER.info("%s shutdown check for spam...", _id)
+        
+        # Gather the result of the await call separately
+        lols_cas_result = await lols_cas_check(_id) is True
+        
+        # Create the task without awaiting it immediately
         task = asyncio.create_task(
             check_and_autoban(
                 str(_id) + "on_shutdown inout",
                 _id,
                 "<code>(" + str(_id) + ")</code> banned on_shutdown event",
-                await lols_cas_check(_id) is True,
+                lols_cas_result,
             ),
             name=str(_id) + "shutdown",
         )
@@ -1072,7 +1077,7 @@ async def check_and_autoban(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
                     "manual check requested,",
-                    "<b>manually kicked from all chats with /check id command while</b>",
+                    "<b>manually kicked</b> from all chats with /check id command while",
                     1,
                 )
                 + " please check for the other spammer messages!",

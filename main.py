@@ -680,11 +680,14 @@ async def on_startup(_dp: Dispatcher):
 async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
-    for i in active_user_checks:
-        LOGGER.info("%s shutdown check for spam...", i)
-        lols_cas_final_check = await lols_cas_check(i) is True
+    for _id in active_user_checks:
+        LOGGER.info("%s shutdown check for spam...", _id)
+        lols_cas_final_check = await lols_cas_check(_id) is True
         await check_and_autoban(
-            "on_shutdown event", i, "on_shutdown inout", lols_cas_final_check
+            str(_id) + "on_shutdown inout",
+            _id,
+            "<code>(" + str(_id) + ")</code> banned on_shutdown event",
+            lols_cas_final_check,
         )
 
 
@@ -998,6 +1001,11 @@ async def check_and_autoban(
         if user_id not in banned_users:
             await lols_autoban(user_id)
             banned_users.add(user_id)
+            LOGGER.info(
+                "\033[91m%s has been banned from all chats.\033[0m Session banned users: %s",
+                user_id,
+                banned_users,
+            )
         else:
             LOGGER.info(
                 "\033[93m%s is already banned from all chats. Skipping...\033[0m Session banned users: %s",

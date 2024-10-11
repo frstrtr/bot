@@ -683,9 +683,9 @@ async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
 
-     # Create a list to hold all tasks
+    # Create a list to hold all tasks
     tasks = []
-    
+
     # Iterate over active user checks and create a task for each check
     for _id in active_user_checks:
         LOGGER.info("%s shutdown check for spam...", _id)
@@ -698,17 +698,17 @@ async def on_shutdown(_dp):
             )
         )
         tasks.append(task)
-    
+
     # Run all tasks concurrently
     await asyncio.gather(*tasks)
-    
+
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
     # Example of another coroutine that waits for the shutdown event
     # async def some_other_coroutine():
     #     await shutdown_event.wait()  # Wait for the shutdown tasks to complete
     #     # Continue with the rest of the coroutine
-    
+
     # Close the bot
     await BOT.close()
 

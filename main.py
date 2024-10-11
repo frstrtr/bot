@@ -1037,7 +1037,7 @@ async def check_and_autoban(
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
-            )close
+            )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"

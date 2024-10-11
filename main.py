@@ -681,12 +681,10 @@ async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
     for i in active_user_checks:
-        LOGGER.debug("%s shutdown check for spam...", i)
-        check_and_autoban(
+        LOGGER.info("%s shutdown check for spam...", i)
+        await check_and_autoban(
             'on_shutdown event', i, 'on_shutdown inout', lols_cas_check(i) is True
         )
-
-    await BOT.close()
 
 
 async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:

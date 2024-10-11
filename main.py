@@ -2215,7 +2215,7 @@ if __name__ == "__main__":
                     f"{message.from_id} message contains 5 or more spammy custom emojis"
                 )
 
-                if check_n_ban(message, the_reason):
+                if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(

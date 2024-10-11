@@ -682,8 +682,9 @@ async def on_shutdown(_dp):
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
     for i in active_user_checks:
         LOGGER.info("%s shutdown check for spam...", i)
+        lols_cas_final_check = await lols_cas_check(i) is True
         await check_and_autoban(
-            'on_shutdown event', i, 'on_shutdown inout', lols_cas_check(i) is True
+            "on_shutdown event", i, "on_shutdown inout", lols_cas_final_check
         )
 
 

@@ -1002,13 +1002,13 @@ async def check_and_autoban(
             await lols_autoban(user_id)
             banned_users.add(user_id)
             LOGGER.info(
-                "\033[91m%s has been banned from all chats.\033[0m Session banned users: %s",
+                "\033[93m%s added to runtime banned users list: %s\033[0m",
                 user_id,
                 banned_users,
             )
         else:
             LOGGER.info(
-                "\033[93m%s is already banned from all chats. Skipping...\033[0m Session banned users: %s",
+                "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
                 user_id,
                 banned_users,
             )
@@ -1234,7 +1234,7 @@ async def perform_checks(
                 return
 
     except asyncio.exceptions.CancelledError as e:
-        LOGGER.error("%s 2hrs spam checking cancelled. %s ", user_id, e)
+        LOGGER.error("\033[93m%s 2hrs spam checking cancelled. %s\033[0m", user_id, e)
 
     except aiohttp.ServerDisconnectedError as e:
         LOGGER.error(

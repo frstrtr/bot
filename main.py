@@ -40,6 +40,7 @@ from aiogram.utils.exceptions import (
 
 # Set to keep track of active user IDs
 active_user_checks = set()
+banned_users = set()
 
 # If adding new column for the first time, uncomment below
 # cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
@@ -989,7 +990,15 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        await lols_autoban(user_id)
+        if user_id not in banned_users:
+            await lols_autoban(user_id)
+            banned_users.add(user_id)
+        else:
+            LOGGER.info(
+                "\033[93m%s is already banned from all chats. Skipping...\033[0m Session banned users: %s",
+                user_id,
+                banned_users,
+            )
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -1358,6 +1367,7 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+
         if inout_status == ChatMemberStatus.KICKED:
             LOGGER.info(
                 "\033[91m%s --> %s in %s at %s\033[0m",
@@ -2666,8 +2676,8 @@ if __name__ == "__main__":
             else:
                 user_lastname = ""
 
-            user_full_name = user_firstname + user_lastname
-            user_full_name = f"{user_full_name} ({user_id})"
+            user_full_name = html.escape(user_firstname + user_lastname)
+            # user_full_name = f"{user_full_name} (<code>{user_id}</code>)"
 
             if message.from_user.username:
                 user_name = message.from_user.username
@@ -2676,7 +2686,7 @@ if __name__ == "__main__":
 
             bot_received_message = (
                 f" Message received in chat {message.chat.title} ({message.chat.id})\n"
-                f" Message chat username: {message.chat.username}\n"
+                f" Message chat username: @{message.chat.username}\n"
                 f" From user {user_full_name}\n"
                 f" Profile links:\n"
                 f"   ├ <a href='tg://user?id={user_id}'>{user_full_name} ID based profile link</a>\n"
@@ -2715,6 +2725,7 @@ if __name__ == "__main__":
                 _reply_message,
                 reply_markup=inline_kb,
                 parse_mode="HTML",
+                disable_web_page_preview=True,
             )
 
             admin_message = await BOT.forward_message(

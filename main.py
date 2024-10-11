@@ -25,7 +25,6 @@ from aiogram.types import (
     CallbackQuery,
     ChatMemberUpdated,
     ChatMemberStatus,
-    ChatMemberAdministrator,
 )
 
 from aiogram import executor
@@ -41,6 +40,9 @@ from aiogram.utils.exceptions import (
 # Set to keep track of active user IDs
 active_user_checks = set()
 banned_users = set()
+
+# Initialize the event
+shutdown_event = asyncio.Event()
 
 # If adding new column for the first time, uncomment below
 # cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
@@ -680,15 +682,45 @@ async def on_startup(_dp: Dispatcher):
 async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
     LOGGER.info("Bot is shutting down... Performing final spammer check...")
+
+     # Create a list to hold all tasks
+    tasks = []
+    
+    # Iterate over active user checks and create a task for each check
     for _id in active_user_checks:
         LOGGER.info("%s shutdown check for spam...", _id)
-        lols_cas_final_check = await lols_cas_check(_id) is True
-        await check_and_autoban(
-            str(_id) + "on_shutdown inout",
-            _id,
-            "<code>(" + str(_id) + ")</code> banned on_shutdown event",
-            lols_cas_final_check,
+        task = asyncio.create_task(
+            check_and_autoban(
+                str(_id) + "on_shutdown inout",
+                _id,
+                "<code>(" + str(_id) + ")</code> banned on_shutdown event",
+                await lols_cas_check(_id) is True,
+            )
         )
+        tasks.append(task)
+    
+    # Run all tasks concurrently
+    await asyncio.gather(*tasks)
+    
+    # Signal that shutdown tasks are completed
+    # shutdown_event.set()
+    # Example of another coroutine that waits for the shutdown event
+    # async def some_other_coroutine():
+    #     await shutdown_event.wait()  # Wait for the shutdown tasks to complete
+    #     # Continue with the rest of the coroutine
+    
+    # Close the bot
+    await BOT.close()
+
+    # for _id in active_user_checks:
+    #     LOGGER.info("%s shutdown check for spam...", _id)
+    #     lols_cas_final_check = await lols_cas_check(_id) is True
+    #     await check_and_autoban(
+    #         str(_id) + "on_shutdown inout",
+    #         _id,
+    #         "<code>(" + str(_id) + ")</code> banned on_shutdown event",
+    #         lols_cas_final_check,
+    #     )
 
 
 async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:

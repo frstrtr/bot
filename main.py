@@ -695,7 +695,8 @@ async def on_shutdown(_dp):
                 _id,
                 "<code>(" + str(_id) + ")</code> banned on_shutdown event",
                 await lols_cas_check(_id) is True,
-            )
+            ),
+            name=str(_id) + "shutdown",
         )
         tasks.append(task)
 

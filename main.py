@@ -962,7 +962,6 @@ async def lols_autoban(_id):
         # XXX remove _id check corutine and from monitoring list?
 
 
-# Helper function to check for spam and autoban
 async def check_and_autoban(
     event_record: str,
     user_id: int,
@@ -1194,12 +1193,13 @@ async def perform_checks(
             )  # Default to yellow if lols_spam is not in the map
 
             # Log the message with the appropriate color
-            LOGGER.debug(
-                "%s%s %02dmin check lols_cas_spam: %s\033[0m",
+            LOGGER.info(
+                "%s%s %02dmin check lols_cas_spam: %s\033[0m Checks awaiting user list: %s",
                 color_code,
                 user_id,
                 sleep_time // 60,
                 lols_spam,
+                active_user_checks,
             )
 
             if await check_and_autoban(

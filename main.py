@@ -10,6 +10,8 @@ import subprocess
 import time
 import html
 
+# import tracemalloc # for memory usage debugging
+
 from typing import Optional, Tuple
 import re
 import aiohttp
@@ -25,6 +27,7 @@ from aiogram.types import (
     ChatMemberStatus,
     ChatMemberAdministrator,
 )
+
 from aiogram import executor
 
 # from aiogram.types import Message
@@ -480,7 +483,6 @@ def extract_status_change(
     return was_member, is_member
 
 
-# Function to check if the message was sent during the night
 def message_sent_during_night(message: types.Message):
     """Function to check if the message was sent during the night."""
     # Assume message.date is already a datetime object in UTC
@@ -497,7 +499,6 @@ def message_sent_during_night(message: types.Message):
     return 1 <= user_hour < 6
 
 
-# Function to check if message contains 5 or more any regular emojis in a single line
 def check_message_for_emojis(message: types.Message):
     """Function to check if the message contains 5 or more emojis in a single line."""
     # Check if the message contains text
@@ -516,7 +517,6 @@ def check_message_for_emojis(message: types.Message):
     return False
 
 
-# Function to check if the message text contains 5 or more consecutive capital letters in a line, excluding URLs
 def check_message_for_capital_letters(message: types.Message):
     """Function to check if the message contains 5 or more consecutive capital letters in a line, excluding URLs."""
     # Check if the message contains text
@@ -543,7 +543,6 @@ def check_message_for_capital_letters(message: types.Message):
     return False
 
 
-# Function to check message for predetermined word sentences
 def check_message_for_sentences(message: types.Message):
     """Function to check the message for predetermined word sentences."""
     # Check if the message contains text
@@ -564,7 +563,6 @@ def check_message_for_sentences(message: types.Message):
     return False
 
 
-# Check for spam indicator: 5 or more entities of type 'custom_emoji'
 def has_custom_emoji_spam(message):
     """Function to check if a message contains spammy custom emojis."""
     message_dict = message.to_python()
@@ -1254,6 +1252,9 @@ async def fetch_admin_group_members():
 
 
 if __name__ == "__main__":
+
+    # Start tracing Python memory allocations
+    # tracemalloc.start()
 
     # Dictionary to store the mapping of unhandled messages to admin's replies
     # global unhandled_messages
@@ -2185,6 +2186,15 @@ if __name__ == "__main__":
             ):  # do lols check if user less than 48hr old sending a message
                 the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first 48hrs after registration. Telefragged...\033[0m"
                 await check_n_ban(message, the_reason)
+
+                # At the point where you want to print the traceback
+                # snapshot = tracemalloc.take_snapshot()
+                # top_stats = snapshot.statistics('lineno')
+
+                # print("[ Top 10 ]")
+                # for stat in top_stats[:10]:
+                #     print(stat)
+
                 return
 
             elif (
@@ -2345,8 +2355,8 @@ if __name__ == "__main__":
                 e,
             )
 
-    # NOTE: Manual typing command ban - useful if ban were postponed
     @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
+    # NOTE: Manual typing command ban - useful if ban were postponed
     async def ban(message: types.Message):
         """Function to ban the user and delete all known to bot messages using '/ban reportID' text command."""
         try:
@@ -2725,7 +2735,6 @@ if __name__ == "__main__":
             LOGGER.error("Error in log_all_unhandled_messages function: %s", e)
             await message.reply(f"Error: {e}")
 
-    # Function to simulate admin reply
     async def simulate_admin_reply(
         original_message_chat_id, original_message_chat_reply_id, response_text
     ):
@@ -2736,7 +2745,6 @@ if __name__ == "__main__":
             reply_to_message_id=original_message_chat_reply_id,
         )
 
-    # Callback query handler to handle button presses
     @DP.callback_query_handler(
         # lambda c: c.data in ["button_sry", "button_end", "button_rnd"]
         lambda c: c.data.startswith("button_")
@@ -2817,7 +2825,6 @@ if __name__ == "__main__":
         # Acknowledge the callback query
         await callback_query.answer()
 
-    # Function to handle replies from the admin to unhandled messages excluding forwards
     @DP.message_handler(
         lambda message: message.forward_date is None
         and message.chat.id == ADMIN_USER_ID,
@@ -2858,9 +2865,6 @@ if __name__ == "__main__":
             LOGGER.error("Error in handle_admin_reply function: %s", e)
             await message.reply(f"Error: {e}")
 
-    # handle user join/left events
-    # with message.new_chat_members and message.left_chat_member
-    # for chats with small amount of members
     @DP.message_handler(
         content_types=[
             types.ContentType.NEW_CHAT_MEMBERS,
@@ -2869,6 +2873,11 @@ if __name__ == "__main__":
     )
     async def user_changed_message(message: types.Message):
         """Function to handle users joining or leaving the chat."""
+
+        # handle user join/left events
+        # with message.new_chat_members and message.left_chat_member
+        # for chats with small amount of members
+
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(

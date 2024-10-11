@@ -1012,6 +1012,7 @@ async def check_and_autoban(
                 user_id,
                 banned_users,
             )
+            return True
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -1108,7 +1109,12 @@ async def check_n_ban(message: types.Message, reason: str):
     if lolscheck is True:
         # send message to the admin group AUTOREPORT thread
         LOGGER.info(
-            f"{reason} {message.from_user.id} in ({message.chat.id}) {message.chat.title} message {message.message_id}"
+            "%s %s in (%s) %s message %s",
+            reason,
+            message.from_user.id,
+            message.chat.id,
+            message.chat.title,
+            message.message_id,
         )
         # delete id from the active_user_checks set
         if message.from_user.id in active_user_checks:
@@ -1165,7 +1171,6 @@ async def check_n_ban(message: types.Message, reason: str):
         return False
 
 
-# Perform checks for spam corutine
 async def perform_checks(
     message_to_delete=None, event_record="", user_id=None, inout_logmessage=""
 ):
@@ -1254,23 +1259,6 @@ async def perform_checks(
             user_id in active_user_checks
         ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
-
-
-# # TODO make this function declaration outside of the load_config function
-async def fetch_admin_group_members():
-    """Function to fetch the list of chat administrators from the admin group."""
-    try:
-        # Fetch the list of chat administrators
-        admins = await BOT.get_chat_administrators(chat_id=ADMIN_GROUP_ID)
-        # Extract user IDs of administrators and populate the set
-        return {
-            admin.user.id
-            for admin in admins
-            if isinstance(admin, ChatMemberAdministrator)
-        }
-    except utils.exceptions.ChatAdminRequired as e:
-        LOGGER.error("Error fetching admin members: %s", e)
-        return set()
 
 
 if __name__ == "__main__":

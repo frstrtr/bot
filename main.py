@@ -1043,7 +1043,7 @@ async def lols_autoban(_id):
     if _id in active_user_checks:
         active_user_checks.remove(_id)
         LOGGER.info(
-            "%s removed from active_user_checks list during lols_autoban: %s",
+            "\033[91m%s removed from active_user_checks list during lols_autoban: \033[0m%s",
             _id,
             active_user_checks,
         )
@@ -1212,7 +1212,7 @@ async def check_n_ban(message: types.Message, reason: str):
         if message.from_user.id in active_user_checks:
             active_user_checks.remove(message.from_user.id)
             LOGGER.info(
-                "%s removed from active_user_checks set in lols_cas_check: %s",
+                "\033[91m%s removed from active_user_checks set in check_n_ban: \033[0m%s",
                 message.from_user.id,
                 active_user_checks,
             )
@@ -1341,14 +1341,14 @@ async def perform_checks(
         if user_id in active_user_checks:
             active_user_checks.remove(user_id)
             LOGGER.info(
-                "\033[93m%s removed from active_user_checks list during perform_checks: %s\033[0m",
+                "\033[93m%s removed from active_user_checks list during perform_checks: \033[0m%s",
                 user_id,
                 active_user_checks,
             )
 
     except aiohttp.ServerDisconnectedError as e:
-        LOGGER.error(
-            "%s Aiohttp Server DISCONNECTED error while checking for spam. %s",
+        LOGGER.warning(
+            "\033[93m%s Aiohttp Server DISCONNECTED error while checking for spam. \033[0m%s",
             user_id,
             e,
         )
@@ -1365,7 +1365,7 @@ async def perform_checks(
         ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
             LOGGER.info(
-                "%s removed from active_user_checks list in finally block: %s",
+                "\033[91m%s removed from active_user_checks list in finally block: \033[0m%s",
                 user_id,
                 active_user_checks,
             )
@@ -1523,7 +1523,7 @@ if __name__ == "__main__":
             if inout_userid in active_user_checks:
                 active_user_checks.remove(inout_userid)
                 LOGGER.info(
-                    "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: %s\033[0m",
+                    "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: \033[0m%s",
                     inout_userid,
                     active_user_checks,
                 )
@@ -2030,7 +2030,7 @@ if __name__ == "__main__":
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
                 LOGGER.info(
-                    "%s removed from active_user_checks list during handle_ban by admin: %s",
+                    "\033[91m%s removed from active_user_checks list during handle_ban by admin: \033[0m%s",
                     author_id,
                     active_user_checks,
                 )
@@ -2596,7 +2596,7 @@ if __name__ == "__main__":
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
                 LOGGER.info(
-                    "%s removed from active_user_checks list during ban by admin: %s",
+                    "\033[91m%s removed from active_user_checks list during ban by admin: \033[0m%s",
                     author_id,
                     active_user_checks,
                 )

@@ -1043,7 +1043,7 @@ async def lols_autoban(_id):
     if _id in active_user_checks:
         active_user_checks.remove(_id)
         LOGGER.info(
-            "%s removed from active_user_checks during lols_autoban list: %s",
+            "%s removed from active_user_checks list during lols_autoban: %s",
             _id,
             active_user_checks,
         )
@@ -1211,6 +1211,11 @@ async def check_n_ban(message: types.Message, reason: str):
         # delete id from the active_user_checks set
         if message.from_user.id in active_user_checks:
             active_user_checks.remove(message.from_user.id)
+            LOGGER.info(
+                "%s removed from active_user_checks set in lols_cas_check: %s",
+                message.from_user.id,
+                active_user_checks,
+            )
             # stop the perform_checks coroutine if it is running for author_id
             for task in asyncio.all_tasks():
                 if task.get_name() == str(message.from_user.id):
@@ -1337,7 +1342,7 @@ async def perform_checks(
         if user_id in active_user_checks:
             active_user_checks.remove(user_id)
             LOGGER.info(
-                "\033[93m%s removed from active_user_checks list: %s\033[0m",
+                "\033[93m%s removed from active_user_checks list during perform_checks: %s\033[0m",
                 user_id,
                 active_user_checks,
             )
@@ -1360,6 +1365,11 @@ async def perform_checks(
             user_id in active_user_checks
         ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
+            LOGGER.info(
+                "%s removed from active_user_checks list in finally block: %s",
+                user_id,
+                active_user_checks,
+            )
 
 
 async def create_named_task(coro, user_id):
@@ -1511,6 +1521,13 @@ if __name__ == "__main__":
                 inout_chattitle,
                 datetime.now().strftime("%H:%M:%S"),
             )
+            if inout_userid in active_user_checks:
+                active_user_checks.remove(inout_userid)
+                LOGGER.info(
+                    "%s removed from active_user_checks list during kick by bot/admin: %s",
+                    inout_userid,
+                    active_user_checks,
+                )
         else:
             LOGGER.info(
                 "%s --> %s in %s at %s",
@@ -2013,6 +2030,11 @@ if __name__ == "__main__":
             # remove userid from the active_user_checks set
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
+                LOGGER.info(
+                    "%s removed from active_user_checks list during handle_ban by admin: %s",
+                    author_id,
+                    active_user_checks,
+                )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):
@@ -2574,6 +2596,11 @@ if __name__ == "__main__":
             # remove userid from the active_user_checks set
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
+                LOGGER.info(
+                    "%s removed from active_user_checks list during ban by admin: %s",
+                    author_id,
+                    active_user_checks,
+                )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):

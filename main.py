@@ -1551,7 +1551,7 @@ if __name__ == "__main__":
 
                 # Log the message with the timestamp
                 LOGGER.debug(
-                    "%s Scheduling perform_checks coroutine at %s",
+                    "\033[96m%s Scheduling perform_checks coroutine at %s\033[0m",
                     inout_userid,
                     timestamp,
                 )

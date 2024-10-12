@@ -687,19 +687,28 @@ async def on_startup(_dp: Dispatcher):
 
 async def load_and_start_checks():
     """Load all unfinished checks from file and start them with 1 sec interval"""
-    with open("active_user_checks.txt", "r", encoding="utf-8") as file:
-        for line in file:
-            user_id = int(line.strip())
-            active_user_checks.add(user_id)
-            # Start the check with 1 sec interval
-            asyncio.create_task(
-                perform_checks(
-                    user_id=user_id,
-                    event_record="on_startup",
-                    inout_logmessage="on_startup",
+    file_path = "active_user_checks.txt"
+
+    if not os.path.exists(file_path):
+        LOGGER.error("File not found: %s", file_path)
+        return
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            for line in file:
+                user_id = int(line.strip())
+                active_user_checks.add(user_id)
+                # Start the check with 1 sec interval
+                asyncio.create_task(
+                    perform_checks(
+                        user_id=user_id,
+                        event_record="on_startup",
+                        inout_logmessage="on_startup",
+                    )
                 )
-            )
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
+    except FileNotFoundError as e:
+        LOGGER.error("Error loading checks: %s", e)
 
 
 async def sequential_shutdown_tasks(_id):

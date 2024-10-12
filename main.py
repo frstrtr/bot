@@ -681,9 +681,29 @@ async def on_startup(_dp: Dispatcher):
         TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
     )
 
+    # Call the function to load and start checks
+    asyncio.create_task(load_and_start_checks)
+
+
+async def load_and_start_checks():
+    """Load all unfinished checks from file and start them with 1 sec interval"""
+    with open("active_user_checks.txt", "r", encoding="utf-8") as file:
+        for line in file:
+            user_id = int(line.strip())
+            active_user_checks.add(user_id)
+            # Start the check with 1 sec interval
+            asyncio.create_task(
+                perform_checks(
+                    user_id=user_id,
+                    event_record="on_startup",
+                    inout_logmessage="on_startup",
+                )
+            )
+            await asyncio.sleep(1)
+
 
 async def sequential_shutdown_tasks(_id):
-    """# Define the new coroutine that runs two async functions sequentially"""
+    """Define the new coroutine that runs two async functions sequentially"""
     # First async function
     lols_cas_result = await lols_cas_check(_id) is True
     # Second async function
@@ -714,6 +734,11 @@ async def on_shutdown(_dp):
 
     # Run all tasks concurrently
     await asyncio.gather(*tasks)
+
+    # save all unbanned checks to temp file to restart checks after bot restart
+    with open("active_user_checks.txt", "w", encoding="utf-8") as file:
+        for _id in active_user_checks:
+            file.write(str(_id) + "\n")
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
@@ -1224,13 +1249,13 @@ async def perform_checks(
 ):
     """Corutine to perform checks for spam and take action if necessary.
 
-    message_to_delete: tuple: chat_id, message_id: The message to delete.
+    param message_to_delete: tuple: chat_id, message_id: The message to delete.
 
-    event_record: str: The event record to log to inout file.
+    param event_record: str: The event record to log to inout file.
 
-    user_id: int: The ID of the user to check for spam.
+    param user_id: int: The ID of the user to check for spam.
 
-    inout_logmessage: str: The log message for the user's activity.
+    param inout_logmessage: str: The log message for the user's activity.
     """
 
     # immediate check

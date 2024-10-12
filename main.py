@@ -39,7 +39,7 @@ from aiogram.utils.exceptions import (
 
 # Set to keep track of active user IDs
 active_user_checks = set()
-# banned_users = set()
+banned_users = set()
 
 # Dictionary to store running tasks by user ID
 running_tasks = {}
@@ -1045,22 +1045,22 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        # if user_id not in banned_users:
+        if user_id not in banned_users:
 
-        await lols_autoban(user_id)
-        # banned_users.add(user_id)
-        # LOGGER.info(
-        #     "\033[93m%s added to runtime banned users list: %s\033[0m",
-        #     user_id,
-        #     banned_users,
-        # )
-        # else:
-        # LOGGER.info(
-        #     "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
-        #     user_id,
-        #     banned_users,
-        # )
-        # return True
+            await lols_autoban(user_id)
+            banned_users.add(user_id)
+            LOGGER.info(
+                "\033[93m%s added to runtime banned users list: %s\033[0m",
+                user_id,
+                banned_users,
+            )
+        else:
+            LOGGER.info(
+                "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
+                user_id,
+                banned_users,
+            )
+            return True
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -1329,9 +1329,7 @@ async def create_named_task(coro, user_id):
     def task_done_callback(t: asyncio.Task):
         running_tasks.pop(user_id, None)
         if t.exception():
-            LOGGER.error(
-                "Task for user %s raised an exception: %s", user_id, t.exception()
-            )
+            LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
 
     task.add_done_callback(task_done_callback)
 
@@ -1981,7 +1979,7 @@ if __name__ == "__main__":
             await save_report_file("inout_", "hbn" + event_record)
 
             # add to the banned users set
-            # banned_users.add(author_id)
+            banned_users.add(author_id)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2527,7 +2525,7 @@ if __name__ == "__main__":
                         task.cancel()
 
             # add to the banned users set
-            # banned_users.add(author_id)
+            banned_users.add(author_id)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:

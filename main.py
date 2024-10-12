@@ -706,6 +706,7 @@ async def load_and_start_checks():
                         inout_logmessage="on_startup",
                     )
                 )
+                # interval between checks
                 await asyncio.sleep(1)
                 LOGGER.info('%s loaded from file & check started ...', user_id)
     except FileNotFoundError as e:
@@ -1038,6 +1039,14 @@ async def save_report_file(file_type, data):
 async def lols_autoban(_id):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
+
+    if _id in active_user_checks:
+        active_user_checks.remove(_id)
+        LOGGER.info(
+            "\033[93m%s removed from active_user_checks list: %s\033[0m",
+            _id,
+            active_user_checks,
+        )
 
     try:
         for chat_id in CHANNEL_IDS:

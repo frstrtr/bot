@@ -1524,7 +1524,7 @@ if __name__ == "__main__":
             if inout_userid in active_user_checks:
                 active_user_checks.remove(inout_userid)
                 LOGGER.info(
-                    "%s removed from active_user_checks list during kick by bot/admin: %s",
+                    "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: %s\033[0m",
                     inout_userid,
                     active_user_checks,
                 )

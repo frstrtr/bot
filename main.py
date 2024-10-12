@@ -708,7 +708,7 @@ async def load_and_start_checks():
                 )
                 # interval between checks
                 await asyncio.sleep(1)
-                LOGGER.info('%s loaded from file & 2hr monitoring started ...', user_id)
+                LOGGER.info("%s loaded from file & 2hr monitoring started ...", user_id)
     except FileNotFoundError as e:
         LOGGER.error("Error loading checks: %s", e)
 
@@ -1232,9 +1232,8 @@ async def check_n_ban(message: types.Message, reason: str):
         await BOT.send_message(
             ADMIN_GROUP_ID,
             (
-                f"User <code>{message.from_user.id}</code> identified as a spammer. "
-                f"Evidance is the message from {message.chat.title} above. "
-                "NO ACTION REQUIRED, relax, Human! I'll take care of it... (:"
+                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! "
+                f"Don't worry, I've got this under control. Sit back, relax, and enjoy a cup of coffee ☕ while I handle this pesky spammer! 😎"
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
@@ -1303,7 +1302,7 @@ async def perform_checks(
 
         for sleep_time in sleep_times:
 
-            if user_id not in active_user_checks: # if user banned somewhere else
+            if user_id not in active_user_checks:  # if user banned somewhere else
                 return
 
             await asyncio.sleep(sleep_time)

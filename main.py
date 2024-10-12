@@ -1319,7 +1319,9 @@ async def create_named_task(coro, user_id):
     """
     if user_id in running_tasks:
         LOGGER.info("%s Task is already running. Skipping new task.", user_id)
-        return
+        return await running_tasks[
+            user_id
+        ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
     # Create the task and store it in the running_tasks dictionary
     task = asyncio.create_task(coro)
@@ -1476,7 +1478,7 @@ if __name__ == "__main__":
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_task(
                 check_and_autoban(event_record, inout_userid, inout_logmessage),
-                inout_userid,
+                user_id=inout_userid,
             )
             # await check_and_autoban(event_record, inout_userid, inout_logmessage)
             # RED color for banned users

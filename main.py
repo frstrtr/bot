@@ -1940,6 +1940,9 @@ if __name__ == "__main__":
             )
             await save_report_file("inout_", "hbn" + event_record)
 
+            # add to the banned users set
+            banned_users.add(author_id)
+
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
                 # LOGGER.debug(
@@ -2482,6 +2485,9 @@ if __name__ == "__main__":
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):
                         task.cancel()
+
+            # add to the banned users set
+            banned_users.add(author_id)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:

@@ -682,7 +682,7 @@ async def on_startup(_dp: Dispatcher):
     )
 
     # Call the function to load and start checks
-    asyncio.create_task(load_and_start_checks)
+    asyncio.create_task(load_and_start_checks())
 
 
 async def load_and_start_checks():

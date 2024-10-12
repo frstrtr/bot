@@ -707,6 +707,7 @@ async def load_and_start_checks():
                     )
                 )
                 await asyncio.sleep(1)
+                LOGGER.info('%s loaded from file & check started ...', user_id)
     except FileNotFoundError as e:
         LOGGER.error("Error loading checks: %s", e)
 

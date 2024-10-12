@@ -708,7 +708,7 @@ async def load_and_start_checks():
                 )
                 # interval between checks
                 await asyncio.sleep(1)
-                LOGGER.info('%s loaded from file & check started ...', user_id)
+                LOGGER.info('%s loaded from file & 2hr monitoring started ...', user_id)
     except FileNotFoundError as e:
         LOGGER.error("Error loading checks: %s", e)
 
@@ -1335,6 +1335,13 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error("\033[93m%s 2hrs spam checking cancelled. %s\033[0m", user_id, e)
+        if user_id in active_user_checks:
+            active_user_checks.remove(user_id)
+            LOGGER.info(
+                "\033[93m%s removed from active_user_checks list: %s\033[0m",
+                user_id,
+                active_user_checks,
+            )
 
     except aiohttp.ServerDisconnectedError as e:
         LOGGER.error(

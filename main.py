@@ -1303,6 +1303,9 @@ async def perform_checks(
 
         for sleep_time in sleep_times:
 
+            if user_id not in active_user_checks: # if user banned somewhere else
+                return
+
             await asyncio.sleep(sleep_time)
             lols_spam = await lols_cas_check(user_id)
 

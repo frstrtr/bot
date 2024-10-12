@@ -39,7 +39,10 @@ from aiogram.utils.exceptions import (
 
 # Set to keep track of active user IDs
 active_user_checks = set()
-banned_users = set()
+# banned_users = set()
+
+# Dictionary to store running tasks by user ID
+running_tasks = {}
 
 # Initialize the event
 shutdown_event = asyncio.Event()
@@ -1042,21 +1045,22 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        if user_id not in banned_users:
-            await lols_autoban(user_id)
-            banned_users.add(user_id)
-            LOGGER.info(
-                "\033[93m%s added to runtime banned users list: %s\033[0m",
-                user_id,
-                banned_users,
-            )
-        else:
-            LOGGER.info(
-                "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
-                user_id,
-                banned_users,
-            )
-            return True
+        # if user_id not in banned_users:
+
+        await lols_autoban(user_id)
+        # banned_users.add(user_id)
+        # LOGGER.info(
+        #     "\033[93m%s added to runtime banned users list: %s\033[0m",
+        #     user_id,
+        #     banned_users,
+        # )
+        # else:
+        # LOGGER.info(
+        #     "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
+        #     user_id,
+        #     banned_users,
+        # )
+        # return True
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -1305,6 +1309,35 @@ async def perform_checks(
             active_user_checks.remove(user_id)
 
 
+async def create_named_task(coro, user_id):
+    """Check if a task for the same user_id is already running
+
+    param coro: The coroutine to run
+
+    param user_id: The user ID to use as the key in the running_tasks dictionary
+
+    """
+    if user_id in running_tasks:
+        LOGGER.info("%s Task is already running. Skipping new task.", user_id)
+        return
+
+    # Create the task and store it in the running_tasks dictionary
+    task = asyncio.create_task(coro)
+    running_tasks[user_id] = task
+
+    # Remove the task from the dictionary when it completes
+    def task_done_callback(t: asyncio.Task):
+        running_tasks.pop(user_id, None)
+        if t.exception():
+            LOGGER.error(
+                "Task for user %s raised an exception: %s", user_id, t.exception()
+            )
+
+    task.add_done_callback(task_done_callback)
+
+    return task
+
+
 if __name__ == "__main__":
 
     # Start tracing Python memory allocations
@@ -1339,6 +1372,10 @@ if __name__ == "__main__":
         """Checks for change in the chat members statuses and check if they are spammers."""
         # Who did the action
         by_user = None
+        # get photo upload date of the user profile with ID update.from_user.id
+        # TODO: get the photo upload date of the user profile
+        # photo_date = await BOT.get_user_profile_photos(update.from_user.id)
+
         if update.from_user.id != update.old_chat_member.user.id:
             # Someone else changed user status
             by_username = update.from_user.username or "!UNDEFINED!"  # optional
@@ -1438,9 +1475,12 @@ if __name__ == "__main__":
 
         # Check lols after user join/leave event in 2hr and ban if spam
         if lols_spam is True:  # not Timeout exactly
-            await check_and_autoban(
-                event_record, inout_userid, inout_logmessage, lols_spam
+            # Call check_and_autoban with concurrency control using named tasks
+            await create_named_task(
+                check_and_autoban(event_record, inout_userid, inout_logmessage),
+                inout_userid,
             )
+            # await check_and_autoban(event_record, inout_userid, inout_logmessage)
             # RED color for banned users
             LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", inout_userid)
         else:
@@ -1941,7 +1981,7 @@ if __name__ == "__main__":
             await save_report_file("inout_", "hbn" + event_record)
 
             # add to the banned users set
-            banned_users.add(author_id)
+            # banned_users.add(author_id)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2487,7 +2527,7 @@ if __name__ == "__main__":
                         task.cancel()
 
             # add to the banned users set
-            banned_users.add(author_id)
+            # banned_users.add(author_id)
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2967,7 +3007,7 @@ if __name__ == "__main__":
     # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
-    # TODO great_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
+    # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
     # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
     # TODO if user is admin - add ban/cancel button to the personal message to admin
 

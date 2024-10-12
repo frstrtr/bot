@@ -1043,7 +1043,7 @@ async def lols_autoban(_id):
     if _id in active_user_checks:
         active_user_checks.remove(_id)
         LOGGER.info(
-            "\033[93m%s removed from active_user_checks list: %s\033[0m",
+            "%s removed from active_user_checks during lols_autoban list: %s",
             _id,
             active_user_checks,
         )

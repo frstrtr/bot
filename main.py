@@ -1108,7 +1108,7 @@ async def check_and_autoban(
             banned_users.add(user_id)
             action = "added to"
         else:
-            action = "is already removed from"
+            action = "is already added to"
         if len(banned_users) > 5:  # prevent spamming the log
             LOGGER.info(
                 "\033[93m%s %s runtime banned users list: %s... and %d more\033[0m",
@@ -1124,7 +1124,7 @@ async def check_and_autoban(
                 action,
                 banned_users,
             )
-        if action == "is already removed from":
+        if action == "is already added to":
             return True
 
         if message_to_delete:  # delete the message if it exists

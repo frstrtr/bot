@@ -19,10 +19,11 @@ import pytz
 from aiogram import Bot, Dispatcher, types
 from aiogram import utils
 import emoji
-import requests
-from PIL import Image
-from io import BytesIO
-from io import BytesIO
+
+# import requests
+# from PIL import Image
+# from io import BytesIO
+# from io import BytesIO
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -1429,39 +1430,39 @@ async def create_named_task(coro, user_id):
     return task
 
 
-async def get_photo_details(user_id: int):
-    """Function to get the photo details of the user profile with the given ID.
+# async def get_photo_details(user_id: int):
+#     """Function to get the photo details of the user profile with the given ID.
 
-    :param user_id: int: The ID of the user profile to get the photo details for
+#     :param user_id: int: The ID of the user profile to get the photo details for
 
-    """
-    # Get the photo details of the user profile with the given ID
-    # https://core.telegram.org/bots/api#getuserprofilephotos
-    # https://core.telegram.org/bots/api#userprofilephotos
-    # https://core.telegram.org/bots/api#photofile
-    photo_data = await BOT.get_user_profile_photos(user_id)
-    # get photo upload date of the user profile with ID user_id
-    if not photo_data:
-        LOGGER.debug("\033[96m%s have no photo data\033[0m", user_id)
-    for photo in photo_data.photos:
-        for size in photo:
-            photo = await BOT.get_file(size.file_id)
-            # get file details of photo file
-            # https://core.telegram.org/bots/api#file
-            # https://core.telegram.org/bots/api#photofile
-            # LOGGER.debug("%s Photo file details: %s", user_id, photo)
-            # get file Use https://api.telegram.org/file/bot<token>/<file_path> to get the file.
-            url = f"https://api.telegram.org/file/bot{API_TOKEN}/{photo.file_path}"
-            response = requests.get(url)
-            if response.status_code == 200:
-                image = Image.open(BytesIO(response.content))
-                metadata = image.info
+#     """
+#     # Get the photo details of the user profile with the given ID
+#     # https://core.telegram.org/bots/api#getuserprofilephotos
+#     # https://core.telegram.org/bots/api#userprofilephotos
+#     # https://core.telegram.org/bots/api#photofile
+#     photo_data = await BOT.get_user_profile_photos(user_id)
+#     # get photo upload date of the user profile with ID user_id
+#     if not photo_data:
+#         LOGGER.debug("\033[96m%s have no photo data\033[0m", user_id)
+#     for photo in photo_data.photos:
+#         for size in photo:
+#             photo = await BOT.get_file(size.file_id)
+#             # get file details of photo file
+#             # https://core.telegram.org/bots/api#file
+#             # https://core.telegram.org/bots/api#photofile
+#             # LOGGER.debug("%s Photo file details: %s", user_id, photo)
+#             # get file Use https://api.telegram.org/file/bot<token>/<file_path> to get the file.
+#             url = f"https://api.telegram.org/file/bot{API_TOKEN}/{photo.file_path}"
+#             response = requests.get(url)
+#             if response.status_code == 200:
+#                 image = Image.open(BytesIO(response.content))
+#                 metadata = image.info
 
-                LOGGER.debug("%s photo metadata: %s", user_id, metadata)
+#                 LOGGER.debug("%s photo metadata: %s", user_id, metadata)
 
-                return response.content
-            else:
-                response.raise_for_status()
+#                 return response.content
+#             else:
+#                 response.raise_for_status()
 
 
 if __name__ == "__main__":
@@ -1503,7 +1504,7 @@ if __name__ == "__main__":
         # photo_date = await BOT.get_user_profile_photos(update.from_user.id)
 
         # XXX
-        await get_photo_details(update.from_user.id)
+        # await get_photo_details(update.from_user.id)
         # XXX
 
         if update.from_user.id != update.old_chat_member.user.id:

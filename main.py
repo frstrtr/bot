@@ -1095,8 +1095,7 @@ async def check_and_autoban(
             action = "added to"
         else:
             action = "is already removed from"
-
-        if len(banned_users) > 5:
+        if len(banned_users) > 5:  # prevent spamming the log
             LOGGER.info(
                 "\033[93m%s %s runtime banned users list: %s... and %d more\033[0m",
                 user_id,
@@ -1104,7 +1103,7 @@ async def check_and_autoban(
                 list(banned_users)[-5:],  # Last 5 elements
                 len(banned_users) - 5,  # Number of elements left
             )
-        else:
+        else:  # less than 5 banned users
             LOGGER.info(
                 "\033[93m%s %s runtime banned users list: %s\033[0m",
                 user_id,
@@ -1113,7 +1112,7 @@ async def check_and_autoban(
             )
         if action == "is already removed from":
             return True
-        
+
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -3074,7 +3073,8 @@ if __name__ == "__main__":
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "Users changed in user_changed_message function: %s --> %s",
+            "%s changed in user_changed_message function: %s --> %s",
+            message.from_id,
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
         )

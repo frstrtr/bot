@@ -1590,13 +1590,13 @@ if __name__ == "__main__":
                 inout_chattitle,
                 datetime.now().strftime("%H:%M:%S"),
             )
-            if inout_userid in active_user_checks:
-                active_user_checks.remove(inout_userid)
-                LOGGER.info(
-                    "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: \033[0m%s",
-                    inout_userid,
-                    active_user_checks,
-                )
+            # if inout_userid in active_user_checks:
+            #     active_user_checks.remove(inout_userid)
+            #     LOGGER.info(
+            #         "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: \033[0m%s",
+            #         inout_userid,
+            #         active_user_checks,
+            #     )
         else:
             LOGGER.info(
                 "%s --> %s in %s at %s",

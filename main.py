@@ -1456,11 +1456,19 @@ async def get_photo_details(user_id: int):
                 # LOGGER.debug("%s Photo file size: %s", user_id, len(response.content))
                 image = Image.open(BytesIO(response.content))
                 metadata = image.info
+                # LOGGER.debug(
+                #     "%s Photo file metadata: %s",
+                #     user_id,
+                #     {k: metadata[k] for k in metadata if k != "exif"},
+                # )
+                # log file creation date, modification date and accessed date
+                LOGGER.debug('%s photo metadata: %s', user_id, metadata)
                 LOGGER.debug(
-                    "%s Photo file metadata: %s",
+                    "%s Photo file creation date: %s",
                     user_id,
-                    {k: metadata[k] for k in metadata if k != "exif"},
+                    datetime.fromtimestamp(metadata["FileCreateDate"]),
                 )
+
                 # LOGGER.debug(
                 #     "%s Photo file details: %s",
                 #     user_id,

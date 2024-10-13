@@ -1342,11 +1342,12 @@ async def perform_checks(
 
             # Log the message with the appropriate color
             LOGGER.info(
-                "%s%s %02dmin check lols_cas_spam: %s\033[0m",
+                "%s%s %02dmin check lols_cas_spam: %s\033[0m Ids to check left: %s",
                 color_code,
                 user_id,
                 sleep_time // 60,
                 lols_spam,
+                len(active_user_checks)
             )
 
             if await check_and_autoban(

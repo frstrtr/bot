@@ -727,7 +727,7 @@ async def sequential_shutdown_tasks(_id):
     await check_and_autoban(
         str(_id) + "on_shutdown inout",
         _id,
-        "<code>(" + str(_id) + ")</code> banned on_shutdown event",
+        "(<code>" + str(_id) + "</code>) banned on_shutdown event",
         lols_cas_result,
     )
 
@@ -1342,7 +1342,7 @@ async def perform_checks(
 
             # Log the message with the appropriate color
             LOGGER.info(
-                "%s%s %02dmin check lols_cas_spam: %s\033[0m Ids to check left: %s",
+                "%s%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,
                 sleep_time // 60,
@@ -3165,6 +3165,7 @@ if __name__ == "__main__":
     # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
     # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
     # TODO if user is admin - add ban/cancel button to the personal message to admin
+    # TODO search and delete user messages if banned by admin and timely checks
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

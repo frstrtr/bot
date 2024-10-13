@@ -19,6 +19,7 @@ import pytz
 from aiogram import Bot, Dispatcher, types
 from aiogram import utils
 import emoji
+import requests
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -322,6 +323,7 @@ def load_config():
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, channels_dict, allowed_content_types
+    global API_TOKEN
 
     #     # Attempt to extract the schedule, if present
     #     schedule = group.find('schedule')
@@ -1440,10 +1442,24 @@ async def get_photo_details(user_id):
             # get file details of photo file
             # https://core.telegram.org/bots/api#file
             # https://core.telegram.org/bots/api#photofile
-            LOGGER.debug("%s Photo file details: %s", user_id, photo)
+            # LOGGER.debug("%s Photo file details: %s", user_id, photo)
+            # get file Use https://api.telegram.org/file/bot<token>/<file_path> to get the file.
+            url = f"https://api.telegram.org/file/bot{API_TOKEN}/{photo.file_path}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                # log file details
+                LOGGER.debug(
+                    "%s Photo file details: %s",
+                    user_id,
+                    response.content.decode("utf-8"),
+                )
+                return response.content
+            else:
+                response.raise_for_status()
+
             # photo_date = datetime.fromtimestamp(photo.file_path.date)
-    LOGGER.debug("%s photos data: %s", user_id, photo_data)
-    return photo_data
+    # LOGGER.debug("%s photos data: %s", user_id, photo_data)
+    # return photo_data
 
 
 if __name__ == "__main__":

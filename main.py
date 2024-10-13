@@ -1441,6 +1441,8 @@ async def get_photo_details(user_id: int):
     # https://core.telegram.org/bots/api#photofile
     photo_data = await BOT.get_user_profile_photos(user_id)
     # get photo upload date of the user profile with ID user_id
+    if not photo_data:
+        LOGGER.debug("\033[96m%s have no photo data\033[0m", user_id)
     for photo in photo_data.photos:
         for size in photo:
             photo = await BOT.get_file(size.file_id)
@@ -1452,37 +1454,14 @@ async def get_photo_details(user_id: int):
             url = f"https://api.telegram.org/file/bot{API_TOKEN}/{photo.file_path}"
             response = requests.get(url)
             if response.status_code == 200:
-                # log file size
-                # LOGGER.debug("%s Photo file size: %s", user_id, len(response.content))
                 image = Image.open(BytesIO(response.content))
                 metadata = image.info
-                # LOGGER.debug(
-                #     "%s Photo file metadata: %s",
-                #     user_id,
-                #     {k: metadata[k] for k in metadata if k != "exif"},
-                # )
-                # log file creation date, modification date and accessed date
 
                 LOGGER.debug("%s photo metadata: %s", user_id, metadata)
-                
-                # LOGGER.debug(
-                #     "%s Photo file creation date: %s",
-                #     user_id,
-                #     datetime.fromtimestamp(metadata["FileCreateDate"]),
-                # )
 
-                # LOGGER.debug(
-                #     "%s Photo file details: %s",
-                #     user_id,
-                #     response.content.decode("utf-8"),
-                # )
                 return response.content
             else:
                 response.raise_for_status()
-
-            # photo_date = datetime.fromtimestamp(photo.file_path.date)
-    # LOGGER.debug("%s photos data: %s", user_id, photo_data)
-    # return photo_data
 
 
 if __name__ == "__main__":

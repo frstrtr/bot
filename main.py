@@ -1372,11 +1372,19 @@ async def perform_checks(
             user_id in active_user_checks
         ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
-            LOGGER.info(
-                "\033[92m%s removed from active_user_checks list in finally block: \033[0m%s",
-                user_id,
-                active_user_checks,
-            )
+            if len(active_user_checks) > 5:
+                LOGGER.info(
+                    "\033[92m%s removed from active_user_checks list in finally block: %s... and %d more\033[0m",
+                    user_id,
+                    list(active_user_checks)[-5:],  # Last 5 elements
+                    len(active_user_checks) - 5  # Number of elements left
+                )
+            else:
+                LOGGER.info(
+                    "\033[92m%s removed from active_user_checks list in finally block: %s\033[0m",
+                    user_id,
+                    active_user_checks,
+                )
 
 
 async def create_named_task(coro, user_id):

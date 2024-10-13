@@ -1434,7 +1434,15 @@ async def get_photo_details(user_id):
     # https://core.telegram.org/bots/api#photofile
     photo_data = await BOT.get_user_profile_photos(user_id)
     # get photo upload date of the user profile with ID user_id
-    LOGGER.debug("Photo data: %s", photo_data)
+    for photo in photo_data.photos:
+        for size in photo:
+            photo = await BOT.get_file(size.file_id)
+            # get file details of photo file
+            # https://core.telegram.org/bots/api#file
+            # https://core.telegram.org/bots/api#photofile
+            LOGGER.debug("%s Photo file details: %s", user_id, photo)
+            # photo_date = datetime.fromtimestamp(photo.file_path.date)
+    LOGGER.debug("%s photos data: %s", user_id, photo_data)
     return photo_data
 
 

@@ -1042,11 +1042,19 @@ async def lols_autoban(_id):
 
     if _id in active_user_checks:
         active_user_checks.remove(_id)
-        LOGGER.info(
-            "\033[91m%s removed from active_user_checks list during lols_autoban: \033[0m%s",
-            _id,
-            active_user_checks,
-        )
+        if len(active_user_checks) > 5:
+            LOGGER.info(
+                "\033[91m%s removed from active_user_checks list during lols_autoban: %s... and %d more\033[0m",
+                _id,
+                list(active_user_checks)[-5:],  # Last 5 elements
+                len(active_user_checks) - 5,  # Number of elements left
+            )
+        else:
+            LOGGER.info(
+                "\033[91m%s removed from active_user_checks list during lols_autoban: %s\033[0m",
+                _id,
+                active_user_checks,
+            )
 
     try:
         for chat_id in CHANNEL_IDS:
@@ -1377,7 +1385,7 @@ async def perform_checks(
                     "\033[92m%s removed from active_user_checks list in finally block: %s... and %d more\033[0m",
                     user_id,
                     list(active_user_checks)[-5:],  # Last 5 elements
-                    len(active_user_checks) - 5  # Number of elements left
+                    len(active_user_checks) - 5,  # Number of elements left
                 )
             else:
                 LOGGER.info(
@@ -1414,6 +1422,20 @@ async def create_named_task(coro, user_id):
     task.add_done_callback(task_done_callback)
 
     return task
+
+
+async def get_photo_details(user_id):
+    """Function to get the photo details of the user profile with the given ID.
+    param user_id: int: The ID of the user profile to get the photo details for.
+    """
+    # Get the photo details of the user profile with the given ID
+    # https://core.telegram.org/bots/api#getuserprofilephotos
+    # https://core.telegram.org/bots/api#userprofilephotos
+    # https://core.telegram.org/bots/api#photofile
+    photo_data = await BOT.get_user_profile_photos(user_id)
+    # get photo upload date of the user profile with ID user_id
+    LOGGER.debug("Photo data: %s", photo_data)
+    return photo_data
 
 
 if __name__ == "__main__":
@@ -1453,6 +1475,10 @@ if __name__ == "__main__":
         # get photo upload date of the user profile with ID update.from_user.id
         # TODO: get the photo upload date of the user profile
         # photo_date = await BOT.get_user_profile_photos(update.from_user.id)
+
+        # XXX
+        await get_photo_details(update.from_user.id)
+        # XXX
 
         if update.from_user.id != update.old_chat_member.user.id:
             # Someone else changed user status
@@ -1498,7 +1524,7 @@ if __name__ == "__main__":
         universal_chatlink = (
             f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
             if update.chat.username
-            else f'<a href="https://t.me/c/{update.chat.id[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
+            else f'<a href="https://t.me/c/{str(update.chat.id)[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
         )
         # Construct the log message
         inout_logmessage = (

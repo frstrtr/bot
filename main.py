@@ -708,8 +708,8 @@ async def load_and_start_checks():
                 asyncio.create_task(
                     perform_checks(
                         user_id=user_id,
-                        event_record="on_startup",
-                        inout_logmessage="on_startup",
+                        event_record=f"{user_id} banned on_startup",
+                        inout_logmessage=f"(<code>{user_id}</code>) banned on_startup",
                     )
                 )
                 # interval between checks

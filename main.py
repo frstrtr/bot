@@ -1090,21 +1090,30 @@ async def check_and_autoban(
 
     if lols_spam is True:  # not Timeout exaclty
         if user_id not in banned_users:
-
             await lols_autoban(user_id)
             banned_users.add(user_id)
+            action = "added to"
+        else:
+            action = "is already removed from"
+
+        if len(banned_users) > 5:
             LOGGER.info(
-                "\033[93m%s added to runtime banned users list: %s\033[0m",
+                "\033[93m%s %s runtime banned users list: %s... and %d more\033[0m",
                 user_id,
-                banned_users,
+                action,
+                list(banned_users)[-5:],  # Last 5 elements
+                len(banned_users) - 5,  # Number of elements left
             )
         else:
             LOGGER.info(
-                "\033[93m%s is already banned from all chats. Skipping...\033[0m Runtime banned users list: %s",
+                "\033[93m%s %s runtime banned users list: %s\033[0m",
                 user_id,
+                action,
                 banned_users,
             )
+        if action == "is already removed from":
             return True
+        
         if message_to_delete:  # delete the message if it exists
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:

@@ -2670,11 +2670,19 @@ if __name__ == "__main__":
             # remove userid from the active_user_checks set
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
-                LOGGER.info(
-                    "\033[91m%s removed from active_user_checks list during ban by admin: \033[0m%s",
-                    author_id,
-                    active_user_checks,
-                )
+                if len(active_user_checks) > 5:
+                    LOGGER.info(
+                        "\033[91m%s removed from active_user_checks list during ban by admin: %s... and %d more\033[0m",
+                        author_id,
+                        list(active_user_checks)[-5:],  # Last 5 elements
+                        len(active_user_checks) - 5,  # Number of elements left
+                    )
+                else:
+                    LOGGER.info(
+                        "\033[91m%s removed from active_user_checks list during ban by admin: %s\033[0m",
+                        author_id,
+                        active_user_checks,
+                    )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):

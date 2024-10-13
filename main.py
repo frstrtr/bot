@@ -1347,7 +1347,7 @@ async def perform_checks(
                 user_id,
                 sleep_time // 60,
                 lols_spam,
-                len(active_user_checks)
+                len(active_user_checks),
             )
 
             if await check_and_autoban(
@@ -1983,7 +1983,7 @@ if __name__ == "__main__":
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
         # And store published bunner message data to provide link to the reportee
         # admin_group_banner_message: Message = None # Type hinting
-        try: # If Topic_closed error
+        try:  # If Topic_closed error
             if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
@@ -1993,16 +1993,14 @@ if __name__ == "__main__":
                 )
             else:  # send report to AUTOREPORT thread of the admin group
                 admin_group_banner_message = await BOT.send_message(
-                ADMIN_GROUP_ID,
-                admin_ban_banner,
-                reply_markup=keyboard,
-                parse_mode="HTML",
-                message_thread_id=ADMIN_AUTOREPORTS,
-            )
+                    ADMIN_GROUP_ID,
+                    admin_ban_banner,
+                    reply_markup=keyboard,
+                    parse_mode="HTML",
+                    message_thread_id=ADMIN_AUTOREPORTS,
+                )
         except utils.exceptions.BadRequest as e:
-            LOGGER.error(
-                "Error while sending the banner to the admin group: %s", e
-            )
+            LOGGER.error("Error while sending the banner to the admin group: %s", e)
             await message.answer(
                 "Error while sending the banner to the admin group. Please check the logs."
             )

@@ -1365,7 +1365,7 @@ async def perform_checks(
         ):  # avoid case when manually banned by admin same time
             active_user_checks.remove(user_id)
             LOGGER.info(
-                "\033[91m%s removed from active_user_checks list in finally block: \033[0m%s",
+                "\033[92m%s removed from active_user_checks list in finally block: \033[0m%s",
                 user_id,
                 active_user_checks,
             )

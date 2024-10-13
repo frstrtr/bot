@@ -20,6 +20,9 @@ from aiogram import Bot, Dispatcher, types
 from aiogram import utils
 import emoji
 import requests
+from PIL import Image
+from io import BytesIO
+from io import BytesIO
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -1400,9 +1403,9 @@ async def perform_checks(
 async def create_named_task(coro, user_id):
     """Check if a task for the same user_id is already running
 
-    param coro: The coroutine to run
+    :param coro: The coroutine to run
 
-    param user_id: The user ID to use as the key in the running_tasks dictionary
+    :param user_id: The user ID to use as the key in the running_tasks dictionary
 
     """
     if user_id in running_tasks:
@@ -1426,9 +1429,11 @@ async def create_named_task(coro, user_id):
     return task
 
 
-async def get_photo_details(user_id):
+async def get_photo_details(user_id: int):
     """Function to get the photo details of the user profile with the given ID.
-    param user_id: int: The ID of the user profile to get the photo details for.
+
+    :param user_id: int: The ID of the user profile to get the photo details for
+
     """
     # Get the photo details of the user profile with the given ID
     # https://core.telegram.org/bots/api#getuserprofilephotos
@@ -1447,12 +1452,20 @@ async def get_photo_details(user_id):
             url = f"https://api.telegram.org/file/bot{API_TOKEN}/{photo.file_path}"
             response = requests.get(url)
             if response.status_code == 200:
-                # log file details
+                # log file size
+                # LOGGER.debug("%s Photo file size: %s", user_id, len(response.content))
+                image = Image.open(BytesIO(response.content))
+                metadata = image.info
                 LOGGER.debug(
-                    "%s Photo file details: %s",
+                    "%s Photo file metadata: %s",
                     user_id,
-                    response.content.decode("utf-8"),
+                    {k: metadata[k] for k in metadata if k != "exif"},
                 )
+                # LOGGER.debug(
+                #     "%s Photo file details: %s",
+                #     user_id,
+                #     response.content.decode("utf-8"),
+                # )
                 return response.content
             else:
                 response.raise_for_status()

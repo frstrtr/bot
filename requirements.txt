@@ -1,2 +1,4 @@
 # Requires Python 3.10
 aiogram==2.25.2
+requests==2.32.3
+pillow==10.4.0

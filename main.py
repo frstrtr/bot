@@ -2357,7 +2357,7 @@ if __name__ == "__main__":
                 message.from_user.id, ADMIN_GROUP_ID
             ):
                 LOGGER.debug(
-                    "\033[93m%s is admin, skipping the message %s in the chat %s\033[0m",
+                    "\033[95m%s is admin, skipping the message %s in the chat %s\033[0m",
                     message.from_user.id,
                     message.message_id,
                     message.chat.title,

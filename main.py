@@ -3180,6 +3180,7 @@ if __name__ == "__main__":
     # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
     # TODO if user is admin - add ban/cancel button to the personal message to admin
     # TODO search and delete user messages if banned by admin and timely checks
+    # TODO bot stats to show on shutdown or on /stats bot comand like runtime banned list, active checks, uptime, etc
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

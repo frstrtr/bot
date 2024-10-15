@@ -1164,7 +1164,7 @@ async def check_and_autoban(
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
             )
-            await save_report_file("inout_", "cbk" + event_record)
+            await save_report_file("inout_", "cbm" + event_record)
         else:  # done by bot but not yet detected by lols_cas
             await BOT.send_message(
                 ADMIN_GROUP_ID,

@@ -1165,7 +1165,7 @@ async def check_and_autoban(
                 + " by Хранитель Порядков\n"
             )
             await save_report_file("inout_", "cbm" + event_record)
-        else:  # done by bot but not yet detected by lols_cas
+        else:  # done by bot but not yet detected by lols_cas XXX
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
@@ -2432,7 +2432,13 @@ if __name__ == "__main__":
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(message)
 
-            if (
+            # XXX if user was in lols but before it was kicked it posted a message eventually
+            # we can check it in runtime banned user list
+            if message.from_user.id in banned_users:
+                the_reason = f"{message.from_user.id} is banned before sending a message but squizzed due latency"
+                if await check_n_ban(message, the_reason):
+                    return
+            elif (
                 user_is_2day_old
             ):  # do lols check if user less than 48hr old sending a message
                 the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first 48hrs after registration. Telefragged...\033[0m"

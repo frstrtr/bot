@@ -20,6 +20,7 @@ import pytz
 from aiogram import Bot, Dispatcher, types
 from aiogram import utils
 import emoji
+from datetime import timedelta
 
 # import requests
 # from PIL import Image
@@ -1438,8 +1439,8 @@ async def create_named_watchdog(coro, user_id):
     return task
 
 
-# Function to log banned_users and active_user_checks
 async def log_lists():
+    """Function to log the banned users and active user checks lists."""
     LOGGER.info(
         "\033[93mBanned users list: %s\033[0m",
         banned_users,
@@ -1448,6 +1449,34 @@ async def log_lists():
         "\033[93mActive user checks list: %s\033[0m",
         active_user_checks,
     )
+    # TODO move inout and daily_spam logs to the dedicated folders
+    # save banned users list to the file
+    # Get yesterday's date
+    today = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
+    # Construct the filename with the current date
+    filename = f"inout/banned_users_{today}.txt"
+    
+    # Ensure the inout directory exists
+    os.makedirs("inout", exist_ok=True)
+    os.makedirs("daily_spam", exist_ok=True)
+    
+    with open(filename, "w", encoding="utf-8") as file:
+        for _id in banned_users:
+            file.write(str(_id) + "\n")
+    # move yesterday's daily_spam file to the daily_spam folder
+    daily_spam_filename = get_daily_spam_filename()
+    inout_filename = get_inout_filename()
+
+    # Move yesterday's daily_spam file to the daily_spam folder
+    for file in os.listdir():
+        if file.startswith("daily_spam_") and file != daily_spam_filename:
+            os.rename(file, f"daily_spam/{file}")
+
+    # Move yesterday's inout file to the inout folder
+    for file in os.listdir():
+        if file.startswith("inout_") and file != inout_filename:
+            os.rename(file, f"inout/{file}")
+
     try:
         active_user_checks_list = [
             f"<code>{user}</code>" for user in active_user_checks
@@ -3219,9 +3248,9 @@ if __name__ == "__main__":
             getattr(message, "new_chat_members", ""),
         )
 
-    # Schedule the log_lists function to run daily at 00:00
-    @aiocron.crontab("0 0 * * *")
+    @aiocron.crontab("0 4 * * *")
     async def scheduled_log():
+        """Function to schedule the log_lists function to run daily at 00:00."""
         await log_lists()
 
     # TODO reply to individual messages by bot in the monitored groups or make posts

@@ -356,7 +356,7 @@ def load_config():
     stream_handler = logging.StreamHandler()  # For writing logs to the console
 
     # Create formatters and add them to handlers
-    FORMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
+    FORMAT_STR = "%(asctime)s - %(message)s"  # Includes timestamp
     formatter = logging.Formatter(FORMAT_STR)
     file_handler.setFormatter(formatter)
     stream_handler.setFormatter(formatter)

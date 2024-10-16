@@ -1421,6 +1421,8 @@ async def create_named_task(coro, user_id):
     # Create the task and store it in the running_tasks dictionary
     task = asyncio.create_task(coro)
     running_tasks[user_id] = task
+    # RED color for banned users
+    LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", user_id)
 
     # Remove the task from the dictionary when it completes
     def task_done_callback(t: asyncio.Task):
@@ -1589,7 +1591,7 @@ if __name__ == "__main__":
                 "\033[91m%s --> %s in %s\033[0m",
                 inout_userid,
                 inout_status,
-                inout_chattitle
+                inout_chattitle,
             )
             # if inout_userid in active_user_checks:
             #     active_user_checks.remove(inout_userid)
@@ -1599,12 +1601,7 @@ if __name__ == "__main__":
             #         active_user_checks,
             #     )
         else:
-            LOGGER.info(
-                "%s --> %s in %s",
-                inout_userid,
-                inout_status,
-                inout_chattitle
-            )
+            LOGGER.info("%s --> %s in %s", inout_userid, inout_status, inout_chattitle)
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -1620,8 +1617,7 @@ if __name__ == "__main__":
                 user_id=inout_userid,
             )
             # await check_and_autoban(event_record, inout_userid, inout_logmessage)
-            # RED color for banned users
-            LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", inout_userid)
+
         else:
             # Schedule the perform_checks coroutine to run in the background
             if inout_status in (

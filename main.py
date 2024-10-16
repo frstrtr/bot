@@ -1,4 +1,5 @@
 import asyncio
+import aiocron
 from datetime import datetime
 import os
 import random
@@ -1435,6 +1436,67 @@ async def create_named_watchdog(coro, user_id):
     task.add_done_callback(task_done_callback)
 
     return task
+
+
+# Function to log banned_users and active_user_checks
+async def log_lists():
+    LOGGER.info(
+        "\033[93mBanned users list: %s\033[0m",
+        banned_users,
+    )
+    LOGGER.info(
+        "\033[93mActive user checks list: %s\033[0m",
+        active_user_checks,
+    )
+    try:
+        active_user_checks_list = [
+            f"<code>{user}</code>" for user in active_user_checks
+        ]
+        banned_users_list = [f"<code>{user}</code>" for user in banned_users]
+
+        # Function to split lists into chunks
+        def split_list(lst, max_length):
+            chunk = []
+            current_length = 0
+            for item in lst:
+                item_length = len(item) + 1  # +1 for the space
+                if current_length + item_length > max_length:
+                    yield chunk
+                    chunk = []
+                    current_length = 0
+                chunk.append(item)
+                current_length += item_length
+            if chunk:
+                yield chunk
+
+        # Split lists into chunks
+        max_message_length = (
+            MAX_TELEGRAM_MESSAGE_LENGTH - 100
+        )  # Reserve some space for other text
+        active_user_chunks = list(
+            split_list(active_user_checks_list, max_message_length)
+        )
+        banned_user_chunks = list(split_list(banned_users_list, max_message_length))
+
+        # Send active user checks list in chunks
+        for chunk in active_user_chunks:
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                f"Active user checks list: {' '.join(chunk)}",
+                message_thread_id=ADMIN_AUTOBAN,
+                parse_mode="HTML",
+            )
+
+        # Send banned users list in chunks
+        for chunk in banned_user_chunks:
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                f"Banned users list: {' '.join(chunk)}",
+                message_thread_id=ADMIN_AUTOBAN,
+                parse_mode="HTML",
+            )
+    except utils.exceptions.BadRequest as e:
+        LOGGER.error("Error sending active_user_checks list: %s", e)
 
 
 # async def get_photo_details(user_id: int):
@@ -3156,6 +3218,11 @@ if __name__ == "__main__":
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
         )
+
+    # Schedule the log_lists function to run daily at 00:00
+    @aiocron.crontab("0 0 * * *")
+    async def scheduled_log():
+        await log_lists()
 
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport

@@ -357,6 +357,8 @@ def load_config():
 
     # Create formatters and add them to handlers
     FORMAT_STR = "%(asctime)s - %(message)s"  # Includes timestamp
+    # FORMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
+
     formatter = logging.Formatter(FORMAT_STR)
     file_handler.setFormatter(formatter)
     stream_handler.setFormatter(formatter)
@@ -1584,11 +1586,10 @@ if __name__ == "__main__":
 
         if inout_status == ChatMemberStatus.KICKED:
             LOGGER.info(
-                "\033[91m%s --> %s in %s at %s\033[0m",
+                "\033[91m%s --> %s in %s\033[0m",
                 inout_userid,
                 inout_status,
-                inout_chattitle,
-                datetime.now().strftime("%H:%M:%S"),
+                inout_chattitle
             )
             # if inout_userid in active_user_checks:
             #     active_user_checks.remove(inout_userid)
@@ -1599,11 +1600,10 @@ if __name__ == "__main__":
             #     )
         else:
             LOGGER.info(
-                "%s --> %s in %s at %s",
+                "%s --> %s in %s",
                 inout_userid,
                 inout_status,
-                inout_chattitle,
-                datetime.now().strftime("%H:%M:%S"),
+                inout_chattitle
             )
 
         # Extract the user status change
@@ -1632,13 +1632,11 @@ if __name__ == "__main__":
             ):  # only if user joined or kicked or restricted or left
 
                 # Get the current timestamp
-                timestamp = datetime.now().strftime("%H:%M:%S")
 
                 # Log the message with the timestamp
                 LOGGER.debug(
-                    "\033[96m%s Scheduling perform_checks coroutine at %s\033[0m",
+                    "\033[96m%s Scheduling perform_checks coroutine\033[0m",
                     inout_userid,
-                    timestamp,
                 )
                 # Check if the user ID is already being processed
                 if inout_userid not in active_user_checks:

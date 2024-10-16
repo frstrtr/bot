@@ -1404,7 +1404,7 @@ async def perform_checks(
                 )
 
 
-async def create_named_task(coro, user_id):
+async def create_named_watchdog(coro, user_id):
     """Check if a task for the same user_id is already running
 
     :param coro: The coroutine to run
@@ -1413,7 +1413,9 @@ async def create_named_task(coro, user_id):
 
     """
     if user_id in running_tasks:
-        LOGGER.info("%s Task is already running. Skipping new task.", user_id)
+        LOGGER.info(
+            "\033[93m%s Watchdog is already set. Skipping new task.\033[0m", user_id
+        )
         return await running_tasks[
             user_id
         ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
@@ -1612,7 +1614,7 @@ if __name__ == "__main__":
         # Check lols after user join/leave event in 2hr and ban if spam
         if lols_spam is True:  # not Timeout exactly
             # Call check_and_autoban with concurrency control using named tasks
-            await create_named_task(
+            await create_named_watchdog(
                 check_and_autoban(event_record, inout_userid, inout_logmessage),
                 user_id=inout_userid,
             )

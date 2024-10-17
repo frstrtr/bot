@@ -768,6 +768,20 @@ async def on_shutdown(_dp):
     #     await shutdown_event.wait()  # Wait for the shutdown tasks to complete
     #     # Continue with the rest of the coroutine
 
+    # send message with short stats about previous session
+    # bot start time
+    # bot end time
+    # Runtime of the previous session
+    # number of spammers detected
+    # number of spammers banned
+    # number of spammers not banned
+    # number of messages from admins
+    # number of the other messages
+    # number of the messages with spam detected
+    # number of the messages with spam not detected and deleted by admins
+    # number of active user checks forwarded to the next session
+
+    await BOT.send_message(TECHNO_LOG_GROUP, "Short session stats:\n", message_thread_id=TECHNO_RESTART)
     # Close the bot
     await BOT.close()
 
@@ -2492,7 +2506,7 @@ if __name__ == "__main__":
                     message.chat.title,
                     message.chat.id,
                 )
-                # await BOT.leave_chat(message.chat.id)
+                # XXX await BOT.leave_chat(message.chat.id)
                 return
 
             cursor.execute(
@@ -3303,7 +3317,6 @@ if __name__ == "__main__":
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
     # TODO more attention to the messages from users with IDs > 8 000 000 000
-    # TODO automatically leave chats which is not listed in settings file
     # TODO edit message update check - check if user edited his message
     # TODO check if user changed his name
     # TODO check photos date and DC location of the joined profile - warn admins if it's just uploaded
@@ -3312,7 +3325,6 @@ if __name__ == "__main__":
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
     # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
-    # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
     # TODO search and delete user messages if banned by admin and timely checks
     # TODO bot stats to show on shutdown or on /stats bot comand like runtime banned list, active checks, uptime, etc
     # TODO use active checks list to store recent messages links during runtime to delete it if user is banned

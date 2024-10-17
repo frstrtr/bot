@@ -1237,11 +1237,19 @@ async def check_n_ban(message: types.Message, reason: str):
         # delete id from the active_user_checks set
         if message.from_user.id in active_user_checks:
             active_user_checks.remove(message.from_user.id)
-            LOGGER.info(
-                "\033[91m%s removed from active_user_checks set in check_n_ban: \033[0m%s",
-                message.from_user.id,
-                active_user_checks,
-            )
+            if len(active_user_checks) > 5:
+                LOGGER.info(
+                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s... and %d more\033[0m",
+                    message.from_user.id,
+                    list(active_user_checks)[-5:],  # Last 5 elements
+                    len(active_user_checks) - 5,  # Number of elements left
+                )
+            else:
+                LOGGER.info(
+                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s\033[0m",
+                    message.from_user.id,
+                    active_user_checks,
+                )
             # stop the perform_checks coroutine if it is running for author_id
             for task in asyncio.all_tasks():
                 if task.get_name() == str(message.from_user.id):

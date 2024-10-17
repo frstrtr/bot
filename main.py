@@ -691,6 +691,9 @@ async def on_startup(_dp: Dispatcher):
         TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
     )
 
+    # DELETE MESSAGE once the bot is started
+    await BOT.delete_message(-1001461337235,126994)
+
     # Call the function to load and start checks
     asyncio.create_task(load_and_start_checks())
 

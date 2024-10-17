@@ -1,5 +1,6 @@
 # Requires Python 3.10
 aiogram==2.25.2
 requests==2.32.3
+emoji==2.14.0
 pillow==10.4.0
 aiocron==1.8.0

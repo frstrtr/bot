@@ -1441,6 +1441,7 @@ async def create_named_watchdog(coro, user_id):
 
 async def log_lists():
     """Function to log the banned users and active user checks lists."""
+    # TODO log summary numbers of banned users and active user checks totals
     LOGGER.info(
         "\033[93mBanned users list: %s\033[0m",
         banned_users,
@@ -1703,7 +1704,7 @@ if __name__ == "__main__":
         was_member, is_member = result
 
         # Check lols after user join/leave event in 2hr and ban if spam
-        if lols_spam is True:  # not Timeout exactly
+        if lols_spam is True or inout_status == ChatMemberStatus.KICKED:  # not Timeout exactly or if kicked by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(
                 check_and_autoban(event_record, inout_userid, inout_logmessage),
@@ -3273,6 +3274,7 @@ if __name__ == "__main__":
     # TODO if user is admin - add ban/cancel button to the personal message to admin
     # TODO search and delete user messages if banned by admin and timely checks
     # TODO bot stats to show on shutdown or on /stats bot comand like runtime banned list, active checks, uptime, etc
+    # TODO use active checks list to store recent messages links during runtime to delete it if user is banned
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

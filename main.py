@@ -2479,6 +2479,22 @@ if __name__ == "__main__":
                 )
                 return
 
+            # Check if the message is from chat in settings
+            if (
+                message.chat.id not in CHANNEL_IDS
+                or message.chat.id != ADMIN_GROUP_ID
+                or message.chat.id != TECHNOLOG_GROUP_ID
+            ):
+                LOGGER.debug(
+                    "\033[95m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
+                    message.from_user.id,
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                )
+                # await BOT.leave_chat(message.chat.id)
+                return
+
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages 

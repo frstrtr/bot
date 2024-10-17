@@ -2086,6 +2086,9 @@ if __name__ == "__main__":
         # admin_group_banner_message: Message = None # Type hinting
         try:  # If Topic_closed error
             if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+
+                # NOTE how to remove buttons if it was pressed in other dialogue?
+
                 # Send report to the admin group
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
@@ -2093,7 +2096,7 @@ if __name__ == "__main__":
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
-                # Send report action banner to the reporter
+                # XXX Send report action banner to the reporter
                 await message.answer(
                     admin_ban_banner,
                     parse_mode="HTML",
@@ -2465,7 +2468,7 @@ if __name__ == "__main__":
             # HACK remove afer sandboxing
 
             # check if sender is an admin in the channel or admin group and skip the message
-            if await is_admin(message.from_user.id, message.chat.id) and await is_admin(
+            if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
                 message.from_user.id, ADMIN_GROUP_ID
             ):
                 LOGGER.debug(
@@ -3284,7 +3287,6 @@ if __name__ == "__main__":
     # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
     # TODO check profile picture date, if today - check for lols for 2 days
     # TODO more attention to the messages from users with IDs > 8 000 000 000
-    # TODO save runtime checks states on shutdown to resume after restart
     # TODO automatically leave chats which is not listed in settings file
     # TODO edit message update check - check if user edited his message
     # TODO check if user changed his name
@@ -3295,7 +3297,6 @@ if __name__ == "__main__":
     # TODO fix database spammer store and find indexes, instead of date
     # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
     # TODO if user joins multiple chats via chat folder - check if the ban already issued to prevent excessive ops
-    # TODO if user is admin - add ban/cancel button to the personal message to admin
     # TODO search and delete user messages if banned by admin and timely checks
     # TODO bot stats to show on shutdown or on /stats bot comand like runtime banned list, active checks, uptime, etc
     # TODO use active checks list to store recent messages links during runtime to delete it if user is banned

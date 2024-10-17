@@ -2496,20 +2496,28 @@ if __name__ == "__main__":
                 return
 
             # Check if the message is from chat in settings
-            # if (
-            #     message.chat.id not in CHANNEL_IDS
-            #     or message.chat.id != ADMIN_GROUP_ID
-            #     or message.chat.id != TECHNOLOG_GROUP_ID
-            # ):
-            #     LOGGER.debug(
-            #         "\033[95m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
-            #         message.from_user.id,
-            #         message.message_id,
-            #         message.chat.title,
-            #         message.chat.id,
-            #     )
-            #     # XXX await BOT.leave_chat(message.chat.id)
-            #     return
+            if (
+                message.chat.id not in CHANNEL_IDS
+                and message.chat.id != ADMIN_GROUP_ID
+                and message.chat.id != TECHNOLOG_GROUP_ID
+            ):
+                # LOGGER.debug(
+                #     "message chat id: %s not in CHANNEL_IDS: %s ADMIN_GROUP_ID: %s TECHNOLOG_GROUP_ID: %s",
+                #     message.chat.id,
+                #     CHANNEL_IDS,
+                #     ADMIN_GROUP_ID,
+                #     TECHNOLOG_GROUP_ID,
+                # )
+
+                LOGGER.debug(
+                    "\033[93m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
+                    message.from_user.id,
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                )
+                # XXX await BOT.leave_chat(message.chat.id)
+                return
 
             cursor.execute(
                 """

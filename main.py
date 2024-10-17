@@ -781,7 +781,9 @@ async def on_shutdown(_dp):
     # number of the messages with spam not detected and deleted by admins
     # number of active user checks forwarded to the next session
 
-    await BOT.send_message(TECHNO_LOG_GROUP, "Short session stats:\n", message_thread_id=TECHNO_RESTART)
+    await BOT.send_message(
+        TECHNO_LOG_GROUP, "Short session stats:\n", message_thread_id=TECHNO_RESTART
+    )
     # Close the bot
     await BOT.close()
 
@@ -2494,20 +2496,20 @@ if __name__ == "__main__":
                 return
 
             # Check if the message is from chat in settings
-            if (
-                message.chat.id not in CHANNEL_IDS
-                or message.chat.id != ADMIN_GROUP_ID
-                or message.chat.id != TECHNOLOG_GROUP_ID
-            ):
-                LOGGER.debug(
-                    "\033[95m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
-                    message.from_user.id,
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                )
-                # XXX await BOT.leave_chat(message.chat.id)
-                return
+            # if (
+            #     message.chat.id not in CHANNEL_IDS
+            #     or message.chat.id != ADMIN_GROUP_ID
+            #     or message.chat.id != TECHNOLOG_GROUP_ID
+            # ):
+            #     LOGGER.debug(
+            #         "\033[95m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
+            #         message.from_user.id,
+            #         message.message_id,
+            #         message.chat.title,
+            #         message.chat.id,
+            #     )
+            #     # XXX await BOT.leave_chat(message.chat.id)
+            #     return
 
             cursor.execute(
                 """

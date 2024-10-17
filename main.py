@@ -49,7 +49,7 @@ active_user_checks = set()
 banned_users = set()
 
 # Dictionary to store running tasks by user ID
-running_tasks = {}
+running_watchdogs = {}
 
 # Initialize the event
 shutdown_event = asyncio.Event()
@@ -1414,29 +1414,29 @@ async def create_named_watchdog(coro, user_id):
     :param user_id: The user ID to use as the key in the running_tasks dictionary
 
     """
-    if user_id in running_tasks:
+    if user_id in running_watchdogs:
         LOGGER.info(
             "\033[93m%s Watchdog is already set. Skipping new task.\033[0m", user_id
         )
-        return await running_tasks[
+        return await running_watchdogs[
             user_id
         ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
     # Create the task and store it in the running_tasks dictionary
     task = asyncio.create_task(coro)
-    running_tasks[user_id] = task
+    running_watchdogs[user_id] = task
     # RED color for banned users
     LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", user_id)
 
     # Remove the task from the dictionary when it completes
     def task_done_callback(t: asyncio.Task):
-        running_tasks.pop(user_id, None)
+        running_watchdogs.pop(user_id, None)
         if t.exception():
             LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
 
     task.add_done_callback(task_done_callback)
 
-    return task
+    return await task  # Await the new task
 
 
 async def log_lists():
@@ -1456,11 +1456,11 @@ async def log_lists():
     today = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
     # Construct the filename with the current date
     filename = f"inout/banned_users_{today}.txt"
-    
+
     # Ensure the inout directory exists
     os.makedirs("inout", exist_ok=True)
     os.makedirs("daily_spam", exist_ok=True)
-    
+
     with open(filename, "w", encoding="utf-8") as file:
         for _id in banned_users:
             file.write(str(_id) + "\n")
@@ -1704,7 +1704,9 @@ if __name__ == "__main__":
         was_member, is_member = result
 
         # Check lols after user join/leave event in 2hr and ban if spam
-        if lols_spam is True or inout_status == ChatMemberStatus.KICKED:  # not Timeout exactly or if kicked by someone else
+        if (
+            lols_spam is True or inout_status == ChatMemberStatus.KICKED
+        ):  # not Timeout exactly or if kicked by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(
                 check_and_autoban(event_record, inout_userid, inout_logmessage),

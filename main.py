@@ -2032,7 +2032,7 @@ if __name__ == "__main__":
         )
 
         # Log the information with the link
-        log_info = (
+        technolog_info = (
             f"💡 Report timestamp: {message_report_date}\n"
             f"💡 Spam message timestamp: {message.date}\n"
             f"💡 Reaction time: {message_report_date - massage_timestamp}\n"
@@ -2070,7 +2070,10 @@ if __name__ == "__main__":
         )
         # Send the banner to the technolog group
         await BOT.send_message(
-            TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML", reply_markup=inline_kb
+            TECHNOLOG_GROUP_ID,
+            technolog_info,
+            parse_mode="HTML",
+            reply_markup=inline_kb,
         )
 
         # Keyboard ban/cancel/confirm buttons
@@ -2079,15 +2082,26 @@ if __name__ == "__main__":
         keyboard.add(ban_btn)
 
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
-        # And store published bunner message data to provide link to the reportee
+        # And store published banner message data to provide link to the reportee
         # admin_group_banner_message: Message = None # Type hinting
         try:  # If Topic_closed error
             if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+                # Send report to the admin group
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
                     reply_markup=keyboard,
                     parse_mode="HTML",
+                )
+                # Send report action banner to the reporter
+                await message.answer(
+                    admin_ban_banner,
+                    parse_mode="HTML",
+                    disable_notification=True,
+                    protect_content=True,
+                    allow_sending_without_reply=True,
+                    disable_web_page_preview=False,
+                    reply_markup=keyboard,
                 )
             else:  # send report to AUTOREPORT thread of the admin group
                 admin_group_banner_message = await BOT.send_message(

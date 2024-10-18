@@ -2238,11 +2238,19 @@ if __name__ == "__main__":
             # remove userid from the active_user_checks set
             if author_id in active_user_checks:
                 active_user_checks.remove(author_id)
-                LOGGER.info(
-                    "\033[91m%s removed from active_user_checks list during handle_ban by admin: \033[0m%s",
-                    author_id,
-                    active_user_checks,
-                )
+                if len(active_user_checks) > 5:
+                    LOGGER.info(
+                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s... and %d more\033[0m",
+                        author_id,
+                        list(active_user_checks)[-5:],  # Last 5 elements
+                        len(active_user_checks) - 5,  # Number of elements left
+                    )
+                else:
+                    LOGGER.info(
+                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s\033[0m",
+                        author_id,
+                        active_user_checks,
+                    )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):
@@ -2318,12 +2326,12 @@ if __name__ == "__main__":
                     try:
                         await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                         LOGGER.debug(
-                            "Message %s deleted from chat %s (%s) for user @%s (%s).",
+                            "\033[91m%s - %s message %s deleted from chat %s (%s).\033[0m",
+                            author_id,
+                            user_name,
                             message_id,
                             channels_dict[chat_id],
                             chat_id,
-                            user_name,
-                            author_id,
                         )
                         break  # break the loop if the message was deleted successfully
                     except RetryAfter as e:
@@ -2369,7 +2377,7 @@ if __name__ == "__main__":
                     #         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     #     )
             LOGGER.debug(
-                "User %s banned and their messages deleted where applicable.\n####################################################",
+                "\033[91m%s banned and their messages deleted where applicable.\n####################################################\033[0m",
                 author_id,
             )
 
@@ -2927,7 +2935,8 @@ if __name__ == "__main__":
                     #     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     # )
             LOGGER.debug(
-                "User %s banned and their messages deleted where applicable.", author_id
+                "\033[91m%s banned and their messages deleted where applicable.\033[0m",
+                author_id,
             )
             await message.reply(
                 f"Action taken: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",

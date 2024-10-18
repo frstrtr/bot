@@ -211,11 +211,11 @@ def get_spammer_details(
     spammer_last_name = spammer_last_name or ""
 
     LOGGER.debug(
-        "Getting chat ID and message ID for\n"
-        "spammerID: %s : firstName : %s : lastName : %s,\n"
+        "%-11s - getting chat ID and message ID\n"
+        "firstName : %s : lastName : %s,\n"
         "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
         "forwardSenderName: %s, forwardedFromID: %s\n",
-        spammer_id,
+        f"{spammer_id:11}",  # padding left align 11 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -292,8 +292,8 @@ def get_spammer_details(
         )  # get names from db
 
     LOGGER.debug(
-        "Result for sender: %s : %s %s, date: %s, from chat title: %s\nResult: %s",
-        spammer_id,
+        "%-11s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
+        f"{spammer_id:11}",
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -465,9 +465,9 @@ def load_config():
         ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 
     except FileNotFoundError as e:
-        LOGGER.error("File not found: %s", e.filename)
+        LOGGER.error("\033[91mFile not found: %s\033[0m", e.filename)
     except ET.ParseError as e:
-        LOGGER.error("Error parsing XML: %s", e)
+        LOGGER.error("\033[91mError parsing XML: %s\033[0m", e)
 
 
 def extract_status_change(
@@ -635,7 +635,11 @@ def format_spam_report(message: types.Message) -> str:
 async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
-    LOGGER.info("%s. Sending automated report to the admin group for review...", reason)
+    LOGGER.info(
+        "%-11s : %s. Sending automated report to the admin group for review...",
+        f"{message.from_id:11}",
+        reason,
+    )
 
     # Use the current date if message.forward_date is None
     # forward_date = message.forward_date if message.forward_date else datetime.now()

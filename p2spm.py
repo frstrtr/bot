@@ -1,44 +1,50 @@
-# p2p spammer database server with api and websocket
-# twisted based solution
-# Check if the user is in the lols bot database
-# https://api.lols.bot/account?id=
-# https://api.cas.chat/check?user_id=
+"""
+p2p spammer database server with API and WebSocket.
+Twisted-based solution.
+Check if the user is in the LOLS bot database:
+https://api.lols.bot/account?id=
+https://api.cas.chat/check?user_id=
+"""
 
-from twisted.internet import reactor, protocol
+import json
+from twisted.internet import reactor, endpoints, defer
+from twisted.web import server, resource
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
-from twisted.internet.defer import inlineCallbacks, returnValue
 from autobahn.twisted.websocket import WebSocketServerProtocol, WebSocketServerFactory
-import json
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger(__name__)
 
 
 class APIClient:
+    """A helper class to fetch data from static endpoints using Twisted's Agent."""
+
     def __init__(self):
         self.agent = Agent(reactor)
 
-    @inlineCallbacks
     def fetch_data(self, url):
-        response = yield self.agent.request(
+        """Fetch data from the given URL."""
+        return self.agent.request(
             b"GET",
             url.encode("utf-8"),
             Headers({"User-Agent": ["Twisted Web Client Example"]}),
             None,
-        )
-        body = yield readBody(response)
-        returnValue(body.decode("utf-8"))
+        ).addCallback(readBody)
 
 
 class SpammerCheckProtocol(WebSocketServerProtocol):
-    def onConnect(self, request):
-        print(f"Client connecting: {request.peer}")
+    """WebSocket protocol to handle spammer check requests."""
 
     def onOpen(self):
-        print("WebSocket connection open.")
+        LOGGER.info("WebSocket connection open.")
 
-    @inlineCallbacks
     def onMessage(self, payload, isBinary):
         if not isBinary:
             message = payload.decode("utf-8")
+            LOGGER.info(f"Text message received: {message}")
             data = json.loads(message)
             user_id = data.get("user_id")
             if user_id:
@@ -46,27 +52,77 @@ class SpammerCheckProtocol(WebSocketServerProtocol):
                 lols_bot_url = f"https://api.lols.bot/account?id={user_id}"
                 cas_chat_url = f"https://api.cas.chat/check?user_id={user_id}"
 
-                lols_bot_response = yield api_client.fetch_data(lols_bot_url)
-                cas_chat_response = yield api_client.fetch_data(cas_chat_url)
+                d1 = api_client.fetch_data(lols_bot_url)
+                d2 = api_client.fetch_data(cas_chat_url)
 
-                response = {
-                    "lols_bot": json.loads(lols_bot_response),
-                    "cas_chat": json.loads(cas_chat_response),
-                }
+                def handle_response(responses):
+                    lols_bot_response, cas_chat_response = responses
+                    response = {
+                        "lols_bot": json.loads(lols_bot_response.decode("utf-8")),
+                        "cas_chat": json.loads(cas_chat_response.decode("utf-8")),
+                    }
+                    self.sendMessage(json.dumps(response).encode("utf-8"))
 
-                self.sendMessage(json.dumps(response).encode("utf-8"))
+                defer.gatherResults([d1, d2]).addCallback(handle_response)
 
     def onClose(self, wasClean, code, reason):
-        print(f"WebSocket connection closed: {reason}")
+        LOGGER.info(f"WebSocket connection closed: {reason}")
 
 
 class SpammerCheckFactory(WebSocketServerFactory):
+    """WebSocket factory to create instances of SpammerCheckProtocol."""
+
     protocol = SpammerCheckProtocol
 
 
+class SpammerCheckResource(resource.Resource):
+    """HTTP resource to handle spammer check requests."""
+
+    isLeaf = True
+
+    def render_GET(self, request):
+        """Handle GET requests by fetching data from the LOLS and CAS APIs."""
+        user_id = request.args.get(b"user_id", [None])[0]
+        if user_id:
+            user_id = user_id.decode("utf-8")
+            api_client = APIClient()
+            lols_bot_url = f"https://api.lols.bot/account?id={user_id}"
+            cas_chat_url = f"https://api.cas.chat/check?user_id={user_id}"
+
+            d1 = api_client.fetch_data(lols_bot_url)
+            d2 = api_client.fetch_data(cas_chat_url)
+
+            def handle_response(responses):
+                lols_bot_response, cas_chat_response = responses
+                response = {
+                    "lols_bot": json.loads(lols_bot_response.decode("utf-8")),
+                    "cas_chat": json.loads(cas_chat_response.decode("utf-8")),
+                }
+                request.setHeader(b"content-type", b"application/json")
+                request.write(json.dumps(response).encode("utf-8"))
+                request.finish()
+
+            defer.gatherResults([d1, d2]).addCallback(handle_response)
+            return server.NOT_DONE_YET
+        else:
+            request.setResponseCode(400)
+            return b"Missing user_id parameter"
+
+
 def main():
-    factory = SpammerCheckFactory()
-    reactor.listenTCP(9000, factory)
+    """Main function to start the server."""
+    # Set up the WebSocket server
+    ws_factory = SpammerCheckFactory()
+    ws_endpoint = endpoints.TCP4ServerEndpoint(reactor, 9000)
+    ws_endpoint.listen(ws_factory)
+
+    # Set up the HTTP server
+    root = resource.Resource()
+    root.putChild(b"check", SpammerCheckResource())
+    http_factory = server.Site(root)
+    http_endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)
+    http_endpoint.listen(http_factory)
+
     reactor.run()
 
 

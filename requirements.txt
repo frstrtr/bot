@@ -6,3 +6,5 @@ pillow==10.4.0
 aiocron==1.8.0
 twisted==24.7.0
 autobahn==24.4.2
+pyopenssl==24.2.1
+service_identity==24.1.0

@@ -21,17 +21,16 @@ LOGGER = logging.getLogger(__name__)
 
 class APIClient:
     """A helper class to fetch data from static endpoints using Twisted's Agent."""
-
     def __init__(self):
-        self.agent = Agent(reactor)
+        self.agent = Agent(reactor, contextFactory=NoVerifyContextFactory())
 
     def fetch_data(self, url):
         """Fetch data from the given URL."""
         return self.agent.request(
-            b"GET",
-            url.encode("utf-8"),
-            Headers({"User-Agent": ["Twisted Web Client Example"]}),
-            None,
+            b'GET',
+            url.encode('utf-8'),
+            Headers({'User-Agent': ['Twisted Web Client Example']}),
+            None
         ).addCallback(readBody)
 
 

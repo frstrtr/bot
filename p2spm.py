@@ -12,6 +12,10 @@ from twisted.web import server, resource
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
 from autobahn.twisted.websocket import WebSocketServerProtocol, WebSocketServerFactory
+from twisted.internet.ssl import optionsForClientTLS
+from twisted.internet._sslverify import ClientTLSOptions
+from twisted.web.iweb import IPolicyForHTTPS
+from zope.interface import implementer
 import logging
 
 # Set up logging
@@ -19,18 +23,30 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 
 
+@implementer(IPolicyForHTTPS)
+class NoVerifyContextFactory:
+    """A context factory that does not verify SSL certificates."""
+
+    def __init__(self):
+        self.options = optionsForClientTLS(hostname=None)
+
+    def creatorForNetloc(self, hostname, port):
+        return ClientTLSOptions(hostname, self.options.getContext())
+
+
 class APIClient:
     """A helper class to fetch data from static endpoints using Twisted's Agent."""
+
     def __init__(self):
         self.agent = Agent(reactor, contextFactory=NoVerifyContextFactory())
 
     def fetch_data(self, url):
         """Fetch data from the given URL."""
         return self.agent.request(
-            b'GET',
-            url.encode('utf-8'),
-            Headers({'User-Agent': ['Twisted Web Client Example']}),
-            None
+            b"GET",
+            url.encode("utf-8"),
+            Headers({"User-Agent": ["Twisted Web Client Example"]}),
+            None,
         ).addCallback(readBody)
 
 

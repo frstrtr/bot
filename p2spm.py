@@ -6,6 +6,7 @@ https://api.lols.bot/account?id=
 https://api.cas.chat/check?user_id=
 """
 
+import logging
 import json
 from twisted.internet import reactor, endpoints, defer
 from twisted.web import server, resource
@@ -16,7 +17,6 @@ from twisted.internet.ssl import CertificateOptions
 from twisted.internet._sslverify import ClientTLSOptions
 from twisted.web.iweb import IPolicyForHTTPS
 from zope.interface import implementer
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +32,8 @@ class NoVerifyContextFactory:
         self.options = CertificateOptions(verify=False)
 
     def creatorForNetloc(self, hostname, port):
+        """Function description here"""
+        LOGGER.info("Creating context for %s: %s", hostname, port)
         return ClientTLSOptions(hostname, self.options.getContext())
 
 
@@ -60,36 +62,37 @@ class SpammerCheckProtocol(WebSocketServerProtocol):
     def onMessage(self, payload, isBinary):
         if not isBinary:
             message = payload.decode("utf-8")
-            LOGGER.info(f"Text message received: {message}")
+            LOGGER.info("Text message received: %s", message)
             data = json.loads(message)
             user_id = data.get("user_id")
             if user_id:
-                api_client = APIClient("api.lols.bot")
+                api_client_lols = APIClient("api.lols.bot")
+                api_client_cas = APIClient("api.cas.chat")
                 lols_bot_url = f"https://api.lols.bot/account?id={user_id}"
                 cas_chat_url = f"https://api.cas.chat/check?user_id={user_id}"
 
-                d1 = api_client.fetch_data(lols_bot_url)
-                d2 = api_client.fetch_data(cas_chat_url)
+                d1 = api_client_lols.fetch_data(lols_bot_url)
+                d2 = api_client_cas.fetch_data(cas_chat_url)
 
                 def handle_response(responses):
                     lols_bot_response, cas_chat_response = responses
                     LOGGER.info(
-                        f"LOLS bot response: {lols_bot_response.decode('utf-8')}"
+                        "LOLS bot response: %s", lols_bot_response.decode("utf-8")
                     )
                     LOGGER.info(
-                        f"CAS chat response: {cas_chat_response.decode('utf-8')}"
+                        "CAS chat response: %s", cas_chat_response.decode("utf-8")
                     )
                     response = {
                         "lols_bot": json.loads(lols_bot_response.decode("utf-8")),
                         "cas_chat": json.loads(cas_chat_response.decode("utf-8")),
                     }
                     self.sendMessage(json.dumps(response).encode("utf-8"))
-                    LOGGER.info(f"Response sent: {response}")
+                    LOGGER.info("Response sent: %s", response)
 
                 defer.gatherResults([d1, d2]).addCallback(handle_response)
 
     def onClose(self, wasClean, code, reason):
-        LOGGER.info(f"WebSocket connection closed: {reason}")
+        LOGGER.info("WebSocket connection closed: %s", reason)
 
 
 class SpammerCheckFactory(WebSocketServerFactory):
@@ -108,7 +111,7 @@ class SpammerCheckResource(resource.Resource):
         user_id = request.args.get(b"user_id", [None])[0]
         if user_id:
             user_id = user_id.decode("utf-8")
-            LOGGER.info(f"Received HTTP request for user_id: {user_id}")
+            LOGGER.info("Received HTTP request for user_id: %s", user_id)
             api_client_lols = APIClient("api.lols.bot")
             api_client_cas = APIClient("api.cas.chat")
             lols_bot_url = f"https://api.lols.bot/account?id={user_id}"
@@ -119,8 +122,8 @@ class SpammerCheckResource(resource.Resource):
 
             def handle_response(responses):
                 lols_bot_response, cas_chat_response = responses
-                LOGGER.info(f"LOLS bot response: {lols_bot_response.decode('utf-8')}")
-                LOGGER.info(f"CAS chat response: {cas_chat_response.decode('utf-8')}")
+                LOGGER.info("LOLS bot response: %s", lols_bot_response.decode("utf-8"))
+                LOGGER.info("CAS chat response: %s", cas_chat_response.decode("utf-8"))
                 response = {
                     "lols_bot": json.loads(lols_bot_response.decode("utf-8")),
                     "cas_chat": json.loads(cas_chat_response.decode("utf-8")),
@@ -128,7 +131,7 @@ class SpammerCheckResource(resource.Resource):
                 request.setHeader(b"content-type", b"application/json")
                 request.write(json.dumps(response).encode("utf-8"))
                 request.finish()
-                LOGGER.info(f"Response sent: {response}")
+                LOGGER.info("Response sent: %s", response)
 
             defer.gatherResults([d1, d2]).addCallback(handle_response)
             return server.NOT_DONE_YET

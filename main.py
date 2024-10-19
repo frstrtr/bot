@@ -292,8 +292,6 @@ def get_spammer_details(
         )  # get names from db
 
     LOGGER.debug(
-        "%s result for sender: %s %s, date: %s, from chat title: %s Result: %s",
-        spammer_id,
         "%-11s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
         f"{spammer_id:11}",
         spammer_first_name,

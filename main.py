@@ -167,7 +167,7 @@ def get_latest_commit_info():
         )
         return _commit_info
     except subprocess.CalledProcessError as e:
-        LOGGER.info(f"Error getting git commit info: {e}")
+        LOGGER.info("Error getting git commit info: %s", e)
         return None
 
 
@@ -292,7 +292,7 @@ def get_spammer_details(
         )  # get names from db
 
     LOGGER.debug(
-        "Result for sender: %s : %s %s, date: %s, from chat title: %s\nResult: %s",
+        "%s result for sender: %s %s, date: %s, from chat title: %s Result: %s",
         spammer_id,
         spammer_first_name,
         spammer_last_name,

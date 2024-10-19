@@ -692,7 +692,8 @@ async def on_startup(_dp: Dispatcher):
     )
 
     # DELETE MESSAGE once the bot is started
-    # await BOT.delete_message(-1001461337235,126994)
+    # https://t.me/mavrikiy/127041
+    await BOT.delete_message("mavrikiy", 127041)
 
     # Call the function to load and start checks
     asyncio.create_task(load_and_start_checks())

@@ -1737,7 +1737,7 @@ if __name__ == "__main__":
         ):  # not Timeout exactly or if kicked by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(
-                await check_and_autoban(event_record, inout_userid, inout_logmessage),
+                check_and_autoban(event_record, inout_userid, inout_logmessage),
                 user_id=inout_userid,
             )
             # await check_and_autoban(event_record, inout_userid, inout_logmessage)

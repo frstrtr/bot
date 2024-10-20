@@ -2141,8 +2141,8 @@ if __name__ == "__main__":
                     reply_markup=keyboard,
                     parse_mode="HTML",
                 )
-                # XXX Send report action banner to the reporter
-                await message.answer(
+                # XXX Send report action banner to the reporter/var to revoke the message
+                admin_action_banner_message = await message.answer(
                     admin_ban_banner,
                     parse_mode="HTML",
                     disable_notification=True,
@@ -2151,6 +2151,24 @@ if __name__ == "__main__":
                     disable_web_page_preview=False,
                     reply_markup=keyboard,
                 )
+
+                # Store the admin action banner message data
+                DP["admin_action_banner_message"] = admin_action_banner_message
+                DP["admin_group_banner_message"] = admin_group_banner_message
+                # always store the report chat ID with admin personal chat ID
+                DP["report_chat_id"] = message.chat.id
+
+                # Construct link to the published banner and send it to the reporter
+                private_chat_id = int(
+                    str(admin_group_banner_message.chat.id)[4:]
+                )  # Remove -100 from the chat ID
+                banner_link = f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
+                # Send the banner link to the reporter-admin
+                await message.answer(f"Admin group banner link: {banner_link}")
+
+                # XXX return admin personal report banner message object
+                return admin_action_banner_message
+
             else:  # send report to AUTOREPORT thread of the admin group
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
@@ -2159,28 +2177,12 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     message_thread_id=ADMIN_AUTOREPORTS,
                 )
+
         except utils.exceptions.BadRequest as e:
             LOGGER.error("Error while sending the banner to the admin group: %s", e)
             await message.answer(
                 "Error while sending the banner to the admin group. Please check the logs."
             )
-
-        # Log the banner message data
-        # logger.debug(f"Admin group banner: {admin_group_banner_message}")
-        # Construct link to the published banner and send it to the reporter
-        private_chat_id = int(
-            str(admin_group_banner_message.chat.id)[4:]
-        )  # Remove -100 from the chat ID
-        banner_link = (
-            f"https://t.me/c/{private_chat_id}/{admin_group_banner_message.message_id}"
-        )
-        # Log the banner link
-        # logger.debug(f"Banner link: {banner_link}")
-
-        # Check if the reporter is an admin in the admin group:
-        if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
-            # Send the banner link to the reporter
-            await message.answer(f"Admin group banner link: {banner_link}")
 
     @DP.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
     async def ask_confirmation(callback_query: CallbackQuery):
@@ -2200,11 +2202,31 @@ if __name__ == "__main__":
 
         keyboard.add(confirm_btn, cancel_btn)
 
+        admin_group_banner_message = DP["admin_group_banner_message"]
+        admin_action_banner_message = DP["admin_action_banner_message"]
+        report_chat_id = DP["report_chat_id"]
+
+        # Edit messages to remove buttons or messages
+        # check where the callback_query was pressed
+        # remove buttons and add Confirm/Cancel buttons in the same chat
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
             reply_markup=keyboard,
         )
+        
+        if callback_query.message.chat.id == ADMIN_GROUP_ID:        
+            # remove personal report banner message
+            await BOT.delete_message(
+                report_chat_id, admin_action_banner_message.message_id
+            )
+        else: # report was actioned in the personal chat
+            # remove admin group banner buttons
+            await BOT.edit_message_reply_markup(
+                chat_id=ADMIN_GROUP_ID,
+                message_id=admin_group_banner_message.message_id,
+            )
+
 
     @DP.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
     async def handle_ban(callback_query: CallbackQuery):

@@ -346,30 +346,29 @@ def load_config():
     #     logger.warning("Bot starting without git info.")
 
     # Configure logging to use UTF-8 encoding
-    logging.basicConfig(
-        level=logging.DEBUG,  # Set the logging level to DEBUG for detailed output
-        format="%(asctime)s - %(message)s",  # Include timestamp in log messages
-        handlers=[
-            logging.StreamHandler(sys.stdout),  # Stream handler for console output
-            logging.FileHandler(
-                "bancop_BOT.log", encoding="utf-8"
-            ),  # File handler for log file output
-        ],
-    )
-
-    # Ensure the stream handler uses UTF-8 encoding
-    for handler in logging.getLogger().handlers:
-        if isinstance(handler, logging.StreamHandler):
-            handler.setStream(
-                open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
-            )
-
     LOGGER = logging.getLogger(__name__)
+    if not LOGGER.hasHandlers():
+        LOGGER.setLevel(
+            logging.INFO
+        )  # Set the logging level to INFO for detailed output
 
-    # Create a formatter and set it for all handlers
-    formatter = logging.Formatter("%(asctime)s - %(message)s")
-    for handler in LOGGER.handlers:
-        handler.setFormatter(formatter)
+        # Create handlers
+        stream_handler = logging.StreamHandler(sys.stdout)
+        file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
+
+        # Create a formatter and set it for all handlers
+        formatter = logging.Formatter("%(asctime)s - %(message)s")
+        stream_handler.setFormatter(formatter)
+        file_handler.setFormatter(formatter)
+
+        # Ensure the stream handler uses UTF-8 encoding
+        stream_handler.setStream(
+            open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
+        )
+
+        # Add handlers to the logger
+        LOGGER.addHandler(stream_handler)
+        LOGGER.addHandler(file_handler)
 
     # Define allowed content types excluding NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
     allowed_content_types = [

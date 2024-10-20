@@ -1,5 +1,6 @@
 import asyncio
 import aiocron
+import sys
 from datetime import datetime
 import os
 import random
@@ -344,30 +345,31 @@ def load_config():
     # else:
     #     logger.warning("Bot starting without git info.")
 
-    # logging.basicConfig(level=logging.DEBUG)
-    # To debug the bot itself (e.g., to see the messages it receives)
-    LOGGER = logging.getLogger(
-        __name__
-    )  # To debug the script (e.g., to see if the XML is loaded correctly)
-    LOGGER.setLevel(
-        logging.DEBUG
-    )  # To debug the script (e.g., to see if the XML is loaded correctly)
+    # Configure logging to use UTF-8 encoding
+    logging.basicConfig(
+        level=logging.DEBUG,  # Set the logging level to DEBUG for detailed output
+        format="%(asctime)s - %(message)s",  # Include timestamp in log messages
+        handlers=[
+            logging.StreamHandler(sys.stdout),  # Stream handler for console output
+            logging.FileHandler(
+                "bancop_BOT.log", encoding="utf-8"
+            ),  # File handler for log file output
+        ],
+    )
 
-    # Create handlers
-    file_handler = logging.FileHandler("bancop_BOT.log")  # For writing logs to a file
-    stream_handler = logging.StreamHandler()  # For writing logs to the console
+    # Ensure the stream handler uses UTF-8 encoding
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setStream(
+                open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
+            )
 
-    # Create formatters and add them to handlers
-    FORMAT_STR = "%(asctime)s - %(message)s"  # Includes timestamp
-    # FORMAT_STR = "%(message)s"  # Excludes timestamp, logger's name, and log level
+    LOGGER = logging.getLogger(__name__)
 
-    formatter = logging.Formatter(FORMAT_STR)
-    file_handler.setFormatter(formatter)
-    stream_handler.setFormatter(formatter)
-
-    # Add handlers to the logger
-    LOGGER.addHandler(file_handler)
-    LOGGER.addHandler(stream_handler)
+    # Create a formatter and set it for all handlers
+    formatter = logging.Formatter("%(asctime)s - %(message)s")
+    for handler in LOGGER.handlers:
+        handler.setFormatter(formatter)
 
     # Define allowed content types excluding NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
     allowed_content_types = [
@@ -882,7 +884,7 @@ async def handle_forwarded_reports_with_details(
 
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
-    #remove -100 from the chat ID if this is a public group
+    # remove -100 from the chat ID if this is a public group
     if message.chat.id < 0:
         chat_id = int(str(message.chat.id)[4:])
     else:

@@ -1475,11 +1475,13 @@ async def log_lists():
     """Function to log the banned users and active user checks lists."""
     # TODO log summary numbers of banned users and active user checks totals
     LOGGER.info(
-        "\033[93mBanned users list: %s\033[0m",
+        "\033[93m%s banned users list: %s\033[0m",
+        len(banned_users),
         banned_users,
     )
     LOGGER.info(
-        "\033[93mActive user checks list: %s\033[0m",
+        "\033[93m%s Active user checks list: %s\033[0m",
+        len(active_user_checks),
         active_user_checks,
     )
     # TODO move inout and daily_spam logs to the dedicated folders
@@ -1539,7 +1541,12 @@ async def log_lists():
             split_list(active_user_checks_list, max_message_length)
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
-
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            f"Current user checks list: {len(active_user_checks)}",
+            message_thread_id=ADMIN_AUTOBAN,
+            parse_mode="HTML",
+        )
         # Send active user checks list in chunks
         for chunk in active_user_chunks:
             await BOT.send_message(
@@ -1548,7 +1555,12 @@ async def log_lists():
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )
-
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            f"Current banned users list: {len(banned_users)}",
+            message_thread_id=ADMIN_AUTOBAN,
+            parse_mode="HTML",
+        )
         # Send banned users list in chunks
         for chunk in banned_user_chunks:
             await BOT.send_message(

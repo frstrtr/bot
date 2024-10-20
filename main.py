@@ -212,11 +212,11 @@ def get_spammer_details(
     spammer_last_name = spammer_last_name or ""
 
     LOGGER.debug(
-        "%-11s - getting chat ID and message ID\n"
+        "%-10s - getting chat ID and message ID\n"
         "firstName : %s : lastName : %s,\n"
         "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
         "forwardSenderName: %s, forwardedFromID: %s\n",
-        f"{spammer_id if spammer_id is not None else '':11}",  # padding left align 11 chars
+        f"{spammer_id if spammer_id is not None else '':10}",  # padding left align 11 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -292,9 +292,14 @@ def get_spammer_details(
             result[6],
         )  # get names from db
 
+    # Ensure result[3] is not None before formatting
+    # result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
+
     LOGGER.debug(
-        "%-11s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
-        f"{spammer_id if spammer_id is not None else '':11}",  # padding left align 11 chars
+        "%-10s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
+        (
+            f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
+        ),  # padding left align 10 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -637,8 +642,8 @@ async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
-        "%-11s : %s. Sending automated report to the admin group for review...",
-        f"{message.from_id:11}",
+        "%-10s : %s. Sending automated report to the admin group for review...",
+        f"{message.from_id:10}",
         reason,
     )
 
@@ -878,7 +883,9 @@ async def handle_forwarded_reports_with_details(
     if not found_message_data:  # Last resort. Give up.
         return
 
-    LOGGER.debug("Found message data: %s", found_message_data)
+    LOGGER.debug(
+        "%-10s - message data: %s", f"{found_message_data[3]:10}", found_message_data
+    )
     # logger.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
@@ -1995,7 +2002,7 @@ if __name__ == "__main__":
             return
             # pass
 
-        LOGGER.debug("%s - message data: %s", spammer_id, found_message_data)
+        LOGGER.debug("%s - message data: %s", found_message_data[3], found_message_data)
 
         # Save both the original message_id and the forwarded message's date
         received_date = message.date if message.date else None
@@ -2214,19 +2221,18 @@ if __name__ == "__main__":
             message_id=callback_query.message.message_id,
             reply_markup=keyboard,
         )
-        
-        if callback_query.message.chat.id == ADMIN_GROUP_ID:        
+
+        if callback_query.message.chat.id == ADMIN_GROUP_ID:
             # remove personal report banner message
             await BOT.delete_message(
                 report_chat_id, admin_action_banner_message.message_id
             )
-        else: # report was actioned in the personal chat
+        else:  # report was actioned in the personal chat
             # remove admin group banner buttons
             await BOT.edit_message_reply_markup(
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_group_banner_message.message_id,
             )
-
 
     @DP.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
     async def handle_ban(callback_query: CallbackQuery):

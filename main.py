@@ -882,10 +882,13 @@ async def handle_forwarded_reports_with_details(
 
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
-    report_id = int(str(message.chat.id) + str(message.message_id))
-    # if report_id:
-    # send report ID to the reporter - no need since this is automated report by condition now
-    # await message.answer(f"Report ID: {report_id}")
+    #remove -100 from the chat ID if this is a public group
+    if message.chat.id < 0:
+        chat_id = int(str(message.chat.id)[4:])
+    else:
+        chat_id = message.chat.id
+    report_id = int(str(chat_id) + str(message.message_id))
+    # Save the message to the database
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 

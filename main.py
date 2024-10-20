@@ -885,10 +885,9 @@ async def handle_forwarded_reports_with_details(
     received_date = message.date if message.date else None
     # remove -100 from the chat ID if this is a public group
     if message.chat.id < 0:
-        chat_id = int(str(message.chat.id)[4:])
+        report_id = int(str(message.chat.id)[4:] + str(message.message_id))
     else:
-        chat_id = message.chat.id
-    report_id = int(str(chat_id) + str(message.message_id))
+        report_id = int(str(message.chat.id) + str(message.message_id))
     # Save the message to the database
     cursor.execute(
         """
@@ -1992,14 +1991,20 @@ if __name__ == "__main__":
                 )
 
         if not found_message_data:  # Last resort. Give up.
+            LOGGER.info("           Could not retrieve the author's user ID.")
             return
             # pass
 
-        LOGGER.debug("Message data: %s", found_message_data)
+        LOGGER.debug("%s - message data: %s", spammer_id, found_message_data)
 
         # Save both the original message_id and the forwarded message's date
         received_date = message.date if message.date else None
-        report_id = int(str(message.chat.id) + str(message.message_id))
+        # Create a unique report ID based on the chat ID and message ID and remove -100 if public chat
+        if message.chat.id < 0:
+            report_id = int(str(message.chat.id)[4:] + str(message.message_id))
+        else:
+            report_id = int(str(message.chat.id) + str(message.message_id))
+
         if report_id:
             # send report ID to the reporter
             await message.answer(f"Report ID: {report_id}")

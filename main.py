@@ -216,7 +216,7 @@ def get_spammer_details(
         "firstName : %s : lastName : %s,\n"
         "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
         "forwardSenderName: %s, forwardedFromID: %s\n",
-        f"{spammer_id:11}",  # padding left align 11 chars
+        f"{spammer_id if spammer_id is not None else '':11}",  # padding left align 11 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -294,7 +294,7 @@ def get_spammer_details(
 
     LOGGER.debug(
         "%-11s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
-        f"{spammer_id:11}",
+        f"{spammer_id if spammer_id is not None else '':11}",  # padding left align 11 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -349,7 +349,7 @@ def load_config():
     LOGGER = logging.getLogger(__name__)
     if not LOGGER.hasHandlers():
         LOGGER.setLevel(
-            logging.INFO
+            logging.DEBUG
         )  # Set the logging level to INFO for detailed output
 
         # Create handlers

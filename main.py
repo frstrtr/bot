@@ -728,14 +728,15 @@ async def on_startup(_dp: Dispatcher):
 
 async def load_and_start_checks():
     """Load all unfinished checks from file and start them with 1 sec interval"""
-    file_path = "active_user_checks.txt"
+    file_path_active_checks = "active_user_checks.txt"
+    file_path_banned_users = "banned_users.txt"
 
-    if not os.path.exists(file_path):
-        LOGGER.error("File not found: %s", file_path)
+    if not os.path.exists(file_path_active_checks):
+        LOGGER.error("File not found: %s", file_path_active_checks)
         return
 
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path_active_checks, "r", encoding="utf-8") as file:
             for line in file:
                 user_id = int(line.strip())
                 active_user_checks.add(user_id)
@@ -750,8 +751,16 @@ async def load_and_start_checks():
                 # interval between checks
                 await asyncio.sleep(1)
                 LOGGER.info("%s loaded from file & 2hr monitoring started ...", user_id)
+    
+        if os.path.exists(file_path_banned_users):
+            with open(file_path_banned_users, "r", encoding="utf-8") as file:
+                for line in file:
+                    user_id = int(line.strip())
+                    banned_users.add(user_id)
+                LOGGER.info("Banned users list loaded from file: %s", banned_users)
+
     except FileNotFoundError as e:
-        LOGGER.error("Error loading checks: %s", e)
+        LOGGER.error("Error loading checks and bans: %s", e)
 
 
 async def sequential_shutdown_tasks(_id):
@@ -788,9 +797,22 @@ async def on_shutdown(_dp):
     await asyncio.gather(*tasks)
 
     # save all unbanned checks to temp file to restart checks after bot restart
-    with open("active_user_checks.txt", "w", encoding="utf-8") as file:
-        for _id in active_user_checks:
-            file.write(str(_id) + "\n")
+    # check if active_user_checks is not empty
+    if active_user_checks:    
+        with open("active_user_checks.txt", "w", encoding="utf-8") as file:
+            for _id in active_user_checks:
+                file.write(str(_id) + "\n")
+
+    # save all banned users to temp file to preserve list after bot restart
+    if os.path.exists("banned_users.txt") and banned_users:
+        with open("banned_users.txt", "a", encoding="utf-8") as file:
+            for _id in banned_users:
+                file.write(str(_id) + "\n")
+    elif banned_users:
+        with open("banned_users.txt", "w", encoding="utf-8") as file:
+            for _id in banned_users:
+                file.write(str(_id) + "\n")
+    
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
@@ -1522,9 +1544,18 @@ async def log_lists():
     os.makedirs("inout", exist_ok=True)
     os.makedirs("daily_spam", exist_ok=True)
 
+    # read current banned users list from the file
+    if os.path.exists("banned_users.txt"):
+        with open('banned_users.txt', 'r') as file:
+            #append users to the set
+            for line in file:
+                banned_users.add(int(line.strip()))
+        os.remove("banned_users.txt") # remove the file after reading
+    # save banned users list to the file with the current date to the inout folder
     with open(filename, "w", encoding="utf-8") as file:
         for _id in banned_users:
             file.write(str(_id) + "\n")
+    
     # move yesterday's daily_spam file to the daily_spam folder
     daily_spam_filename = get_daily_spam_filename()
     inout_filename = get_inout_filename()
@@ -3423,11 +3454,14 @@ if __name__ == "__main__":
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "%s changed in user_changed_message function: %s --> %s",
+            "%s changed in user_changed_message function: %s --> %s, deleting system message...",
             message.from_id,
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
         )
+
+        # remove system message about user join/left where applicable
+        await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
 
     @aiocron.crontab("0 4 * * *")
     async def scheduled_log():

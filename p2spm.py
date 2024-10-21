@@ -234,6 +234,7 @@ class P2PProtocol(protocol.Protocol):
             {
                 "host": peer.transport.getPeer().host,
                 "port": peer.transport.getPeer().port,
+                "uuid": self.factory.uuid,
             }
             for peer in self.factory.peers
         ]
@@ -288,7 +289,7 @@ class P2PFactory(protocol.Factory):
         for peer in peers:
             host = peer["host"]
             port = peer["port"]
-            peer_uuid = peer["uuid"]
+            peer_uuid = peer.get("uuid")  # Use .get() to handle missing UUID gracefully
             if peer_uuid == self.uuid:
                 LOGGER.info(
                     "Skipping self connection to %s:%d (UUID: %s)",

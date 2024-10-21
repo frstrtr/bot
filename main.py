@@ -1088,10 +1088,10 @@ async def lols_autoban(_id):
         active_user_checks.remove(_id)
         if len(active_user_checks) > 5:
             LOGGER.info(
-                "\033[91m%s removed from active_user_checks list during lols_autoban: %s... and %d more\033[0m",
+                "\033[91m%s removed from active_user_checks list during lols_autoban: %s... and %d totally\033[0m",
                 _id,
                 list(active_user_checks)[-5:],  # Last 5 elements
-                len(active_user_checks) - 5,  # Number of elements left
+                len(active_user_checks),  # Number of elements left
             )
         else:
             LOGGER.info(
@@ -1149,11 +1149,11 @@ async def check_and_autoban(
             action = "is already added to"
         if len(banned_users) > 5:  # prevent spamming the log
             LOGGER.info(
-                "\033[93m%s %s runtime banned users list: %s... and %d more\033[0m",
+                "\033[93m%s %s runtime banned users list: %s... and %d totally\033[0m",
                 user_id,
                 action,
                 list(banned_users)[-5:],  # Last 5 elements
-                len(banned_users) - 5,  # Number of elements left
+                len(banned_users),  # Number of elements left
             )
         else:  # less than 5 banned users
             LOGGER.info(
@@ -1273,10 +1273,10 @@ async def check_n_ban(message: types.Message, reason: str):
             active_user_checks.remove(message.from_user.id)
             if len(active_user_checks) > 5:
                 LOGGER.info(
-                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s... and %d more\033[0m",
+                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s... and %d totally\033[0m",
                     message.from_user.id,
                     list(active_user_checks)[-5:],  # Last 5 elements
-                    len(active_user_checks) - 5,  # Number of elements left
+                    len(active_user_checks),  # Number of elements left
                 )
             else:
                 LOGGER.info(
@@ -1435,10 +1435,10 @@ async def perform_checks(
             active_user_checks.remove(user_id)
             if len(active_user_checks) > 5:
                 LOGGER.info(
-                    "\033[92m%s removed from active_user_checks list in finally block: %s... and %d more\033[0m",
+                    "\033[92m%s removed from active_user_checks list in finally block: %s... and %d totally\033[0m",
                     user_id,
                     list(active_user_checks)[-5:],  # Last 5 elements
-                    len(active_user_checks) - 5,  # Number of elements left
+                    len(active_user_checks),  # Number of elements left
                 )
             else:
                 LOGGER.info(
@@ -2294,10 +2294,10 @@ if __name__ == "__main__":
                 active_user_checks.remove(author_id)
                 if len(active_user_checks) > 5:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s... and %d more\033[0m",
+                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s... and %d totally\033[0m",
                         author_id,
                         list(active_user_checks)[-5:],  # Last 5 elements
-                        len(active_user_checks) - 5,  # Number of elements left
+                        len(active_user_checks),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
@@ -2898,10 +2898,10 @@ if __name__ == "__main__":
                 active_user_checks.remove(author_id)
                 if len(active_user_checks) > 5:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during ban by admin: %s... and %d more\033[0m",
+                        "\033[91m%s removed from active_user_checks list during ban by admin: %s... and %d totally\033[0m",
                         author_id,
                         list(active_user_checks)[-5:],  # Last 5 elements
-                        len(active_user_checks) - 5,  # Number of elements left
+                        len(active_user_checks),  # Number of elements left
                     )
                 else:
                     LOGGER.info(

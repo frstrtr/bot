@@ -258,13 +258,6 @@ class P2PFactory(protocol.Factory):
             peer.transport.write(message.encode("utf-8"))
         LOGGER.info("Broadcasted spammer info: %s", message)
 
-    def broadcast_spammer_info(self, user_id):
-        """Broadcast spammer information to all connected peers."""
-        message = json.dumps({"user_id": user_id})
-        for peer in self.peers:
-            peer.transport.write(message.encode("utf-8"))
-        LOGGER.info("Broadcasted spammer info: %s", message)
-
     def connect_to_bootstrap_peers(self, bootstrap_addresses):
         """Connect to bootstrap peers and gather available peers."""
         deferreds = []

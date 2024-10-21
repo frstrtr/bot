@@ -189,20 +189,56 @@ class SpammerCheckResource(resource.Resource):
                 lols_bot_response, cas_chat_response = responses
                 LOGGER.info("LOLS bot response: %s", lols_bot_response.decode("utf-8"))
                 LOGGER.info("CAS chat response: %s", cas_chat_response.decode("utf-8"))
+                lols_bot_data = json.loads(lols_bot_response.decode("utf-8"))
+                cas_chat_data = json.loads(cas_chat_response.decode("utf-8"))
+
+                # Determine if the user is a spammer based on either response
+                is_spammer = (
+                    lols_bot_data.get("banned", False)
+                    or cas_chat_data.get("result", {}).get("offenses", 0) > 0
+                )
+
+                # Check for P2P data (placeholder implementation)
+                p2p_data = self.check_p2p_data(user_id)
+
                 response = {
-                    "lols_bot": json.loads(lols_bot_response.decode("utf-8")),
-                    "cas_chat": json.loads(cas_chat_response.decode("utf-8")),
+                    "ok": True,
+                    "user_id": user_id,
+                    "is_spammer": is_spammer,
+                    "lols_bot": lols_bot_data,
+                    "cas_chat": cas_chat_data,
+                    "p2p": p2p_data,
                 }
                 request.setHeader(b"content-type", b"application/json")
                 request.write(json.dumps(response).encode("utf-8"))
                 request.finish()
                 LOGGER.info("Response sent: %s", response)
 
-            defer.gatherResults([d1, d2]).addCallback(handle_response)
+            def handle_error(failure):
+                LOGGER.error("Error querying APIs: %s", failure)
+                response = {
+                    "ok": False,
+                    "user_id": user_id,
+                    "error": str(failure),
+                }
+                request.setHeader(b"content-type", b"application/json")
+                request.write(json.dumps(response).encode("utf-8"))
+                request.finish()
+                LOGGER.info("Error response sent: %s", response)
+
+            d = defer.gatherResults([d1, d2])
+            d.addCallback(handle_response)
+            d.addErrback(handle_error)
             return server.NOT_DONE_YET
         else:
             request.setResponseCode(400)
             return b"Missing user_id parameter"
+
+    def check_p2p_data(self, user_id):
+        """Placeholder function to check for P2P data."""
+        # This function should be implemented to check for P2P data in the future
+        # For now, it returns an empty dictionary
+        return {}
 
 
 class P2PProtocol(protocol.Protocol):

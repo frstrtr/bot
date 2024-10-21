@@ -751,7 +751,7 @@ async def load_and_start_checks():
                 # interval between checks
                 await asyncio.sleep(1)
                 LOGGER.info("%s loaded from file & 2hr monitoring started ...", user_id)
-    
+
         if os.path.exists(file_path_banned_users):
             with open(file_path_banned_users, "r", encoding="utf-8") as file:
                 for line in file:
@@ -798,7 +798,7 @@ async def on_shutdown(_dp):
 
     # save all unbanned checks to temp file to restart checks after bot restart
     # check if active_user_checks is not empty
-    if active_user_checks:    
+    if active_user_checks:
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id in active_user_checks:
                 file.write(str(_id) + "\n")
@@ -812,7 +812,6 @@ async def on_shutdown(_dp):
         with open("banned_users.txt", "w", encoding="utf-8") as file:
             for _id in banned_users:
                 file.write(str(_id) + "\n")
-    
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
@@ -1546,16 +1545,18 @@ async def log_lists():
 
     # read current banned users list from the file
     if os.path.exists("banned_users.txt"):
-        with open('banned_users.txt', 'r') as file:
-            #append users to the set
+        with open("banned_users.txt", "r") as file:
+            # append users to the set
             for line in file:
                 banned_users.add(int(line.strip()))
-        os.remove("banned_users.txt") # remove the file after reading
+        os.remove("banned_users.txt")  # remove the file after reading
     # save banned users list to the file with the current date to the inout folder
     with open(filename, "w", encoding="utf-8") as file:
         for _id in banned_users:
             file.write(str(_id) + "\n")
-    
+    # empty banned_users set
+    banned_users.clear()
+
     # move yesterday's daily_spam file to the daily_spam folder
     daily_spam_filename = get_daily_spam_filename()
     inout_filename = get_inout_filename()
@@ -3463,6 +3464,7 @@ if __name__ == "__main__":
         # remove system message about user join/left where applicable
         await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
 
+    # scheduler to run the log_lists function daily at 04:00
     @aiocron.crontab("0 4 * * *")
     async def scheduled_log():
         """Function to schedule the log_lists function to run daily at 00:00."""

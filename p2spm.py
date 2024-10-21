@@ -32,7 +32,7 @@ class NoVerifyContextFactory:
         self.hostname = hostname
         self.options = CertificateOptions(verify=False)
 
-    def creatorForNetloc(self, hostname, port):
+    def creator_for_netloc(self, hostname, port):
         """Function description here"""
         LOGGER.info("Creating context for %s: %s", hostname, port)
         return ClientTLSOptions(hostname, self.options.getContext())
@@ -49,7 +49,7 @@ class APIClient:
         return self.agent.request(
             b"GET",
             url.encode("utf-8"),
-            Headers({"User-Agent": ["Twisted Web Client Example"]}),
+            Headers({"User-Agent": ["Twisted P2P spam checker"]}),
             None,
         ).addCallback(readBody)
 

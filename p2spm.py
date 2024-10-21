@@ -10,7 +10,7 @@ import sys
 import logging
 import json
 import uuid
-from twisted.internet import endpoints, defer, task, protocol
+from twisted.internet import endpoints, defer, error, protocol
 from twisted.internet import reactor
 from twisted.web import server, resource
 from twisted.web.client import Agent, readBody
@@ -314,13 +314,28 @@ class P2PFactory(protocol.Factory):
                 LOGGER.info("Connecting to new peer %s:%d", host, port)
 
 
+def find_available_port(start_port):
+    """Find an available port starting from the given port."""
+    port = start_port
+    while True:
+        try:
+            endpoint = endpoints.TCP4ServerEndpoint(reactor, port)
+            endpoint.listen(protocol.Factory())  # Try to bind to the port
+            return port
+        except error.CannotListenError:
+            port += 1  # Increment port and try again
+
+
 def main():
     """Main function to start the server."""
-    if len(sys.argv) < 2:
-        print("Usage: python3 p2spm.py <port> [peer1] [peer2] ...")
-        sys.exit(1)
 
-    port = int(sys.argv[1])
+    DEFAULT_PORT = 9001  # Define a default port
+
+    if len(sys.argv) < 2:
+        port = DEFAULT_PORT
+    else:
+        port = int(sys.argv[1])
+
     peers = sys.argv[2:]
 
     # Generate a unique identifier for the node

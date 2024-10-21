@@ -2500,6 +2500,33 @@ if __name__ == "__main__":
     )
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
+        # XXX
+        # check if message is from user from active_user_checks set or banned_users set
+        if message.from_user.id in active_user_checks and message.from_user.id in banned_users:
+            LOGGER.warning(
+                "\033[93m%s is in both active_user_checks and banned_users, check the message %s in the chat %s (%s)\033[0m",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
+        elif message.from_user.id in active_user_checks:
+            LOGGER.warning(
+                "\033[93m%s is in active_user_checks, check the message %s in the chat %s (%s)\033[0m",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
+        elif message.from_user.id in banned_users:
+            LOGGER.warning(
+                "\033[93m%s is in banned_users, check the message %s in the chat %s (%s)\033[0m",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
+            # return
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
@@ -3402,8 +3429,7 @@ if __name__ == "__main__":
     # TODO fix database spammer store and find indexes, instead of date
     # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
     # TODO search and delete user messages if banned by admin and timely checks
-    # TODO bot stats to show on shutdown or on /stats bot comand like runtime banned list, active checks, uptime, etc
-    # TODO use active checks list to store recent messages links during runtime to delete it if user is banned
+    # TODO use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

@@ -701,6 +701,23 @@ async def on_startup(_dp: Dispatcher):
         TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
     )
 
+    # List of user IDs to check for Deleted Accounts
+    # if the user is not in the chat, the bot will not be able to get the user info
+    # Deleted Accounts have first_name = ""
+    # user_ids = [508008791, 6566378702, 129849153, 6524729690]
+    # chat_id = -1001755583146
+
+    # async def check_user_status(chat_id: int, user_id: int):
+    #     try:
+    #         member = await BOT.get_chat_member(chat_id, user_id)
+    #         LOGGER.debug("Checking user %s: %s", user_id, member.user)
+    #     except Exception as e:
+    #         LOGGER.error("Error checking user %s: %s", user_id, e)
+    #         return False
+
+    # for user_id in user_ids:
+    #     await check_user_status(chat_id, user_id)
+
     # DELETE MESSAGE once the bot is started
     # https://t.me/mavrikiy/127041
     # await BOT.delete_message(-1001461337235, 127041)
@@ -2502,7 +2519,10 @@ if __name__ == "__main__":
         """Function to store recent messages in the database."""
         # XXX
         # check if message is from user from active_user_checks set or banned_users set
-        if message.from_user.id in active_user_checks and message.from_user.id in banned_users:
+        if (
+            message.from_user.id in active_user_checks
+            and message.from_user.id in banned_users
+        ):
             LOGGER.warning(
                 "\033[93m%s is in both active_user_checks and banned_users, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
@@ -3427,9 +3447,8 @@ if __name__ == "__main__":
     # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
-    # TODO greet_chat_member refactor - remove excessive checks and logic. Check for admin actions carefully
-    # TODO search and delete user messages if banned by admin and timely checks
-    # TODO use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned
+    # XXX search and delete user messages if banned by admin and timely checks
+    # XXX use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

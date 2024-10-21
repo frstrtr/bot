@@ -6,9 +6,10 @@ https://api.lols.bot/account?id=
 https://api.cas.chat/check?user_id=
 """
 
+import sys
 import logging
 import json
-from twisted.internet import endpoints, defer, task
+from twisted.internet import endpoints, defer, task, protocol
 from twisted.internet import reactor
 from twisted.web import server, resource
 from twisted.web.client import Agent, readBody
@@ -32,7 +33,7 @@ class NoVerifyContextFactory:
         self.hostname = hostname
         self.options = CertificateOptions(verify=False)
 
-    def creator_for_netloc(self, hostname, port):
+    def creatorForNetloc(self, hostname, port):
         """Function description here"""
         LOGGER.info("Creating context for %s: %s", hostname, port)
         return ClientTLSOptions(hostname, self.options.getContext())
@@ -97,7 +98,13 @@ class SpammerCheckProtocol(WebSocketServerProtocol):
             LOGGER.info("Response sent: %s", response)
 
             # Check if the user is a spammer
-            if not (lols_bot_data.get("banned") or (cas_chat_data.get("result") and cas_chat_data["result"].get("offenses", 0) > 0)):
+            if not (
+                lols_bot_data.get("banned")
+                or (
+                    cas_chat_data.get("result")
+                    and cas_chat_data["result"].get("offenses", 0) > 0
+                )
+            ):
                 # Start exponential backoff polling
                 self.start_exponential_backoff_polling(user_id, polling_duration)
 
@@ -197,9 +204,55 @@ class SpammerCheckResource(resource.Resource):
             return b"Missing user_id parameter"
 
 
+class P2PProtocol(protocol.Protocol):
+    """P2P protocol to handle connections and exchange spammer information."""
+
+    def connectionMade(self):
+        self.factory.peers.append(self)
+        LOGGER.info("P2P connection made with %s", self.transport.getPeer())
+
+    def dataReceived(self, data):
+        message = data.decode("utf-8")
+        LOGGER.info("P2P message received: %s", message)
+        data = json.loads(message)
+        user_id = data.get("user_id")
+        if user_id:
+            self.factory.broadcast_spammer_info(user_id)
+
+    def connectionLost(self, reason):
+        self.factory.peers.remove(self)
+        LOGGER.info("P2P connection lost: %s", reason)
+
+
+class P2PFactory(protocol.Factory):
+    """Factory to manage P2P connections."""
+
+    protocol = P2PProtocol
+
+    def __init__(self):
+        self.peers = []
+
+    def broadcast_spammer_info(self, user_id):
+        """Broadcast spammer information to all connected peers."""
+        message = json.dumps({"user_id": user_id})
+        for peer in self.peers:
+            peer.transport.write(message.encode("utf-8"))
+        LOGGER.info("Broadcasted spammer info: %s", message)
+
+
 def main():
     """Main function to start the server."""
-    LOGGER.info("Starting server...")
+    if len(sys.argv) < 2:
+        print("Usage: python3 p2spm.py <port> [peer1] [peer2] ...")
+        sys.exit(1)
+
+    port = int(sys.argv[1])
+    peers = sys.argv[2:]
+
+    LOGGER.info("Starting P2P server on port %d", port)
+
+    # TODO implement WebHook to receive data from bot
+
     # Set up the WebSocket server
     ws_factory = SpammerCheckFactory()
     ws_endpoint = endpoints.TCP4ServerEndpoint(reactor, 9000)
@@ -213,6 +266,20 @@ def main():
     http_endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)
     http_endpoint.listen(http_factory)
     LOGGER.info("HTTP server listening on port 8080")
+
+    # Set up the P2P server
+    p2p_factory = P2PFactory()
+    p2p_endpoint = endpoints.TCP4ServerEndpoint(reactor, 9001)
+    p2p_endpoint.listen(p2p_factory)
+    LOGGER.info("P2P server listening on port 9001")
+
+    # Connect to peers
+    for peer in peers:
+        peer_host, peer_port = peer.split(":")
+        peer_port = int(peer_port)
+        peer_endpoint = endpoints.TCP4ClientEndpoint(reactor, peer_host, peer_port)
+        peer_endpoint.connect(p2p_factory)
+        LOGGER.info("Connecting to peer %s:%d", peer_host, peer_port)
 
     reactor.run()
 

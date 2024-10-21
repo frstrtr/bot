@@ -745,7 +745,7 @@ async def load_and_start_checks():
                     perform_checks(
                         user_id=user_id,
                         event_record=f"{user_id} banned on_startup",
-                        inout_logmessage=f"(<code>{user_id}</code>) banned on_startup",
+                        inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                     )
                 )
                 # interval between checks
@@ -1797,7 +1797,14 @@ if __name__ == "__main__":
             #         inout_userid,
             #         active_user_checks,
             #     )
-        else:
+        elif inout_status == ChatMemberStatus.RESTRICTED:
+            LOGGER.info(
+                "\033[93m%s --> %s in %s\033[0m",
+                inout_userid,
+                inout_status,
+                inout_chattitle,
+            )
+        else: # member or left - white color
             LOGGER.info("%s --> %s in %s", inout_userid, inout_status, inout_chattitle)
 
         # Extract the user status change
@@ -1808,8 +1815,8 @@ if __name__ == "__main__":
 
         # Check lols after user join/leave event in 2hr and ban if spam
         if (
-            lols_spam is True or inout_status == ChatMemberStatus.KICKED
-        ):  # not Timeout exactly or if kicked by someone else
+            lols_spam is True or inout_status == ChatMemberStatus.KICKED or inout_status == ChatMemberStatus.RESTRICTED
+        ):  # not Timeout exactly or if kicked/restricted by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(
                 check_and_autoban(event_record, inout_userid, inout_logmessage),

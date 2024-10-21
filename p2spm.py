@@ -280,7 +280,13 @@ def main():
         peer_host, peer_port = peer.split(":")
         peer_port = int(peer_port)
         peer_endpoint = endpoints.TCP4ClientEndpoint(reactor, peer_host, peer_port)
-        peer_endpoint.connect(p2p_factory)
+        peer_endpoint.connect(p2p_factory).addCallback(
+            lambda _: LOGGER.info("Connected to peer %s:%d", peer_host, peer_port)
+        ).addErrback(
+            lambda err: LOGGER.error(
+                "Failed to connect to peer %s:%d: %s", peer_host, peer_port, err
+            )
+        )
         LOGGER.info("Connecting to peer %s:%d", peer_host, peer_port)
 
     reactor.run()

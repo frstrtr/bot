@@ -9,6 +9,7 @@ https://api.cas.chat/check?user_id=
 import sys
 import logging
 import json
+import uuid
 from twisted.internet import endpoints, defer, task, protocol
 from twisted.internet import reactor
 from twisted.web import server, resource
@@ -246,8 +247,9 @@ class P2PFactory(protocol.Factory):
 
     protocol = P2PProtocol
 
-    def __init__(self):
+    def __init__(self, uuid):
         self.peers = []
+        self.uuid = uuid
         # XXX: Hardcoded bootstrap peers for now
         self.bootstrap_peers = ["172.19.113.234:9002", "172.19.112.1:9001"]
 
@@ -286,6 +288,15 @@ class P2PFactory(protocol.Factory):
         for peer in peers:
             host = peer["host"]
             port = peer["port"]
+            peer_uuid = peer["uuid"]
+            if peer_uuid == self.uuid:
+                LOGGER.info(
+                    "Skipping self connection to %s:%d (UUID: %s)",
+                    host,
+                    port,
+                    peer_uuid,
+                )
+                continue
             if not any(
                 p.transport.getPeer().host == host
                 and p.transport.getPeer().port == port
@@ -311,6 +322,9 @@ def main():
     port = int(sys.argv[1])
     peers = sys.argv[2:]
 
+    # Generate a unique identifier for the node
+    node_uuid = str(uuid.uuid4())
+
     LOGGER.info("Starting P2P server on port %d", port)
 
     # TODO implement WebHook to receive data from bot
@@ -330,12 +344,22 @@ def main():
     LOGGER.info("HTTP server listening on port 8080")
 
     # Set up the P2P server
-    p2p_factory = P2PFactory()
-    p2p_endpoint = endpoints.TCP4ServerEndpoint(reactor, 9001)
+    p2p_factory = P2PFactory(node_uuid)
+    p2p_endpoint = endpoints.TCP4ServerEndpoint(reactor, port, interface="0.0.0.0")
     p2p_endpoint.listen(p2p_factory)
-    LOGGER.info("P2P server listening on port 9001")
+    LOGGER.info("P2P server listening on port %d", port)
 
-    # Connect to peers
+    # Connect to bootstrap peers
+    bootstrap_addresses = [
+        "172.19.113.234:9002",
+        "172.19.112.1:9001",
+    ]  # Example bootstrap addresses
+    p2p_factory.connect_to_bootstrap_peers(bootstrap_addresses).addCallback(
+        lambda _: LOGGER.info("Finished connecting to bootstrap peers")
+    )
+
+    # Connect to peers specified in command-line arguments
+    # TODO prevent connecting to the banned peers misbehaving
     for peer in peers:
         peer_host, peer_port = peer.split(":")
         peer_port = int(peer_port)

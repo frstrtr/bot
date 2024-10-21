@@ -212,18 +212,33 @@ class P2PProtocol(protocol.Protocol):
         peer = self.transport.getPeer()
         LOGGER.info("P2P connection made with %s:%d", peer.host, peer.port)
         LOGGER.info("P2P connection details: %s", peer)
+        self.send_peer_info()
 
     def dataReceived(self, data):
         message = data.decode("utf-8")
         LOGGER.info("P2P message received: %s", message)
         data = json.loads(message)
-        user_id = data.get("user_id")
-        if user_id:
-            self.factory.broadcast_spammer_info(user_id)
+        if "user_id" in data:
+            self.factory.broadcast_spammer_info(data["user_id"])
+        elif "peers" in data:
+            self.factory.update_peer_list(data["peers"])
 
     def connectionLost(self, reason):
         self.factory.peers.remove(self)
         LOGGER.info("P2P connection lost: %s", reason)
+
+    def send_peer_info(self):
+        """Send the list of known peers to the connected peer."""
+        peer_info = [
+            {
+                "host": peer.transport.getPeer().host,
+                "port": peer.transport.getPeer().port,
+            }
+            for peer in self.factory.peers
+        ]
+        message = json.dumps({"peers": peer_info})
+        self.transport.write(message.encode("utf-8"))
+        LOGGER.info("Sent peer info: %s", message)
 
 
 class P2PFactory(protocol.Factory):
@@ -233,6 +248,8 @@ class P2PFactory(protocol.Factory):
 
     def __init__(self):
         self.peers = []
+        # XXX: Hardcoded bootstrap peers for now
+        self.bootstrap_peers = ["172.19.113.234:9002", "172.19.112.1:9001"]
 
     def broadcast_spammer_info(self, user_id):
         """Broadcast spammer information to all connected peers."""
@@ -240,6 +257,56 @@ class P2PFactory(protocol.Factory):
         for peer in self.peers:
             peer.transport.write(message.encode("utf-8"))
         LOGGER.info("Broadcasted spammer info: %s", message)
+
+    def broadcast_spammer_info(self, user_id):
+        """Broadcast spammer information to all connected peers."""
+        message = json.dumps({"user_id": user_id})
+        for peer in self.peers:
+            peer.transport.write(message.encode("utf-8"))
+        LOGGER.info("Broadcasted spammer info: %s", message)
+
+    def connect_to_bootstrap_peers(self, bootstrap_addresses):
+        """Connect to bootstrap peers and gather available peers."""
+        deferreds = []
+        for address in bootstrap_addresses:
+            host, port = address.split(":")
+            port = int(port)
+            endpoint = endpoints.TCP4ClientEndpoint(reactor, host, port)
+            deferred = endpoint.connect(self)
+            deferred.addCallback(self.on_bootstrap_peer_connected)
+            deferred.addErrback(self.on_bootstrap_peer_failed, address)
+            deferreds.append(deferred)
+        return defer.gatherResults(deferreds)
+
+    def on_bootstrap_peer_connected(self, protocol):
+        """Handle successful connection to a bootstrap peer."""
+        peer = protocol.transport.getPeer()
+        LOGGER.info("Connected to bootstrap peer %s:%d", peer.host, peer.port)
+        self.bootstrap_peers.append(protocol)
+
+    def on_bootstrap_peer_failed(self, failure, address):
+        """Handle failed connection to a bootstrap peer."""
+        LOGGER.error("Failed to connect to bootstrap peer %s: %s", address, failure)
+
+    def update_peer_list(self, peers):
+        """Update the list of known peers."""
+        for peer in peers:
+            host = peer["host"]
+            port = peer["port"]
+            if not any(
+                p.transport.getPeer().host == host
+                and p.transport.getPeer().port == port
+                for p in self.peers
+            ):
+                endpoint = endpoints.TCP4ClientEndpoint(reactor, host, port)
+                endpoint.connect(self).addCallback(
+                    lambda _: LOGGER.info("Connected to new peer %s:%d", host, port)
+                ).addErrback(
+                    lambda err: LOGGER.error(
+                        "Failed to connect to new peer %s:%d: %s", host, port, err
+                    )
+                )
+                LOGGER.info("Connecting to new peer %s:%d", host, port)
 
 
 def main():

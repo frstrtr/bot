@@ -209,7 +209,9 @@ class P2PProtocol(protocol.Protocol):
 
     def connectionMade(self):
         self.factory.peers.append(self)
-        LOGGER.info("P2P connection made with %s", self.transport.getPeer())
+        peer = self.transport.getPeer()
+        LOGGER.info("P2P connection made with %s:%d", peer.host, peer.port)
+        LOGGER.info("P2P connection details: %s", peer)
 
     def dataReceived(self, data):
         message = data.decode("utf-8")

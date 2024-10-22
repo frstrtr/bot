@@ -1368,17 +1368,6 @@ async def check_n_ban(message: types.Message, reason: str):
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
-        # delete message from the chat XXX message_id invalid after the message is deleted?
-        try:
-            await BOT.delete_message(message.chat.id, message.message_id)
-        except utils.exceptions.MessageToDeleteNotFound:
-            LOGGER.error(
-                "\033[93m%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m",
-                message.from_user.id,
-                message.message_id,
-                message.chat.title,
-                message.chat.id,
-            )
 
         # remove spammer from all groups
         await lols_autoban(message.from_user.id)
@@ -1395,6 +1384,24 @@ async def check_n_ban(message: types.Message, reason: str):
         # save to report file spam message
         await save_report_file("daily_spam_", reported_spam)
         await save_report_file("inout_", "srm" + event_record)
+
+        # add the user to the banned users list
+        if message.from_user.id not in banned_users:
+            banned_users.add(message.from_user.id)
+            if len(banned_users) > 5:
+                LOGGER.info(
+                    "\033[93m%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
+                    message.from_user.id,
+                    list(banned_users)[-5:],  # Last 5 elements
+                    len(banned_users),  # Number of elements left
+                )
+            else:
+                LOGGER.info(
+                    "\033[93m%s added to banned users list in check_n_ban: %s\033[0m",
+                    message.from_user.id,
+                    banned_users,
+                )
+
         # XXX message id invalid after the message is deleted? Or deleted by other bot?
         # TODO shift to delete_messages in aiogram 3.0
         try:
@@ -1407,22 +1414,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 message.chat.title,
                 message.chat.id,
             )
-        # add the user to the banned users list
-        if message.from_user.id not in banned_users:
-            banned_users.add(message.from_user.id)
-            if len(banned_users) > 5:
-                LOGGER.info(
-                    "\033[91m%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
-                    message.from_user.id,
-                    list(banned_users)[-5:],  # Last 5 elements
-                    len(banned_users),  # Number of elements left
-                )
-            else:
-                LOGGER.info(
-                    "\033[91m%s added to banned users list in check_n_ban: %s\033[0m",
-                    message.from_user.id,
-                    banned_users,
-                )
+
         return True
     else:
         return False

@@ -44,6 +44,8 @@ from aiogram.utils.exceptions import (
     RetryAfter,
 )
 
+bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 # Set to keep track of active user IDs
 active_user_checks = set()
@@ -683,7 +685,6 @@ async def take_heuristic_action(message: types.Message, reason):
 
 async def on_startup(_dp: Dispatcher):
     """Function to handle the bot startup."""
-    bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _commit_info = get_latest_commit_info()
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
@@ -741,11 +742,16 @@ async def load_and_start_checks():
             for line in file:
                 user_id = int(line.strip())
                 active_user_checks.add(user_id)
+                event_message = (
+                    f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                    + str(user_id)
+                    + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
+                )
                 # Start the check with 1 sec interval
                 asyncio.create_task(
                     perform_checks(
                         user_id=user_id,
-                        event_record=f"{user_id} banned on_startup",
+                        event_record=event_message,
                         inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                     )
                 )
@@ -774,9 +780,11 @@ async def sequential_shutdown_tasks(_id):
     lols_cas_result = await lols_cas_check(_id) is True
     # Second async function
     await check_and_autoban(
-        str(_id) + "on_shutdown inout",
+        f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+        + str(_id)
+        + " ❌ \t\t\tbanned everywhere during final checks on_shutdown inout",
         _id,
-        "(<code>" + str(_id) + "</code>) banned on_shutdown event",
+        "(<code>" + str(_id) + "</code>) banned during final checks on_shutdown event",
         lols_cas_result,
     )
 
@@ -839,7 +847,14 @@ async def on_shutdown(_dp):
     # number of active user checks forwarded to the next session
 
     await BOT.send_message(
-        TECHNO_LOG_GROUP, "Short session stats:\n", message_thread_id=TECHNO_RESTART
+        TECHNO_LOG_GROUP,
+        (
+            "Runtime session shutdown stats:\n"
+            f"Bot started at: {bot_start_time}\n"
+            f"Current active user checks: {len(active_user_checks)}\n"
+            f"Spammers detected: {len(banned_users)}\n"
+        ),
+        message_thread_id=TECHNO_RESTART,
     )
     # Close the bot
     await BOT.close()

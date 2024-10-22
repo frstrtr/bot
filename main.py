@@ -719,9 +719,9 @@ async def on_startup(_dp: Dispatcher):
     #     await check_user_status(chat_id, user_id)
 
     # DELETE MESSAGE once the bot is started
-    # https://t.me/mavrikiy/127041
-    # https://t.me/rumauritius/1/81190
-    await BOT.delete_message(-1001771233876, 81190)
+    # https://t.me/123/127041
+    # https://t.me/123/1/81190
+    # await BOT.delete_message(-1002331876, 81190)
 
     # Call the function to load and start checks
     asyncio.create_task(load_and_start_checks())

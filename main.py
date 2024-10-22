@@ -95,29 +95,31 @@ conn.commit()
 
 
 def construct_message_link(found_message_data):
-    """Construct a link to the original message (assuming it's a supergroup or channel)
-    Extract the chat ID and remove the '-100' prefix if it exists
-    var: found_message_data: list: The spammer data extracted from the found message.
+    """Construct a link to the original message (assuming it's a supergroup or channel).
+    Extract the chat ID and remove the '-100' prefix if it exists.
+
+    :param found_message_data: list: The spammer data extracted from the found message.
     """
     chat_id = str(found_message_data[0])
-    if found_message_data[2]:  # this is public chat with chat.username
-        message_link = f"https://t.me/{found_message_data[2]}/{found_message_data[1]}"
-    elif chat_id.startswith(
-        "-100"
-    ):  # this is public chat without chat.username or private chat
-        chat_id = chat_id[4:]  # remove leading -100 for public chats
-        # Construct the message link with the modified chat ID
-        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
+    message_id = found_message_data[1]
+    chat_username = found_message_data[2]
+
+    if chat_username:
+        message_link = f"https://t.me/{chat_username}/{message_id}"
     else:
-        # Construct the message link with the full chat ID since chat is private
-        message_link = f"https://t.me/c/{chat_id}/{found_message_data[1]}"
+        if chat_id.startswith("-100"):
+            chat_id = chat_id[4:]  # Remove leading -100 for public chats
+        message_link = f"https://t.me/c/{chat_id}/{message_id}"
+
     return message_link
 
 
-def load_predetermined_sentences(txt_file):
+def load_predetermined_sentences(txt_file: str):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
     remove extra spaces and punctuation marks, check for duplicates, rewrite the file
     excluding duplicates if any, and log the results. Return None if the file doesn't exist.
+
+    :param txt_file: str: The path to the plain text file containing predetermined sentences.
     """
     if not os.path.exists(txt_file):
         return None
@@ -174,8 +176,10 @@ def get_latest_commit_info():
         return None
 
 
-def extract_spammer_info(message):
-    """Extract the spammer's details from the message."""
+def extract_spammer_info(message: types.Message):
+    """Extract the spammer's details from the message.
+
+    :param message: types.Message: The message to extract the spammer's details from."""
     if message.forward_from:
         first_name = message.forward_from.first_name or ""
         last_name = getattr(message.forward_from, "last_name", "") or ""
@@ -207,7 +211,8 @@ def get_spammer_details(
     forwarded_from_id and message_forward_date.
     forwarded_from_username, forwarded_from_first_name,
     forward_from_last_name are used only for forwarded forwarded messages
-    and reserved for future use"""
+    and reserved for future use
+    """
 
     spammer_id = spammer_id or None
     # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489

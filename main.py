@@ -297,8 +297,8 @@ def get_spammer_details(
     # Ensure result[3] is not None before formatting
     # result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
 
-    LOGGER.debug(
-        "%-10s - result for sender: %s %s, date: %s, from chat title: %s\nResult: %s",
+    LOGGER.info(
+        "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
         (
             f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
         ),  # padding left align 10 chars
@@ -306,6 +306,13 @@ def get_spammer_details(
         spammer_last_name,
         message_forward_date,
         forward_from_chat_title,
+        result,
+    )
+    LOGGER.debug(
+        "%-10s Result: %s",
+        (
+            f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
+        ),  # padding left align 10 chars
         result,
     )
 
@@ -1383,7 +1390,7 @@ async def check_n_ban(message: types.Message, reason: str):
         )  # replace leading ### with AUT to indicate autoban
         # save to report file spam message
         await save_report_file("daily_spam_", reported_spam)
-        await save_report_file("inout_", "srm" + event_record)
+        await save_report_file("inout_", "cnb" + event_record)
 
         # add the user to the banned users list
         if message.from_user.id not in banned_users:
@@ -2381,13 +2388,17 @@ if __name__ == "__main__":
             ) = result
 
             LOGGER.debug(
-                "Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "%-10s original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                (
+                    f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
+                ),  # padding left align 10 chars
                 original_chat_id,
                 report_id,
                 forwarded_message_data,
                 original_message_timestamp,
             )
 
+            # XXX find safe solution to get the author_id from the forwarded_message_data
             author_id = eval(forwarded_message_data)[3]
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
@@ -2492,7 +2503,7 @@ if __name__ == "__main__":
                     try:
                         await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                         LOGGER.debug(
-                            "\033[91m%s - %s message %s deleted from chat %s (%s).\033[0m",
+                            "\033[91m%s @%s message %s deleted from chat %s (%s).\033[0m",
                             author_id,
                             user_name,
                             message_id,
@@ -2543,7 +2554,7 @@ if __name__ == "__main__":
                     #         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     #     )
             LOGGER.debug(
-                "\033[91m%s banned and their messages deleted where applicable.\n####################################################\033[0m",
+                "\033[91m%s manually banned and their messages deleted where applicable.\033[0m",
                 author_id,
             )
 

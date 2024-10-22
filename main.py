@@ -2582,7 +2582,7 @@ if __name__ == "__main__":
             and message.from_user.id in banned_users
         ):
             LOGGER.warning(
-                "\033[93m%s is in both active_user_checks and banned_users, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in both active_user_checks and banned_users, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -2590,7 +2590,7 @@ if __name__ == "__main__":
             )
         elif message.from_user.id in active_user_checks:
             LOGGER.warning(
-                "\033[93m%s is in active_user_checks, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in active_user_checks, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -2598,7 +2598,7 @@ if __name__ == "__main__":
             )
         elif message.from_user.id in banned_users:
             LOGGER.warning(
-                "\033[93m%s is in banned_users, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in banned_users, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -2760,7 +2760,7 @@ if __name__ == "__main__":
             # XXX if user was in lols but before it was kicked it posted a message eventually
             # we can check it in runtime banned user list
             if message.from_user.id in banned_users:
-                the_reason = f"{message.from_user.id} is banned before sending a message but squizzed due latency"
+                the_reason = f"{message.from_user.id} is banned before sending a message, but squizzed due to latency..."
                 if await check_n_ban(message, the_reason):
                     return
             elif (
@@ -2851,7 +2851,7 @@ if __name__ == "__main__":
                     if await check_n_ban(message, the_reason):
                         return
                     else:
-                        LOGGER.info("%s is possibly a bot", message.from_id)
+                        LOGGER.info("%s is possibly a bot typing histerically...", message.from_id)
                         await take_heuristic_action(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old and entity_spam_trigger:

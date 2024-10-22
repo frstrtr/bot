@@ -213,16 +213,21 @@ def get_spammer_details(
     # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
+    spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
+
     LOGGER.debug(
-        "%-10s - getting chat ID and message ID\n"
-        "firstName : %s : lastName : %s,\n"
-        "messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "forwardSenderName: %s, forwardedFromID: %s\n",
-        f"{spammer_id if spammer_id is not None else '':10}",  # padding left align 11 chars
+        "%s getting chat ID and message ID\n"
+        "%s firstName : %s : lastName : %s,\n"
+        "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "%s forwardSenderName: %s, forwardedFromID: %s\n",
+        spammer_id_str,
+        spammer_id_str,
         spammer_first_name,
         spammer_last_name,
+        spammer_id_str,
         message_forward_date,
         forward_from_chat_title,
+        spammer_id_str,
         forward_sender_name,
         forwarded_from_id,
     )
@@ -902,9 +907,6 @@ async def handle_forwarded_reports_with_details(
     # store spam text and caption to the daily_spam file
     await save_report_file("daily_spam_", reported_spam)
 
-    LOGGER.debug("############################################################")
-    LOGGER.debug("                                                            ")
-    LOGGER.debug("------------------------------------------------------------")
     # LOGGER.debug(f"Received forwarded message for the investigation: {message}")
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
@@ -2010,10 +2012,10 @@ if __name__ == "__main__":
         # store spam text and caption to the daily_spam file
         await save_report_file("daily_spam_", reported_spam)
 
-        LOGGER.debug("############################################################")
-        LOGGER.debug("                                                            ")
-        LOGGER.debug("------------------------------------------------------------")
-        LOGGER.debug("Received forwarded message for the investigation: %s", message)
+        # LOGGER.debug("############################################################")
+        # LOGGER.debug("                                                            ")
+        # LOGGER.debug("------------------------------------------------------------")
+        # LOGGER.debug("Received forwarded message for the investigation: %s", message)
         # Send a thank you note to the user
         await message.answer("Thank you for the report. We will investigate it.")
         # Forward the message to the admin group

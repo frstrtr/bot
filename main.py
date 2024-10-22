@@ -758,7 +758,11 @@ async def load_and_start_checks():
                 for line in file:
                     user_id = int(line.strip())
                     banned_users.add(user_id)
-                LOGGER.info("Banned users list loaded from file: %s", banned_users)
+                LOGGER.info(
+                    "Banned users (%s) list loaded from file: %s",
+                    len(banned_users),
+                    banned_users,
+                )
 
     except FileNotFoundError as e:
         LOGGER.error("Error loading checks and bans: %s", e)
@@ -1360,6 +1364,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 message.chat.title,
                 message.chat.id,
             )
+
         # remove spammer from all groups
         await lols_autoban(message.from_user.id)
         event_record = (
@@ -2293,29 +2298,36 @@ if __name__ == "__main__":
 
         keyboard.add(confirm_btn, cancel_btn)
 
-        admin_group_banner_message = DP["admin_group_banner_message"]
-        admin_action_banner_message = DP["admin_action_banner_message"]
-        report_chat_id = DP["report_chat_id"]
+        try:  # KeyError if it was reported by non-admin user
+            admin_group_banner_message = DP["admin_group_banner_message"]
+            admin_action_banner_message = DP["admin_action_banner_message"]
+            report_chat_id = DP["report_chat_id"]
 
-        # Edit messages to remove buttons or messages
-        # check where the callback_query was pressed
-        # remove buttons and add Confirm/Cancel buttons in the same chat
-        await BOT.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            reply_markup=keyboard,
-        )
-
-        if callback_query.message.chat.id == ADMIN_GROUP_ID:
-            # remove personal report banner message
-            await BOT.delete_message(
-                report_chat_id, admin_action_banner_message.message_id
-            )
-        else:  # report was actioned in the personal chat
-            # remove admin group banner buttons
+            # Edit messages to remove buttons or messages
+            # check where the callback_query was pressed
+            # remove buttons and add Confirm/Cancel buttons in the same chat
             await BOT.edit_message_reply_markup(
-                chat_id=ADMIN_GROUP_ID,
-                message_id=admin_group_banner_message.message_id,
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=keyboard,
+            )
+
+            if callback_query.message.chat.id == ADMIN_GROUP_ID:
+                # remove personal report banner message
+                await BOT.delete_message(
+                    report_chat_id, admin_action_banner_message.message_id
+                )
+            else:  # report was actioned in the personal chat
+                # remove admin group banner buttons
+                await BOT.edit_message_reply_markup(
+                    chat_id=ADMIN_GROUP_ID,
+                    message_id=admin_group_banner_message.message_id,
+                )
+        except KeyError as e:
+            LOGGER.error(
+                "\033[93m%s Error while removing the buttons: %s. Message reported by non-admin user?\033[0m",
+                callback_query.from_user.id,
+                e,
             )
 
     @DP.callback_query_handler(lambda c: c.data.startswith("do_ban_"))

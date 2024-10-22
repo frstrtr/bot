@@ -1370,7 +1370,21 @@ async def check_n_ban(message: types.Message, reason: str):
         # TODO shift to delete_messages in aiogram 3.0
         await BOT.delete_message(message.chat.id, message.message_id)
         # add the user to the banned users list
-        banned_users.add(message.from_user.id)
+        if message.from_user.id not in banned_users:
+            banned_users.add(message.from_user.id)
+            if len(banned_users) > 5:
+                LOGGER.info(
+                    "\033[91m%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
+                    message.from_user.id,
+                    list(banned_users)[-5:],  # Last 5 elements
+                    len(banned_users),  # Number of elements left
+                )
+            else:
+                LOGGER.info(
+                    "\033[91m%s added to banned users list in check_n_ban: %s\033[0m",
+                    message.from_user.id,
+                    banned_users,
+                )
         return True
     else:
         return False
@@ -1807,7 +1821,7 @@ if __name__ == "__main__":
                 inout_status,
                 inout_chattitle,
             )
-        else: # member or left - white color
+        else:  # member or left - white color
             LOGGER.info("%s --> %s in %s", inout_userid, inout_status, inout_chattitle)
 
         # Extract the user status change
@@ -1818,7 +1832,9 @@ if __name__ == "__main__":
 
         # Check lols after user join/leave event in 2hr and ban if spam
         if (
-            lols_spam is True or inout_status == ChatMemberStatus.KICKED or inout_status == ChatMemberStatus.RESTRICTED
+            lols_spam is True
+            or inout_status == ChatMemberStatus.KICKED
+            or inout_status == ChatMemberStatus.RESTRICTED
         ):  # not Timeout exactly or if kicked/restricted by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(

@@ -1369,6 +1369,8 @@ async def check_n_ban(message: types.Message, reason: str):
         # XXX message id invalid after the message is deleted? Or deleted by other bot?
         # TODO shift to delete_messages in aiogram 3.0
         await BOT.delete_message(message.chat.id, message.message_id)
+        # add the user to the banned users list
+        banned_users.add(message.from_user.id)
         return True
     else:
         return False

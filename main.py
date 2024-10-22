@@ -1397,7 +1397,16 @@ async def check_n_ban(message: types.Message, reason: str):
         await save_report_file("inout_", "srm" + event_record)
         # XXX message id invalid after the message is deleted? Or deleted by other bot?
         # TODO shift to delete_messages in aiogram 3.0
-        await BOT.delete_message(message.chat.id, message.message_id)
+        try:
+            await BOT.delete_message(message.chat.id, message.message_id)
+        except utils.exceptions.MessageToDeleteNotFound:
+            LOGGER.error(
+                "\033[93m%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m Already deleted?",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
         # add the user to the banned users list
         if message.from_user.id not in banned_users:
             banned_users.add(message.from_user.id)

@@ -1300,11 +1300,10 @@ async def check_n_ban(message: types.Message, reason: str):
     if lolscheck is True:
         # send message to the admin group AUTOREPORT thread
         LOGGER.info(
-            "%s %s in (%s) %s message %s",
+            "%s in %s (%s) message %s",
             reason,
-            message.from_user.id,
-            message.chat.id,
             message.chat.title,
+            message.chat.id,
             message.message_id,
         )
         # delete id from the active_user_checks set
@@ -1312,14 +1311,14 @@ async def check_n_ban(message: types.Message, reason: str):
             active_user_checks.remove(message.from_user.id)
             if len(active_user_checks) > 5:
                 LOGGER.info(
-                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s... %d totally\033[0m",
+                    "\033[91m%s removed from the active_user_checks set in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
                     list(active_user_checks)[-5:],  # Last 5 elements
                     len(active_user_checks),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[91m%s removed from active_user_checks set in check_n_ban: %s\033[0m",
+                    "\033[91m%s removed from the active_user_checks set in check_n_ban: %s\033[0m",
                     message.from_user.id,
                     active_user_checks,
                 )
@@ -1344,13 +1343,23 @@ async def check_n_ban(message: types.Message, reason: str):
         await BOT.send_message(
             ADMIN_GROUP_ID,
             (
-                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! "
-                f"Don't worry, I've got this under control. Sit back, relax, and enjoy a cup of coffee ☕ while I handle this pesky spammer! 😎"
+                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! Telefragged..."
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
+        # delete message from the chat XXX message_id invalid after the message is deleted?
+        try:
+            await BOT.delete_message(message.chat.id, message.message_id)
+        except utils.exceptions.MessageToDeleteNotFound:
+            LOGGER.error(
+                "\033[93m%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
         # remove spammer from all groups
         await lols_autoban(message.from_user.id)
         event_record = (
@@ -2851,7 +2860,10 @@ if __name__ == "__main__":
                     if await check_n_ban(message, the_reason):
                         return
                     else:
-                        LOGGER.info("%s is possibly a bot typing histerically...", message.from_id)
+                        LOGGER.info(
+                            "%s is possibly a bot typing histerically...",
+                            message.from_id,
+                        )
                         await take_heuristic_action(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old and entity_spam_trigger:

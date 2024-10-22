@@ -5,7 +5,6 @@ This module handles P2P connections and data synchronization.
 """
 
 import json
-import uuid
 import logging
 from twisted.internet import endpoints, defer, error, protocol, reactor
 from database import store_spammer_data, retrieve_spammer_data

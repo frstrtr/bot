@@ -14,7 +14,7 @@ test.py
 !server/
 !server/main.py
 !server/api.py
-!serveer/config.py
+!server/config.py
 !server/database.py
 !server/p2p.py
 !server/p2spm.py

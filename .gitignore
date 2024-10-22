@@ -11,3 +11,11 @@ test.py
 !spam_dict.txt
 !p2spm.py
 !parse_spam.py
+!server/
+!server/main.py
+!server/api.py
+!serveer/config.py
+!server/database.py
+!server/p2p.py
+!server/p2spm.py
+!server/websocket.py

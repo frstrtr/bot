@@ -238,6 +238,7 @@ class SpammerCheckResource(resource.Resource):
         """Placeholder function to check for P2P data."""
         # This function should be implemented to check for P2P data in the future
         # For now, it returns an empty dictionary
+        reply = {"ok": True, "user_id": user_id, }
         return {}
 
 
@@ -391,7 +392,7 @@ def main():
     root = resource.Resource()
     root.putChild(b"check", SpammerCheckResource())
     http_factory = server.Site(root)
-    http_endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)
+    http_endpoint = endpoints.TCP4ServerEndpoint(reactor, 8081)
     http_endpoint.listen(http_factory)
     LOGGER.info("HTTP server listening on port 8080")
 

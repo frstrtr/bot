@@ -1552,7 +1552,7 @@ async def create_named_watchdog(coro, user_id):
 
     :param coro: The coroutine to run
 
-    :param user_id: The user ID to use as the key in the running_tasks dictionary
+    :param user_id: The user ID to use as the key in the running_watchdogs dictionary
 
     """
     if user_id in running_watchdogs:
@@ -1563,11 +1563,10 @@ async def create_named_watchdog(coro, user_id):
             user_id
         ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
-    # Create the task and store it in the running_tasks dictionary
+    # Create the task and store it in the running_watchdogs dictionary
     task = asyncio.create_task(coro)
     running_watchdogs[user_id] = task
-    # RED color for banned users
-    LOGGER.info("\033[91m%s is banned by lols/cas check\033[0m", user_id)
+    LOGGER.info("\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id)
 
     # Remove the task from the dictionary when it completes
     def task_done_callback(t: asyncio.Task):

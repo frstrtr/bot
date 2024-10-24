@@ -297,6 +297,11 @@ def get_spammer_details(
     query = base_query.format(condition=condition)
     result = cursor.execute(query, params).fetchone()
 
+    # Ensure result is not None before accessing its elements
+    if result is None:
+        LOGGER.error("No result found for the given query and parameters. GSD")
+        return None
+
     if not spammer_first_name:
         spammer_first_name, spammer_last_name = (
             result[5],
@@ -304,13 +309,11 @@ def get_spammer_details(
         )  # get names from db
 
     # Ensure result[3] is not None before formatting
-    # result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
+    result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
 
     LOGGER.info(
         "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
-        (
-            f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
-        ),  # padding left align 10 chars
+        result_3_formatted,  # padding left align 10 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
@@ -319,9 +322,7 @@ def get_spammer_details(
     )
     LOGGER.debug(
         "%-10s Result: %s",
-        (
-            f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
-        ),  # padding left align 10 chars
+        result_3_formatted,  # padding left align 10 chars
         result,
     )
 
@@ -3584,7 +3585,7 @@ if __name__ == "__main__":
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
     # XXX search and delete user messages if banned by admin and timely checks
-    # XXX use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned
+    # XXX use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned FSM?
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

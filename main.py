@@ -215,7 +215,6 @@ def get_spammer_details(
     """
 
     spammer_id = spammer_id or None
-    # spammer_id = spammer_id or MANUALLY ENTERED SPAMMER_ID INT 5338846489
     spammer_last_name = spammer_last_name or ""
 
     spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
@@ -722,8 +721,6 @@ async def on_startup(_dp: Dispatcher):
     # List of user IDs to check for Deleted Accounts
     # if the user is not in the chat, the bot will not be able to get the user info
     # Deleted Accounts have first_name = ""
-    # user_ids = [508008791, 6566378702, 129849153, 6524729690]
-    # chat_id = -1001755583146
 
     # async def check_user_status(chat_id: int, user_id: int):
     #     try:
@@ -737,9 +734,17 @@ async def on_startup(_dp: Dispatcher):
     #     await check_user_status(chat_id, user_id)
 
     # DELETE MESSAGE once the bot is started
+    # https://t.me/rumauritius/54607/81235
+    # try:
+    #     await BOT.delete_message(-1001711422922, 81235)
+    # except MessageToDeleteNotFound as e:
+    #     LOGGER.error("Error deleting message: %s", e)
+    # except Exception as e:
+    #     LOGGER.error("Error deleting message: %s", e)
     # https://t.me/123/127041
     # https://t.me/123/1/81190
     # await BOT.delete_message(-1002331876, 81190)
+    # await lols_autoban(5697700097, "on_startup event", "banned during on_startup event")
 
     # Call the function to load and start checks
     asyncio.create_task(load_and_start_checks())
@@ -1566,7 +1571,9 @@ async def create_named_watchdog(coro, user_id):
     # Create the task and store it in the running_watchdogs dictionary
     task = asyncio.create_task(coro)
     running_watchdogs[user_id] = task
-    LOGGER.info("\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id)
+    LOGGER.info(
+        "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id
+    )
 
     # Remove the task from the dictionary when it completes
     def task_done_callback(t: asyncio.Task):
@@ -2343,9 +2350,19 @@ if __name__ == "__main__":
 
             if callback_query.message.chat.id == ADMIN_GROUP_ID:
                 # remove personal report banner message
-                await BOT.delete_message(
-                    report_chat_id, admin_action_banner_message.message_id
-                )
+                try:
+                    await BOT.delete_message(
+                        report_chat_id, admin_action_banner_message.message_id
+                    )
+                except (
+                    MessageToDeleteNotFound
+                ):  # Message already deleted when replied in personal messages? XXX
+                    LOGGER.warning(
+                        "%s Message %s in Admin group to delete not found. Already deleted or not found.",
+                        callback_query.from_user.id,
+                        callback_query.message.message_id,
+                    )
+
             else:  # report was actioned in the personal chat
                 # remove admin group banner buttons
                 await BOT.edit_message_reply_markup(

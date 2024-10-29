@@ -1622,8 +1622,6 @@ async def log_lists():
     with open(filename, "w", encoding="utf-8") as file:
         for _id in banned_users:
             file.write(str(_id) + "\n")
-    # empty banned_users set
-    banned_users.clear()
 
     # move yesterday's daily_spam file to the daily_spam folder
     daily_spam_filename = get_daily_spam_filename()
@@ -1698,7 +1696,9 @@ async def log_lists():
             )
     except utils.exceptions.BadRequest as e:
         LOGGER.error("Error sending active_user_checks list: %s", e)
-
+    
+    # empty banned_users set
+    banned_users.clear()
 
 # async def get_photo_details(user_id: int):
 #     """Function to get the photo details of the user profile with the given ID.

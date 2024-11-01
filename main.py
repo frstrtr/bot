@@ -1366,12 +1366,22 @@ async def check_n_ban(message: types.Message, reason: str):
                 if task.get_name() == str(message.from_user.id):
                     task.cancel()
         # forward the telefragged message to the admin group
-        await BOT.forward_message(
-            ADMIN_GROUP_ID,
-            message.chat.id,
-            message.message_id,
-            message_thread_id=ADMIN_AUTOBAN,
-        )
+        try:
+            await BOT.forward_message(
+                ADMIN_GROUP_ID,
+                message.chat.id,
+                message.message_id,
+                message_thread_id=ADMIN_AUTOBAN,
+            )
+        except utils.exceptions.MessageToForwardNotFound as e:
+            LOGGER.error(
+                "\033[93m%s - message %s to forward using check_n_an not found in %s (%s)\033[0m Already deleted? %s",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+                e,
+            )
         # send the telefrag log message to the admin group
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
@@ -1696,9 +1706,10 @@ async def log_lists():
             )
     except utils.exceptions.BadRequest as e:
         LOGGER.error("Error sending active_user_checks list: %s", e)
-    
+
     # empty banned_users set
     banned_users.clear()
+
 
 # async def get_photo_details(user_id: int):
 #     """Function to get the photo details of the user profile with the given ID.

@@ -348,7 +348,7 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, TECHNO_NAMES
     global CHANNEL_NAMES, SPAM_TRIGGERS
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -442,6 +442,7 @@ def load_config():
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
         TECHNO_RESTART = int(config_XML_root.find("techno_restart").text)
         TECHNO_INOUT = int(config_XML_root.find("techno_inout").text)
+        TECHNO_NAMES = int(config_XML_root.find("techno_names").text)
 
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
         CHANNEL_IDS = [
@@ -1294,6 +1295,12 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"@{user_name}",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
@@ -1309,6 +1316,12 @@ async def check_and_autoban(
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
+            )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"@{user_name}",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
             )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
@@ -1340,6 +1353,12 @@ async def check_and_autoban(
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
+        )
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"@{user_name}",
+            parse_mode="HTML",
+            message_thread_id=TECHNO_NAMES,
         )
         return True
 
@@ -1418,6 +1437,12 @@ async def check_n_ban(message: types.Message, reason: str):
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             reply_markup=inline_kb,
+        )
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"@{message.from_user.username}",
+            parse_mode="HTML",
+            message_thread_id=TECHNO_NAMES,
         )
 
         # remove spammer from all groups
@@ -2062,6 +2087,12 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         reply_markup=inline_kb,
                         disable_web_page_preview=True,
+                    )
+                    await BOT.send_message(
+                        TECHNOLOG_GROUP_ID,
+                        f"@{inout_username}",
+                        parse_mode="HTML",
+                        message_thread_id=TECHNO_NAMES,
                     )
 
             except IndexError:

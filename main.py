@@ -1176,7 +1176,7 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            list(active_user_checks_dict.items())[-5:],  # Last 5 elements
+            list(active_user_checks_dict.items())[:5],  # First 5 elements
             len(active_user_checks_dict),  # Number of elements left
         )
     else:
@@ -1236,7 +1236,7 @@ async def check_and_autoban(
         else:
             action = "is already added to"
         if len(banned_users_dict) > 5:  # prevent spamming the log
-            last_five_users = list(banned_users_dict.items())[-5:]  # Last 5 elements
+            last_five_users = list(banned_users_dict.items())[:5]  # First 5 elements
             last_five_users_str = ", ".join(
                 [f"{uid}: {uname}" for uid, uname in last_five_users]
             )
@@ -1295,9 +1295,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            # if user_name is not None:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"@{user_name}",
+                f"{user_id}:@{user_name} (1302 {user_name is not None})",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1317,9 +1318,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            # if user_name is not None:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"@{user_name}",
+                f"{user_id}:@{user_name} (1326 {user_name is not None})",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1354,9 +1356,10 @@ async def check_and_autoban(
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+        # if user_name is not None:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"@{user_name}",
+            f"{user_id}:@{user_name} (1365 {user_name is not None})",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1391,7 +1394,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 LOGGER.info(
                     "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    list(active_user_checks_dict.items())[-5:],  # Last 5 elements
+                    list(active_user_checks_dict.items())[:5],  # First 5 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
@@ -1438,13 +1441,13 @@ async def check_n_ban(message: types.Message, reason: str):
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
+        # if message.from_user.username:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"@{message.from_user.username}",
+            f"{message.from_user.id}:@{message.from_user.username} (1451 {message.from_user.username})",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
-
         # remove spammer from all groups
         await lols_autoban(message.from_user.id, message.from_user.username)
         event_record = (
@@ -1467,17 +1470,17 @@ async def check_n_ban(message: types.Message, reason: str):
                 message.from_user.username or "NoUserName"
             )
             if len(banned_users_dict) > 5:
-                last_five_users = list(banned_users_dict.items())[
-                    -5:
+                first_five_users = list(banned_users_dict.items())[
+                    :5
                 ]  # Last 5 elements
                 last_five_users_str = ", ".join(
-                    [f"{uid}: {uname}" for uid, uname in last_five_users]
+                    [f"{uid}: {uname}" for uid, uname in first_five_users]
                 )
                 LOGGER.info(
                     "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
                     message.from_user.username,
-                    last_five_users,  # Last 5 elements
+                    last_five_users_str,  # First 5 elements
                     len(banned_users_dict),  # Number of elements left
                 )
             else:
@@ -1613,7 +1616,7 @@ async def perform_checks(
                 LOGGER.info(
                     "\033[92m%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
-                    list(active_user_checks_dict.items())[-5:],  # Last 5 elements
+                    list(active_user_checks_dict.items())[:5],  # First 5 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
@@ -1641,7 +1644,7 @@ async def create_named_watchdog(coro, user_id):
         ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
     # Create the task and store it in the running_watchdogs dictionary
-    task = asyncio.create_task(coro)
+    task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
         "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id
@@ -2088,13 +2091,13 @@ if __name__ == "__main__":
                         reply_markup=inline_kb,
                         disable_web_page_preview=True,
                     )
+                    # if update.old_chat_member.user.username:
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"@{inout_username}",
+                        f"{inout_userid}:@{inout_username} (2102 {update.old_chat_member.user.username})",
                         parse_mode="HTML",
                         message_thread_id=TECHNO_NAMES,
                     )
-
             except IndexError:
                 LOGGER.debug(
                     "%s left and has no previous join/leave events", inout_userid
@@ -2535,7 +2538,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks_dict.items())[-5:],  # Last 5 elements
+                        list(active_user_checks_dict.items())[:5],  # First 5 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
@@ -3178,7 +3181,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "\033[91m%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks_dict.items())[-5:],  # Last 5 elements
+                        list(active_user_checks_dict.items())[:5],  # First 5 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:

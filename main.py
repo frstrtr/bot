@@ -844,6 +844,11 @@ async def on_shutdown(_dp):
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
                 file.write(f"{_id}:{_uname}\n")
+    else:
+        # clear the file if no active checks
+        with open("active_user_checks.txt", "w", encoding="utf-8") as file:
+            file.write("")
+        
 
     # save all banned users to temp file to preserve list after bot restart
     banned_users_filename = "banned_users.txt"
@@ -1186,7 +1191,13 @@ async def lols_autoban(_id, user_name="None"):
             _id,
             active_user_checks_dict,
         )
-
+    if user_name is not None:
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"<code>{_id}</code>:@{user_name}",
+            parse_mode="HTML",
+            message_thread_id=TECHNO_NAMES,
+        )
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
@@ -1298,7 +1309,7 @@ async def check_and_autoban(
             # if user_name is not None:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"{user_id}:@{user_name} (1302 {user_name is not None})",
+                f"<code>{user_id}</code>:@{user_name} (1304 {user_name is not None})",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1321,7 +1332,7 @@ async def check_and_autoban(
             # if user_name is not None:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"{user_id}:@{user_name} (1326 {user_name is not None})",
+                f"<code>{user_id}</code>:@{user_name} (1327 {user_name is not None})",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1359,7 +1370,7 @@ async def check_and_autoban(
         # if user_name is not None:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"{user_id}:@{user_name} (1365 {user_name is not None})",
+            f"<code>{user_id}</code>:@{user_name} (1365 {user_name is not None})",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1444,7 +1455,7 @@ async def check_n_ban(message: types.Message, reason: str):
         # if message.from_user.username:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"{message.from_user.id}:@{message.from_user.username} (1451 {message.from_user.username})",
+            f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1451 {message.from_user.username})",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -2094,7 +2105,7 @@ if __name__ == "__main__":
                     # if update.old_chat_member.user.username:
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"{inout_userid}:@{inout_username} (2102 {update.old_chat_member.user.username})",
+                        f"<code>{inout_userid}</code>:@{inout_username} (2100 {update.old_chat_member.user.username})",
                         parse_mode="HTML",
                         message_thread_id=TECHNO_NAMES,
                     )

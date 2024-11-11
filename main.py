@@ -1181,7 +1181,7 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            list(active_user_checks_dict.items())[:5],  # First 5 elements
+            list(active_user_checks_dict.items())[:2],  # First 2 elements
             len(active_user_checks_dict),  # Number of elements left
         )
     else:
@@ -1249,7 +1249,7 @@ async def check_and_autoban(
         else:
             action = "is already added to"
         if len(banned_users_dict) > 5:  # prevent spamming the log
-            last_five_users = list(banned_users_dict.items())[:5]  # First 5 elements
+            last_five_users = list(banned_users_dict.items())[:2]  # First 2 elements
             last_five_users_str = ", ".join(
                 [f"{uid}: {uname}" for uid, uname in last_five_users]
             )
@@ -1407,7 +1407,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 LOGGER.info(
                     "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    list(active_user_checks_dict.items())[:5],  # First 5 elements
+                    list(active_user_checks_dict.items())[:2],  # First 2 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
@@ -1483,17 +1483,17 @@ async def check_n_ban(message: types.Message, reason: str):
                 message.from_user.username or "NoUserName"
             )
             if len(banned_users_dict) > 5:
-                first_five_users = list(banned_users_dict.items())[
-                    :5
-                ]  # Last 5 elements
-                last_five_users_str = ", ".join(
-                    [f"{uid}: {uname}" for uid, uname in first_five_users]
+                first_two_users = list(banned_users_dict.items())[
+                    :2
+                ]  # First 2 elements
+                first_two_users_str = ", ".join(
+                    [f"{uid}: {uname}" for uid, uname in first_two_users]
                 )
                 LOGGER.info(
                     "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
                     message.from_user.username,
-                    last_five_users_str,  # First 5 elements
+                    first_two_users_str,  # First 2 elements
                     len(banned_users_dict),  # Number of elements left
                 )
             else:
@@ -1629,7 +1629,7 @@ async def perform_checks(
                 LOGGER.info(
                     "\033[92m%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
-                    list(active_user_checks_dict.items())[:5],  # First 5 elements
+                    list(active_user_checks_dict.items())[:2],  # First 2 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
@@ -2551,7 +2551,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks_dict.items())[:5],  # First 5 elements
+                        list(active_user_checks_dict.items())[:2],  # First 2 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
@@ -3194,7 +3194,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "\033[91m%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks_dict.items())[:5],  # First 5 elements
+                        list(active_user_checks_dict.items())[:2],  # First 2 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:

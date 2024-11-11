@@ -1222,15 +1222,17 @@ async def check_and_autoban(
 ):
     """Function to check for spam and take action if necessary.
 
-    event_record: str: The event record to log to inout file.
+    :param event_record: str: The event record to log to inout file.
 
-    user_id: int: The ID of the user to check for spam.
+    :param user_id: int: The ID of the user to check for spam.
 
-    inout_logmessage: str: The log message for the user's activity.
+    :param inout_logmessage: str: The log message for the user's activity.
 
-    lols_spam: bool: The result of the lols_check function. OR TIMEOUT
+    :param user_name: str: The name of the user to check for spam.
 
-    message_to_delete: tuple: chat_id, message_id: The message to delete.
+    :param lols_spam: bool: The result of the lols_check function. OR TIMEOUT
+
+    :param message_to_delete: tuple: chat_id, message_id: The message to delete.
     """
 
     lols_url = f"https://t.me/lolsbotcatcherbot?start={user_id}"
@@ -1309,7 +1311,7 @@ async def check_and_autoban(
             # if user_name is not None:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1304 {user_name is not None})",
+                f"<code>{user_id}</code>:@{user_name} (1304 {user_name is None})",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )

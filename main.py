@@ -1728,11 +1728,11 @@ async def log_lists():
 
     try:
         active_user_checks_list = [
-            f"<code>{user}</code>:<code>@{uname}</code>"
+            f"<code>{user}</code>:@{uname}"
             for user, uname in active_user_checks_dict.items()
         ]
         banned_users_list = [
-            f"{user_id}:{user_name}" for user_id, user_name in banned_users_dict.items()
+            f"<code>{user_id}</code>:{user_name}" for user_id, user_name in banned_users_dict.items()
         ]
 
         # Function to split lists into chunks

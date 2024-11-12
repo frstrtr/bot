@@ -848,7 +848,6 @@ async def on_shutdown(_dp):
         # clear the file if no active checks
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             file.write("")
-        
 
     # save all banned users to temp file to preserve list after bot restart
     banned_users_filename = "banned_users.txt"
@@ -1191,10 +1190,10 @@ async def lols_autoban(_id, user_name="None"):
             _id,
             active_user_checks_dict,
         )
-    if user_name is not None:
+    if user_name is not None and user_name != "":
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name}",
+            f"<code>{_id}</code>:@{user_name} (1194)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1331,13 +1330,13 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            # if user_name is not None:
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1327 {user_name is not None})",
-                parse_mode="HTML",
-                message_thread_id=TECHNO_NAMES,
-            )
+            if user_name is not None and user_name != "":
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{user_id}</code>:@{user_name} (1327)",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)
@@ -1372,7 +1371,7 @@ async def check_and_autoban(
         # if user_name is not None:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{user_id}</code>:@{user_name} (1365 {user_name is not None})",
+            f"<code>{user_id}</code>:@{user_name} (1373 {user_name is not None})",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1454,13 +1453,13 @@ async def check_n_ban(message: types.Message, reason: str):
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
-        # if message.from_user.username:
-        await BOT.send_message(
-            TECHNOLOG_GROUP_ID,
-            f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1451 {message.from_user.username})",
-            parse_mode="HTML",
-            message_thread_id=TECHNO_NAMES,
-        )
+        if message.from_user.username != None and message.from_user.username != "":
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1457)",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
         # remove spammer from all groups
         await lols_autoban(message.from_user.id, message.from_user.username)
         event_record = (
@@ -1732,7 +1731,8 @@ async def log_lists():
             for user, uname in active_user_checks_dict.items()
         ]
         banned_users_list = [
-            f"<code>{user_id}</code>:@{user_name}" for user_id, user_name in banned_users_dict.items()
+            f"<code>{user_id}</code>:@{user_name}"
+            for user_id, user_name in banned_users_dict.items()
         ]
 
         # Function to split lists into chunks
@@ -2107,7 +2107,7 @@ if __name__ == "__main__":
                     # if update.old_chat_member.user.username:
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"<code>{inout_userid}</code>:@{inout_username} (2100 {update.old_chat_member.user.username})",
+                        f"<code>{inout_userid}</code>:@{inout_username} (2108 {update.old_chat_member.user.username})",
                         parse_mode="HTML",
                         message_thread_id=TECHNO_NAMES,
                     )

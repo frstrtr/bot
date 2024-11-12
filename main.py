@@ -2706,6 +2706,27 @@ if __name__ == "__main__":
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2108 {forwarded_message_data[4]})",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
+            banned_users_dict[author_id] = forwarded_message_data[4]
+            if forwarded_message_data[4] in active_user_checks_dict:
+                active_user_checks_dict.pop(forwarded_message_data[4], None)
+                LOGGER.info(
+                    "\033[91m%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin: %s\033[0m",
+                    forwarded_message_data[4],
+                    active_user_checks_dict,
+                )
+            LOGGER.info(
+                "%s Message %s action taken by @%s: User @%s banned and their messages deleted where applicable.",
+                author_id,
+                message_id_to_ban,
+                button_pressed_by,
+                forwarded_message_data[4],
+            )
 
         except utils.exceptions.MessageCantBeDeleted as e:
             LOGGER.error("Error in handle_ban function: %s", e)

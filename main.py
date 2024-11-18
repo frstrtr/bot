@@ -2824,9 +2824,9 @@ if __name__ == "__main__":
 
             # flag true if user joined the chat more than 3 days ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
-            user_is_2day_old = (
+            user_is_1week_old = (
                 message.date - user_join_chat_date
-            ).total_seconds() < 172805  # 2 days and 5 seconds
+            ).total_seconds() < 604805  # ONE week and 5 seconds
             # user_is_1day_old = (
             #     message.date - user_join_chat_date
             # ).total_seconds() < 86400  # 1 days and 5 seconds
@@ -2847,9 +2847,9 @@ if __name__ == "__main__":
                 if await check_n_ban(message, the_reason):
                     return
             elif (
-                user_is_2day_old
+                user_is_1week_old
             ):  # do lols check if user less than 48hr old sending a message
-                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first 48hrs after registration. Telefragged...\033[0m"
+                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged...\033[0m"
                 await check_n_ban(message, the_reason)
 
                 # At the point where you want to print the traceback

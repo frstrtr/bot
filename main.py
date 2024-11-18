@@ -48,8 +48,8 @@ bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 # Set to keep track of active user IDs
-active_user_checks = set()
-banned_users = set()
+active_user_checks_dict = dict()
+banned_users_dict = dict()
 
 # Dictionary to store running tasks by user ID
 running_watchdogs = {}
@@ -348,7 +348,7 @@ def get_inout_filename():
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, TECHNO_NAMES
     global CHANNEL_NAMES, SPAM_TRIGGERS
     global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -381,7 +381,7 @@ def load_config():
         file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
 
         # Create a formatter and set it for all handlers
-        formatter = logging.Formatter("%(asctime)s - %(message)s")
+        formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
         stream_handler.setFormatter(formatter)
         file_handler.setFormatter(formatter)
 
@@ -442,6 +442,7 @@ def load_config():
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
         TECHNO_RESTART = int(config_XML_root.find("techno_restart").text)
         TECHNO_INOUT = int(config_XML_root.find("techno_inout").text)
+        TECHNO_NAMES = int(config_XML_root.find("techno_names").text)
 
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
         CHANNEL_IDS = [
@@ -753,18 +754,19 @@ async def on_startup(_dp: Dispatcher):
 
 async def load_and_start_checks():
     """Load all unfinished checks from file and start them with 1 sec interval"""
-    file_path_active_checks = "active_user_checks.txt"
-    file_path_banned_users = "banned_users.txt"
+    active_checks_filename = "active_user_checks.txt"
+    banned_users_filename = "banned_users.txt"  # TODO store banned user names too
 
-    if not os.path.exists(file_path_active_checks):
-        LOGGER.error("File not found: %s", file_path_active_checks)
+    if not os.path.exists(active_checks_filename):
+        LOGGER.error("File not found: %s", active_checks_filename)
         return
 
     try:
-        with open(file_path_active_checks, "r", encoding="utf-8") as file:
+        with open(active_checks_filename, "r", encoding="utf-8") as file:
             for line in file:
-                user_id = int(line.strip())
-                active_user_checks.add(user_id)
+                user_id = int(line.strip().split(":")[0])
+                user_name = line.strip().split(":")[1]
+                active_user_checks_dict[user_id] = user_name
                 event_message = (
                     f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
                     + str(user_id)
@@ -782,22 +784,25 @@ async def load_and_start_checks():
                 await asyncio.sleep(1)
                 LOGGER.info("%s loaded from file & 2hr monitoring started ...", user_id)
 
-        if os.path.exists(file_path_banned_users):
-            with open(file_path_banned_users, "r", encoding="utf-8") as file:
+        if os.path.exists(banned_users_filename):
+            with open(banned_users_filename, "r", encoding="utf-8") as file:
                 for line in file:
-                    user_id = int(line.strip())
-                    banned_users.add(user_id)
+                    user_id, user_name = (
+                        int(line.strip().split(":")[0]),
+                        line.strip().split(":")[1],
+                    )
+                    banned_users_dict[user_id] = user_name
                 LOGGER.info(
                     "Banned users (%s) list loaded from file: %s",
-                    len(banned_users),
-                    banned_users,
+                    len(banned_users_dict),
+                    banned_users_dict,
                 )
 
     except FileNotFoundError as e:
         LOGGER.error("Error loading checks and bans: %s", e)
 
 
-async def sequential_shutdown_tasks(_id):
+async def sequential_shutdown_tasks(_id, _uname):
     """Define the new coroutine that runs two async functions sequentially"""
     # First async function
     lols_cas_result = await lols_cas_check(_id) is True
@@ -808,6 +813,7 @@ async def sequential_shutdown_tasks(_id):
         + " ❌ \t\t\tbanned everywhere during final checks on_shutdown inout",
         _id,
         "(<code>" + str(_id) + "</code>) banned during final checks on_shutdown event",
+        _uname,
         lols_cas_result,
     )
 
@@ -820,12 +826,12 @@ async def on_shutdown(_dp):
     tasks = []
 
     # Iterate over active user checks and create a task for each check
-    for _id in active_user_checks:
-        LOGGER.info("%s shutdown check for spam...", _id)
+    for _id, _uname in active_user_checks_dict.items():
+        LOGGER.info("%s:%s shutdown check for spam...", _id, _uname)
 
         # Create the task for the sequential coroutine without awaiting it immediately
         task = asyncio.create_task(
-            sequential_shutdown_tasks(_id), name=str(_id) + "shutdown"
+            sequential_shutdown_tasks(_id, _uname), name=str(_id) + "shutdown"
         )
         tasks.append(task)
 
@@ -833,21 +839,26 @@ async def on_shutdown(_dp):
     await asyncio.gather(*tasks)
 
     # save all unbanned checks to temp file to restart checks after bot restart
-    # check if active_user_checks is not empty
-    if active_user_checks:
+    # check if active_user_checks_dict is not empty
+    if active_user_checks_dict:
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
-            for _id in active_user_checks:
-                file.write(str(_id) + "\n")
+            for _id, _uname in active_user_checks_dict.items():
+                file.write(f"{_id}:{_uname}\n")
+    else:
+        # clear the file if no active checks
+        with open("active_user_checks.txt", "w", encoding="utf-8") as file:
+            file.write("")
 
     # save all banned users to temp file to preserve list after bot restart
-    if os.path.exists("banned_users.txt") and banned_users:
-        with open("banned_users.txt", "a", encoding="utf-8") as file:
-            for _id in banned_users:
-                file.write(str(_id) + "\n")
-    elif banned_users:
-        with open("banned_users.txt", "w", encoding="utf-8") as file:
-            for _id in banned_users:
-                file.write(str(_id) + "\n")
+    banned_users_filename = "banned_users.txt"
+    if os.path.exists(banned_users_filename) and banned_users_dict:
+        with open(banned_users_filename, "a", encoding="utf-8") as file:
+            for _id, _username in banned_users_dict.items():
+                file.write(f"{_id}:{_username}\n")
+    elif banned_users_dict:
+        with open(banned_users_filename, "w", encoding="utf-8") as file:
+            for _id, _username in banned_users_dict.items():
+                file.write(f"{_id}:{_username}\n")
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
@@ -874,15 +885,15 @@ async def on_shutdown(_dp):
         (
             "Runtime session shutdown stats:\n"
             f"Bot started at: {bot_start_time}\n"
-            f"Current active user checks: {len(active_user_checks)}\n"
-            f"Spammers detected: {len(banned_users)}\n"
+            f"Current active user checks: {len(active_user_checks_dict)}\n"
+            f"Spammers detected: {len(banned_users_dict)}\n"
         ),
         message_thread_id=TECHNO_RESTART,
     )
     # Close the bot
     await BOT.close()
 
-    # for _id in active_user_checks:
+    # for _id in active_user_checks_dict:
     #     LOGGER.info("%s shutdown check for spam...", _id)
     #     lols_cas_final_check = await lols_cas_check(_id) is True
     #     await check_and_autoban(
@@ -1158,26 +1169,34 @@ async def save_report_file(file_type, data):
             file.write(data)
 
 
-async def lols_autoban(_id):
+async def lols_autoban(_id, user_name="None"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
 
-    if _id in active_user_checks:
-        active_user_checks.remove(_id)
-        if len(active_user_checks) > 5:
-            LOGGER.info(
-                "\033[91m%s removed from active_user_checks list during lols_autoban: %s... %d totally\033[0m",
-                _id,
-                list(active_user_checks)[-5:],  # Last 5 elements
-                len(active_user_checks),  # Number of elements left
-            )
-        else:
-            LOGGER.info(
-                "\033[91m%s removed from active_user_checks list during lols_autoban: %s\033[0m",
-                _id,
-                active_user_checks,
-            )
-
+    if _id in active_user_checks_dict:
+        banned_users_dict[_id] = active_user_checks_dict.pop(
+            _id, None
+        )  # add and remove the user to the banned_users_dict
+        LOGGER.info(
+            "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
+            _id,
+            list(active_user_checks_dict.items())[:3],  # First 2 elements
+            len(active_user_checks_dict),  # Number of elements left
+        )
+    else:
+        banned_users_dict[_id] = user_name
+        LOGGER.info(
+            "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s\033[0m",
+            _id,
+            active_user_checks_dict,
+        )
+    if user_name is not None and user_name != "":
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"<code>{_id}</code>:@{user_name} (1194)",
+            parse_mode="HTML",
+            message_thread_id=TECHNO_NAMES,
+        )
     try:
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
@@ -1196,20 +1215,23 @@ async def check_and_autoban(
     event_record: str,
     user_id: int,
     inout_logmessage: str,
+    user_name: str,
     lols_spam=True,
     message_to_delete=None,
 ):
     """Function to check for spam and take action if necessary.
 
-    event_record: str: The event record to log to inout file.
+    :param event_record: str: The event record to log to inout file.
 
-    user_id: int: The ID of the user to check for spam.
+    :param user_id: int: The ID of the user to check for spam.
 
-    inout_logmessage: str: The log message for the user's activity.
+    :param inout_logmessage: str: The log message for the user's activity.
 
-    lols_spam: bool: The result of the lols_check function. OR TIMEOUT
+    :param user_name: str: The name of the user to check for spam.
 
-    message_to_delete: tuple: chat_id, message_id: The message to delete.
+    :param lols_spam: bool: The result of the lols_check function. OR TIMEOUT
+
+    :param message_to_delete: tuple: chat_id, message_id: The message to delete.
     """
 
     lols_url = f"https://t.me/lolsbotcatcherbot?start={user_id}"
@@ -1219,26 +1241,35 @@ async def check_and_autoban(
     )
 
     if lols_spam is True:  # not Timeout exaclty
-        if user_id not in banned_users:
-            await lols_autoban(user_id)
-            banned_users.add(user_id)
+        if user_id not in banned_users_dict:
+            await lols_autoban(user_id, user_name)
+            banned_users_dict[user_id] = user_name
             action = "added to"
         else:
             action = "is already added to"
-        if len(banned_users) > 5:  # prevent spamming the log
+        if len(banned_users_dict) > 5:  # prevent spamming the log
+            last_five_users = list(banned_users_dict.items())[:3]  # First 2 elements
+            last_five_users_str = ", ".join(
+                [f"{uid}: {uname}" for uid, uname in last_five_users]
+            )
             LOGGER.info(
-                "\033[93m%s %s runtime banned users list: %s... %d totally\033[0m",
+                "\033[93m%s:%s %s runtime banned users list: %s... %d totally\033[0m",
                 user_id,
+                user_name,
                 action,
-                list(banned_users)[-5:],  # Last 5 elements
-                len(banned_users),  # Number of elements left
+                last_five_users_str,  # Last 5 elements as string
+                len(banned_users_dict),  # Total number of elements
             )
         else:  # less than 5 banned users
+            all_users_str = ", ".join(
+                [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
+            )
             LOGGER.info(
-                "\033[93m%s %s runtime banned users list: %s\033[0m",
+                "\033[93m%s:%s %s runtime banned users list: %s\033[0m",
                 user_id,
+                user_name,
                 action,
-                banned_users,
+                all_users_str,  # All elements as string
             )
         if action == "is already added to":
             return True
@@ -1276,6 +1307,13 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            # if user_name is not None:
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{user_id}</code>:@{user_name} (1304 {user_name is None})",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
@@ -1292,6 +1330,13 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
+            if user_name is not None and user_name != "":
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{user_id}</code>:@{user_name} (1327)",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)
@@ -1323,6 +1368,13 @@ async def check_and_autoban(
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+        # if user_name is not None:
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"<code>{user_id}</code>:@{user_name} (1373 {user_name is not None})",
+            parse_mode="HTML",
+            message_thread_id=TECHNO_NAMES,
+        )
         return True
 
     return False
@@ -1345,21 +1397,24 @@ async def check_n_ban(message: types.Message, reason: str):
             message.chat.id,
             message.message_id,
         )
-        # delete id from the active_user_checks set
-        if message.from_user.id in active_user_checks:
-            active_user_checks.remove(message.from_user.id)
-            if len(active_user_checks) > 5:
+        # delete id from the active_user_checks_dict
+        if message.from_user.id in active_user_checks_dict:
+            banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(
+                message.from_user.id, None
+            )
+            if len(active_user_checks_dict) > 5:
                 LOGGER.info(
-                    "\033[91m%s removed from the active_user_checks set in check_n_ban: %s... %d totally\033[0m",
+                    "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    list(active_user_checks)[-5:],  # Last 5 elements
-                    len(active_user_checks),  # Number of elements left
+                    list(active_user_checks_dict.items())[:3],  # First 2 elements
+                    len(active_user_checks_dict),  # Number of elements left
                 )
             else:
+                banned_users_dict[message.from_user.id] = message.from_user.username
                 LOGGER.info(
-                    "\033[91m%s removed from the active_user_checks set in check_n_ban: %s\033[0m",
+                    "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s\033[0m",
                     message.from_user.id,
-                    active_user_checks,
+                    active_user_checks_dict,
                 )
             # stop the perform_checks coroutine if it is running for author_id
             for task in asyncio.all_tasks():
@@ -1398,9 +1453,15 @@ async def check_n_ban(message: types.Message, reason: str):
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
-
+        if message.from_user.username != None and message.from_user.username != "":
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1457)",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
         # remove spammer from all groups
-        await lols_autoban(message.from_user.id)
+        await lols_autoban(message.from_user.id, message.from_user.username)
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
             f"{message.from_id:<10} "
@@ -1416,20 +1477,30 @@ async def check_n_ban(message: types.Message, reason: str):
         await save_report_file("inout_", "cnb" + event_record)
 
         # add the user to the banned users list
-        if message.from_user.id not in banned_users:
-            banned_users.add(message.from_user.id)
-            if len(banned_users) > 5:
+        if message.from_user.id not in banned_users_dict:
+            banned_users_dict[message.from_user.id] = (
+                message.from_user.username or "NoUserName"
+            )
+            if len(banned_users_dict) > 5:
+                first_two_users = list(banned_users_dict.items())[
+                    :3
+                ]  # First 2 elements
+                first_two_users_str = ", ".join(
+                    [f"{uid}: {uname}" for uid, uname in first_two_users]
+                )
                 LOGGER.info(
-                    "\033[93m%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
+                    "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    list(banned_users)[-5:],  # Last 5 elements
-                    len(banned_users),  # Number of elements left
+                    message.from_user.username,
+                    first_two_users_str,  # First 2 elements
+                    len(banned_users_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[93m%s added to banned users list in check_n_ban: %s\033[0m",
+                    "\033[93m%s:%s added to banned users list in check_n_ban: %s\033[0m",
                     message.from_user.id,
-                    banned_users,
+                    message.from_user.username,
+                    banned_users_dict,
                 )
 
         # XXX message id invalid after the message is deleted? Or deleted by other bot?
@@ -1451,7 +1522,11 @@ async def check_n_ban(message: types.Message, reason: str):
 
 
 async def perform_checks(
-    message_to_delete=None, event_record="", user_id=None, inout_logmessage=""
+    message_to_delete=None,
+    event_record="",
+    user_id=None,
+    inout_logmessage="",
+    user_name="",
 ):
     """Corutine to perform checks for spam and take action if necessary.
 
@@ -1490,7 +1565,7 @@ async def perform_checks(
 
         for sleep_time in sleep_times:
 
-            if user_id not in active_user_checks:  # if user banned somewhere else
+            if user_id not in active_user_checks_dict:  # if user banned somewhere else
                 return
 
             await asyncio.sleep(sleep_time)
@@ -1508,13 +1583,14 @@ async def perform_checks(
                 user_id,
                 sleep_time // 60,
                 lols_spam,
-                len(active_user_checks),
+                len(active_user_checks_dict),
             )
 
             if await check_and_autoban(
                 event_record,
                 user_id,
                 inout_logmessage,
+                user_name,
                 lols_spam=lols_spam,
                 message_to_delete=message_to_delete,
             ):
@@ -1522,12 +1598,12 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error("\033[93m%s 2hrs spam checking cancelled. %s\033[0m", user_id, e)
-        if user_id in active_user_checks:
-            active_user_checks.remove(user_id)
+        if user_id in active_user_checks_dict:
+            active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
-                "\033[93m%s removed from active_user_checks list during perform_checks: \033[0m%s",
+                "\033[93m%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
                 user_id,
-                active_user_checks,
+                active_user_checks_dict,
             )
 
     except aiohttp.ServerDisconnectedError as e:
@@ -1541,25 +1617,25 @@ async def perform_checks(
         # Remove the user ID from the active set when done
         # Finally Block:
         # The `finally` block ensures that the `user_id`
-        # is removed from the `active_user_checks` set
+        # is removed from the `active_user_checks` dict
         # after all checks are completed or
         # if the function exits early due to a `return` statement:
         if (
-            user_id in active_user_checks
+            user_id in active_user_checks_dict
         ):  # avoid case when manually banned by admin same time
-            active_user_checks.remove(user_id)
-            if len(active_user_checks) > 5:
+            active_user_checks_dict.pop(user_id, None)
+            if len(active_user_checks_dict) > 5:
                 LOGGER.info(
-                    "\033[92m%s removed from active_user_checks list in finally block: %s... %d totally\033[0m",
+                    "\033[92m%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
-                    list(active_user_checks)[-5:],  # Last 5 elements
-                    len(active_user_checks),  # Number of elements left
+                    list(active_user_checks_dict.items())[:3],  # First 2 elements
+                    len(active_user_checks_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s removed from active_user_checks list in finally block: %s\033[0m",
+                    "\033[92m%s removed from active_user_checks_dict in finally block: %s\033[0m",
                     user_id,
-                    active_user_checks,
+                    active_user_checks_dict,
                 )
 
 
@@ -1580,7 +1656,7 @@ async def create_named_watchdog(coro, user_id):
         ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
     # Create the task and store it in the running_watchdogs dictionary
-    task = asyncio.create_task(coro)
+    task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
         "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id
@@ -1602,13 +1678,13 @@ async def log_lists():
     # TODO log summary numbers of banned users and active user checks totals
     LOGGER.info(
         "\033[93m%s banned users list: %s\033[0m",
-        len(banned_users),
-        banned_users,
+        len(banned_users_dict),
+        banned_users_dict,
     )
     LOGGER.info(
         "\033[93m%s Active user checks list: %s\033[0m",
-        len(active_user_checks),
-        active_user_checks,
+        len(active_user_checks_dict),
+        active_user_checks_dict,
     )
     # TODO move inout and daily_spam logs to the dedicated folders
     # save banned users list to the file
@@ -1622,16 +1698,18 @@ async def log_lists():
     os.makedirs("daily_spam", exist_ok=True)
 
     # read current banned users list from the file
-    if os.path.exists("banned_users.txt"):
-        with open("banned_users.txt", "r") as file:
+    banned_users_filename = "banned_users.txt"
+    if os.path.exists(banned_users_filename):
+        with open(banned_users_filename, "r", encoding="utf-8") as file:
             # append users to the set
             for line in file:
-                banned_users.add(int(line.strip()))
-        os.remove("banned_users.txt")  # remove the file after reading
+                user_id, user_name = line.strip().split(":")
+                banned_users_dict[int(user_id)] = user_name
+        os.remove(banned_users_filename)  # remove the file after reading
     # save banned users list to the file with the current date to the inout folder
     with open(filename, "w", encoding="utf-8") as file:
-        for _id in banned_users:
-            file.write(str(_id) + "\n")
+        for _id, _username in banned_users_dict.items():
+            file.write(f"{_id}:{_username}\n")
 
     # move yesterday's daily_spam file to the daily_spam folder
     daily_spam_filename = get_daily_spam_filename()
@@ -1649,9 +1727,13 @@ async def log_lists():
 
     try:
         active_user_checks_list = [
-            f"<code>{user}</code>" for user in active_user_checks
+            f"<code>{user}</code>:@{uname}"
+            for user, uname in active_user_checks_dict.items()
         ]
-        banned_users_list = [f"<code>{user}</code>" for user in banned_users]
+        banned_users_list = [
+            f"<code>{user_id}</code>:@{user_name}"
+            for user_id, user_name in banned_users_dict.items()
+        ]
 
         # Function to split lists into chunks
         def split_list(lst, max_length):
@@ -1678,7 +1760,7 @@ async def log_lists():
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            f"Current user checks list: {len(active_user_checks)}",
+            f"Current user checks list: {len(active_user_checks_dict)}",
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
         )
@@ -1692,7 +1774,7 @@ async def log_lists():
             )
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            f"Current banned users list: {len(banned_users)}",
+            f"Current banned users list: {len(banned_users_dict)}",
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
         )
@@ -1705,10 +1787,10 @@ async def log_lists():
                 parse_mode="HTML",
             )
     except utils.exceptions.BadRequest as e:
-        LOGGER.error("Error sending active_user_checks list: %s", e)
+        LOGGER.error("Error sending active_user_checks_dict: %s", e)
 
-    # empty banned_users set
-    banned_users.clear()
+    # empty banned_users_dict
+    banned_users_dict.clear()
 
 
 # async def get_photo_details(user_id: int):
@@ -1869,12 +1951,12 @@ if __name__ == "__main__":
                 inout_status,
                 inout_chattitle,
             )
-            # if inout_userid in active_user_checks:
+            # if inout_userid in active_user_checks_dict:
             #     active_user_checks.remove(inout_userid)
             #     LOGGER.info(
-            #         "\033[91m%s removed from active_user_checks list during GCM kick by bot/admin: \033[0m%s",
+            #         "\033[91m%s removed from active_user_checks_dict during GCM kick by bot/admin: \033[0m%s",
             #         inout_userid,
-            #         active_user_checks,
+            #         active_user_checks_dict,
             #     )
         elif inout_status == ChatMemberStatus.RESTRICTED:
             LOGGER.info(
@@ -1900,7 +1982,12 @@ if __name__ == "__main__":
         ):  # not Timeout exactly or if kicked/restricted by someone else
             # Call check_and_autoban with concurrency control using named tasks
             await create_named_watchdog(
-                check_and_autoban(event_record, inout_userid, inout_logmessage),
+                check_and_autoban(
+                    event_record,
+                    inout_userid,
+                    inout_logmessage,
+                    user_name=update.old_chat_member.user.username,
+                ),
                 user_id=inout_userid,
             )
             # await check_and_autoban(event_record, inout_userid, inout_logmessage)
@@ -1922,9 +2009,11 @@ if __name__ == "__main__":
                     inout_userid,
                 )
                 # Check if the user ID is already being processed
-                if inout_userid not in active_user_checks:
+                if inout_userid not in active_user_checks_dict:
                     # Add the user ID to the active set
-                    active_user_checks.add(inout_userid)
+                    active_user_checks_dict[inout_userid] = (
+                        update.old_chat_member.user.username
+                    )
                     # create task with user_id as name
                     asyncio.create_task(
                         perform_checks(
@@ -2015,7 +2104,13 @@ if __name__ == "__main__":
                         reply_markup=inline_kb,
                         disable_web_page_preview=True,
                     )
-
+                    # if update.old_chat_member.user.username:
+                    await BOT.send_message(
+                        TECHNOLOG_GROUP_ID,
+                        f"<code>{inout_userid}</code>:@{inout_username} (2108 {update.old_chat_member.user.username})",
+                        parse_mode="HTML",
+                        message_thread_id=TECHNO_NAMES,
+                    )
             except IndexError:
                 LOGGER.debug(
                     "%s left and has no previous join/leave events", inout_userid
@@ -2447,21 +2542,23 @@ if __name__ == "__main__":
                     "Could not retrieve the author's user ID from the report."
                 )
                 return
-            # remove userid from the active_user_checks set
-            if author_id in active_user_checks:
-                active_user_checks.remove(author_id)
-                if len(active_user_checks) > 5:
+            # remove userid from the active_user_checks_dict
+            if author_id in active_user_checks_dict:
+                banned_users_dict[author_id] = active_user_checks_dict.pop(
+                    author_id, None
+                )
+                if len(active_user_checks_dict) > 5:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks)[-5:],  # Last 5 elements
-                        len(active_user_checks),  # Number of elements left
+                        list(active_user_checks_dict.items())[:3],  # First 2 elements
+                        len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during handle_ban by admin: %s\033[0m",
+                        "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s\033[0m",
                         author_id,
-                        active_user_checks,
+                        active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
@@ -2484,7 +2581,9 @@ if __name__ == "__main__":
             await save_report_file("inout_", "hbn" + event_record)
 
             # add to the banned users set
-            banned_users.add(author_id)
+            banned_users_dict[int(author_id)] = (
+                forwarded_message_data[4] if forwarded_message_data[4] else "NoUserName"
+            )
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -2607,6 +2706,27 @@ if __name__ == "__main__":
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2108 {forwarded_message_data[4]})",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
+            banned_users_dict[author_id] = forwarded_message_data[4]
+            if forwarded_message_data[4] in active_user_checks_dict:
+                active_user_checks_dict.pop(forwarded_message_data[4], None)
+                LOGGER.info(
+                    "\033[91m%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin: %s\033[0m",
+                    forwarded_message_data[4],
+                    active_user_checks_dict,
+                )
+            LOGGER.info(
+                "%s Message %s action taken by @%s: User @%s banned and their messages deleted where applicable.",
+                author_id,
+                message_id_to_ban,
+                button_pressed_by,
+                forwarded_message_data[4],
+            )
 
         except utils.exceptions.MessageCantBeDeleted as e:
             LOGGER.error("Error in handle_ban function: %s", e)
@@ -2659,29 +2779,29 @@ if __name__ == "__main__":
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         # XXX
-        # check if message is from user from active_user_checks set or banned_users set
+        # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
-            message.from_user.id in active_user_checks
-            and message.from_user.id in banned_users
+            message.from_user.id in active_user_checks_dict
+            and message.from_user.id in banned_users_dict
         ):
             LOGGER.warning(
-                "\033[47m\033[34m%s is in both active_user_checks and banned_users, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
             )
-        elif message.from_user.id in active_user_checks:
+        elif message.from_user.id in active_user_checks_dict:
             LOGGER.warning(
-                "\033[47m\033[34m%s is in active_user_checks, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in active_user_checks_dict, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
             )
-        elif message.from_user.id in banned_users:
+        elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
-                "\033[47m\033[34m%s is in banned_users, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -2842,7 +2962,7 @@ if __name__ == "__main__":
 
             # XXX if user was in lols but before it was kicked it posted a message eventually
             # we can check it in runtime banned user list
-            if message.from_user.id in banned_users:
+            if message.from_user.id in banned_users_dict:
                 the_reason = f"{message.from_user.id} is banned before sending a message, but squizzed due to latency..."
                 if await check_n_ban(message, the_reason):
                     return
@@ -2985,9 +3105,11 @@ if __name__ == "__main__":
                 # )
                 if await check_n_ban(message, the_reason):
                     return
-                elif message.from_id not in active_user_checks:
-                    # check if the user is not in the active_user_checks already
-                    active_user_checks.add(message.from_id)
+                elif message.from_id not in active_user_checks_dict:
+                    # check if the user is not in the active_user_checks_dict already
+                    active_user_checks_dict[message.from_id] = (
+                        message.from_user.username
+                    )
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
@@ -3084,21 +3206,23 @@ if __name__ == "__main__":
                 )
                 return
 
-            # remove userid from the active_user_checks set
-            if author_id in active_user_checks:
-                active_user_checks.remove(author_id)
-                if len(active_user_checks) > 5:
+            # remove userid from the active_user_checks_dict
+            if author_id in active_user_checks_dict:
+                banned_users_dict[author_id] = active_user_checks_dict.pop(
+                    author_id, None
+                )
+                if len(active_user_checks_dict) > 5:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks)[-5:],  # Last 5 elements
-                        len(active_user_checks),  # Number of elements left
+                        list(active_user_checks_dict.items())[:3],  # First 2 elements
+                        len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks list during ban by admin: %s\033[0m",
+                        "\033[91m%s removed from active_user_checks_dict during ban by admin: %s\033[0m",
                         author_id,
-                        active_user_checks,
+                        active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
@@ -3106,7 +3230,9 @@ if __name__ == "__main__":
                         task.cancel()
 
             # add to the banned users set
-            banned_users.add(author_id)
+            banned_users_dict[int(author_id)] = (
+                forwarded_message_data[4] if forwarded_message_data[4] else "NoUserName"
+            )
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -3209,11 +3335,11 @@ if __name__ == "__main__":
                 message.from_user.id,
             )
 
-            if user_id in active_user_checks:
+            if user_id in active_user_checks_dict:
                 await message.reply("User is already being checked.")
                 return
             else:
-                active_user_checks.add(user_id)
+                active_user_checks_dict[user_id] = message.from_user.username
 
             # start the perform_checks coroutine
             asyncio.create_task(

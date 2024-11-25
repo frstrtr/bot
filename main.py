@@ -1216,7 +1216,7 @@ async def check_and_autoban(
     user_id: int,
     inout_logmessage: str,
     user_name: str,
-    lols_spam=True,
+    lols_spam=False,
     message_to_delete=None,
 ):
     """Function to check for spam and take action if necessary.
@@ -1987,47 +1987,45 @@ if __name__ == "__main__":
                     inout_userid,
                     inout_logmessage,
                     user_name=update.old_chat_member.user.username,
+                    lols_spam=lols_spam,
                 ),
                 user_id=inout_userid,
             )
-            # await check_and_autoban(event_record, inout_userid, inout_logmessage)
 
-        else:
-            # Schedule the perform_checks coroutine to run in the background
-            if inout_status in (
-                ChatMemberStatus.MEMBER,
-                ChatMemberStatus.KICKED,
-                ChatMemberStatus.RESTRICTED,
-                ChatMemberStatus.LEFT,
-            ):  # only if user joined or kicked or restricted or left
+        elif inout_status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.KICKED,
+            ChatMemberStatus.RESTRICTED,
+            ChatMemberStatus.LEFT,
+        ):  # only if user joined or kicked or restricted or left
 
-                # Get the current timestamp
+            # Get the current timestamp
 
-                # Log the message with the timestamp
+            # Log the message with the timestamp
+            LOGGER.debug(
+                "\033[96m%s Scheduling perform_checks coroutine\033[0m",
+                inout_userid,
+            )
+            # Check if the user ID is already being processed
+            if inout_userid not in active_user_checks_dict:
+                # Add the user ID to the active set
+                active_user_checks_dict[inout_userid] = (
+                    update.old_chat_member.user.username
+                )
+                # create task with user_id as name
+                asyncio.create_task(
+                    perform_checks(
+                        event_record=event_record,
+                        user_id=update.old_chat_member.user.id,
+                        inout_logmessage=inout_logmessage,
+                    ),
+                    name=str(inout_userid),
+                )
+            else:
                 LOGGER.debug(
-                    "\033[96m%s Scheduling perform_checks coroutine\033[0m",
+                    "\033[93m%s skipping perform_checks as it is already being processed\033[0m",
                     inout_userid,
                 )
-                # Check if the user ID is already being processed
-                if inout_userid not in active_user_checks_dict:
-                    # Add the user ID to the active set
-                    active_user_checks_dict[inout_userid] = (
-                        update.old_chat_member.user.username
-                    )
-                    # create task with user_id as name
-                    asyncio.create_task(
-                        perform_checks(
-                            event_record=event_record,
-                            user_id=update.old_chat_member.user.id,
-                            inout_logmessage=inout_logmessage,
-                        ),
-                        name=str(inout_userid),
-                    )
-                else:
-                    LOGGER.debug(
-                        "\033[93m%s skipping perform_checks as it is already being processed\033[0m",
-                        inout_userid,
-                    )
 
         # record the event in the database if not lols_spam
         if not lols_spam:

@@ -381,7 +381,8 @@ def load_config():
         file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
 
         # Create a formatter and set it for all handlers
-        formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
+        # formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
+        formatter = logging.Formatter("%(asctime)s - %(message)s")
         stream_handler.setFormatter(formatter)
         file_handler.setFormatter(formatter)
 

@@ -2799,6 +2799,8 @@ if __name__ == "__main__":
                 message.chat.title,
                 message.chat.id,
             )
+            message_link = 'https://t.me/c/' + str(message.chat.id)[4:] + '/' + str(message.message_id)
+            LOGGER.info('%s suspicious message link: %s', message.from_user.id, message_link)
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
                 "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",

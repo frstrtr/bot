@@ -1398,6 +1398,7 @@ async def check_n_ban(message: types.Message, reason: str):
             message.chat.id,
             message.message_id,
         )
+        time_passed = reason.split("...")[0].split()[-1]
         # delete id from the active_user_checks_dict
         if message.from_user.id in active_user_checks_dict:
             banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(
@@ -1448,7 +1449,7 @@ async def check_n_ban(message: types.Message, reason: str):
         await BOT.send_message(
             ADMIN_GROUP_ID,
             (
-                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! Telefragged..."
+                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! Telefragged in {time_passed}..."
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
@@ -2968,7 +2969,15 @@ if __name__ == "__main__":
             elif (
                 user_is_1week_old
             ):  # do lols check if user less than 48hr old sending a message
-                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged...\033[0m"
+                time_passed = message.date - user_join_chat_date
+                human_readable_time = str(time_passed)
+                LOGGER.info(
+                    "%s joined the chat %s %s ago",
+                    message.from_id,
+                    message.chat.title,
+                    human_readable_time,
+                )
+                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 await check_n_ban(message, the_reason)
 
                 # At the point where you want to print the traceback

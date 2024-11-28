@@ -1830,6 +1830,27 @@ async def log_lists():
 #                 response.raise_for_status()
 
 
+def extract_chat_id_and_message_id_from_link(message_link):
+    """Extract chat ID and message ID from a message link."""
+    if not str(message_link).startswith("https://t.me/"):
+        raise ValueError("Invalid message link format")
+    try:
+        parts = message_link.split("/")
+        chat_id = parts[-2]
+        message_id = int(parts[-1])
+        if "c" in parts:
+            chat_id = int("-100" + chat_id)
+        elif chat_id != '':
+            chat_id = "@"+chat_id
+        else:
+            raise ValueError("Invalid message link format")
+        return chat_id, message_id
+    except (IndexError, ValueError) as e:
+        raise ValueError(
+            "Invalid message link format. https://t.me/ChatName/MessageID"
+        ) from e
+
+
 if __name__ == "__main__":
 
     # Start tracing Python memory allocations
@@ -2779,23 +2800,7 @@ if __name__ == "__main__":
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         # XXX
-        
-        # check if it is a message link from admin from admin group to be deleted
-        if await is_admin(message.from_user.id, ADMIN_GROUP_ID) and message.text.startswith('https://t.me/'):
-            # get chat_id and message_id from the message link
-            chat_id, message_id = message.text.split('/')[-2:]
-            # delete the message
-            logging.info('%s (ADMIN) requested deletion of message %s from chat %s', message.from_user.id, message_id, chat_id)
-            # TODO add confirmation
-            # TODO add admin group info and message forward to log action made by admin
-            # try:
-            # await BOT.delete_message(chat_id, message_id)
-            # LOGGER.info('Message %s deleted from chat %s by admin', message_id, chat_id)
-            # return
-            # except Exception as e:
-            # LOGGER.error('%s (ADMIN) Error while deleting message %s from chat %s: %s', message.from_user.id, message_id, chat_id, e)
-        
-        
+
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict
@@ -2816,8 +2821,15 @@ if __name__ == "__main__":
                 message.chat.title,
                 message.chat.id,
             )
-            message_link = 'https://t.me/c/' + str(message.chat.id)[4:] + '/' + str(message.message_id)
-            LOGGER.info('%s suspicious message link: %s', message.from_user.id, message_link)
+            message_link = (
+                "https://t.me/c/"
+                + str(message.chat.id)[4:]
+                + "/"
+                + str(message.message_id)
+            )
+            LOGGER.info(
+                "%s suspicious message link: %s", message.from_user.id, message_link
+            )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
                 "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
@@ -3386,6 +3398,71 @@ if __name__ == "__main__":
         except Exception as e:
             LOGGER.error("Error in check_user: %s", e)
             await message.reply("An error occurred while trying to check the user.")
+
+    @DP.message_handler(commands=["delmsg"], chat_id=ADMIN_GROUP_ID)
+    async def delete_message(message: types.Message):
+        """Function to delete the message by its link."""
+        try:
+            command_args = message.text.split()
+            LOGGER.debug("Command arguments received: %s", command_args)
+
+            if len(command_args) < 2:
+                raise ValueError("Please provide the message link to delete.")
+
+            message_link = command_args[1]
+            LOGGER.debug("Message link to delete: %s", message_link)
+
+            # Admin_ID
+            admin_id = message.from_user.id
+            # Extract the chat ID and message ID from the message link
+            chat_id, message_id = extract_chat_id_and_message_id_from_link(message_link)
+            LOGGER.debug("Chat ID: %d, Message ID: %d", chat_id, message_id)
+
+            # reply to the message # TODO confirm deletion
+            # await message.reply('Are you sure you want to delete the message?')
+
+            if not chat_id or not message_id:
+                raise ValueError("Invalid message link provided.")
+
+            try:
+                await BOT.delete_message(chat_id=chat_id, message_id=message_id)
+                LOGGER.info(
+                    "Message %d deleted from chat %d by admin request",
+                    message_id,
+                    chat_id,
+                )
+                await message.reply(
+                    f"Message {message_id} deleted from chat {chat_id}."
+                )
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"{message_link} Message {message_id} deleted from chat {chat_id} by admin <code>{admin_id}</code> request.",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_LOGGING,
+                )
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    f"{message_link} Message {message_id} deleted from chat {chat_id} by admin <code>{admin_id}</code> request.",
+                    parse_mode="HTML",
+                    message_thread_id=ADMIN_MANBAN,
+                )
+
+            except Exception as e:
+                LOGGER.error(
+                    "Failed to delete message %d in chat %d. Error: %s",
+                    message_id,
+                    chat_id,
+                    e,
+                )
+                await message.reply(
+                    f"Failed to delete message {message_id} in chat {chat_id}. Error: {e}"
+                )
+
+        except ValueError as ve:
+            await message.reply(str(ve))
+        except Exception as e:
+            LOGGER.error("Error in delete_message: %s", e)
+            await message.reply("An error occurred while trying to delete the message.")
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):

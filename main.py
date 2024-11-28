@@ -3447,7 +3447,7 @@ if __name__ == "__main__":
                     message_thread_id=ADMIN_MANBAN,
                 )
 
-            except Exception as e:
+            except utils.exceptions.ChatNotFound as e:
                 LOGGER.error(
                     "Failed to delete message %d in chat %d. Error: %s",
                     message_id,

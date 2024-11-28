@@ -1181,15 +1181,16 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            list(active_user_checks_dict.items())[:3],  # First 2 elements
+            list(active_user_checks_dict.items())[:3],  # Last 2 elements
             len(active_user_checks_dict),  # Number of elements left
         )
     else:
         banned_users_dict[_id] = user_name
         LOGGER.info(
-            "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s\033[0m",
+            "\033[91m%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            active_user_checks_dict,
+            list(banned_users_dict.items())[:3],  # Last 2 elements
+            len(banned_users_dict),  # Number of elements left
         )
     if user_name is not None and user_name != "":
         await BOT.send_message(
@@ -3001,7 +3002,11 @@ if __name__ == "__main__":
                     + "/"
                     + str(message.message_id)
                 )
-                LOGGER.info("%s latency message link: %s", message.from_user.id, latency_message_link)
+                LOGGER.info(
+                    "%s latency message link: %s",
+                    message.from_user.id,
+                    latency_message_link,
+                )
                 if await check_n_ban(message, the_reason):
                     return
             elif (

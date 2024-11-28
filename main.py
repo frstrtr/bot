@@ -642,6 +642,11 @@ def get_channel_id_by_name(channel_name):
     raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
 
 
+def get_channel_name_by_id(channel_id):
+    """Function to get the channel name by its ID."""
+    return channels_dict.get(channel_id, None)
+
+
 def format_spam_report(message: types.Message) -> str:
     """Function to format the message one line for logging."""
 
@@ -1207,8 +1212,13 @@ async def lols_autoban(_id, user_name="None"):
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
+        chat_name = get_channel_name_by_id(chat_id)
         LOGGER.error(
-            "%s - error banning in chat %s: %s. Deleted Account?", _id, chat_id, e
+            "%s - error banning in chat %s (%s): %s. Deleted Account?",
+            _id,
+            chat_name,
+            chat_id,
+            e,
         )
         # XXX remove _id check corutine and from monitoring list?
 

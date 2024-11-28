@@ -2779,6 +2779,21 @@ if __name__ == "__main__":
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
         # XXX
+        
+        # check if it is a message link from admin from admin group to be deleted
+        if is_admin(message.from_user.id, ADMIN_GROUP_ID) and message.text.startswith('https://t.me/'):
+            # get chat_id and message_id from the message link
+            chat_id, message_id = message.text.split('/')[-2:]
+            # delete the message
+            logging.info('%s (ADMIN) requested deletion of message %s from chat %s', message.from_user.id, message_id, chat_id)
+            # try:
+            # await BOT.delete_message(chat_id, message_id)
+            # LOGGER.info('Message %s deleted from chat %s by admin', message_id, chat_id)
+            # return
+            # except Exception as e:
+            # LOGGER.error('%s (ADMIN) Error while deleting message %s from chat %s: %s', message.from_user.id, message_id, chat_id, e)
+        
+        
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict

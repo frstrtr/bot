@@ -1840,8 +1840,8 @@ def extract_chat_id_and_message_id_from_link(message_link):
         message_id = int(parts[-1])
         if "c" in parts:
             chat_id = int("-100" + chat_id)
-        elif chat_id != '':
-            chat_id = "@"+chat_id
+        elif chat_id != "":
+            chat_id = "@" + chat_id
         else:
             raise ValueError("Invalid message link format")
         return chat_id, message_id
@@ -2995,6 +2995,13 @@ if __name__ == "__main__":
             # we can check it in runtime banned user list
             if message.from_user.id in banned_users_dict:
                 the_reason = f"{message.from_user.id} is banned before sending a message, but squizzed due to latency..."
+                latency_message_link = (
+                    "https://t.me/c/"
+                    + str(message.chat.id)[4:]
+                    + "/"
+                    + str(message.message_id)
+                )
+                LOGGER.info("%s latency message link: ", latency_message_link)
                 if await check_n_ban(message, the_reason):
                     return
             elif (

@@ -2781,11 +2781,13 @@ if __name__ == "__main__":
         # XXX
         
         # check if it is a message link from admin from admin group to be deleted
-        if is_admin(message.from_user.id, ADMIN_GROUP_ID) and message.text.startswith('https://t.me/'):
+        if await is_admin(message.from_user.id, ADMIN_GROUP_ID) and message.text.startswith('https://t.me/'):
             # get chat_id and message_id from the message link
             chat_id, message_id = message.text.split('/')[-2:]
             # delete the message
             logging.info('%s (ADMIN) requested deletion of message %s from chat %s', message.from_user.id, message_id, chat_id)
+            # TODO add confirmation
+            # TODO add admin group info and message forward to log action made by admin
             # try:
             # await BOT.delete_message(chat_id, message_id)
             # LOGGER.info('Message %s deleted from chat %s by admin', message_id, chat_id)

@@ -3416,7 +3416,7 @@ if __name__ == "__main__":
             admin_id = message.from_user.id
             # Extract the chat ID and message ID from the message link
             chat_id, message_id = extract_chat_id_and_message_id_from_link(message_link)
-            LOGGER.debug("Chat ID: %d, Message ID: %d", chat_id, message_id)
+            LOGGER.debug("Chat ID: %s, Message ID: %d", chat_id, message_id)
 
             # reply to the message # TODO confirm deletion
             # await message.reply('Are you sure you want to delete the message?')
@@ -3438,7 +3438,6 @@ if __name__ == "__main__":
                     TECHNOLOG_GROUP_ID,
                     f"{message_link} Message {message_id} deleted from chat {chat_id} by admin <code>{admin_id}</code> request.",
                     parse_mode="HTML",
-                    message_thread_id=TECHNO_LOGGING,
                 )
                 await BOT.send_message(
                     ADMIN_GROUP_ID,

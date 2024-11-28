@@ -3001,7 +3001,7 @@ if __name__ == "__main__":
                     + "/"
                     + str(message.message_id)
                 )
-                LOGGER.info("%s latency message link: ", latency_message_link)
+                LOGGER.info("%s latency message link: %s", message.from_user.id, latency_message_link)
                 if await check_n_ban(message, the_reason):
                     return
             elif (

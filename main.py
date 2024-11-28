@@ -3427,7 +3427,7 @@ if __name__ == "__main__":
             try:
                 await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                 LOGGER.info(
-                    "Message %d deleted from chat %d by admin request",
+                    "Message %d deleted from chat %s by admin request",
                     message_id,
                     chat_id,
                 )
@@ -3448,7 +3448,7 @@ if __name__ == "__main__":
 
             except utils.exceptions.ChatNotFound as e:
                 LOGGER.error(
-                    "Failed to delete message %d in chat %d. Error: %s",
+                    "Failed to delete message %d in chat %s. Error: %s",
                     message_id,
                     chat_id,
                     e,

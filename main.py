@@ -1847,18 +1847,27 @@ def extract_chat_id_and_message_id_from_link(message_link):
         raise ValueError("Invalid message link format")
     try:
         parts = message_link.split("/")
-        chat_id = parts[-2]
-        message_id = int(parts[-1])
+        if len(parts) == 5:
+            chat_id = parts[3]
+            message_id = int(parts[-1])
+        elif "c" in parts:
+            chat_id = parts[4]
+            message_id = int(parts[-1])
+        else:
+            chat_id = parts[3]
+            message_id = int(parts[-1])
+        
         if "c" in parts:
             chat_id = int("-100" + chat_id)
         elif chat_id != "":
             chat_id = "@" + chat_id
         else:
             raise ValueError("Invalid message link format")
+        
         return chat_id, message_id
     except (IndexError, ValueError) as e:
         raise ValueError(
-            "Invalid message link format. https://t.me/ChatName/MessageID"
+            "Invalid message link format. https://t.me/ChatName/MessageID or https://t.me/ChatName/threadID/MessageID"
         ) from e
 
 

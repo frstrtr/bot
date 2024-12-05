@@ -2850,6 +2850,11 @@ if __name__ == "__main__":
             LOGGER.info(
                 "%s suspicious message link: %s", message.from_user.id, message_link
             )
+            # await BOT.send_message(
+            #     ADMIN_GROUP_ID,
+            #     f"User {message.from_user.id} is in active_user_checks_dict. Suspicious message link: {message_link}",
+            #     message_thread_id=ADMIN_AUTOREPORTS,
+            # )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
                 "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",

@@ -1061,7 +1061,6 @@ async def handle_forwarded_reports_with_details(
         f"{escaped_name}\n"
         f"💀 SPAMMER ID profile links:\n"
         f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
-        f"   ├☠️ Plain text: tg://user?id={user_id}\n"
         f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
@@ -1969,7 +1968,6 @@ if __name__ == "__main__":
             f"💬 {universal_chatlink}\n"
             f"🔗 <b>profile links:</b>\n"
             f"   ├ <b><a href='tg://user?id={inout_userid}'>id based profile link</a></b>\n"
-            f"   ├ <b>plain text: tg://user?id={inout_userid}</b>\n"
             f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
@@ -2367,7 +2365,6 @@ if __name__ == "__main__":
             f"{escaped_name}\n"
             f"💀 SPAMMER ID profile links:\n"
             f"   ├☠️ <a href='tg://user?id={user_id}'>Spammer ID based profile link</a>\n"
-            f"   ├☠️ Plain text: tg://user?id={user_id}\n"
             f"   ├☠️ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
             f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
@@ -3638,7 +3635,6 @@ if __name__ == "__main__":
                 f" From user {user_full_name}\n"
                 f" Profile links:\n"
                 f"   ├ <a href='tg://user?id={user_id}'>{user_full_name} ID based profile link</a>\n"
-                f"   ├ Plain text: tg://user?id={user_id}\n"
                 f"   ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
                 f"   ├ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
                 f"   └ <a href='tg://resolve?domain={user_name}'>@{user_name}</a>\n"

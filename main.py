@@ -2642,18 +2642,18 @@ if __name__ == "__main__":
             result = cursor.execute(query, params).fetchall()
 
             # delete them one by one
-            for chat_id, message_id, user_name in result:
+            for channel_id, message_id, user_name in result:
                 retry_attempts = 3  # number of attempts to delete the message
                 for attempt in range(retry_attempts):
                     try:
-                        await BOT.delete_message(chat_id=chat_id, message_id=message_id)
+                        await BOT.delete_message(chat_id=channel_id, message_id=message_id)
                         LOGGER.debug(
                             "\033[91m%s @%s message %s deleted from chat %s (%s).\033[0m",
                             author_id,
                             user_name,
                             message_id,
-                            channels_dict[chat_id],
-                            chat_id,
+                            channels_dict[channel_id],
+                            channel_id,
                         )
                         break  # break the loop if the message was deleted successfully
                     except RetryAfter as e:
@@ -2671,20 +2671,20 @@ if __name__ == "__main__":
                         LOGGER.warning(
                             "Message %s in chat %s (%s) not found for deletion.",
                             message_id,
-                            channels_dict[chat_id],
-                            chat_id,
+                            channels_dict[channel_id],
+                            channel_id,
                         )
                         break  # No need to retry in this case
                     except utils.exceptions.ChatAdminRequired as inner_e:
                         LOGGER.error(
                             "Bot is not an admin in chat %s (%s). Error: %s",
-                            channels_dict[chat_id],
-                            chat_id,
+                            channels_dict[channel_id],
+                            channel_id,
                             inner_e,
                         )
                         await BOT.send_message(
                             TECHNOLOG_GROUP_ID,
-                            f"Bot is not an admin in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                            f"Bot is not an admin in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
                         )
                     # except Exception as inner_e:
                     #     LOGGER.error(
@@ -2701,17 +2701,22 @@ if __name__ == "__main__":
 
                     
             # Attempting to ban user from channels
-            for chat_id in CHANNEL_IDS:
+            for channel_id in CHANNEL_IDS:
                 # LOGGER.debug(
                 #     f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
                 # )
 
                 try:
+                    # pause 0.02 second to prevent flood control errors
+                    await asyncio.sleep(.02)
+                    
+                    # ban the user and delete their messages if revoke is wotking
                     await BOT.ban_chat_member(
-                        chat_id=chat_id,
+                        chat_id=channel_id,
                         user_id=author_id,
                         revoke_messages=True,
                     )
+                    
                     # LOGGER.debug(
                     #     "User %s banned and their messages deleted from chat %s (%s).",
                     #     author_id,
@@ -2721,13 +2726,13 @@ if __name__ == "__main__":
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
-                        channels_dict[chat_id],
-                        chat_id,
+                        channels_dict[channel_id],
+                        channel_id,
                         inner_e,
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                        f"Failed to ban and delete messages in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
                     )
 
 

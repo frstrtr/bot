@@ -2626,36 +2626,6 @@ if __name__ == "__main__":
                 forwarded_message_data[4] if forwarded_message_data[4] else "NoUserName"
             )
 
-            # Attempting to ban user from channels
-            for chat_id in CHANNEL_IDS:
-                # LOGGER.debug(
-                #     f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
-                # )
-
-                try:
-                    await BOT.ban_chat_member(
-                        chat_id=chat_id,
-                        user_id=author_id,
-                        revoke_messages=True,
-                    )
-                    # LOGGER.debug(
-                    #     "User %s banned and their messages deleted from chat %s (%s).",
-                    #     author_id,
-                    #     channels_dict[chat_id],
-                    #     chat_id,
-                    # )
-                except Exception as inner_e:
-                    LOGGER.error(
-                        "Failed to ban and delete messages in chat %s (%s). Error: %s",
-                        channels_dict[chat_id],
-                        chat_id,
-                        inner_e,
-                    )
-                    await BOT.send_message(
-                        TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
-                    )
-
             # select all messages from the user in the chat
             # and this is not records about join or leave
             # and this record have name of the chat
@@ -2728,6 +2698,39 @@ if __name__ == "__main__":
                     #         TECHNOLOG_GROUP_ID,
                     #         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     #     )
+
+                    
+            # Attempting to ban user from channels
+            for chat_id in CHANNEL_IDS:
+                # LOGGER.debug(
+                #     f"Attempting to ban user {author_id} from chat {channels_dict[chat_id]} ({chat_id})"
+                # )
+
+                try:
+                    await BOT.ban_chat_member(
+                        chat_id=chat_id,
+                        user_id=author_id,
+                        revoke_messages=True,
+                    )
+                    # LOGGER.debug(
+                    #     "User %s banned and their messages deleted from chat %s (%s).",
+                    #     author_id,
+                    #     channels_dict[chat_id],
+                    #     chat_id,
+                    # )
+                except Exception as inner_e:
+                    LOGGER.error(
+                        "Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        channels_dict[chat_id],
+                        chat_id,
+                        inner_e,
+                    )
+                    await BOT.send_message(
+                        TECHNOLOG_GROUP_ID,
+                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                    )
+
+
             LOGGER.debug(
                 "\033[91m%s manually banned and their messages deleted where applicable.\033[0m",
                 author_id,

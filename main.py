@@ -3044,10 +3044,22 @@ if __name__ == "__main__":
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 LOGGER.info(
-                    "%s joined the chat %s %s ago",
+                    "%s sent message and joined the chat %s %s ago",
                     message.from_id,
                     message.chat.title,
                     human_readable_time,
+                )
+                if message.chat.username:
+                    message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                else:
+                    chat_id = str(message.chat.id)
+                    if chat_id.startswith("-100"):
+                        chat_id = chat_id[4:]  # Remove leading -100 for public chats
+                    message_link = f"https://t.me/c/{chat_id}/{message.message_id}"
+                LOGGER.info(
+                    "%s message link: %s",
+                    message.from_id,
+                    message_link,
                 )
                 the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 await check_n_ban(message, the_reason)

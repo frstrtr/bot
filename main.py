@@ -2888,7 +2888,7 @@ if __name__ == "__main__":
             )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
-                "\033[47m\033[34m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
+                "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,

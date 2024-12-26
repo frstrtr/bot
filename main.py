@@ -2858,25 +2858,33 @@ if __name__ == "__main__":
             LOGGER.info(
                 "%s suspicious message link: %s", message.from_user.id, message_link
             )
-            # # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
-            # if message.from_user.id not in active_user_checks_dict or not isinstance(active_user_checks_dict[message.from_user.id], dict):
-            #     active_user_checks_dict[message.from_user.id] = {}
+            # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
+            if message.from_user.id not in active_user_checks_dict or not isinstance(
+                active_user_checks_dict[message.from_user.id], dict
+            ):
+                # Initialize with the username if it exists, otherwise with "None"
+                active_user_checks_dict[message.from_user.id] = {
+                    "username": (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "None"
+                    )
+                }
 
-            # # Store the message link in the active_user_checks_dict
-            # if "messages" not in active_user_checks_dict[message.from_user.id]:
-            #     active_user_checks_dict[message.from_user.id]["messages"] = []
-            # active_user_checks_dict[message.from_user.id]["messages"].append(
-            #     (message.chat.id, message.message_id)
-            # )
-            # LOGGER.info(
-            #     "%s suspicious messages list: %s",
-            #     message.from_user.id,
-            #     active_user_checks_dict[message.from_user.id]["messages"],
-            # )
-            LOGGER.debug(
-                "Active user checks dict: %s",
-                json.dumps(active_user_checks_dict, indent=4),
+            # Store the message link in the active_user_checks_dict
+            message_key = f"{message.chat.id}_{message.message_id}"
+            active_user_checks_dict[message.from_user.id][message_key] = message_link
+
+            LOGGER.info(
+                "%s suspicious messages list: %s",
+                message.from_user.id,
+                active_user_checks_dict[message.from_user.id],
             )
+
+            # LOGGER.debug(
+            #     "Active user checks dict: %s",
+            #     json.dumps(active_user_checks_dict, indent=4),
+            # )
             # send suspicious message link to the autoreport group
             await BOT.send_message(
                 ADMIN_GROUP_ID,

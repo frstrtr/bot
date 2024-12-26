@@ -11,6 +11,7 @@ import json
 import subprocess
 import time
 import html
+import tracemalloc
 
 # import tracemalloc # for memory usage debugging
 
@@ -43,6 +44,8 @@ from aiogram.utils.exceptions import (
     # MessageCantBeDeleted,
     RetryAfter,
 )
+
+tracemalloc.start()
 
 bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

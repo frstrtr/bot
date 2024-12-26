@@ -2010,7 +2010,7 @@ if __name__ == "__main__":
                 inout_chattitle,
             )
         else:  # member or left - white color
-            LOGGER.info("%s --> %s in %s", inout_userid, inout_status, inout_chattitle)
+            LOGGER.info("%s:%s --> %s in %s", inout_userid, inout_username, inout_status, inout_chattitle)
 
         # Extract the user status change
         result = extract_status_change(update)

@@ -2876,16 +2876,11 @@ if __name__ == "__main__":
             active_user_checks_dict[message.from_user.id][message_key] = message_link
 
             LOGGER.info(
-                "%s suspicious messages list: %s",
+                "%s suspicious messages dict: %s",
                 message.from_user.id,
                 active_user_checks_dict[message.from_user.id],
             )
 
-            # LOGGER.debug(
-            #     "Active user checks dict: %s",
-            #     json.dumps(active_user_checks_dict, indent=4),
-            # )
-            # send suspicious message link to the autoreport group
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"User {message.from_user.id} is in active_user_checks_dict. Suspicious message link: {message_link}",
@@ -2893,12 +2888,14 @@ if __name__ == "__main__":
             )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
-                "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
             )
+            # Delete message from banned user
+            await BOT.delete_message(message.chat.id, message.message_id)
             # return
         try:
             # Log the full message object for debugging

@@ -1855,14 +1855,14 @@ def extract_chat_id_and_message_id_from_link(message_link):
         else:
             chat_id = parts[3]
             message_id = int(parts[-1])
-        
+
         if "c" in parts:
             chat_id = int("-100" + chat_id)
         elif chat_id != "":
             chat_id = "@" + chat_id
         else:
             raise ValueError("Invalid message link format")
-        
+
         return chat_id, message_id
     except (IndexError, ValueError) as e:
         raise ValueError(
@@ -2643,7 +2643,9 @@ if __name__ == "__main__":
                 retry_attempts = 3  # number of attempts to delete the message
                 for attempt in range(retry_attempts):
                     try:
-                        await BOT.delete_message(chat_id=channel_id, message_id=message_id)
+                        await BOT.delete_message(
+                            chat_id=channel_id, message_id=message_id
+                        )
                         LOGGER.debug(
                             "\033[91m%s @%s message %s deleted from chat %s (%s).\033[0m",
                             author_id,
@@ -2696,7 +2698,6 @@ if __name__ == "__main__":
                     #         f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
                     #     )
 
-                    
             # Attempting to ban user from channels
             for channel_id in CHANNEL_IDS:
                 # LOGGER.debug(
@@ -2705,15 +2706,15 @@ if __name__ == "__main__":
 
                 try:
                     # pause 0.02 second to prevent flood control errors
-                    await asyncio.sleep(.02)
-                    
+                    await asyncio.sleep(0.02)
+
                     # ban the user and delete their messages if revoke is wotking
                     await BOT.ban_chat_member(
                         chat_id=channel_id,
                         user_id=author_id,
                         revoke_messages=True,
                     )
-                    
+
                     # LOGGER.debug(
                     #     "User %s banned and their messages deleted from chat %s (%s).",
                     #     author_id,
@@ -2731,7 +2732,6 @@ if __name__ == "__main__":
                         TECHNOLOG_GROUP_ID,
                         f"Failed to ban and delete messages in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
                     )
-
 
             LOGGER.debug(
                 "\033[91m%s manually banned and their messages deleted where applicable.\033[0m",
@@ -2855,11 +2855,23 @@ if __name__ == "__main__":
             LOGGER.info(
                 "%s suspicious message link: %s", message.from_user.id, message_link
             )
-            # await BOT.send_message(
-            #     ADMIN_GROUP_ID,
-            #     f"User {message.from_user.id} is in active_user_checks_dict. Suspicious message link: {message_link}",
-            #     message_thread_id=ADMIN_AUTOREPORTS,
-            # )
+            # Store the message link in the active_user_checks_dict
+            if "messages" not in active_user_checks_dict[message.from_user.id]:
+                active_user_checks_dict[message.from_user.id]["messages"] = []
+            active_user_checks_dict[message.from_user.id]["messages"].append(
+                (message.chat.id, message.message_id)
+            )
+            LOGGER.info(
+                "%s suspicious messages list: %s",
+                message.from_user.id,
+                active_user_checks_dict[message.from_user.id]["messages"],
+            )
+            # send suspicious message link to the autoreport group
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                f"User {message.from_user.id} is in active_user_checks_dict. Suspicious message link: {message_link}",
+                message_thread_id=ADMIN_AUTOREPORTS,
+            )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
                 "\033[47m\033[34m%s is in banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
@@ -3050,7 +3062,9 @@ if __name__ == "__main__":
                     human_readable_time,
                 )
                 if message.chat.username:
-                    message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                    message_link = (
+                        f"https://t.me/{message.chat.username}/{message.message_id}"
+                    )
                 else:
                     chat_id = str(message.chat.id)
                     if chat_id.startswith("-100"):

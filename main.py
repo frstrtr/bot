@@ -1671,7 +1671,7 @@ async def perform_checks(
                 )
 
 
-async def create_named_watchdog(coro, user_id):
+async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     """Check if a task for the same user_id is already running
 
     :param coro: The coroutine to run
@@ -1681,7 +1681,9 @@ async def create_named_watchdog(coro, user_id):
     """
     if user_id in running_watchdogs:
         LOGGER.info(
-            "\033[93m%s Watchdog is already set. Skipping new task.\033[0m", user_id
+            "\033[93m%s:%s Watchdog is already set. Skipping new task.\033[0m",
+            user_id,
+            user_name,
         )
         return await running_watchdogs[
             user_id
@@ -2062,6 +2064,7 @@ if __name__ == "__main__":
                     lols_spam=lols_spam,
                 ),
                 user_id=inout_userid,
+                user_name=inout_username,
             )
 
         elif inout_status in (
@@ -2075,8 +2078,9 @@ if __name__ == "__main__":
 
             # Log the message with the timestamp
             LOGGER.debug(
-                "\033[96m%s Scheduling perform_checks coroutine\033[0m",
+                "\033[96m%s:%s Scheduling perform_checks coroutine\033[0m",
                 inout_userid,
+                inout_username,
             )
             # Check if the user ID is already being processed
             if inout_userid not in active_user_checks_dict:
@@ -2184,7 +2188,9 @@ if __name__ == "__main__":
                     )
             except IndexError:
                 LOGGER.debug(
-                    "%s left and has no previous join/leave events", inout_userid
+                    "%s:%s left and has no previous join/leave events",
+                    inout_userid,
+                    inout_username,
                 )
 
     @DP.message_handler(

@@ -2938,7 +2938,7 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 f"WARNING! User {message.from_user.id} suspicious activity detected.",
                 reply_markup=inline_kb,
-                message_thread_id=1,  # # main thread (#REPORTS)
+                # message_thread_id=1,  # # main thread (#REPORTS)
             )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(

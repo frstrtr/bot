@@ -1186,17 +1186,19 @@ async def lols_autoban(_id, user_name="None"):
             _id, None
         )  # add and remove the user to the banned_users_dict
         LOGGER.info(
-            "\033[91m%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            list(active_user_checks_dict.items())[:3],  # Last 2 elements
+            user_name,
+            list(active_user_checks_dict.items())[-3:],  # Last 3 elements
             len(active_user_checks_dict),  # Number of elements left
         )
     else:
         banned_users_dict[_id] = user_name
         LOGGER.info(
-            "\033[91m%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            list(banned_users_dict.items())[:3],  # Last 2 elements
+            user_name,
+            list(banned_users_dict.items())[-3:],  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
     if user_name is not None and user_name != "":
@@ -1210,7 +1212,9 @@ async def lols_autoban(_id, user_name="None"):
         for chat_id in CHANNEL_IDS:
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
         # RED color for the log
-        LOGGER.info("\033[91m%s has been banned from all chats.\033[0m", _id)
+        LOGGER.info(
+            "\033[91m%s:%s has been banned from all chats.\033[0m", _id, user_name
+        )
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
@@ -1593,9 +1597,10 @@ async def perform_checks(
 
             # Log the message with the appropriate color
             LOGGER.info(
-                "%s%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
+                "%s%s:%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,
+                user_name,
                 sleep_time // 60,
                 lols_spam,
                 len(active_user_checks_dict),
@@ -1674,7 +1679,8 @@ async def create_named_watchdog(coro, user_id):
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
-        "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m", user_id
+        "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m",
+        user_id,
     )
 
     # Remove the task from the dictionary when it completes
@@ -2073,8 +2079,9 @@ if __name__ == "__main__":
                 )
             else:
                 LOGGER.debug(
-                    "\033[93m%s skipping perform_checks as it is already being processed\033[0m",
+                    "\033[93m%s:%s skipping perform_checks as it is already being processed\033[0m",
                     inout_userid,
+                    inout_username,
                 )
 
         # record the event in the database if not lols_spam
@@ -3613,7 +3620,7 @@ if __name__ == "__main__":
             )
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:
+        except Exception as e:  # XXX too general exception!
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 

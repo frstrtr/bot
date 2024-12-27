@@ -2010,7 +2010,13 @@ if __name__ == "__main__":
                 inout_chattitle,
             )
         else:  # member or left - white color
-            LOGGER.info("%s:%s --> %s in %s", inout_userid, inout_username, inout_status, inout_chattitle)
+            LOGGER.info(
+                "%s:%s --> %s in %s",
+                inout_userid,
+                inout_username,
+                inout_status,
+                inout_chattitle,
+            )
 
         # Extract the user status change
         result = extract_status_change(update)
@@ -2849,12 +2855,15 @@ if __name__ == "__main__":
                 message.chat.title,
                 message.chat.id,
             )
-            message_link = (
-                "https://t.me/c/"
-                + str(message.chat.id)[4:]
-                + "/"
-                + str(message.message_id)
-            )
+            # create ubfied message link
+            if message.chat.username:
+                message_link = (
+                    f"https://t.me/{message.chat.username}/{message.message_id}"
+                )
+            else:
+                message_link = (
+                    f"https://t.me/c/{str(message.chat.id)[4:]}/{message.message_id}"
+                )
             LOGGER.info(
                 "%s suspicious message link: %s", message.from_user.id, message_link
             )
@@ -2870,20 +2879,38 @@ if __name__ == "__main__":
                         else "None"
                     )
                 }
-
             # Store the message link in the active_user_checks_dict
             message_key = f"{message.chat.id}_{message.message_id}"
             active_user_checks_dict[message.from_user.id][message_key] = message_link
-
+            # Log resulting dict
             LOGGER.info(
                 "%s suspicious messages dict: %s",
                 message.from_user.id,
                 active_user_checks_dict[message.from_user.id],
             )
-
+            # Forward suspicious message to the technolog originals thread
+            await BOT.forward_message(
+                TECHNOLOG_GROUP_ID,
+                message.chat.id,
+                message.message_id,
+                TECHNO_ORIGINALS,
+                True,
+            )
+            # Create an inline keyboard with a link
+            inline_kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("View Original Message", url=message_link)
+            )
+            # Send a new message with the inline keyboard link
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                "Click the button below to view the original message:",
+                reply_markup=inline_kb,
+            )
+            # Send warning to the Admin group with link to the message
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"User {message.from_user.id} is in active_user_checks_dict. Suspicious message link: {message_link}",
+                f"WARNING! User {message.from_user.id} suspicious activity detected.",
+                reply_markup=inline_kb,
                 message_thread_id=ADMIN_AUTOREPORTS,
             )
         elif message.from_user.id in banned_users_dict:

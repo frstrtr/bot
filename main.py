@@ -97,15 +97,20 @@ cursor.execute(
 conn.commit()
 
 
-def construct_message_link(found_message_data):
+def construct_message_link(message_data_list: list) -> str:
     """Construct a link to the original message (assuming it's a supergroup or channel).
     Extract the chat ID and remove the '-100' prefix if it exists.
 
-    :param found_message_data: list: The spammer data extracted from the found message.
+    Args:
+        found_message_data (list): The spammer data extracted from the found message.
+            [chatID, messageID, chatUsername]
+
+    Returns:
+        str: The constructed message link.
     """
-    chat_id = str(found_message_data[0])
-    message_id = found_message_data[1]
-    chat_username = found_message_data[2]
+    chat_id = str(message_data_list[0])
+    message_id = message_data_list[1]
+    chat_username = message_data_list[2]
 
     if chat_username:
         message_link = f"https://t.me/{chat_username}/{message_id}"
@@ -2884,15 +2889,10 @@ if __name__ == "__main__":
                 message.chat.title,
                 message.chat.id,
             )
-            # create ubfied message link
-            if message.chat.username:
-                message_link = (
-                    f"https://t.me/{message.chat.username}/{message.message_id}"
-                )
-            else:
-                message_link = (
-                    f"https://t.me/c/{str(message.chat.id)[4:]}/{message.message_id}"
-                )
+            # create unified message link
+            message_link = construct_message_link(
+                [message.chat.id, message.message_id, message.chat.username]
+            )
             LOGGER.info(
                 "%s suspicious message link: %s", message.from_user.id, message_link
             )
@@ -3013,6 +3013,9 @@ if __name__ == "__main__":
             if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
                 message.from_user.id, ADMIN_GROUP_ID
             ):
+                message_link = construct_message_link(
+                    [message.chat.id, message.message_id, message.chat.username]
+                )
                 LOGGER.debug(
                     "\033[95m%s is admin, skipping the message %s in the chat %s\033[0m",
                     message.from_user.id,
@@ -3117,11 +3120,12 @@ if __name__ == "__main__":
             # we can check it in runtime banned user list
             if message.from_user.id in banned_users_dict:
                 the_reason = f"{message.from_user.id} is banned before sending a message, but squizzed due to latency..."
-                latency_message_link = (
-                    "https://t.me/c/"
-                    + str(message.chat.id)[4:]
-                    + "/"
-                    + str(message.message_id)
+                latency_message_link = construct_message_link(
+                    [
+                        message.chat.id,
+                        message.message_id,
+                        message.chat.username,
+                    ]
                 )
                 LOGGER.info(
                     "%s:%s latency message link: %s",
@@ -3147,14 +3151,9 @@ if __name__ == "__main__":
                     human_readable_time,
                 )
                 if message.chat.username:
-                    message_link = (
-                        f"https://t.me/{message.chat.username}/{message.message_id}"
+                    message_link = construct_message_link(
+                        [message.chat.id, message.message_id, message.chat.username]
                     )
-                else:
-                    chat_id = str(message.chat.id)
-                    if chat_id.startswith("-100"):
-                        chat_id = chat_id[4:]  # Remove leading -100 for public chats
-                    message_link = f"https://t.me/c/{chat_id}/{message.message_id}"
                 LOGGER.info(
                     "%s message link: %s",
                     message.from_id,
@@ -3521,7 +3520,7 @@ if __name__ == "__main__":
 
             user_id = int(command_args[1])
             LOGGER.debug(
-                "%d - User ID to check, requested by admin %d",
+                "%d:!UNDEFINED! - User ID to check, requested by admin %d",
                 user_id,
                 message.from_user.id,
             )

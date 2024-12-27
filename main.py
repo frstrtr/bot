@@ -3017,10 +3017,12 @@ if __name__ == "__main__":
                     [message.chat.id, message.message_id, message.chat.username]
                 )
                 LOGGER.debug(
-                    "\033[95m%s is admin, skipping the message %s in the chat %s\033[0m",
+                    "\033[95m%s is admin, skipping the message %s in the chat %s.\033[0m Message link: %s",
                     message.from_user.id,
                     message.message_id,
                     message.chat.title,
+                    message_link,
+
                 )
                 return
 

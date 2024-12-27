@@ -1575,12 +1575,17 @@ async def perform_checks(
         # List of sleep times in seconds
         sleep_times = [
             65,
+            125,
             185,
+            245,
+            305,
             605,
+            1205,
             1805,
             3605,
             7205,
-        ]  # 1min, 3min, 10min, 30min, 1hr, 2hrs
+            10805,
+        ]  # 1min, 2 min, 3min, 4 min, 5 min, 10min, 20min, 30min, 1hr, 2hrs, 3hrs
 
         for sleep_time in sleep_times:
 
@@ -1600,7 +1605,7 @@ async def perform_checks(
                 "%s%s:%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,
-                user_name,
+                user_name if user_name else "!UNDEFINED!",
                 sleep_time // 60,
                 lols_spam,
                 len(active_user_checks_dict),
@@ -2927,6 +2932,14 @@ if __name__ == "__main__":
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
+            )
+            # Forwarding banned user message to technolog originals
+            await BOT.forward_message(
+                TECHNOLOG_GROUP_ID,
+                message.chat.id,
+                message.message_id,
+                TECHNO_ORIGINALS,
+                True,
             )
             # Delete message from banned user
             await BOT.delete_message(message.chat.id, message.message_id)

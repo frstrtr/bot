@@ -1272,20 +1272,20 @@ async def check_and_autoban(
             action = "added to"
         else:
             action = "is already added to"
-        if len(banned_users_dict) > 5:  # prevent spamming the log
-            last_five_users = list(banned_users_dict.items())[:3]  # First 2 elements
-            last_five_users_str = ", ".join(
-                [f"{uid}: {uname}" for uid, uname in last_five_users]
+        if len(banned_users_dict) > 3:  # prevent spamming the log
+            last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+            last_3_users_str = ", ".join(
+                [f"{uid}: {uname}" for uid, uname in last_3_users]
             )
             LOGGER.info(
                 "\033[93m%s:%s %s runtime banned users list: %s... %d totally\033[0m",
                 user_id,
                 user_name if user_name else "!UNDEFINED!",
                 action,
-                last_five_users_str,  # Last 5 elements as string
+                last_3_users_str,  # Last 3 elements as string
                 len(banned_users_dict),  # Total number of elements
             )
-        else:  # less than 5 banned users
+        else:  # less than 3 banned users
             all_users_str = ", ".join(
                 [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
             )
@@ -1507,18 +1507,16 @@ async def check_n_ban(message: types.Message, reason: str):
             banned_users_dict[message.from_user.id] = (
                 message.from_user.username or "NoUserName"
             )
-            if len(banned_users_dict) > 5:
-                first_two_users = list(banned_users_dict.items())[
-                    :3
-                ]  # First 2 elements
-                first_two_users_str = ", ".join(
-                    [f"{uid}: {uname}" for uid, uname in first_two_users]
+            if len(banned_users_dict) > 3:
+                last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+                last_3_users_str = ", ".join(
+                    [f"{uid}: {uname}" for uid, uname in last_3_users]
                 )
                 LOGGER.info(
                     "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
                     message.from_user.username,
-                    first_two_users_str,  # First 2 elements
+                    last_3_users_str,  # First 2 elements
                     len(banned_users_dict),  # Number of elements left
                 )
             else:

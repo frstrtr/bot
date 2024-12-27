@@ -1703,7 +1703,11 @@ async def create_named_watchdog(coro, user_id):
 
     task.add_done_callback(task_done_callback)
 
-    return await task  # Await the new task
+    # Await the newly created task
+    await task  # Wait for check_and_autoban to finish before continuing
+
+    # No need to return anything here as the function now awaits the task
+    # return await task  # Await the new task
 
 
 async def log_lists():

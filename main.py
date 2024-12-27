@@ -796,7 +796,7 @@ async def load_and_start_checks():
                 )
                 # interval between checks
                 await asyncio.sleep(1)
-                LOGGER.info("%s loaded from file & 2hr monitoring started ...", user_id)
+                LOGGER.info("%s loaded from file & 3hr monitoring started ...", user_id)
 
         if os.path.exists(banned_users_filename):
             with open(banned_users_filename, "r", encoding="utf-8") as file:
@@ -1634,7 +1634,7 @@ async def perform_checks(
                 return
 
     except asyncio.exceptions.CancelledError as e:
-        LOGGER.error("\033[93m%s 2hrs spam checking cancelled. %s\033[0m", user_id, e)
+        LOGGER.error("\033[93m%s 3hrs spam checking cancelled. %s\033[0m", user_id, e)
         if user_id in active_user_checks_dict:
             active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
@@ -2053,7 +2053,7 @@ if __name__ == "__main__":
             return
         was_member, is_member = result
 
-        # Check lols after user join/leave event in 2hr and ban if spam
+        # Check lols after user join/leave event in 3hr and ban if spam
         if (
             lols_spam is True
             or inout_status == ChatMemberStatus.KICKED
@@ -3022,7 +3022,6 @@ if __name__ == "__main__":
                     message.message_id,
                     message.chat.title,
                     message_link,
-
                 )
                 return
 
@@ -3512,7 +3511,7 @@ if __name__ == "__main__":
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
-        """Function to start lols_cas check 2hrs corutine check the user for spam."""
+        """Function to start lols_cas check 3hrs corutine check the user for spam."""
         try:
             command_args = message.text.split()
             # LOGGER.debug("Command arguments received: %s", command_args)
@@ -3544,7 +3543,7 @@ if __name__ == "__main__":
             )
 
             await message.reply(
-                f"User {user_id} 2hrs monitoring activity check started."
+                f"User {user_id} 3hrs monitoring activity check started."
             )
         except ValueError as ve:
             await message.reply(str(ve))

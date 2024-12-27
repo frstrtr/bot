@@ -1686,7 +1686,7 @@ async def create_named_watchdog(coro, user_id):
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
-        "\033[91m%s is banned by lols/cas check. Watchdog assigned.\033[0m",
+        "\033[91m%s:!UNDEFINED! is banned by lols/cas check. Watchdog assigned.\033[0m",
         user_id,
     )
 

@@ -1213,7 +1213,9 @@ async def lols_autoban(_id, user_name="None"):
             await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
         # RED color for the log
         LOGGER.info(
-            "\033[91m%s:%s has been banned from all chats.\033[0m", _id, user_name
+            "\033[91m%s:%s has been banned from all chats.\033[0m",
+            _id,
+            user_name if user_name else "!UNDEFINED!",
         )
     except (
         utils.exceptions.BadRequest

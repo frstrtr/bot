@@ -1530,8 +1530,13 @@ async def check_n_ban(message: types.Message, reason: str):
             await BOT.delete_message(message.chat.id, message.message_id)
         except utils.exceptions.MessageToDeleteNotFound:
             LOGGER.error(
-                "\033[93m%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m Already deleted?",
+                "\033[93m%s:%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
@@ -3109,8 +3114,13 @@ if __name__ == "__main__":
                     + str(message.message_id)
                 )
                 LOGGER.info(
-                    "%s latency message link: %s",
+                    "%s:%s latency message link: %s",
                     message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     latency_message_link,
                 )
                 if await check_n_ban(message, the_reason):

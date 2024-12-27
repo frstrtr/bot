@@ -1188,7 +1188,7 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            user_name,
+            user_name if user_name else "!UNDEFINED!",
             list(active_user_checks_dict.items())[-3:],  # Last 3 elements
             len(active_user_checks_dict),  # Number of elements left
         )
@@ -1197,14 +1197,14 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            user_name,
+            user_name if user_name else "!UNDEFINED!",
             list(banned_users_dict.items())[-3:],  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
     if user_name is not None and user_name != "":
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (1194)",
+            f"<code>{_id}</code>:@{user_name} (1207)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -2918,7 +2918,7 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 f"WARNING! User {message.from_user.id} suspicious activity detected.",
                 reply_markup=inline_kb,
-                message_thread_id=ADMIN_AUTOREPORTS,
+                message_thread_id=1,  # # main thread (#REPORTS)
             )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(

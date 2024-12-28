@@ -2686,7 +2686,6 @@ if __name__ == "__main__":
                 """
             params = {"author_id": author_id}
             result = cursor.execute(query, params).fetchall()
-
             # delete them one by one
             for channel_id, message_id, user_name in result:
                 retry_attempts = 3  # number of attempts to delete the message
@@ -2781,10 +2780,12 @@ if __name__ == "__main__":
                         TECHNOLOG_GROUP_ID,
                         f"Failed to ban and delete messages in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
                     )
-
+            # unpack user_name correctly XXX
+            user_name = result[0][2] if result else "!UNDEFINED!"
             LOGGER.debug(
-                "\033[91m%s manually banned and their messages deleted where applicable.\033[0m",
+                "\033[91m%s:%s manually banned and their messages deleted where applicable.\033[0m",
                 author_id,
+                user_name,
             )
 
             # TODO add the timestamp of the button press and how much time passed since

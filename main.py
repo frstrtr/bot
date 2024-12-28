@@ -1555,7 +1555,7 @@ async def perform_checks(
     event_record="",
     user_id=None,
     inout_logmessage="",
-    user_name="",
+    user_name="!UNDEFINED!",
 ):
     """Corutine to perform checks for spam and take action if necessary.
 
@@ -1632,12 +1632,18 @@ async def perform_checks(
                 return
 
     except asyncio.exceptions.CancelledError as e:
-        LOGGER.error("\033[93m%s 3hrs spam checking cancelled. %s\033[0m", user_id, e)
+        LOGGER.error(
+            "\033[93m%s:%s 3hrs spam checking cancelled. %s\033[0m",
+            user_id,
+            user_name,
+            e,
+        )
         if user_id in active_user_checks_dict:
             active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
-                "\033[93m%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
+                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
                 user_id,
+                user_name,
                 active_user_checks_dict,
             )
 
@@ -1661,15 +1667,17 @@ async def perform_checks(
             active_user_checks_dict.pop(user_id, None)
             if len(active_user_checks_dict) > 5:
                 LOGGER.info(
-                    "\033[92m%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
+                    "\033[92m%s:%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
+                    user_name,
                     list(active_user_checks_dict.items())[:3],  # First 2 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s removed from active_user_checks_dict in finally block: %s\033[0m",
+                    "\033[92m%s$%s removed from active_user_checks_dict in finally block: %s\033[0m",
                     user_id,
+                    user_name,
                     active_user_checks_dict,
                 )
 

@@ -2867,6 +2867,14 @@ if __name__ == "__main__":
         """Function to store recent messages in the database."""
         # XXX
 
+        # create unified message link
+        message_link = construct_message_link(
+            [message.chat.id, message.message_id, message.chat.username]
+        )
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("View Original Message", url=message_link)
+        )
+
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict
@@ -2880,22 +2888,8 @@ if __name__ == "__main__":
                 message.chat.id,
             )
         elif message.from_user.id in active_user_checks_dict:
-            LOGGER.warning(
-                "\033[47m\033[34m%s is in active_user_checks_dict, check the message %s in the chat %s (%s)\033[0m",
-                message.from_user.id,
-                message.message_id,
-                message.chat.title,
-                message.chat.id,
-            )
-            # create unified message link
-            message_link = construct_message_link(
-                [message.chat.id, message.message_id, message.chat.username]
-            )
-            LOGGER.info(
-                "%s suspicious message link: %s", message.from_user.id, message_link
-            )
             # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
-            if message.from_user.id not in active_user_checks_dict or not isinstance(
+            if message.from_user.id is not isinstance(
                 active_user_checks_dict[message.from_user.id], dict
             ):
                 # Initialize with the username if it exists, otherwise with "None"
@@ -2903,16 +2897,47 @@ if __name__ == "__main__":
                     "username": (
                         message.from_user.username
                         if message.from_user.username
-                        else "None"
+                        else (
+                            active_user_checks_dict[message.from_user.id]
+                            if active_user_checks_dict[message.from_user.id]
+                            else "!UNDEFINED!"
+                        )
                     )
                 }
             # Store the message link in the active_user_checks_dict
             message_key = f"{message.chat.id}_{message.message_id}"
             active_user_checks_dict[message.from_user.id][message_key] = message_link
+
+            # Create an inline keyboard with a link
+            LOGGER.warning(
+                "\033[47m\033[34m%s:%s is in active_user_checks_dict, check the message %s in the chat %s (%s)\033[0m\n"
+                "%s:%s suspicious message link: %s",
+                message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+                message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
+                message_link,
+            )
             # Log resulting dict
             LOGGER.info(
-                "%s suspicious messages dict: %s",
+                "%s:%s suspicious messages dict: %s",
                 message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
                 active_user_checks_dict[message.from_user.id],
             )
             # Forward suspicious message to the technolog originals thread
@@ -2923,23 +2948,20 @@ if __name__ == "__main__":
                 TECHNO_ORIGINALS,
                 True,
             )
-            # Create an inline keyboard with a link
-            inline_kb = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("View Original Message", url=message_link)
-            )
-            # Send a new message with the inline keyboard link
+            # Send a new message with the inline keyboard link to the technolog originals
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 "Click the button below to view the original message:",
                 reply_markup=inline_kb,
+                message_thread_id=TECHNO_ORIGINALS,
             )
             # Send warning to the Admin group with link to the message
-            await BOT.send_message(
-                ADMIN_GROUP_ID,
-                f"WARNING! User {message.from_user.id} suspicious activity detected.",
-                reply_markup=inline_kb,
-                # message_thread_id=1,  # # main thread (#REPORTS)
-            )
+            # await BOT.send_message(
+            #     ADMIN_GROUP_ID,
+            #     f"WARNING! User {message.from_user.id} suspicious activity detected.",
+            #     reply_markup=inline_kb,
+            #     # message_thread_id=1,  # # main thread (#REPORTS)
+            # )
         elif message.from_user.id in banned_users_dict:
             LOGGER.warning(
                 "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
@@ -2955,6 +2977,17 @@ if __name__ == "__main__":
                 message.message_id,
                 TECHNO_ORIGINALS,
                 True,
+            )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                "Click the button below to view the original message:",
+                reply_markup=inline_kb,
+                message_thread_id=TECHNO_ORIGINALS,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                disable_notification=False,
+                allow_sending_without_reply=True,
+                protect_content=True,
             )
             # Delete message from banned user
             await BOT.delete_message(message.chat.id, message.message_id)

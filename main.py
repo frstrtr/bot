@@ -40,6 +40,7 @@ from aiogram.utils.exceptions import (
 
 # load utilities
 from utils.utils import (
+    initialize_logger,
     construct_message_link,
     check_message_for_sentences,
     get_latest_commit_info,

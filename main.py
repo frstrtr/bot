@@ -57,9 +57,13 @@ from utils.utils import (
     get_channel_id_by_name,
     get_channel_name_by_id,
     has_spam_entities,
+    load_predetermined_sentences,
 )
 
 tracemalloc.start()
+
+# List of predetermined sentences to check for
+PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
 
 bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -2973,7 +2977,7 @@ if __name__ == "__main__":
                     )
                     await take_heuristic_action(message, the_reason)
 
-            elif check_message_for_sentences(message):
+            elif check_message_for_sentences(message, PREDETERMINED_SENTENCES):
                 the_reason = f"{message.from_id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
                     return

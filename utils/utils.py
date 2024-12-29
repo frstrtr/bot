@@ -345,10 +345,9 @@ def extract_chat_id_and_message_id_from_link(message_link):
         ) from e
 
 
-def check_message_for_sentences(message: types.Message):
+def check_message_for_sentences(message: types.Message, predetermined_sentences):
     """Function to check the message for predetermined word sentences."""
-    # List of predetermined sentences to check for
-    predetermined_sentences = load_predetermined_sentences("spam_dict.txt")
+
     if not predetermined_sentences:
         LOGGER.warning(
             "spam_dict.txt not found. Automated spam detection will not check for predetermined sentences."

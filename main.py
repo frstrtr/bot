@@ -57,7 +57,6 @@ from utils.utils import (
     get_channel_id_by_name,
     get_channel_name_by_id,
     has_spam_entities,
-    get_spammer_details,
 )
 
 tracemalloc.start()
@@ -82,9 +81,9 @@ shutdown_event = asyncio.Event()
 # conn.commit()
 
 # Setting up SQLite Database
-conn = sqlite3.connect("messages.db")
-cursor = conn.cursor()
-cursor.execute(
+CONN = sqlite3.connect("messages.db")
+CURSOR = CONN.cursor()
+CURSOR.execute(
     """
     CREATE TABLE IF NOT EXISTS recent_messages (
         chat_id INTEGER NOT NULL,
@@ -109,7 +108,7 @@ cursor.execute(
     )
     """
 )
-conn.commit()
+CONN.commit()
 
 
 def load_config():
@@ -255,6 +254,138 @@ def load_config():
         LOGGER.error("\033[91mFile not found: %s\033[0m", e.filename)
     except ET.ParseError as e:
         LOGGER.error("\033[91mError parsing XML: %s\033[0m", e)
+
+
+def get_spammer_details(
+    spammer_id,
+    spammer_first_name,
+    spammer_last_name,
+    message_forward_date,
+    forward_sender_name="",
+    forward_from_chat_title="",
+    forwarded_from_id=None,
+):
+    """Function to get chat ID and message ID by sender name and date
+    or if the message is a forward of a forward then using
+    forwarded_from_id and message_forward_date.
+    forwarded_from_username, forwarded_from_first_name,
+    forward_from_last_name are used only for forwarded forwarded messages
+    and reserved for future use
+    """
+
+    spammer_id = spammer_id or None
+    spammer_last_name = spammer_last_name or ""
+
+    spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
+
+    LOGGER.debug(
+        "%s getting chat ID and message ID\n"
+        "%s firstName : %s : lastName : %s,\n"
+        "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "%s forwardSenderName: %s, forwardedFromID: %s\n",
+        spammer_id_str,
+        spammer_id_str,
+        spammer_first_name,
+        spammer_last_name,
+        spammer_id_str,
+        message_forward_date,
+        forward_from_chat_title,
+        spammer_id_str,
+        forward_sender_name,
+        forwarded_from_id,
+    )
+
+    # Common SQL and parameters for both cases
+    base_query = """
+        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name, received_date
+        FROM recent_messages
+        WHERE {condition}
+        ORDER BY received_date DESC
+        LIMIT 1
+    """
+    params = {
+        "message_forward_date": message_forward_date,
+        "sender_first_name": spammer_first_name,
+        "sender_last_name": spammer_last_name,
+        "from_chat_title": forward_from_chat_title,
+        "user_id": spammer_id,
+        "forward_sender_name": forward_sender_name,
+    }
+
+    if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
+        # This is not a forwarded forwarded message
+        condition = (
+            "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
+            " OR (user_id = :user_id)"
+            " OR (from_chat_title = :from_chat_title)"
+            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
+            " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
+        )
+    elif forward_sender_name == "Deleted Account":
+        # Manage Deleted Account by message date only
+        condition = "received_date = :message_forward_date"
+        params = {
+            "message_forward_date": message_forward_date,
+        }
+    elif spammer_id:
+        # This is a forwarded forwarded message with known user_id
+        condition = (
+            "(user_id = :user_id)"
+            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
+        )
+        # FIXME is it neccessary below?
+        params.update(
+            {
+                "forward_date": message_forward_date,
+                "forwarded_from_id": forwarded_from_id,
+            }
+        )
+
+    else:
+        # This is a forwarded forwarded message
+        condition = (
+            "forwarded_from_id = :forwarded_from_id AND forward_date = :forward_date"
+        )
+        params.update(
+            {
+                "forward_date": message_forward_date,
+                "forwarded_from_id": forwarded_from_id,
+            }
+        )
+
+    query = base_query.format(condition=condition)
+    result = CURSOR.execute(query, params).fetchone()
+
+    # Ensure result is not None before accessing its elements
+    if result is None:
+        LOGGER.error("No result found for the given query and parameters. GSD")
+        return None
+
+    if not spammer_first_name:
+        spammer_first_name, spammer_last_name = (
+            result[5],
+            result[6],
+        )  # get names from db
+
+    # Ensure result[3] is not None before formatting
+    result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
+
+    LOGGER.info(
+        "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
+        result_3_formatted,  # padding left align 10 chars
+        spammer_first_name,
+        spammer_last_name,
+        message_forward_date,
+        forward_from_chat_title,
+        result,
+    )
+    LOGGER.debug(
+        "%-10s Result: %s",
+        result_3_formatted,  # padding left align 10 chars
+        result,
+    )
+
+    return result
 
 
 async def take_heuristic_action(message: types.Message, reason):
@@ -584,7 +715,7 @@ async def handle_forwarded_reports_with_details(
     else:
         report_id = int(str(message.chat.id) + str(message.message_id))
     # Save the message to the database
-    cursor.execute(
+    CURSOR.execute(
         """
         INSERT OR REPLACE INTO recent_messages 
         (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, received_date, forwarded_message_data)
@@ -603,7 +734,7 @@ async def handle_forwarded_reports_with_details(
         ),
     )
 
-    conn.commit()
+    CONN.commit()
 
     message_link = construct_message_link(found_message_data)
 
@@ -1705,7 +1836,7 @@ if __name__ == "__main__":
 
         # record the event in the database if not lols_spam
         if not lols_spam:
-            cursor.execute(
+            CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages
                 (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
@@ -1733,12 +1864,12 @@ if __name__ == "__main__":
                     was_member,
                 ),
             )
-            conn.commit()
+            CONN.commit()
 
         # checking if user joins and leave chat in 1 minute or less
         if inout_status == ChatMemberStatus.LEFT:
             try:  # check if left less than 1 min after join
-                last2_join_left_event = cursor.execute(
+                last2_join_left_event = CURSOR.execute(
                     """
                     SELECT received_date, new_chat_member, left_chat_member
                     FROM recent_messages
@@ -1928,7 +2059,7 @@ if __name__ == "__main__":
         if report_id:
             # send report ID to the reporter
             await message.answer(f"Report ID: {report_id}")
-        cursor.execute(
+        CURSOR.execute(
             """
             INSERT OR REPLACE INTO recent_messages 
             (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, received_date, forwarded_message_data)
@@ -1947,7 +2078,7 @@ if __name__ == "__main__":
             ),
         )
 
-        conn.commit()
+        CONN.commit()
 
         # Found message data:
         #        0           1           2            3            4        5           6            7
@@ -2178,11 +2309,11 @@ if __name__ == "__main__":
             *_, message_id_to_ban = callback_query.data.split("_")
             message_id_to_ban = int(message_id_to_ban)
 
-            cursor.execute(
+            CURSOR.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
                 (message_id_to_ban,),
             )
-            result = cursor.fetchone()
+            result = CURSOR.fetchone()
 
             if not result:
                 await callback_query.message.reply(
@@ -2278,7 +2409,7 @@ if __name__ == "__main__":
                 AND chat_username IS NOT NULL
                 """
             params = {"author_id": author_id}
-            result = cursor.execute(query, params).fetchall()
+            result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
             for channel_id, message_id, user_name in result:
                 retry_attempts = 3  # number of attempts to delete the message
@@ -2680,7 +2811,7 @@ if __name__ == "__main__":
                 # XXX await BOT.leave_chat(message.chat.id)
                 return
 
-            cursor.execute(
+            CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages 
                 (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
@@ -2706,11 +2837,11 @@ if __name__ == "__main__":
                     None,
                 ),
             )
-            conn.commit()
+            CONN.commit()
             # logger.info(f"Stored recent message: {message}")
 
             # search for the user join chat event date using user_id in the DB
-            user_join_chat_date_str = cursor.execute(
+            user_join_chat_date_str = CURSOR.execute(
                 "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1",
                 (message.from_user.id,),
             ).fetchone()
@@ -2988,11 +3119,11 @@ if __name__ == "__main__":
             report_msg_id = int(command_args[1])
             LOGGER.debug("Report message ID parsed: %d", report_msg_id)
 
-            cursor.execute(
+            CURSOR.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
                 (report_msg_id,),
             )
-            result = cursor.fetchone()
+            result = CURSOR.fetchone()
             LOGGER.debug(
                 "Database query result for forwarded_message_data %d: %s",
                 report_msg_id,
@@ -3107,7 +3238,7 @@ if __name__ == "__main__":
                 AND chat_username IS NOT NULL
                 """
             params = {"author_id": author_id}
-            result = cursor.execute(query, params).fetchall()
+            result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
             for chat_id, message_id, user_name in result:
                 try:
@@ -3631,4 +3762,4 @@ if __name__ == "__main__":
     )
 
     # Close SQLite connection
-    conn.close()
+    CONN.close()

@@ -1,11 +1,13 @@
 #! module utils
 """utils.py
-This module provides various utility functions for logging, message processing, and spam detection in a Telegram bot.
+This module provides various utility functions for logging, message processing, 
+and spam detection in a Telegram bot.
 Functions:
     construct_message_link(message_data_list: list) -> str:
         Construct a link to the original message (assuming it's a supergroup or channel).
     load_predetermined_sentences(txt_file: str):
-        Load predetermined sentences from a plain text file, normalize to lowercase, remove extra spaces and punctuation marks, check for duplicates, rewrite the file excluding duplicates if any, and log the results.
+        Load predetermined sentences from a plain text file, normalize to lowercase, remove extra spaces and punctuation marks, 
+        check for duplicates, rewrite the file excluding duplicates if any, and log the results.
     get_latest_commit_info():
         Function to get the latest commit info.
     extract_spammer_info(message: types.Message):
@@ -15,7 +17,8 @@ Functions:
     get_inout_filename():
         Generate the filename for in/out events based on the current date.
     extract_status_change(chat_member_update: types.ChatMemberUpdated) -> Optional[Tuple[bool, bool]]:
-        Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member of the chat and whether the 'new_chat_member' is a member of the chat.
+        Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member of the chat 
+        and whether the 'new_chat_member' is a member of the chat.
     message_sent_during_night(message: types.Message):
         Function to check if the message was sent during the night.
     check_message_for_emojis(message: types.Message):
@@ -31,16 +34,17 @@ Functions:
         """
 import logging
 import subprocess
+import re
+from datetime import datetime
+from typing import Optional, Tuple
 
 import os
-import re
 import sys
 import pytz
 import emoji
 
 
-from datetime import datetime
-from typing import Optional, Tuple
+
 
 
 from aiogram import types
@@ -310,6 +314,7 @@ def format_spam_report(message: types.Message) -> str:
 
     return _reported_spam
 
+
 def extract_chat_id_and_message_id_from_link(message_link):
     """Extract chat ID and message ID from a message link."""
     if not str(message_link).startswith("https://t.me/"):
@@ -338,3 +343,193 @@ def extract_chat_id_and_message_id_from_link(message_link):
         raise ValueError(
             "Invalid message link format. https://t.me/ChatName/MessageID or https://t.me/ChatName/threadID/MessageID"
         ) from e
+
+
+def check_message_for_sentences(message: types.Message):
+    """Function to check the message for predetermined word sentences."""
+    # List of predetermined sentences to check for
+    predetermined_sentences = load_predetermined_sentences("spam_dict.txt")
+    if not predetermined_sentences:
+        LOGGER.warning(
+            "spam_dict.txt not found. Automated spam detection will not check for predetermined sentences."
+        )
+    # Check if the message contains text
+    if message.text is None:
+        return False
+
+    # Convert the message text to lowercase and tokenize it into words
+    message_words = re.findall(r"\b\w+\b", message.text.lower())
+
+    # Check if the message contains any of the predetermined sentences
+    for sentence in predetermined_sentences:
+        # Tokenize the predetermined sentence into words
+        sentence_words = re.findall(r"\b\w+\b", sentence.lower())
+
+        # Check if all words in the predetermined sentence are in the message words
+        if all(word in message_words for word in sentence_words):
+            return True
+    return False
+
+
+def get_channel_id_by_name(channel_dict, channel_name):
+    """Function to get the channel ID by its name."""
+    for _id, name in channel_dict.items():
+        if name == channel_name:
+            return _id
+    raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
+
+
+def get_channel_name_by_id(channel_dict, channel_id):
+    """Function to get the channel name by its ID."""
+    return channel_dict.get(channel_id, None)
+
+
+def has_spam_entities(spam_triggers, message: types.Message):
+    """
+    Check if the message is a spam by checking the entities.
+
+    Args:
+        message (types.Message): The message to check.
+
+    Returns:
+        bool: True if the message is spam, False otherwise.
+    """
+    if message.entities:
+        for entity in message.entities:
+            if entity["type"] in spam_triggers:
+                # Spam detected
+                return entity["type"]
+    return None
+
+
+def get_spammer_details(
+    cursor_spammer_details,
+    spammer_id,
+    spammer_first_name,
+    spammer_last_name,
+    message_forward_date,
+    forward_sender_name="",
+    forward_from_chat_title="",
+    forwarded_from_id=None,
+):
+    """Function to get chat ID and message ID by sender name and date
+    or if the message is a forward of a forward then using
+    forwarded_from_id and message_forward_date.
+    forwarded_from_username, forwarded_from_first_name,
+    forward_from_last_name are used only for forwarded forwarded messages
+    and reserved for future use
+    """
+
+    spammer_id = spammer_id or None
+    spammer_last_name = spammer_last_name or ""
+
+    spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
+
+    LOGGER.debug(
+        "%s getting chat ID and message ID\n"
+        "%s firstName : %s : lastName : %s,\n"
+        "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "%s forwardSenderName: %s, forwardedFromID: %s\n",
+        spammer_id_str,
+        spammer_id_str,
+        spammer_first_name,
+        spammer_last_name,
+        spammer_id_str,
+        message_forward_date,
+        forward_from_chat_title,
+        spammer_id_str,
+        forward_sender_name,
+        forwarded_from_id,
+    )
+
+    # Common SQL and parameters for both cases
+    base_query = """
+        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name, received_date
+        FROM recent_messages
+        WHERE {condition}
+        ORDER BY received_date DESC
+        LIMIT 1
+    """
+    params = {
+        "message_forward_date": message_forward_date,
+        "sender_first_name": spammer_first_name,
+        "sender_last_name": spammer_last_name,
+        "from_chat_title": forward_from_chat_title,
+        "user_id": spammer_id,
+        "forward_sender_name": forward_sender_name,
+    }
+
+    if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
+        # This is not a forwarded forwarded message
+        condition = (
+            "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
+            " OR (user_id = :user_id)"
+            " OR (from_chat_title = :from_chat_title)"
+            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
+            " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
+        )
+    elif forward_sender_name == "Deleted Account":
+        # Manage Deleted Account by message date only
+        condition = "received_date = :message_forward_date"
+        params = {
+            "message_forward_date": message_forward_date,
+        }
+    elif spammer_id:
+        # This is a forwarded forwarded message with known user_id
+        condition = (
+            "(user_id = :user_id)"
+            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
+        )
+        # FIXME is it neccessary below?
+        params.update(
+            {
+                "forward_date": message_forward_date,
+                "forwarded_from_id": forwarded_from_id,
+            }
+        )
+
+    else:
+        # This is a forwarded forwarded message
+        condition = (
+            "forwarded_from_id = :forwarded_from_id AND forward_date = :forward_date"
+        )
+        params.update(
+            {
+                "forward_date": message_forward_date,
+                "forwarded_from_id": forwarded_from_id,
+            }
+        )
+
+    query = base_query.format(condition=condition)
+    result = cursor_spammer_details.execute(query, params).fetchone()
+
+    # Ensure result is not None before accessing its elements
+    if result is None:
+        LOGGER.error("No result found for the given query and parameters. GSD")
+        return None
+
+    if not spammer_first_name:
+        spammer_first_name, spammer_last_name = (
+            result[5],
+            result[6],
+        )  # get names from db
+
+    # Ensure result[3] is not None before formatting
+    result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
+
+    LOGGER.info(
+        "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
+        result_3_formatted,  # padding left align 10 chars
+        spammer_first_name,
+        spammer_last_name,
+        message_forward_date,
+        forward_from_chat_title,
+        result,
+    )
+    LOGGER.debug(
+        "%-10s Result: %s",
+        result_3_formatted,  # padding left align 10 chars
+        result,
+    )
+
+    return result

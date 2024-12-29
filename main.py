@@ -14,7 +14,6 @@ import tracemalloc
 
 # import tracemalloc # for memory usage debugging
 
-import re
 import aiohttp
 from aiogram import Bot, Dispatcher, types
 from aiogram import utils
@@ -43,7 +42,7 @@ from aiogram.utils.exceptions import (
 # load utilities
 from utils.utils import (
     construct_message_link,
-    load_predetermined_sentences,
+    check_message_for_sentences,
     get_latest_commit_info,
     extract_spammer_info,
     get_daily_spam_filename,
@@ -55,6 +54,10 @@ from utils.utils import (
     has_custom_emoji_spam,
     format_spam_report,
     extract_chat_id_and_message_id_from_link,
+    get_channel_id_by_name,
+    get_channel_name_by_id,
+    has_spam_entities,
+    get_spammer_details,
 )
 
 tracemalloc.start()
@@ -109,147 +112,15 @@ cursor.execute(
 conn.commit()
 
 
-def get_spammer_details(
-    spammer_id,
-    spammer_first_name,
-    spammer_last_name,
-    message_forward_date,
-    forward_sender_name="",
-    forward_from_chat_title="",
-    forwarded_from_id=None,
-):
-    """Function to get chat ID and message ID by sender name and date
-    or if the message is a forward of a forward then using
-    forwarded_from_id and message_forward_date.
-    forwarded_from_username, forwarded_from_first_name,
-    forward_from_last_name are used only for forwarded forwarded messages
-    and reserved for future use
-    """
-
-    spammer_id = spammer_id or None
-    spammer_last_name = spammer_last_name or ""
-
-    spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
-
-    LOGGER.debug(
-        "%s getting chat ID and message ID\n"
-        "%s firstName : %s : lastName : %s,\n"
-        "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "%s forwardSenderName: %s, forwardedFromID: %s\n",
-        spammer_id_str,
-        spammer_id_str,
-        spammer_first_name,
-        spammer_last_name,
-        spammer_id_str,
-        message_forward_date,
-        forward_from_chat_title,
-        spammer_id_str,
-        forward_sender_name,
-        forwarded_from_id,
-    )
-
-    # Common SQL and parameters for both cases
-    base_query = """
-        SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name, received_date
-        FROM recent_messages
-        WHERE {condition}
-        ORDER BY received_date DESC
-        LIMIT 1
-    """
-    params = {
-        "message_forward_date": message_forward_date,
-        "sender_first_name": spammer_first_name,
-        "sender_last_name": spammer_last_name,
-        "from_chat_title": forward_from_chat_title,
-        "user_id": spammer_id,
-        "forward_sender_name": forward_sender_name,
-    }
-
-    if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
-        # This is not a forwarded forwarded message
-        condition = (
-            "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
-            " OR (user_id = :user_id)"
-            " OR (from_chat_title = :from_chat_title)"
-            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
-            " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
-        )
-    elif forward_sender_name == "Deleted Account":
-        # Manage Deleted Account by message date only
-        condition = "received_date = :message_forward_date"
-        params = {
-            "message_forward_date": message_forward_date,
-        }
-    elif spammer_id:
-        # This is a forwarded forwarded message with known user_id
-        condition = (
-            "(user_id = :user_id)"
-            " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
-        )
-        # FIXME is it neccessary below?
-        params.update(
-            {
-                "forward_date": message_forward_date,
-                "forwarded_from_id": forwarded_from_id,
-            }
-        )
-
-    else:
-        # This is a forwarded forwarded message
-        condition = (
-            "forwarded_from_id = :forwarded_from_id AND forward_date = :forward_date"
-        )
-        params.update(
-            {
-                "forward_date": message_forward_date,
-                "forwarded_from_id": forwarded_from_id,
-            }
-        )
-
-    query = base_query.format(condition=condition)
-    result = cursor.execute(query, params).fetchone()
-
-    # Ensure result is not None before accessing its elements
-    if result is None:
-        LOGGER.error("No result found for the given query and parameters. GSD")
-        return None
-
-    if not spammer_first_name:
-        spammer_first_name, spammer_last_name = (
-            result[5],
-            result[6],
-        )  # get names from db
-
-    # Ensure result[3] is not None before formatting
-    result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
-
-    LOGGER.info(
-        "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
-        result_3_formatted,  # padding left align 10 chars
-        spammer_first_name,
-        spammer_last_name,
-        message_forward_date,
-        forward_from_chat_title,
-        result,
-    )
-    LOGGER.debug(
-        "%-10s Result: %s",
-        result_3_formatted,  # padding left align 10 chars
-        result,
-    )
-
-    return result
-
-
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
     global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, TECHNO_NAMES
     global CHANNEL_NAMES, SPAM_TRIGGERS
-    global PREDETERMINED_SENTENCES, ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
+    global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
-    global DP, BOT, LOGGER, ALLOWED_UPDATES, channels_dict, allowed_content_types
+    global DP, BOT, LOGGER, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
     global API_TOKEN
 
     #     # Attempt to extract the schedule, if present
@@ -292,7 +163,7 @@ def load_config():
         LOGGER.addHandler(file_handler)
 
     # Define allowed content types excluding NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
-    allowed_content_types = [
+    ALLOWED_CONTENT_TYPES = [
         types.ContentType.TEXT,
         types.ContentType.AUDIO,
         types.ContentType.DOCUMENT,
@@ -313,13 +184,6 @@ def load_config():
         types.ContentType.MIGRATE_TO_CHAT_ID,
         types.ContentType.MIGRATE_FROM_CHAT_ID,
     ]
-
-    # List of predetermined sentences to check for
-    PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
-    if not PREDETERMINED_SENTENCES:
-        LOGGER.warning(
-            "spam_dict.txt not found. Automated spam detection will not check for predetermined sentences."
-        )
 
     try:
 
@@ -350,11 +214,11 @@ def load_config():
         ]
 
         # add channels to dict for logging
-        channels_dict = {}
+        CHANNEL_DICT = {}
         for group in channels_root.findall("group"):
             channel_id = int(group.find("id").text)
             channel_name = group.find("name").text
-            channels_dict[channel_id] = channel_name
+            CHANNEL_DICT[channel_id] = channel_name
 
         SPAM_TRIGGERS = [
             trigger.text
@@ -434,57 +298,6 @@ async def take_heuristic_action(message: types.Message, reason):
         found_message_data,
         reason=reason,
     )
-
-
-def check_message_for_sentences(message: types.Message):
-    """Function to check the message for predetermined word sentences."""
-    # Check if the message contains text
-    if message.text is None:
-        return False
-
-    # Convert the message text to lowercase and tokenize it into words
-    message_words = re.findall(r"\b\w+\b", message.text.lower())
-
-    # Check if the message contains any of the predetermined sentences
-    for sentence in PREDETERMINED_SENTENCES:
-        # Tokenize the predetermined sentence into words
-        sentence_words = re.findall(r"\b\w+\b", sentence.lower())
-
-        # Check if all words in the predetermined sentence are in the message words
-        if all(word in message_words for word in sentence_words):
-            return True
-    return False
-
-
-def has_spam_entities(message: types.Message):
-    """
-    Check if the message is a spam by checking the entities.
-
-    Args:
-        message (types.Message): The message to check.
-
-    Returns:
-        bool: True if the message is spam, False otherwise.
-    """
-    if message.entities:
-        for entity in message.entities:
-            if entity["type"] in SPAM_TRIGGERS:
-                # Spam detected
-                return entity["type"]
-    return None
-
-
-def get_channel_id_by_name(channel_name):
-    """Function to get the channel ID by its name."""
-    for _id, name in channels_dict.items():
-        if name == channel_name:
-            return _id
-    raise ValueError(f"Channel name {channel_name} not found in channels_dict.")
-
-
-def get_channel_name_by_id(channel_id):
-    """Function to get the channel name by its ID."""
-    return channels_dict.get(channel_id, None)
 
 
 async def on_startup(_dp: Dispatcher):
@@ -997,7 +810,7 @@ async def lols_autoban(_id, user_name="None"):
     except (
         utils.exceptions.BadRequest
     ) as e:  # if user were Deleted Account while banning
-        chat_name = get_channel_name_by_id(chat_id)
+        chat_name = get_channel_name_by_id(CHANNEL_DICT, chat_id)
         LOGGER.error(
             "%s - error banning in chat %s (%s): %s. Deleted Account?",
             _id,
@@ -1259,6 +1072,7 @@ async def check_n_ban(message: types.Message, reason: str):
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
+            disable_web_page_preview=True,            
             reply_markup=inline_kb,
         )
         if message.from_user.username != None and message.from_user.username != "":
@@ -2451,7 +2265,7 @@ if __name__ == "__main__":
                             author_id,
                             user_name,
                             message_id,
-                            channels_dict[channel_id],
+                            CHANNEL_DICT[channel_id],
                             channel_id,
                         )
                         break  # break the loop if the message was deleted successfully
@@ -2470,20 +2284,20 @@ if __name__ == "__main__":
                         LOGGER.warning(
                             "Message %s in chat %s (%s) not found for deletion.",
                             message_id,
-                            channels_dict[channel_id],
+                            CHANNEL_DICT[channel_id],
                             channel_id,
                         )
                         break  # No need to retry in this case
                     except utils.exceptions.ChatAdminRequired as inner_e:
                         LOGGER.error(
                             "Bot is not an admin in chat %s (%s). Error: %s",
-                            channels_dict[channel_id],
+                            CHANNEL_DICT[channel_id],
                             channel_id,
                             inner_e,
                         )
                         await BOT.send_message(
                             TECHNOLOG_GROUP_ID,
-                            f"Bot is not an admin in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
+                            f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
                         )
                     # except Exception as inner_e:
                     #     LOGGER.error(
@@ -2524,13 +2338,13 @@ if __name__ == "__main__":
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
-                        channels_dict[channel_id],
+                        CHANNEL_DICT[channel_id],
                         channel_id,
                         inner_e,
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {channels_dict[channel_id]} ({channel_id}). Error: {inner_e}",
+                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
                     )
             # unpack user_name correctly XXX
             user_name = result[0][2] if result else "!UNDEFINED!"
@@ -2622,7 +2436,7 @@ if __name__ == "__main__":
 
     @DP.message_handler(
         lambda message: message.chat.id in CHANNEL_IDS,
-        content_types=allowed_content_types,
+        content_types=ALLOWED_CONTENT_TYPES,
     )
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
@@ -2743,7 +2557,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                "Click the button below to view the original message:",
+                "Click buttons below for more information:",
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_AUTOBAN,
             )
@@ -2904,7 +2718,7 @@ if __name__ == "__main__":
             ).total_seconds() < 10
 
             # check if the message is a spam by checking the entities
-            entity_spam_trigger = has_spam_entities(message)
+            entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
 
             # XXX if user was in lols but before it was kicked it posted a message eventually
             # we can check it in runtime banned user list
@@ -3229,7 +3043,7 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         "User %s banned and their messages deleted from chat %s (%s).",
                         author_id,
-                        channels_dict[chat_id],
+                        CHANNEL_DICT[chat_id],
                         chat_id,
                     )
                     # await BOT.send_message(
@@ -3239,13 +3053,13 @@ if __name__ == "__main__":
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
-                        channels_dict[chat_id],
+                        CHANNEL_DICT[chat_id],
                         chat_id,
                         inner_e,
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
+                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[chat_id]} ({chat_id}). Error: {inner_e}",
                     )
             # select all messages from the user in the chat
             # and this is not records about join or leave
@@ -3268,7 +3082,7 @@ if __name__ == "__main__":
                     LOGGER.debug(
                         "Message %s deleted from chat %s (%s) for user @%s (%s).",
                         message_id,
-                        channels_dict[chat_id],
+                        CHANNEL_DICT[chat_id],
                         chat_id,
                         user_name,
                         author_id,
@@ -3277,7 +3091,7 @@ if __name__ == "__main__":
                     LOGGER.error(
                         "Failed to delete message %s in chat %s (%s). Error: %s",
                         message_id,
-                        channels_dict[chat_id],
+                        CHANNEL_DICT[chat_id],
                         chat_id,
                         inner_e,
                     )
@@ -3418,7 +3232,7 @@ if __name__ == "__main__":
             LOGGER.debug("User ID to unban: %d", user_id)
 
             for channel_name in CHANNEL_NAMES:
-                channel_id = get_channel_id_by_name(channel_name)
+                channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)
                 if channel_id:
                     try:
                         await BOT.unban_chat_member(
@@ -3452,7 +3266,7 @@ if __name__ == "__main__":
         lambda message: message.chat.id
         not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS]
         and message.forward_from_chat is None,
-        content_types=allowed_content_types,
+        content_types=ALLOWED_CONTENT_TYPES,
     )  # exclude admins and technolog group, exclude join/left messages
     async def log_all_unhandled_messages(message: types.Message):
         """Function to log all unhandled messages to the technolog group and admin."""
@@ -3775,7 +3589,7 @@ if __name__ == "__main__":
     executor.start_polling(
         DP,
         skip_updates=True,
-        on_startup=on_startup,                                                                                  
+        on_startup=on_startup,
         on_shutdown=on_shutdown,
         allowed_updates=ALLOWED_UPDATES,
     )

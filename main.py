@@ -791,10 +791,10 @@ async def lols_autoban(_id, user_name="None"):
             list(banned_users_dict.items())[-3:],  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
-    if user_name is not None and user_name != "":
+    if user_name:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (1207)",
+            f"<code>{_id}</code>:@{user_name} (797)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -917,13 +917,13 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            # if user_name is not None:
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1304 {user_name is None})",
-                parse_mode="HTML",
-                message_thread_id=TECHNO_NAMES,
-            )
+            if user_name:
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{user_id}</code>:@{user_name} (923)",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
@@ -940,10 +940,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            if user_name is not None and user_name != "":
+            if user_name:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (1327)",
+                    f"<code>{user_id}</code>:@{user_name} (946)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -978,13 +978,13 @@ async def check_and_autoban(
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        # if user_name is not None:
-        await BOT.send_message(
-            TECHNOLOG_GROUP_ID,
-            f"<code>{user_id}</code>:@{user_name} (1373 {user_name is not None})",
-            parse_mode="HTML",
-            message_thread_id=TECHNO_NAMES,
-        )
+        if user_name:
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"<code>{user_id}</code>:@{user_name} (984)",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_NAMES,
+            )
         return True
 
     return False
@@ -1072,13 +1072,13 @@ async def check_n_ban(message: types.Message, reason: str):
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
-            disable_web_page_preview=True,            
+            disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        if message.from_user.username != None and message.from_user.username != "":
+        if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1457)",
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1081)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1747,7 +1747,6 @@ if __name__ == "__main__":
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
-
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 1 minute or less",
@@ -1756,13 +1755,15 @@ if __name__ == "__main__":
                         reply_markup=inline_kb,
                         disable_web_page_preview=True,
                     )
-                    # if update.old_chat_member.user.username:
-                    await BOT.send_message(
-                        TECHNOLOG_GROUP_ID,
-                        f"<code>{inout_userid}</code>:@{inout_username} (2108 {update.old_chat_member.user.username})",
-                        parse_mode="HTML",
-                        message_thread_id=TECHNO_NAMES,
-                    )
+                    if (
+                        update.old_chat_member.user.username
+                    ):  # post username if the user have it
+                        await BOT.send_message(
+                            TECHNOLOG_GROUP_ID,
+                            f"<code>{inout_userid}</code>:@{update.old_chat_member.user.username} (1763)",
+                            parse_mode="HTML",
+                            message_thread_id=TECHNO_NAMES,
+                        )
             except IndexError:
                 LOGGER.debug(
                     "%s:%s left and has no previous join/leave events or was already in lols/cas spam",
@@ -2368,12 +2369,13 @@ if __name__ == "__main__":
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2108 {forwarded_message_data[4]})",
-                parse_mode="HTML",
-                message_thread_id=TECHNO_NAMES,
-            )
+            if forwarded_message_data[4]:
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2375)",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
             banned_users_dict[author_id] = forwarded_message_data[4]
             if forwarded_message_data[4] in active_user_checks_dict:
                 active_user_checks_dict.pop(forwarded_message_data[4], None)

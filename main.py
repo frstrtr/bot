@@ -767,9 +767,47 @@ async def save_report_file(file_type, data):
             file.write(data)
 
 
-async def lols_autoban(_id, user_name="None"):
+async def ban_user_from_all_chats(
+    user_id: int, user_name: str, channel_ids: list, channel_dict: dict
+):
+    """
+    Ban a user from all specified chats and log the results.
+
+    Args:
+        user_id (int): The ID of the user to ban.
+        user_name (str): The name of the user to ban.
+        channel_ids (list): A list of channel IDs to ban the user from.
+        channel_dict (dict): A dictionary mapping channel IDs to channel names.
+    """
+    try:
+        for chat_id in channel_ids:
+            await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
+        # RED color for the log
+        LOGGER.info(
+            "\033[91m%s:%s has been banned from all chats.\033[0m",
+            user_id,
+            user_name if user_name else "!UNDEFINED!",
+        )
+    except (
+        utils.exceptions.BadRequest
+    ) as e:  # if user were Deleted Account while banning
+        chat_name = get_channel_name_by_id(channel_dict, chat_id)
+        LOGGER.error(
+            "%s - error banning in chat %s (%s): %s. Deleted Account?",
+            user_id,
+            chat_name,
+            chat_id,
+            e,
+        )
+        # XXX remove user_id check coroutine and from monitoring list?
+
+
+async def lols_autoban(_id, user_name="!UNDEFINED!"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
+
+    # remove user from all known chats first
+    await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
 
     if _id in active_user_checks_dict:
         banned_users_dict[_id] = active_user_checks_dict.pop(
@@ -778,7 +816,7 @@ async def lols_autoban(_id, user_name="None"):
         LOGGER.info(
             "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            user_name if user_name else "!UNDEFINED!",
+            user_name,
             list(active_user_checks_dict.items())[-3:],  # Last 3 elements
             len(active_user_checks_dict),  # Number of elements left
         )
@@ -794,31 +832,10 @@ async def lols_autoban(_id, user_name="None"):
     if user_name:
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (797)",
+            f"<code>{_id}</code>:@{user_name} (800)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
-    try:
-        for chat_id in CHANNEL_IDS:
-            await BOT.ban_chat_member(chat_id, _id, revoke_messages=True)
-        # RED color for the log
-        LOGGER.info(
-            "\033[91m%s:%s has been banned from all chats.\033[0m",
-            _id,
-            user_name if user_name else "!UNDEFINED!",
-        )
-    except (
-        utils.exceptions.BadRequest
-    ) as e:  # if user were Deleted Account while banning
-        chat_name = get_channel_name_by_id(CHANNEL_DICT, chat_id)
-        LOGGER.error(
-            "%s - error banning in chat %s (%s): %s. Deleted Account?",
-            _id,
-            chat_name,
-            chat_id,
-            e,
-        )
-        # XXX remove _id check corutine and from monitoring list?
 
 
 async def check_and_autoban(
@@ -1748,13 +1765,17 @@ if __name__ == "__main__":
                         inout_userid,
                         inout_chattitle,
                     )
+                    # ban user from all chats
+                    await ban_user_from_all_chats(
+                        inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
+                    )
                     lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 1 minute or less",
+                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 1 minute or less. Telefragged...",
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,
@@ -1765,7 +1786,7 @@ if __name__ == "__main__":
                     ):  # post username if the user have it
                         await BOT.send_message(
                             TECHNOLOG_GROUP_ID,
-                            f"<code>{inout_userid}</code>:@{update.old_chat_member.user.username} (1763)",
+                            f"<code>{inout_userid}</code>:@{update.old_chat_member.user.username} (1790)",
                             parse_mode="HTML",
                             message_thread_id=TECHNO_NAMES,
                         )

@@ -259,10 +259,10 @@ def get_spammer_details(
     spammer_id_str = f"{spammer_id if spammer_id is not None else '':10}"
 
     LOGGER.debug(
-        "%s getting chat ID and message ID\n"
+        "\033[93m%s getting chat ID and message ID\n"
         "%s firstName : %s : lastName : %s,\n"
         "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "%s forwardSenderName: %s, forwardedFromID: %s\n",
+        "%s forwardSenderName: %s, forwardedFromID: %s\n\033[0m",
         spammer_id_str,
         spammer_id_str,
         spammer_first_name,
@@ -338,7 +338,7 @@ def get_spammer_details(
 
     # Ensure result is not None before accessing its elements
     if result is None:
-        LOGGER.error("No result found for the given query and parameters. GSD")
+        LOGGER.error("\033[91mNo result found for the given query and parameters. GSD\033[0m")
         return None
 
     if not spammer_first_name:
@@ -351,7 +351,7 @@ def get_spammer_details(
     result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
 
     LOGGER.info(
-        "%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s",
+        "\033[92m%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s\033[0m",
         result_3_formatted,  # padding left align 10 chars
         spammer_first_name,
         spammer_last_name,
@@ -360,7 +360,7 @@ def get_spammer_details(
         result,
     )
     LOGGER.debug(
-        "%-10s Result: %s",
+        "\033[92m%-10s Result: %s\033[0m",
         result_3_formatted,  # padding left align 10 chars
         result,
     )
@@ -2309,8 +2309,14 @@ if __name__ == "__main__":
                 original_message_timestamp,
             ) = result
 
+            # Parse forwarded_message_data as JSON to get the author_id
+            forwarded_message_data_json = json.loads(forwarded_message_data)
+            author_id = forwarded_message_data_json[3]
+            # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
+            
             LOGGER.debug(
-                "%-10s original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "%s Message timestamp:%-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                author_id,
                 (
                     f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
                 ),  # padding left align 10 chars
@@ -2319,10 +2325,6 @@ if __name__ == "__main__":
                 forwarded_message_data,
                 original_message_timestamp,
             )
-
-            # XXX find safe solution to get the author_id from the forwarded_message_data
-            author_id = eval(forwarded_message_data)[3]
-            # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Author ID retrieved for original message: (<code>{author_id}</code>)",

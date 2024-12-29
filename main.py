@@ -1951,7 +1951,7 @@ if __name__ == "__main__":
                     )
             except IndexError:
                 LOGGER.debug(
-                    "%s:%s left and has no previous join/leave events",
+                    "%s:%s left and has no previous join/leave events or was already in lols/cas spam",
                     inout_userid,
                     inout_username,
                 )
@@ -3775,7 +3775,7 @@ if __name__ == "__main__":
     executor.start_polling(
         DP,
         skip_updates=True,
-        on_startup=on_startup,
+        on_startup=on_startup,                                                                                  
         on_shutdown=on_shutdown,
         allowed_updates=ALLOWED_UPDATES,
     )

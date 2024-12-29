@@ -19,3 +19,5 @@ test.py
 !server/p2p.py
 !server/p2spm.py
 !server/websocket.py
+!utils/*
+!utils/utils.py

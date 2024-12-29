@@ -76,7 +76,9 @@ def initialize_logger():
         logger.addHandler(file_handler)
     return logger
 
+
 LOGGER = initialize_logger()
+
 
 def construct_message_link(message_data_list: list) -> str:
     """Construct a link to the original message (assuming it's a supergroup or channel).
@@ -113,44 +115,39 @@ def load_predetermined_sentences(txt_file: str):
     if not os.path.exists(txt_file):
         return None
 
-    try:
-        with open(txt_file, "r", encoding="utf-8") as file:
-            lines = [line.strip().lower() for line in file if line.strip()]
+    with open(txt_file, "r", encoding="utf-8") as file:
+        lines = [line.strip().lower() for line in file if line.strip()]
 
-        # Normalize lines by removing extra spaces and punctuation marks
-        normalized_lines = [re.sub(r"[^\w\s]", "", line).strip() for line in lines]
+    # Normalize lines by removing extra spaces and punctuation marks
+    normalized_lines = [re.sub(r"[^\w\s]", "", line).strip() for line in lines]
 
-        unique_lines = list(set(normalized_lines))
-        duplicates = [
-            line for line in normalized_lines if normalized_lines.count(line) > 1
-        ]
+    unique_lines = list(set(normalized_lines))
+    duplicates = [line for line in normalized_lines if normalized_lines.count(line) > 1]
 
-        # Check if there are duplicates or normalization changes
-        if len(unique_lines) != len(lines) or lines != normalized_lines:
-            # Rewrite the file with unique and normalized lines
-            with open(txt_file, "w", encoding="utf-8") as file:
-                for line in unique_lines:
-                    file.write(line + "\n")
+    # Check if there are duplicates or normalization changes
+    if len(unique_lines) != len(lines) or lines != normalized_lines:
+        # Rewrite the file with unique and normalized lines
+        with open(txt_file, "w", encoding="utf-8") as file:
+            for line in unique_lines:
+                file.write(line + "\n")
 
-            # Log the results
-            LOGGER.info(
-                "\nNumber of lines after checking for duplicates: %s", len(unique_lines)
-            )
-            LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
-            if duplicates:
-                LOGGER.info("Contents of removed duplicate lines:")
-                for line in set(duplicates):
-                    LOGGER.info(line)
-            else:
-                LOGGER.info("No duplicates found in spam dictionary.\n")
+        # Log the results
+        LOGGER.info(
+            "\nNumber of lines after checking for duplicates: %s", len(unique_lines)
+        )
+        LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
+        if duplicates:
+            LOGGER.info("Contents of removed duplicate lines:")
+            for line in set(duplicates):
+                LOGGER.info(line)
         else:
-            LOGGER.info(
-                "No duplicates or normalization changes found. File not rewritten.\n"
-            )
+            LOGGER.info("No duplicates found in spam dictionary.\n")
+    else:
+        LOGGER.info(
+            "No duplicates or normalization changes found. File not rewritten.\n"
+        )
 
-        return unique_lines
-    except FileNotFoundError:
-        return None
+    return unique_lines
 
 
 def get_latest_commit_info(logger):
@@ -348,7 +345,9 @@ def extract_chat_id_and_message_id_from_link(message_link):
         ) from e
 
 
-def check_message_for_sentences(message: types.Message, predetermined_sentences, logger):
+def check_message_for_sentences(
+    message: types.Message, predetermined_sentences, logger
+):
     """Function to check the message for predetermined word sentences."""
 
     if not predetermined_sentences:

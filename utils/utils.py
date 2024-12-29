@@ -44,35 +44,39 @@ import pytz
 import emoji
 
 
-
-
-
 from aiogram import types
 
+LOGGER = None
 
-# Configure logging to use UTF-8 encoding
-LOGGER = logging.getLogger(__name__)
-if not LOGGER.hasHandlers():
-    LOGGER.setLevel(logging.DEBUG)  # Set the logging level to INFO for detailed output
 
-    # Create handlers
-    stream_handler = logging.StreamHandler(sys.stdout)
-    file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
+def initialize_logger():
+    """Initialize the logger."""
+    global LOGGER
+    # Configure logging to use UTF-8 encoding
+    LOGGER = logging.getLogger(__name__)
+    if not LOGGER.hasHandlers():
+        LOGGER.setLevel(
+            logging.DEBUG
+        )  # Set the logging level to INFO for detailed output
 
-    # Create a formatter and set it for all handlers
-    # formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
-    formatter = logging.Formatter("%(asctime)s - %(message)s")
-    stream_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
+        # Create handlers
+        stream_handler = logging.StreamHandler(sys.stdout)
+        file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
 
-    # Ensure the stream handler uses UTF-8 encoding
-    stream_handler.setStream(
-        open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
-    )
+        # Create a formatter and set it for all handlers
+        # formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
+        formatter = logging.Formatter("%(asctime)s - %(message)s")
+        stream_handler.setFormatter(formatter)
+        file_handler.setFormatter(formatter)
 
-    # Add handlers to the logger
-    LOGGER.addHandler(stream_handler)
-    LOGGER.addHandler(file_handler)
+        # Ensure the stream handler uses UTF-8 encoding
+        stream_handler.setStream(
+            open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
+        )
+
+        # Add handlers to the logger
+        LOGGER.addHandler(stream_handler)
+        LOGGER.addHandler(file_handler)
 
 
 def construct_message_link(message_data_list: list) -> str:

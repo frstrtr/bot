@@ -1339,7 +1339,7 @@ async def perform_checks(
 
             # Log the message with the appropriate color
             LOGGER.info(
-                "%s%s:%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
+                "%s%s:@%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,
                 user_name if user_name else "!UNDEFINED!",

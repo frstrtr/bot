@@ -1671,6 +1671,11 @@ if __name__ == "__main__":
                         event_record=event_record,
                         user_id=update.old_chat_member.user.id,
                         inout_logmessage=inout_logmessage,
+                        user_name=(
+                            update.old_chat_member.user.username
+                            if update.old_chat_member.user.username
+                            else "!UNDEFINED!"
+                        ),
                     ),
                     name=str(inout_userid),
                 )
@@ -2921,6 +2926,11 @@ if __name__ == "__main__":
                             event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
                             user_id=message.from_id,
                             inout_logmessage=f"{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...",
+                            user_name=(
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
                         ),
                         name=str(message.from_id),
                     )
@@ -3132,10 +3142,12 @@ if __name__ == "__main__":
             )
 
             if user_id in active_user_checks_dict:
-                await message.reply("User is already being checked.")
+                await message.reply(
+                    f"User {active_user_checks_dict[user_id]} is already being checked."
+                )
                 return
             else:
-                active_user_checks_dict[user_id] = message.from_user.username
+                active_user_checks_dict[user_id] = "!UNDEFINED!"
 
             # start the perform_checks coroutine
             asyncio.create_task(
@@ -3143,6 +3155,7 @@ if __name__ == "__main__":
                     event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual check requested by admin {message.from_user.id}",
                     user_id=user_id,
                     inout_logmessage=f"{user_id} manual check requested, checking user activity requested by admin {message.from_id}...",
+                    user_name=active_user_checks_dict[user_id],
                 ),
                 name=str(user_id),
             )

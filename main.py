@@ -41,6 +41,7 @@ from aiogram.utils.exceptions import (
 
 # load utilities
 from utils.utils import (
+    initialize_logger,
     construct_message_link,
     check_message_for_sentences,
     get_latest_commit_info,
@@ -59,6 +60,10 @@ from utils.utils import (
     has_spam_entities,
     load_predetermined_sentences,
 )
+
+LOGGER = None
+# LOGGER init
+initialize_logger()
 
 tracemalloc.start()
 
@@ -138,32 +143,6 @@ def load_config():
     #     logger.info("Bot starting with commit info:\n%s", commit_info)
     # else:
     #     logger.warning("Bot starting without git info.")
-
-    # Configure logging to use UTF-8 encoding
-    LOGGER = logging.getLogger(__name__)
-    if not LOGGER.hasHandlers():
-        LOGGER.setLevel(
-            logging.DEBUG
-        )  # Set the logging level to INFO for detailed output
-
-        # Create handlers
-        stream_handler = logging.StreamHandler(sys.stdout)
-        file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
-
-        # Create a formatter and set it for all handlers
-        # formatter = logging.Formatter("%(asctime)s - %(threadName)s - %(message)s")
-        formatter = logging.Formatter("%(asctime)s - %(message)s")
-        stream_handler.setFormatter(formatter)
-        file_handler.setFormatter(formatter)
-
-        # Ensure the stream handler uses UTF-8 encoding
-        stream_handler.setStream(
-            open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
-        )
-
-        # Add handlers to the logger
-        LOGGER.addHandler(stream_handler)
-        LOGGER.addHandler(file_handler)
 
     # Define allowed content types excluding NEW_CHAT_MEMBERS and LEFT_CHAT_MEMBER
     ALLOWED_CONTENT_TYPES = [
@@ -1253,7 +1232,7 @@ async def check_n_ban(message: types.Message, reason: str):
         # add the user to the banned users list
         if message.from_user.id not in banned_users_dict:
             banned_users_dict[message.from_user.id] = (
-                message.from_user.username or "NoUserName"
+                message.from_user.username or "!UNDEFINED!"
             )
             if len(banned_users_dict) > 3:
                 last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
@@ -2530,10 +2509,10 @@ if __name__ == "__main__":
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
-            if forwarded_message_data[4]:
+            if forwarded_message_data[4] and (forwarded_message_data[4] != 0):
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2375)",
+                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2536)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -2550,7 +2529,11 @@ if __name__ == "__main__":
                 author_id,
                 message_id_to_ban,
                 button_pressed_by,
-                forwarded_message_data[4],
+                (
+                    forwarded_message_data[4]
+                    if forwarded_message_data[4] != 0
+                    else "!UNDEFINED!"
+                ),
             )
 
         except utils.exceptions.MessageCantBeDeleted as e:

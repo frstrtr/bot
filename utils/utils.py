@@ -46,16 +46,13 @@ import emoji
 
 from aiogram import types
 
-LOGGER = None
-
 
 def initialize_logger():
     """Initialize the logger."""
-    global LOGGER
     # Configure logging to use UTF-8 encoding
-    LOGGER = logging.getLogger(__name__)
-    if not LOGGER.hasHandlers():
-        LOGGER.setLevel(
+    logger = logging.getLogger(__name__)
+    if not logger.hasHandlers():
+        logger.setLevel(
             logging.DEBUG
         )  # Set the logging level to INFO for detailed output
 
@@ -75,9 +72,11 @@ def initialize_logger():
         )
 
         # Add handlers to the logger
-        LOGGER.addHandler(stream_handler)
-        LOGGER.addHandler(file_handler)
+        logger.addHandler(stream_handler)
+        logger.addHandler(file_handler)
+    return logger
 
+LOGGER = initialize_logger()
 
 def construct_message_link(message_data_list: list) -> str:
     """Construct a link to the original message (assuming it's a supergroup or channel).
@@ -154,7 +153,7 @@ def load_predetermined_sentences(txt_file: str):
         return None
 
 
-def get_latest_commit_info():
+def get_latest_commit_info(logger):
     """Function to get the latest commit info."""
     try:
         _commit_info = (
@@ -162,7 +161,7 @@ def get_latest_commit_info():
         )
         return _commit_info
     except subprocess.CalledProcessError as e:
-        LOGGER.info("Error getting git commit info: %s", e)
+        logger.info("Error getting git commit info: %s", e)
         return None
 
 
@@ -349,11 +348,11 @@ def extract_chat_id_and_message_id_from_link(message_link):
         ) from e
 
 
-def check_message_for_sentences(message: types.Message, predetermined_sentences):
+def check_message_for_sentences(message: types.Message, predetermined_sentences, logger):
     """Function to check the message for predetermined word sentences."""
 
     if not predetermined_sentences:
-        LOGGER.warning(
+        logger.warning(
             "spam_dict.txt not found. Automated spam detection will not check for predetermined sentences."
         )
     # Check if the message contains text

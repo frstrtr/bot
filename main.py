@@ -750,7 +750,7 @@ async def on_startup(_dp: Dispatcher):
     #     await check_user_status(chat_id, user_id)
 
     # DELETE MESSAGE once the bot is started
-    # https://t.me/rumauritius/54607/81235
+    # https://t.me/chatname/threadID/message
     # try:
     #     await BOT.delete_message(-1001711422922, 81235)
     # except MessageToDeleteNotFound as e:
@@ -1470,10 +1470,16 @@ async def check_n_ban(message: types.Message, reason: str):
                 url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
             )
         )
+        chat_link = (
+            f"https://t.me/{message.chat.username}"
+            if message.chat.username
+            else f"https://t.me/c/{message.chat.id}"
+        )
+        chat_link_name = f"{message.chat.title}:@{message.chat.username}" if message.chat.username else message.chat.title
         await BOT.send_message(
             ADMIN_GROUP_ID,
             (
-                f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in {message.chat.title}! Telefragged in {time_passed}..."
+            f"Alert! 🚨 User <code>{message.from_user.id}</code> has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}..."
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
@@ -2880,8 +2886,10 @@ if __name__ == "__main__":
         message_link = construct_message_link(
             [message.chat.id, message.message_id, message.chat.username]
         )
+        lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
         inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("View Original Message", url=message_link)
+            InlineKeyboardButton("View Original Message", url=message_link),
+            InlineKeyboardButton("Check lols data", url=lols_link),
         )
 
         # check if message is from user from active_user_checks_dict or banned_users_dict set
@@ -2981,22 +2989,17 @@ if __name__ == "__main__":
             )
             # Forwarding banned user message to technolog originals
             await BOT.forward_message(
-                TECHNOLOG_GROUP_ID,
+                ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                TECHNO_ORIGINALS,
+                ADMIN_AUTOBAN,
                 True,
             )
             await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
+                ADMIN_GROUP_ID,
                 "Click the button below to view the original message:",
                 reply_markup=inline_kb,
-                message_thread_id=TECHNO_ORIGINALS,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-                disable_notification=False,
-                allow_sending_without_reply=True,
-                protect_content=True,
+                message_thread_id=ADMIN_AUTOBAN,
             )
             # Delete message from banned user
             await BOT.delete_message(message.chat.id, message.message_id)

@@ -77,9 +77,6 @@ def initialize_logger():
     return logger
 
 
-LOGGER = initialize_logger()
-
-
 def construct_message_link(message_data_list: list) -> str:
     """Construct a link to the original message (assuming it's a supergroup or channel).
     Extract the chat ID and remove the '-100' prefix if it exists.
@@ -105,7 +102,7 @@ def construct_message_link(message_data_list: list) -> str:
     return message_link
 
 
-def load_predetermined_sentences(txt_file: str):
+def load_predetermined_sentences(txt_file: str, logger):
     """Load predetermined sentences from a plain text file, normalize to lowercase,
     remove extra spaces and punctuation marks, check for duplicates, rewrite the file
     excluding duplicates if any, and log the results. Return None if the file doesn't exist.
@@ -132,18 +129,18 @@ def load_predetermined_sentences(txt_file: str):
                 file.write(line + "\n")
 
         # Log the results
-        LOGGER.info(
+        logger.info(
             "\nNumber of lines after checking for duplicates: %s", len(unique_lines)
         )
-        LOGGER.info("Number of duplicate lines removed: %s", len(duplicates))
+        logger.info("Number of duplicate lines removed: %s", len(duplicates))
         if duplicates:
-            LOGGER.info("Contents of removed duplicate lines:")
+            logger.info("Contents of removed duplicate lines:")
             for line in set(duplicates):
-                LOGGER.info(line)
+                logger.info(line)
         else:
-            LOGGER.info("No duplicates found in spam dictionary.\n")
+            logger.info("No duplicates found in spam dictionary.\n")
     else:
-        LOGGER.info(
+        logger.info(
             "No duplicates or normalization changes found. File not rewritten.\n"
         )
 

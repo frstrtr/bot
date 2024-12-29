@@ -5,7 +5,6 @@ import os
 import random
 import sqlite3
 import xml.etree.ElementTree as ET
-import logging
 import json
 import time
 import html
@@ -66,7 +65,7 @@ LOGGER = initialize_logger()
 tracemalloc.start()
 
 # List of predetermined sentences to check for
-PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt")
+PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt", LOGGER)
 
 bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -414,7 +413,8 @@ async def take_heuristic_action(message: types.Message, reason):
 
 async def on_startup(_dp: Dispatcher):
     """Function to handle the bot startup."""
-    _commit_info = get_latest_commit_info()
+    _commit_info = get_latest_commit_info(LOGGER)
+
     bot_start_message = (
         f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
@@ -2958,7 +2958,7 @@ if __name__ == "__main__":
                     )
                     await take_heuristic_action(message, the_reason)
 
-            elif check_message_for_sentences(message, PREDETERMINED_SENTENCES):
+            elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
                     return

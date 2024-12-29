@@ -1,6 +1,5 @@
 import asyncio
 import aiocron
-import sys
 from datetime import datetime
 import os
 import random
@@ -41,7 +40,6 @@ from aiogram.utils.exceptions import (
 
 # load utilities
 from utils.utils import (
-    initialize_logger,
     construct_message_link,
     check_message_for_sentences,
     get_latest_commit_info,
@@ -61,9 +59,8 @@ from utils.utils import (
     load_predetermined_sentences,
 )
 
-LOGGER = None
 # LOGGER init
-initialize_logger()
+LOGGER = initialize_logger()
 
 tracemalloc.start()
 
@@ -2402,7 +2399,7 @@ if __name__ == "__main__":
                             chat_id=channel_id, message_id=message_id
                         )
                         LOGGER.debug(
-                            "\033[91m%s @%s message %s deleted from chat %s (%s).\033[0m",
+                            "\033[91m%s:@%s message %s deleted from chat %s (%s).\033[0m",
                             author_id,
                             user_name,
                             message_id,
@@ -2490,7 +2487,7 @@ if __name__ == "__main__":
             # unpack user_name correctly XXX
             user_name = result[0][2] if result else "!UNDEFINED!"
             LOGGER.debug(
-                "\033[91m%s:%s manually banned and their messages deleted where applicable.\033[0m",
+                "\033[91m%s:@%s manually banned and their messages deleted where applicable.\033[0m",
                 author_id,
                 user_name,
             )

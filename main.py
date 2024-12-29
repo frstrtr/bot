@@ -1041,7 +1041,7 @@ async def check_n_ban(message: types.Message, reason: str):
             )
         except utils.exceptions.MessageToForwardNotFound as e:
             LOGGER.error(
-                "\033[93m%s - message %s to forward using check_n_an not found in %s (%s)\033[0m Already deleted? %s",
+                "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -1129,7 +1129,7 @@ async def check_n_ban(message: types.Message, reason: str):
             await BOT.delete_message(message.chat.id, message.message_id)
         except utils.exceptions.MessageToDeleteNotFound:
             LOGGER.error(
-                "\033[93m%s:%s - message %s to delete using check_n_ban not found in %s (%s)\033[0m Already deleted?",
+                "\033[93m%s:%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
                 (
                     message.from_user.username

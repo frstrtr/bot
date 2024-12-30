@@ -2311,11 +2311,23 @@ if __name__ == "__main__":
                 original_message_timestamp,
             ) = result
 
-            # Parse forwarded_message_data as JSON to get the author_id
-            forwarded_message_data_json = json.loads(forwarded_message_data)
-            author_id = forwarded_message_data_json[3]
+            # XXXfixed find safe solution to get the author_id from the forwarded_message_data
+            # author_id = eval(forwarded_message_data)[3]
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
 
+            # Check if forwarded_message_data is not empty and is a list
+            if not forwarded_message_data:
+                await callback_query.message.reply("Error: Forwarded message data is empty.")
+                return
+
+            # Extract author_id from the list
+            try:
+                author_id = forwarded_message_data[3]
+            except IndexError as e:
+                LOGGER.error("Index error: %s", e)
+                await callback_query.message.reply("Error: Invalid data format in forwarded message.")
+                return
+           
             LOGGER.debug(
                 "%s Message timestamp:%-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
                 author_id,

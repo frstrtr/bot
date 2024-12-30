@@ -943,10 +943,10 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
             list(banned_users_dict.items())[-3:],  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
-    if user_name:
+    if user_name and user_name != "!UNDEFINED!":  # exclude noname users
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (800)",
+            f"<code>{_id}</code>:@{user_name} (949)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1423,31 +1423,42 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
             user_id,
             user_name,
         )
-        return await running_watchdogs[
-            user_id
-        ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
+        return  # Do nothing; a watchdog is already active.
+        # return await running_watchdogs[
+        #     user_id
+        # ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
 
     # Create the task and store it in the running_watchdogs dictionary
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
-        "\033[91m%s:!UNDEFINED! is banned by lols/cas check. Watchdog assigned.\033[0m",
+        "\033[91m%s:%s Watchdog assigned.\033[0m",
         user_id,
+        user_name,
+    )  # Include user_name
+
+    # # Remove the task from the dictionary when it completes
+    # def task_done_callback(t: asyncio.Task):
+    #     running_watchdogs.pop(user_id, None)
+    #     if t.exception():
+    #         LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
+
+    # task.add_done_callback(task_done_callback)
+    task.add_done_callback(
+        lambda t: (
+            LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
+            if t.exception()
+            else None
+        )
     )
 
-    # Remove the task from the dictionary when it completes
-    def task_done_callback(t: asyncio.Task):
-        running_watchdogs.pop(user_id, None)
-        if t.exception():
-            LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
-
-    task.add_done_callback(task_done_callback)
-
     # Await the newly created task
-    await task  # Wait for check_and_autoban to finish before continuing
+    # await task  # Wait for check_and_autoban to finish before continuing
 
     # No need to return anything here as the function now awaits the task
     # return await task  # Await the new task
+
+    return task  # Return the task so the caller can manage it
 
 
 async def log_lists():
@@ -1654,7 +1665,7 @@ if __name__ == "__main__":
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
             # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
-            by_user = f"by @{by_username}: {by_userfirstname} {by_userlastname}\n"
+            by_user = f"by {update.from_user.id}:@{by_username}: {by_userfirstname} {by_userlastname}\n"
 
         inout_status = update.new_chat_member.status
 
@@ -1720,50 +1731,44 @@ if __name__ == "__main__":
             reply_markup=inline_kb,
         )
 
-        if inout_status == ChatMemberStatus.KICKED:
-            LOGGER.info(
-                "\033[91m%s --> %s in %s\033[0m",
-                inout_userid,
-                inout_status,
-                inout_chattitle,
-            )
-            # if inout_userid in active_user_checks_dict:
-            #     active_user_checks.remove(inout_userid)
-            #     LOGGER.info(
-            #         "\033[91m%s removed from active_user_checks_dict during GCM kick by bot/admin: \033[0m%s",
-            #         inout_userid,
-            #         active_user_checks_dict,
-            #     )
-        elif inout_status == ChatMemberStatus.RESTRICTED:
-            LOGGER.info(
-                "\033[93m%s --> %s in %s\033[0m",
-                inout_userid,
-                inout_status,
-                inout_chattitle,
-            )
-        else:  # member or left - white color
-            LOGGER.info(
-                "%s:%s --> %s in %s",
-                inout_userid,
-                inout_username,
-                inout_status,
-                inout_chattitle,
-            )
+        # different colors for inout status
+        status_colors = {
+            ChatMemberStatus.KICKED: "\033[91m",  # Red
+            ChatMemberStatus.RESTRICTED: "\033[93m",  # Yellow
+        }
+        color = status_colors.get(inout_status, "")  # Default to no color
+        reset_color = "\033[0m" if color else ""  # Reset color if a color was used
+        LOGGER.info(
+            "%s%s --> %s in %s%s",
+            color,
+            inout_userid,
+            inout_status,
+            inout_chattitle,
+            reset_color,
+        )
 
         # Extract the user status change
         result = extract_status_change(update)
         if result is None:
             return
         was_member, is_member = result
+        # if already identified as a spammer and not TIMEOUT
+        if lols_spam is True:
+            await check_and_autoban(
+                event_record,
+                inout_userid,
+                inout_logmessage,
+                inout_username,
+                lols_spam=lols_spam,
+            )
 
         # Check lols after user join/leave event in 3hr and ban if spam
         if (
-            lols_spam is True
-            or inout_status == ChatMemberStatus.KICKED
+            inout_status == ChatMemberStatus.KICKED
             or inout_status == ChatMemberStatus.RESTRICTED
-        ):  # not Timeout exactly or if kicked/restricted by someone else
+        ):  # not Timeout (lols_spam) exactly or if kicked/restricted by someone else
             # Call check_and_autoban with concurrency control using named tasks
-            await create_named_watchdog(
+            task_GCM = await create_named_watchdog(
                 check_and_autoban(
                     event_record,
                     inout_userid,
@@ -1777,8 +1782,8 @@ if __name__ == "__main__":
 
         elif inout_status in (
             ChatMemberStatus.MEMBER,
-            ChatMemberStatus.KICKED,
-            ChatMemberStatus.RESTRICTED,
+            # ChatMemberStatus.KICKED,
+            # ChatMemberStatus.RESTRICTED,
             ChatMemberStatus.LEFT,
         ):  # only if user joined or kicked or restricted or left
 
@@ -2327,7 +2332,7 @@ if __name__ == "__main__":
             #     LOGGER.error("Index error: %s", e)
             #     await callback_query.message.reply("Error: Invalid data format in forwarded message.")
             #     return
-           
+
             LOGGER.debug(
                 "%s Message timestamp:%-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
                 author_id,

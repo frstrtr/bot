@@ -338,7 +338,9 @@ def get_spammer_details(
 
     # Ensure result is not None before accessing its elements
     if result is None:
-        LOGGER.error("\033[91mNo result found for the given query and parameters. GSD\033[0m")
+        LOGGER.error(
+            "\033[91mNo result found for the given query and parameters. GSD\033[0m"
+        )
         return None
 
     if not spammer_first_name:
@@ -2313,7 +2315,7 @@ if __name__ == "__main__":
             forwarded_message_data_json = json.loads(forwarded_message_data)
             author_id = forwarded_message_data_json[3]
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
-            
+
             LOGGER.debug(
                 "%s Message timestamp:%-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
                 author_id,
@@ -2612,21 +2614,16 @@ if __name__ == "__main__":
             )
         elif message.from_user.id in active_user_checks_dict:
             # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
-            if message.from_user.id is not isinstance(
-                active_user_checks_dict[message.from_user.id], dict
-            ):
-                # Initialize with the username if it exists, otherwise with "None"
+            if not isinstance(active_user_checks_dict.get(message.from_user.id), dict):
+                # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
                 active_user_checks_dict[message.from_user.id] = {
                     "username": (
                         message.from_user.username
                         if message.from_user.username
-                        else (
-                            active_user_checks_dict[message.from_user.id]
-                            if active_user_checks_dict[message.from_user.id]
-                            else "!UNDEFINED!"
-                        )
+                        else "!UNDEFINED!"
                     )
                 }
+
             # Store the message link in the active_user_checks_dict
             message_key = f"{message.chat.id}_{message.message_id}"
             active_user_checks_dict[message.from_user.id][message_key] = message_link

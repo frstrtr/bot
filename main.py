@@ -2595,10 +2595,19 @@ if __name__ == "__main__":
             [message.chat.id, message.message_id, message.chat.username]
         )
         lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("View Original Message", url=message_link),
-            InlineKeyboardButton("Check lols data", url=lols_link),
-        )
+
+        # Create the inline keyboard
+        inline_kb = InlineKeyboardMarkup()
+
+        # Add buttons to the keyboard, each in a new row
+        inline_kb.add(InlineKeyboardButton("View Original Message", url=message_link))
+        inline_kb.add(InlineKeyboardButton("Check LOLS Data", url=lols_link))
+
+        # Buttons in one line
+        # inline_kb = InlineKeyboardMarkup().add(
+        #     InlineKeyboardButton("View Original Message", url=message_link),
+        #     InlineKeyboardButton("Check lols data", url=lols_link),
+        # )
 
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
@@ -2671,8 +2680,9 @@ if __name__ == "__main__":
             # Send a new message with the inline keyboard link to the technolog originals
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                "Click the button below to view the original message:",
+                f"<code>{message_link}</code>\nClick the button below to view the suspicious message:",
                 reply_markup=inline_kb,
+                parse_mode="HTML",
                 message_thread_id=TECHNO_ORIGINALS,
             )
             # Send warning to the Admin group with link to the message

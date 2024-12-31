@@ -817,6 +817,13 @@ async def handle_forwarded_reports_with_details(
         disable_web_page_preview=False,
     )
 
+    # TODO parameters to pass to callback function callback_query_handler() to prevent errors
+    # Store the admin action banner message data
+    # DP["admin_action_banner_message"] = admin_action_banner_message
+    # DP["admin_group_banner_message"] = admin_group_banner_message
+    # always store the report chat ID with admin personal chat ID
+    # DP["report_chat_id"] = message.chat.id
+
 
 async def lols_cas_check(user_id):
     """Function to check if a user is in the lols/cas bot database.
@@ -2790,8 +2797,13 @@ if __name__ == "__main__":
                     [message.chat.id, message.message_id, message.chat.username]
                 )
                 LOGGER.debug(
-                    "\033[95m%s is admin, skipping the message %s in the chat %s.\033[0m Message link: %s",
+                    "\033[95m%s:@%s is admin, skipping the message %s in the chat %s.\033[0m Message link: %s",
                     message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     message.message_id,
                     message.chat.title,
                     message_link,

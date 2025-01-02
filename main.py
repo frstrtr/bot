@@ -2663,8 +2663,7 @@ if __name__ == "__main__":
 
             # Create an inline keyboard with a link
             LOGGER.warning(
-                "\033[47m\033[34m%s:%s is in active_user_checks_dict, check the message %s in the chat %s (%s)\033[0m\n"
-                "%s:%s suspicious message link: %s",
+                "\033[47m\033[34m%s:%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m Suspicious message link: %s",
                 message.from_user.id,
                 (
                     message.from_user.username
@@ -2674,12 +2673,6 @@ if __name__ == "__main__":
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
-                message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
                 message_link,
             )
             # Log resulting dict

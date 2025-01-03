@@ -101,6 +101,8 @@ from utils.utils_config import (
     API_TOKEN,
 )
 
+# Load configuration values from the XML file
+load_config()
 
 # LOGGER init
 LOGGER = initialize_logger()
@@ -1561,9 +1563,6 @@ if __name__ == "__main__":
     # Dictionary to store the mapping of unhandled messages to admin's replies
     # global unhandled_messages
     unhandled_messages = {}
-
-    # Load configuration values from the XML file
-    load_config()
 
     LOGGER.info("Using bot: %s", BOT_NAME)
     LOGGER.info("Using bot id: %s", BOT_USERID)

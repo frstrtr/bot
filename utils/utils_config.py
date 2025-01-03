@@ -35,6 +35,7 @@ BOT = None
 ALLOWED_UPDATES = []
 CHANNEL_DICT = {}
 ALLOWED_CONTENT_TYPES = []
+API_TOKEN = None  # Initialize API_TOKEN at the module level
 
 
 def load_config():

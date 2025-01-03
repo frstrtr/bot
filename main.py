@@ -67,7 +67,6 @@ from utils.utils_decorators import (
 )
 
 from utils.utils_config import (
-    load_config,
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
     TECHNO_LOGGING,
@@ -98,7 +97,6 @@ from utils.utils_config import (
     ALLOWED_UPDATES,
     CHANNEL_DICT,
     ALLOWED_CONTENT_TYPES,
-    API_TOKEN,
 )
 
 
@@ -570,7 +568,7 @@ async def handle_forwarded_reports_with_details(
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    technnolog_spamMessage_copy = await BOT.forward_message(
+    technnolog_spam_message_copy = await BOT.forward_message(
         TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
     )
     message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
@@ -664,10 +662,10 @@ async def handle_forwarded_reports_with_details(
     user_id = found_message_data[3]
 
     technolog_chat_id = int(
-        str(technnolog_spamMessage_copy.chat.id)[4:]
+        str(technnolog_spam_message_copy.chat.id)[4:]
     )  # Remove -100 from the chat ID
     technnolog_spamMessage_copy_link = (
-        f"https://t.me/c/{technolog_chat_id}/{technnolog_spamMessage_copy.message_id}"
+        f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
     )
 
     # fix if message not forwarded and autoreported
@@ -1560,7 +1558,9 @@ if __name__ == "__main__":
 
     # Dictionary to store the mapping of unhandled messages to admin's replies
     # global unhandled_messages
-    unhandled_messages = {} # XXX need to store in the DB to preserve it between sessions
+    unhandled_messages = (
+        {}
+    )  # XXX need to store in the DB to preserve it between sessions
 
     # Load configuration values from the XML file
     # load_config()
@@ -2210,7 +2210,10 @@ if __name__ == "__main__":
                 reply_markup=keyboard,
             )
 
-            if callback_query.message.chat.id == ADMIN_GROUP_ID:
+            if (
+                callback_query.message.chat.id == ADMIN_GROUP_ID
+                and admin_action_banner_message
+            ):
                 # remove personal report banner message if BAN button pressed in ADMIN group
                 try:
                     await BOT.delete_message(

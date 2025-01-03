@@ -57,6 +57,11 @@ from utils.utils import (
     get_channel_name_by_id,
     has_spam_entities,
     load_predetermined_sentences,
+    is_not_bot_action,
+    is_forwarded_from_unknown_channel_message,
+    is_admin_user_message,
+    is_channel_message,
+    is_valid_message,
 )
 
 # LOGGER init
@@ -1656,10 +1661,6 @@ if __name__ == "__main__":
     )
     LOGGER.info("\n")
 
-    def is_not_bot_action(update: types.ChatMemberUpdated) -> bool:
-        """Check if the update is not from the bot itself."""
-        return update.from_user.id != BOT_USERID
-
     @DP.chat_member_handler(is_not_bot_action)  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Checks for change in the chat members statuses and check if they are spammers."""
@@ -1930,19 +1931,6 @@ if __name__ == "__main__":
                     inout_userid,
                     inout_username,
                 )
-
-    def is_forwarded_from_unknown_channel_message(message: types.Message) -> bool:
-        """Function to check if the message is a forwarded message from someone or FOREIGN channel.
-        Message is not from the BOT managed channels.
-        Message is not from ADMIN group.
-        Message is not from TECHNOLOG group.
-        """
-        return (
-            message.forward_date is not None
-            and message.chat.id not in CHANNEL_IDS
-            and message.chat.id != ADMIN_GROUP_ID
-            and message.chat.id != TECHNOLOG_GROUP_ID
-        )
 
     @DP.message_handler(
         is_forwarded_from_unknown_channel_message,
@@ -2642,7 +2630,7 @@ if __name__ == "__main__":
         )
 
     @DP.message_handler(
-        lambda message: message.chat.id in CHANNEL_IDS,
+        is_channel_message,
         content_types=ALLOWED_CONTENT_TYPES,
     )
     async def store_recent_messages(message: types.Message):
@@ -3481,9 +3469,7 @@ if __name__ == "__main__":
             await message.reply("An error occurred while trying to unban the user.")
 
     @DP.message_handler(
-        lambda message: message.chat.id
-        not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID, CHANNEL_IDS]
-        and message.forward_from_chat is None,
+        is_valid_message,
         content_types=ALLOWED_CONTENT_TYPES,
     )  # exclude admins and technolog group, exclude join/left messages
     async def log_all_unhandled_messages(message: types.Message):
@@ -3713,8 +3699,7 @@ if __name__ == "__main__":
         await callback_query.answer()
 
     @DP.message_handler(
-        lambda message: message.forward_date is None
-        and message.chat.id == ADMIN_USER_ID,
+        is_admin_user_message,
         content_types=types.ContentTypes.TEXT,
     )
     async def handle_admin_reply(message: types.Message):

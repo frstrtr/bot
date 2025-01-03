@@ -1656,9 +1656,11 @@ if __name__ == "__main__":
     )
     LOGGER.info("\n")
 
-    @DP.chat_member_handler(
-        lambda update: update.from_user.id != BOT_USERID
-    )  # exclude bot's own actions
+    def is_not_bot_action(update: types.ChatMemberUpdated) -> bool:
+        """Check if the update is not from the bot itself."""
+        return update.from_user.id != BOT_USERID
+
+    @DP.chat_member_handler(is_not_bot_action)  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Checks for change in the chat members statuses and check if they are spammers."""
         # Who did the action

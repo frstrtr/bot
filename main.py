@@ -2187,13 +2187,13 @@ if __name__ == "__main__":
                 "report_chat_id"
             )  # store chat where action happened
 
-            LOGGER.debug(
-                "agbm: %s, agbam: %s, aabm: %s, rcid: %s",
-                DP.get("admin_group_banner_message"),
-                DP.get("admin_group_banner_autoreport_message"),
-                DP.get("admin_action_banner_message"),
-                DP.get("report_chat_id"),
-            )
+            # LOGGER.debug(
+            #     "agbm: %s, agbam: %s, aabm: %s, rcid: %s",
+            #     DP.get("admin_group_banner_message"),
+            #     DP.get("admin_group_banner_autoreport_message"),
+            #     DP.get("admin_action_banner_message"),
+            #     DP.get("report_chat_id"),
+            # )
 
             # clear states
             DP["admin_group_banner_message"] = None

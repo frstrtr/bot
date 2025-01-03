@@ -803,8 +803,8 @@ async def handle_forwarded_reports_with_details(
     # Forward original message to the admin group
     await BOT.forward_message(
         ADMIN_GROUP_ID,
-        found_message_data[0],
-        found_message_data[1],
+        found_message_data[0], # from_chat_id
+        found_message_data[1], # message_id
         message_thread_id=ADMIN_AUTOREPORTS,
     )
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
@@ -814,7 +814,7 @@ async def handle_forwarded_reports_with_details(
         reply_markup=keyboard,
         parse_mode="HTML",
         message_thread_id=ADMIN_AUTOREPORTS,
-        disable_web_page_preview=False,
+        disable_web_page_preview=True,
     )
 
     # TODO parameters to pass to callback function callback_query_handler() to prevent errors

@@ -803,12 +803,12 @@ async def handle_forwarded_reports_with_details(
     # Forward original message to the admin group
     await BOT.forward_message(
         ADMIN_GROUP_ID,
-        found_message_data[0], # from_chat_id
-        found_message_data[1], # message_id
+        found_message_data[0],  # from_chat_id
+        found_message_data[1],  # message_id
         message_thread_id=ADMIN_AUTOREPORTS,
     )
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
-    await BOT.send_message(
+    admin_group_banner_autoreport_message = await BOT.send_message(
         ADMIN_GROUP_ID,
         admin_ban_banner,
         reply_markup=keyboard,
@@ -820,7 +820,9 @@ async def handle_forwarded_reports_with_details(
     # TODO parameters to pass to callback function callback_query_handler() to prevent errors
     # Store the admin action banner message data
     # DP["admin_action_banner_message"] = admin_action_banner_message
-    # DP["admin_group_banner_message"] = admin_group_banner_message
+    DP["admin_group_banner_autoreport_message"] = (
+        admin_group_banner_autoreport_message  # AUTOREPORT manage state
+    )
     # always store the report chat ID with admin personal chat ID
     # DP["report_chat_id"] = message.chat.id
 
@@ -2262,11 +2264,26 @@ if __name__ == "__main__":
         keyboard.add(confirm_btn, cancel_btn)
 
         try:  # KeyError if it was reported by non-admin user
-            admin_group_banner_message: types.Message = DP["admin_group_banner_message"]
-            admin_action_banner_message: types.Message = DP[
-                "admin_action_banner_message"
-            ]
-            report_chat_id = DP["report_chat_id"]
+            banner_message_origin: types.Message = (
+                DP["admin_group_banner_message"]
+                if DP["admin_group_banner_message"]
+                else DP["admin_group_banner_autoreport_message"]
+            )  # check message object for AUTO/MANUAL report origin
+            admin_action_banner_message: types.Message = (
+                DP["admin_action_banner_message"]
+                if DP["admin_action_banner_message"]
+                else None
+            )  # if this is MANUAL action by ADMIN
+            # ADMIN_GROUP_ID = DP["admin_group_id"]
+            report_chat_id = (
+                DP["report_chat_id"] if DP["report_chet_id"] else None
+            )  # store chat where action happened
+
+            # clear states
+            DP["admin_group_banner_message"] = None
+            DP["admin_group_banner_autoreport_message"] = None
+            DP["admin_action_banner_message"] = None
+            DP["report_chat_id"] = None
 
             # Edit messages to remove buttons or messages
             # check where the callback_query was pressed
@@ -2278,7 +2295,7 @@ if __name__ == "__main__":
             )
 
             if callback_query.message.chat.id == ADMIN_GROUP_ID:
-                # remove personal report banner message
+                # remove personal report banner message if BAN button pressed in ADMIN group
                 try:
                     await BOT.delete_message(
                         report_chat_id, admin_action_banner_message.message_id
@@ -2287,7 +2304,7 @@ if __name__ == "__main__":
                     MessageToDeleteNotFound
                 ):  # Message already deleted when replied in personal messages? XXX
                     LOGGER.warning(
-                        "%s Message %s in Admin group to delete not found. Already deleted or not found.",
+                        "%s Message %s in BOT PM to delete not found. Already deleted?",
                         callback_query.from_user.id,
                         callback_query.message.message_id,
                     )
@@ -2296,7 +2313,7 @@ if __name__ == "__main__":
                 # remove admin group banner buttons
                 await BOT.edit_message_reply_markup(
                     chat_id=ADMIN_GROUP_ID,
-                    message_id=admin_group_banner_message.message_id,
+                    message_id=banner_message_origin.message_id,
                 )
         except KeyError as e:
             LOGGER.error(

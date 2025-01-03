@@ -57,6 +57,8 @@ from utils.utils import (
     get_channel_name_by_id,
     has_spam_entities,
     load_predetermined_sentences,
+)
+from utils.utils_decorators import (
     is_not_bot_action,
     is_forwarded_from_unknown_channel_message,
     is_admin_user_message,

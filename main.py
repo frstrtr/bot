@@ -1927,11 +1927,21 @@ if __name__ == "__main__":
                     inout_username,
                 )
 
+    def is_forwarded_from_unknown_channel_message(message: types.Message) -> bool:
+        """Function to check if the message is a forwarded message from someone or FOREIGN channel.
+        Message is not from the BOT managed channels.
+        Message is not from ADMIN group.
+        Message is not from TECHNOLOG group.
+        """
+        return (
+            message.forward_date is not None
+            and message.chat.id not in CHANNEL_IDS
+            and message.chat.id != ADMIN_GROUP_ID
+            and message.chat.id != TECHNOLOG_GROUP_ID
+        )
+
     @DP.message_handler(
-        lambda message: message.forward_date is not None
-        and message.chat.id not in CHANNEL_IDS
-        and message.chat.id != ADMIN_GROUP_ID
-        and message.chat.id != TECHNOLOG_GROUP_ID,
+        is_forwarded_from_unknown_channel_message,
         content_types=types.ContentTypes.ANY,
     )
     async def handle_forwarded_reports(message: types.Message):
@@ -2252,8 +2262,10 @@ if __name__ == "__main__":
         keyboard.add(confirm_btn, cancel_btn)
 
         try:  # KeyError if it was reported by non-admin user
-            admin_group_banner_message = DP["admin_group_banner_message"]
-            admin_action_banner_message = DP["admin_action_banner_message"]
+            admin_group_banner_message: types.Message = DP["admin_group_banner_message"]
+            admin_action_banner_message: types.Message = DP[
+                "admin_action_banner_message"
+            ]
             report_chat_id = DP["report_chat_id"]
 
             # Edit messages to remove buttons or messages

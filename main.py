@@ -2254,20 +2254,27 @@ if __name__ == "__main__":
         keyboard.add(confirm_btn, cancel_btn)
 
         try:  # KeyError if it was reported by non-admin user
-            banner_message_origin: types.Message = (
-                DP["admin_group_banner_message"]
-                if DP["admin_group_banner_message"]
-                else DP["admin_group_banner_autoreport_message"]
+            banner_message_origin: types.Message = DP.get(
+                "admin_group_banner_message"
+            ) or DP.get(
+                "admin_group_banner_autoreport_message"
             )  # check message object for AUTO/MANUAL report origin
-            admin_action_banner_message: types.Message = (
-                DP["admin_action_banner_message"]
-                if DP["admin_action_banner_message"]
-                else None
+
+            admin_action_banner_message: types.Message = DP.get(
+                "admin_action_banner_message"
             )  # if this is MANUAL action by ADMIN
-            # ADMIN_GROUP_ID = DP["admin_group_id"]
-            report_chat_id = (
-                DP["report_chat_id"] if DP["report_chet_id"] else None
+
+            report_chat_id = DP.get(
+                "report_chat_id"
             )  # store chat where action happened
+
+            LOGGER.debug(
+                "agbm: %s, agbam: %s, aabm: %s, rcid: %s",
+                DP.get("admin_group_banner_message"),
+                DP.get("admin_group_banner_autoreport_message"),
+                DP.get("admin_action_banner_message"),
+                DP.get("report_chat_id"),
+            )
 
             # clear states
             DP["admin_group_banner_message"] = None

@@ -140,3 +140,7 @@ def load_config():
         LOGGER.error("\033[91mFile not found: %s\033[0m", e.filename)
     except ET.ParseError as e:
         LOGGER.error("\033[91mError parsing XML: %s\033[0m", e)
+
+
+# Load configuration when the module is imported
+load_config()

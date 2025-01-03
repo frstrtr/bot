@@ -1,6 +1,6 @@
 from aiogram import types
 
-from main import (
+from utils.utils_config import (
     ADMIN_GROUP_ID,
     TECHNOLOG_GROUP_ID,
     ADMIN_USER_ID,

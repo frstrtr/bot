@@ -953,7 +953,7 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
     if user_name and user_name != "!UNDEFINED!":  # exclude noname users
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (949)",
+            f"<code>{_id}</code>:@{user_name} (956)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1058,7 +1058,7 @@ async def check_and_autoban(
             if user_name:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (923)",
+                    f"<code>{user_id}</code>:@{user_name} (1061)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1081,7 +1081,7 @@ async def check_and_autoban(
             if user_name:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (946)",
+                    f"<code>{user_id}</code>:@{user_name} (1084)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1119,7 +1119,7 @@ async def check_and_autoban(
         if user_name:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (984)",
+                f"<code>{user_id}</code>:@{user_name} (1122)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1216,7 +1216,7 @@ async def check_n_ban(message: types.Message, reason: str):
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1081)",
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1219)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1522,7 +1522,11 @@ async def log_lists():
 
     try:
         active_user_checks_list = [
-            f"<code>{user}</code>:@{uname}"
+            (
+                f"<code>{user}</code>:{uname}"
+                if isinstance(uname, dict)
+                else f"<code>{user}</code>:@{uname}"
+            )  # if there were suspicious messages do not put @ in front of the dict
             for user, uname in active_user_checks_dict.items()
         ]
         banned_users_list = [
@@ -2651,7 +2655,7 @@ if __name__ == "__main__":
                 # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
                 active_user_checks_dict[message.from_user.id] = {
                     "username": (
-                        message.from_user.username
+                        "@" + message.from_user.username
                         if message.from_user.username
                         else "!UNDEFINED!"
                     )

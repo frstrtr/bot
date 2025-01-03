@@ -1726,7 +1726,7 @@ if __name__ == "__main__":
 
             # Log the message with the timestamp
             LOGGER.debug(
-                "\033[96m%s:%s Scheduling perform_checks coroutine\033[0m",
+                "\033[96m%s:@%s Scheduling perform_checks coroutine\033[0m",
                 inout_userid,
                 inout_username,
             )
@@ -2348,7 +2348,14 @@ if __name__ == "__main__":
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
             )
             LOGGER.debug(
-                "%s hbn forwared_message_data: %s", author_id, forwarded_message_data
+                "%s:@%s hbn forwared_message_data: %s",
+                author_id,
+                (
+                    forwarded_message_data[4]
+                    if forwarded_message_data[4]
+                    else "!UNDEFINED!"
+                ),
+                forwarded_message_data,
             )
             await save_report_file("inout_", "hbn" + event_record)
 

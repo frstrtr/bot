@@ -2379,15 +2379,25 @@ if __name__ == "__main__":
                 )
                 if len(active_user_checks_dict) > 5:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
                         author_id,
+                        (
+                            forwarded_message_data[4]
+                            if forwarded_message_data[4] not in [0, "0", None]
+                            else "!UNDEFINED!"
+                        ),
                         list(active_user_checks_dict.items())[:3],  # First 2 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks_dict during handle_ban by admin: %s\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin: %s\033[0m",
                         author_id,
+                        (
+                            forwarded_message_data[4]
+                            if forwarded_message_data[4] not in [0, "0", None]
+                            else "!UNDEFINED!"
+                        ),
                         active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id
@@ -2958,8 +2968,13 @@ if __name__ == "__main__":
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 LOGGER.info(
-                    "%s sent message and joined the chat %s %s ago",
+                    "%s:@%s sent message and joined the chat %s %s ago",
                     message.from_id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     message.chat.title,
                     human_readable_time,
                 )
@@ -2968,8 +2983,13 @@ if __name__ == "__main__":
                         [message.chat.id, message.message_id, message.chat.username]
                     )
                 LOGGER.info(
-                    "%s message link: %s",
+                    "%s:@%s message link: %s",
                     message.from_id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     message_link,
                 )
                 the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"

@@ -402,9 +402,7 @@ async def ban_rogue_chan(rogue_chan_id: int, chan_list) -> bool:
                     "Successfully banned CHANNEL %s in %s", rogue_channel_id, chat_id
                 )
                 asyncio.sleep(1)  # pause 1 sec
-            except (
-                BadRequest
-            ) as e:  # if user were Deleted Account while banning
+            except BadRequest as e:  # if user were Deleted Account while banning
                 # chat_name = get_channel_id_by_name(channel_dict, chat_id)
                 LOGGER.error(
                     "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
@@ -880,9 +878,7 @@ async def ban_user_from_all_chats(
         try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
             LOGGER.info("Successfully banned USER %s in %s", user_id, chat_id)
-        except (
-            BadRequest
-        ) as e:  # if user were Deleted Account while banning
+        except BadRequest as e:  # if user were Deleted Account while banning
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
                 "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT?",
@@ -2848,12 +2844,32 @@ if __name__ == "__main__":
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_AUTOBAN,
             )
+
             # check if message is forward from channel
-            if message.forward_from_chat:
+            if message.sender_chat:
                 try:
-                    await BOT.ban_chat_sender_chat(message.chat.id, message.sender_chat)
+                    ban_chat_task = BOT.ban_chat_sender_chat(
+                        message.chat.id, message.sender_chat
+                    )
+                    delete_message_task = BOT.delete_message(
+                        message.chat.id, message.message_id
+                    )
+                    ban_member_task = BOT.ban_chat_member(
+                        message.chat.id, message.from_id, revoke_messages=True
+                    )
+                    ban_rogue_chan_task = ban_rogue_chan(
+                        message.sender_chat, CHANNEL_IDS
+                    )
+
+                    await asyncio.gather(
+                        ban_chat_task,
+                        delete_message_task,
+                        ban_member_task,
+                        ban_rogue_chan_task,
+                    )
+
                     LOGGER.info(
-                        "Chat %s banned in chat %s",
+                        "Channel %s banned in chat %s",
                         message.sender_chat,
                         message.chat.id,
                     )
@@ -2864,10 +2880,12 @@ if __name__ == "__main__":
                         message.chat.id,
                         e,
                     )
+            else:
+                await BOT.delete_message(message.chat.id, message.message_id)
+                await BOT.ban_chat_member(
+                    message.chat.id, message.from_id, revoke_messages=True
+                )
 
-            # Delete message from banned user and ban
-            await BOT.delete_message(message.chat.id, message.message_id)
-            await BOT.ban_chat_member(message.chat.id, message.from_id, revoke_messages=True)
             # return
         try:
             # Log the full message object for debugging

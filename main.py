@@ -489,6 +489,8 @@ async def on_shutdown(_dp):
     if active_user_checks_dict:
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
+                if _uname.startswith("{'username'"):
+                    _uname = active_user_checks_dict[_id]["username"]
                 LOGGER.debug(_uname)
                 file.write(f"{_id}:{_uname}\n")
     else:

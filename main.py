@@ -2643,6 +2643,13 @@ if __name__ == "__main__":
         # Add buttons to the keyboard, each in a new row
         inline_kb.add(InlineKeyboardButton("View Original Message", url=message_link))
         inline_kb.add(InlineKeyboardButton("Check LOLS Data", url=lols_link))
+        # Add callback data button to prevent further checks
+        inline_kb.add(
+            InlineKeyboardButton(
+                "Seems legit, STOP checks",
+                callback_data=f"stop_checks_{message.from_user.id}",
+            )
+        )
 
         # Buttons in one line
         # inline_kb = InlineKeyboardMarkup().add(
@@ -3691,6 +3698,49 @@ if __name__ == "__main__":
 
         # Acknowledge the callback query
         await callback_query.answer()
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
+    async def stop_checks(callback_query: CallbackQuery):
+        """Function to stop checks for the user."""
+        *_, user_id_legit = callback_query.data.split("_")
+
+        # remove buttons from the admin group
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+        )
+
+        button_pressed_by = callback_query.from_user.username
+        admin_id = callback_query.from_user.id
+        # DEBUG:
+        # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
+        LOGGER.info(
+            "\033[95m%s Identified as legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            user_id_legit,
+            admin_id,
+            button_pressed_by,
+        )
+        await BOT.send_message(
+            ADMIN_GROUP_ID,
+            f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "
+            f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
+            message_thread_id=callback_query.message.message_thread_id,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}. "
+            f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+        # Removing user from active_user_checks dict and stop checks coroutines
+        if user_id_legit in active_user_checks_dict:
+            del active_user_checks_dict[user_id_legit]
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(user_id_legit):
+                    task.cancel()
 
     @DP.message_handler(
         is_admin_user_message,

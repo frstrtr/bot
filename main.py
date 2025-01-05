@@ -460,14 +460,20 @@ async def sequential_shutdown_tasks(_id, _uname):
 
 async def on_shutdown(_dp):
     """Function to handle the bot shutdown."""
-    LOGGER.info("Bot is shutting down... Performing final spammer check...")
+    LOGGER.info(
+        "\033[95mBot is shutting down... Performing final spammer check...\033[0m"
+    )
 
     # Create a list to hold all tasks
     tasks = []
 
     # Iterate over active user checks and create a task for each check
     for _id, _uname in active_user_checks_dict.items():
-        LOGGER.info("%s:%s shutdown check for spam...", _id, _uname)
+        LOGGER.info(
+            "%s:@%s shutdown check for spam...",
+            _id,
+            _uname if _uname else "!UNDEFINED!'",
+        )
 
         # Create the task for the sequential coroutine without awaiting it immediately
         task = asyncio.create_task(
@@ -483,6 +489,7 @@ async def on_shutdown(_dp):
     if active_user_checks_dict:
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
+                LOGGER.debug(_uname)
                 file.write(f"{_id}:{_uname}\n")
     else:
         # clear the file if no active checks
@@ -529,6 +536,15 @@ async def on_shutdown(_dp):
             f"Spammers detected: {len(banned_users_dict)}\n"
         ),
         message_thread_id=TECHNO_RESTART,
+    )
+    LOGGER.info(
+        "Runtime session shutdown stats:\n"
+        "Bot started at: %s\n"
+        "Current active user checks: %d\n"
+        "Spammers detected: %d",
+        bot_start_time,
+        len(active_user_checks_dict),
+        len(banned_users_dict),
     )
     # Close the bot
     await BOT.close()

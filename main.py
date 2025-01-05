@@ -1023,6 +1023,8 @@ async def check_and_autoban(
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
         str(BOT_USERID) not in event_record
     ):  # XXX user is not in the lols database and kicked/restricted by admin
+        
+        # TODO Add perform-checks coroutine!!!
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         # LOGGER.debug("event_record: %s", event_record)

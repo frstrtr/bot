@@ -418,7 +418,11 @@ async def load_and_start_checks():
                 )
                 # interval between checks
                 await asyncio.sleep(1)
-                LOGGER.info("%s loaded from file & 3hr monitoring started ...", user_id)
+                LOGGER.info(
+                    "%s:@%s loaded from file & 3hr monitoring started ...",
+                    user_id,
+                    user_name,
+                )
 
         if os.path.exists(banned_users_filename):
             with open(banned_users_filename, "r", encoding="utf-8") as file:

@@ -1340,7 +1340,7 @@ async def perform_checks(
             active_user_checks_dict.pop(user_id, None)
             if len(active_user_checks_dict) > 5:
                 LOGGER.info(
-                    "\033[92m%s:%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
+                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
                     user_name,
                     list(active_user_checks_dict.items())[:3],  # First 2 elements
@@ -1348,7 +1348,7 @@ async def perform_checks(
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s$%s removed from active_user_checks_dict in finally block: %s\033[0m",
+                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s\033[0m",
                     user_id,
                     user_name,
                     active_user_checks_dict,

@@ -877,7 +877,7 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
     if user_name and user_name != "!UNDEFINED!":  # exclude noname users
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (956)",
+            f"<code>{_id}</code>:@{user_name} (880)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1278,6 +1278,21 @@ async def perform_checks(
                 lols_spam,
                 len(active_user_checks_dict),
             )
+
+            # getting message to delete link if it is in the checks dict
+            # XXX removes only one recorded message!!! What if there is more than one?
+            if isinstance(active_user_checks_dict[user_id], dict):
+                suspicious_messages = {
+                    k: v
+                    for k, v in active_user_checks_dict[user_id].items()
+                    if k != "username"
+                }
+                if suspicious_messages:
+                    chat_id, message_id = next(iter(suspicious_messages)).split("_")
+                    message_to_delete = [
+                        int(str(chat_id).replace("-100", "", 1)),
+                        int(message_id),
+                    ]
 
             if await check_and_autoban(
                 event_record,

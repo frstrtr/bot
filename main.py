@@ -1087,8 +1087,9 @@ async def check_and_autoban(
         # LOGGER.debug("event_record: %s", event_record)
         # user is not spammer but kicked or restricted by admin
         LOGGER.info(
-            "%s kicked/restricted by admin, but is not now in the lols database.",
+            "%s:@%s kicked/restricted by admin, but is not now in the lols database.",
             user_id,
+            user_name,
         )
         await BOT.send_message(
             ADMIN_GROUP_ID,

@@ -411,7 +411,7 @@ async def load_and_start_checks():
                 asyncio.create_task(
                     perform_checks(
                         user_id=user_id,
-                        user_name=user_name,
+                        user_name=user_name if user_name else "!UNDEFINED!",
                         event_record=event_message,
                         inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                     )
@@ -421,7 +421,7 @@ async def load_and_start_checks():
                 LOGGER.info(
                     "%s:@%s loaded from file & 3hr monitoring started ...",
                     user_id,
-                    user_name,
+                    user_name if user_name else "!UNDEFINED!",
                 )
 
         if os.path.exists(banned_users_filename):

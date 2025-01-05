@@ -1177,21 +1177,9 @@ async def check_n_ban(message: types.Message, reason: str):
             if message.chat.username
             else message.chat.title
         )
-        alert_text = (
-            "Alert! 🚨 User @%s:(<code>%s</code>) has been caught red-handed spamming in <a href='%s'>%s</a>! Telefragged in %s...",
-            (
-                message.from_user.username
-                if message.from_user.username
-                else "!UNDEFINED!"
-            ),
-            message.from_user.id,
-            chat_link,
-            chat_link_name,
-            time_passed,
-        )
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            alert_text,
+            f"Alert! 🚨 User @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>) has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}...",
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -1200,7 +1188,7 @@ async def check_n_ban(message: types.Message, reason: str):
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1179)",
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1191)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )

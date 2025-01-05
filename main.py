@@ -1156,7 +1156,16 @@ async def check_n_ban(message: types.Message, reason: str):
         await BOT.send_message(
             ADMIN_GROUP_ID,
             (
-                f"Alert! 🚨 User <code>{message.from_user.id}</code>:{message.from_user.username if message.from_user.username else message.from_user.first_name} has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}..."
+                "Alert! 🚨 User @%s:(<code>%s</code>) has been caught red-handed spamming in <a href='%s'>%s</a>! Telefragged in %s...",
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else message.from_user.first_name
+                ),
+                message.from_user.id,
+                chat_link,
+                chat_link_name,
+                time_passed,
             ),
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",

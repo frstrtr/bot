@@ -411,6 +411,7 @@ async def load_and_start_checks():
                 asyncio.create_task(
                     perform_checks(
                         user_id=user_id,
+                        user_name=user_name,
                         event_record=event_message,
                         inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                     )
@@ -1024,6 +1025,7 @@ async def check_and_autoban(
         str(BOT_USERID) not in event_record
     ):  # XXX user is not in the lols database and kicked/restricted by admin
 
+        # perform_checks(user_id, user_name)
         # TODO Add perform-checks coroutine!!!
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)

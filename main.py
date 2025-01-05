@@ -1733,11 +1733,6 @@ if __name__ == "__main__":
             reset_color,
         )
 
-        # Extract the user status change
-        result = extract_status_change(update)
-        if result is None:
-            return
-        was_member, is_member = result
         # if already identified as a spammer and not TIMEOUT
         if lols_spam is True:
             await check_and_autoban(
@@ -1747,6 +1742,13 @@ if __name__ == "__main__":
                 inout_username,
                 lols_spam=lols_spam,
             )
+            return  # stop further checks
+
+        # Extract the user status change
+        result = extract_status_change(update)
+        if result is None:
+            return
+        was_member, is_member = result
 
         # Check lols after user join/leave event in 3hr and ban if spam
         if (

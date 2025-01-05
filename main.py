@@ -32,8 +32,13 @@ from aiogram import executor
 # from aiogram.types import Message
 from aiogram.utils.exceptions import (
     MessageToDeleteNotFound,
-    # MessageCantBeDeleted,
+    MessageCantBeDeleted,
     RetryAfter,
+    BadRequest,
+    ChatNotFound,
+    MessageToForwardNotFound,
+    MessageIdInvalid,
+    ChatAdminRequired,
 )
 
 # load utilities
@@ -382,16 +387,23 @@ async def on_startup(_dp: Dispatcher):
     # await BOT.delete_message(-1002331876, 81190)
     # await lols_autoban(5697700097, "on_startup event", "banned during on_startup event")
 
-    ROGUE_CHANNELS_LIST = []
+    # Call the function to load and start checks
+    asyncio.create_task(load_and_start_checks())
+
+
+async def ban_rogue_chan(rogue_chan_id: int, chan_list) -> bool:
+    """ban chat sender chat for Rogue channels"""
+    ROGUE_CHANNELS_LIST = [rogue_chan_id]
     for rogue_channel_id in ROGUE_CHANNELS_LIST:
-        for chat_id in CHANNEL_IDS:
+        for chat_id in chan_list:
             try:
                 await BOT.ban_chat_sender_chat(chat_id, rogue_channel_id)
                 LOGGER.info(
                     "Successfully banned CHANNEL %s in %s", rogue_channel_id, chat_id
                 )
+                asyncio.sleep(1)  # pause 1 sec
             except (
-                utils.exceptions.BadRequest
+                BadRequest
             ) as e:  # if user were Deleted Account while banning
                 # chat_name = get_channel_id_by_name(channel_dict, chat_id)
                 LOGGER.error(
@@ -401,9 +413,6 @@ async def on_startup(_dp: Dispatcher):
                     e,
                 )
                 continue
-
-    # Call the function to load and start checks
-    asyncio.create_task(load_and_start_checks())
 
 
 async def load_and_start_checks():
@@ -872,7 +881,7 @@ async def ban_user_from_all_chats(
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
             LOGGER.info("Successfully banned USER %s in %s", user_id, chat_id)
         except (
-            utils.exceptions.BadRequest
+            BadRequest
         ) as e:  # if user were Deleted Account while banning
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
@@ -1175,7 +1184,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 message.message_id,
                 message_thread_id=ADMIN_AUTOBAN,
             )
-        except utils.exceptions.MessageToForwardNotFound as e:
+        except MessageToForwardNotFound as e:
             LOGGER.error(
                 "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
                 message.from_user.id,
@@ -1269,7 +1278,7 @@ async def check_n_ban(message: types.Message, reason: str):
         # TODO shift to delete_messages in aiogram 3.0
         try:
             await BOT.delete_message(message.chat.id, message.message_id)
-        except utils.exceptions.MessageToDeleteNotFound:
+        except MessageToDeleteNotFound:
             LOGGER.error(
                 "\033[93m%s:%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
@@ -1613,7 +1622,7 @@ async def log_lists():
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )
-    except utils.exceptions.BadRequest as e:
+    except BadRequest as e:
         LOGGER.error("Error sending active_user_checks_dict: %s", e)
 
     # empty banned_users_dict
@@ -2255,7 +2264,7 @@ if __name__ == "__main__":
                     message_thread_id=ADMIN_AUTOREPORTS,
                 )
 
-        except utils.exceptions.BadRequest as e:
+        except BadRequest as e:
             LOGGER.error("Error while sending the banner to the admin group: %s", e)
             await message.answer(
                 "Error while sending the banner to the admin group. Please check the logs."
@@ -2548,7 +2557,7 @@ if __name__ == "__main__":
                             channel_id,
                         )
                         break  # No need to retry in this case
-                    except utils.exceptions.ChatAdminRequired as inner_e:
+                    except ChatAdminRequired as inner_e:
                         LOGGER.error(
                             "Bot is not an admin in chat %s (%s). Error: %s",
                             CHANNEL_DICT[channel_id],
@@ -2663,7 +2672,7 @@ if __name__ == "__main__":
                 ),
             )
 
-        except utils.exceptions.MessageCantBeDeleted as e:
+        except MessageCantBeDeleted as e:
             LOGGER.error("Error in handle_ban function: %s", e)
             await callback_query.message.reply(f"Error in handle_ban function: {e}")
 
@@ -2839,8 +2848,26 @@ if __name__ == "__main__":
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_AUTOBAN,
             )
-            # Delete message from banned user
+            # check if message is forward from channel
+            if message.forward_from_chat:
+                try:
+                    await BOT.ban_chat_sender_chat(message.chat.id, message.sender_chat)
+                    LOGGER.info(
+                        "Chat %s banned in chat %s",
+                        message.sender_chat,
+                        message.chat.id,
+                    )
+                except BadRequest as e:
+                    LOGGER.error(
+                        "Error banning channel %s in chat %s: %s",
+                        message.sender_chat,
+                        message.chat.id,
+                        e,
+                    )
+
+            # Delete message from banned user and ban
             await BOT.delete_message(message.chat.id, message.message_id)
+            await BOT.ban_chat_member(message.chat.id, message.from_id, revoke_messages=True)
             # return
         try:
             # Log the full message object for debugging
@@ -3230,7 +3257,7 @@ if __name__ == "__main__":
             #     await take_heuristic_action(message, the_reason)
 
         # If other user/admin or bot deletes message earlier than this bot we got an error
-        except utils.exceptions.MessageIdInvalid as e:
+        except MessageIdInvalid as e:
             LOGGER.error(
                 "Error storing/deleting recent %s message, %s - someone deleted it already?",
                 message.message_id,
@@ -3517,7 +3544,7 @@ if __name__ == "__main__":
                     message_thread_id=ADMIN_MANBAN,
                 )
 
-            except utils.exceptions.ChatNotFound as e:
+            except ChatNotFound as e:
                 LOGGER.error(
                     "Failed to delete message %d in chat %s. Error: %s",
                     message_id,

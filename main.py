@@ -984,10 +984,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            if user_name:
+            if user_name and user_name != "!UNDEFINED!":
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (1061)",
+                    f"<code>{user_id}</code>:@{user_name} (990)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1007,10 +1007,10 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            if user_name:
+            if user_name and user_name != "!UNDEFINED!":
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (1084)",
+                    f"<code>{user_id}</code>:@{user_name} (1013)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1051,7 +1051,7 @@ async def check_and_autoban(
         if user_name and user_name != "!UNDEFINED!":
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1048)",
+                f"<code>{user_id}</code>:@{user_name} (1054)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1148,7 +1148,7 @@ async def check_n_ban(message: types.Message, reason: str):
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1219)",
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1151)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -2529,7 +2529,7 @@ if __name__ == "__main__":
             if forwarded_message_data[4] not in [0, "0", None]:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2526)",
+                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2532)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )

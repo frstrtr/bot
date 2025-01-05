@@ -829,7 +829,7 @@ async def ban_user_from_all_chats(
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
         # RED color for the log
         LOGGER.info(
-            "\033[91m%s:%s has been banned from all chats.\033[0m",
+            "\033[91m%s:@%s has been banned from all chats.\033[0m",
             user_id,
             user_name if user_name else "!UNDEFINED!",
         )
@@ -1365,7 +1365,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     """
     if user_id in running_watchdogs:
         LOGGER.info(
-            "\033[93m%s:%s Watchdog is already set. Skipping new task.\033[0m",
+            "\033[93m%s:@%s Watchdog is already set. Skipping new task.\033[0m",
             user_id,
             user_name,
         )
@@ -1378,7 +1378,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
-        "\033[91m%s:%s Watchdog assigned.\033[0m",
+        "\033[91m%s:@%s Watchdog assigned.\033[0m",
         user_id,
         user_name,
     )  # Include user_name
@@ -1767,7 +1767,7 @@ if __name__ == "__main__":
                 )
             else:
                 LOGGER.debug(
-                    "\033[93m%s:%s skipping perform_checks as it is already being processed\033[0m",
+                    "\033[93m%s:@%s skipping perform_checks as it is already being processed\033[0m",
                     inout_userid,
                     inout_username,
                 )
@@ -1830,8 +1830,9 @@ if __name__ == "__main__":
                     and last2_join_left_event[1][1] == 1
                 ):
                     LOGGER.debug(
-                        "%s joined and left %s in 1 minute or less",
+                        "%s:@%s joined and left %s in 1 minute or less",
                         inout_userid,
+                        inout_username,
                         inout_chattitle,
                     )
                     # ban user from all chats

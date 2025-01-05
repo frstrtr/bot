@@ -1342,7 +1342,7 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error(
-            "\033[93m%s:%s 3hrs spam checking cancelled. %s\033[0m",
+            "\033[93m%s:@%s 3hrs spam checking cancelled. %s\033[0m",
             user_id,
             user_name,
             e,

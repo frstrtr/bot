@@ -4,7 +4,6 @@ from datetime import datetime
 import os
 import random
 import sqlite3
-import xml.etree.ElementTree as ET
 import json
 import time
 import html
@@ -13,7 +12,7 @@ import tracemalloc
 # import tracemalloc # for memory usage debugging
 
 import aiohttp
-from aiogram import Bot, Dispatcher, types
+from aiogram import Dispatcher, types
 from aiogram import utils
 from datetime import timedelta
 
@@ -847,27 +846,31 @@ async def ban_user_from_all_chats(
         channel_ids (list): A list of channel IDs to ban the user from.
         channel_dict (dict): A dictionary mapping channel IDs to channel names.
     """
-    try:
-        for chat_id in channel_ids:
+
+    for chat_id in channel_ids:
+        try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
-        # RED color for the log
-        LOGGER.info(
-            "\033[91m%s:@%s has been banned from all chats.\033[0m",
-            user_id,
-            user_name if user_name else "!UNDEFINED!",
-        )
-    except (
-        utils.exceptions.BadRequest
-    ) as e:  # if user were Deleted Account while banning
-        chat_name = get_channel_name_by_id(channel_dict, chat_id)
-        LOGGER.error(
-            "%s - error banning in chat %s (%s): %s. Deleted Account?",
-            user_id,
-            chat_name,
-            chat_id,
-            e,
-        )
-        # XXX remove user_id check coroutine and from monitoring list?
+        except (
+            utils.exceptions.BadRequest
+        ) as e:  # if user were Deleted Account while banning
+            chat_name = get_channel_name_by_id(channel_dict, chat_id)
+            LOGGER.error(
+                "%s - error banning in chat %s (%s): %s. Deleted Account?",
+                user_id,
+                chat_name,
+                chat_id,
+                e,
+            )
+            await asyncio.sleep(1)
+            # XXX remove user_id check coroutine and from monitoring list?
+            continue
+
+    # RED color for the log
+    LOGGER.info(
+        "\033[91m%s:@%s has been banned from all chats.\033[0m",
+        user_id,
+        user_name if user_name else "!UNDEFINED!",
+    )
 
 
 async def lols_autoban(_id, user_name="!UNDEFINED!"):

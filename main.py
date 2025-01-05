@@ -1176,7 +1176,7 @@ async def check_n_ban(message: types.Message, reason: str):
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1151)",
+                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1179)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -2410,7 +2410,7 @@ if __name__ == "__main__":
                 author_id,
                 (
                     forwarded_message_data[4]
-                    if forwarded_message_data[4]
+                    if forwarded_message_data[4] not in [0, "0", None]
                     else "!UNDEFINED!"
                 ),
                 forwarded_message_data,

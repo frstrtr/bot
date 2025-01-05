@@ -1023,7 +1023,7 @@ async def check_and_autoban(
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
         str(BOT_USERID) not in event_record
     ):  # XXX user is not in the lols database and kicked/restricted by admin
-        
+
         # TODO Add perform-checks coroutine!!!
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
@@ -1042,10 +1042,10 @@ async def check_and_autoban(
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        if user_name:
+        if user_name and user_name != "!UNDEFINED!":
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1122)",
+                f"<code>{user_id}</code>:@{user_name} (1048)",
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1314,7 +1314,7 @@ async def perform_checks(
             e,
         )
         if user_id in active_user_checks_dict:
-            active_user_checks_dict.pop(user_id, None)
+            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
                 "\033[93m%s:%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
                 user_id,
@@ -1339,7 +1339,7 @@ async def perform_checks(
         if (
             user_id in active_user_checks_dict
         ):  # avoid case when manually banned by admin same time
-            active_user_checks_dict.pop(user_id, None)
+            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
             if len(active_user_checks_dict) > 5:
                 LOGGER.info(
                     "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
@@ -2292,6 +2292,12 @@ if __name__ == "__main__":
                 forwarded_message_data,
                 original_message_timestamp,
             ) = result
+            #  result for sender:
+            #
+            # ФАЛЬШ СУПЕР , date: 2025-01-04 22:13:02, from chat title: ФАЛЬШ СУПЕР
+            #            [0]            [1]      [2]                [3]         [4]      [5]    [6]    [7]
+            #            ChatID        MsgID    ChatUsername       UserID     UserName  User1  User2   MessageForwardDate
+            # Result: (-1001753683146, 3255, 'mauritiusTransfer', 8095305945, 'aqqwrn', 'нелл', None, '2025-01-05 02:35:53')
 
             # XXXfixed find safe solution to get the author_id from the forwarded_message_data
             author_id = eval(forwarded_message_data)[3]
@@ -2379,7 +2385,9 @@ if __name__ == "__main__":
 
             # add to the banned users set
             banned_users_dict[int(author_id)] = (
-                forwarded_message_data[4] if forwarded_message_data[4] else "NoUserName"
+                forwarded_message_data[4]
+                if forwarded_message_data[4] not in [0, "0", None]
+                else "!UNDEFINED!"
             )
 
             # select all messages from the user in the chat
@@ -2512,29 +2520,37 @@ if __name__ == "__main__":
                 f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
-            if forwarded_message_data[4] and (forwarded_message_data[4] != 0):
+            if forwarded_message_data[4] not in [0, "0", None]:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2536)",
+                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2526)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
-            banned_users_dict[author_id] = forwarded_message_data[4]
-            if forwarded_message_data[4] in active_user_checks_dict:
-                active_user_checks_dict.pop(forwarded_message_data[4], None)
+            banned_users_dict[author_id] = (
+                forwarded_message_data[4]
+                if forwarded_message_data[4] not in [0, "0", None]
+                else "!UNDEFINED!"
+            )
+            if forwarded_message_data[3] in active_user_checks_dict:
+                banned_users_dict[forwarded_message_data[3]] = (
+                    active_user_checks_dict.pop(forwarded_message_data[3], None)
+                )
                 LOGGER.info(
-                    "\033[91m%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin: %s\033[0m",
-                    forwarded_message_data[4],
+                    "\033[91m%s:@%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin: %s\033[0m",
+                    forwarded_message_data[3],
+                    user_name,
                     active_user_checks_dict,
                 )
             LOGGER.info(
-                "%s Message %s action taken by @%s: User @%s banned and their messages deleted where applicable.",
+                "%s:@%s Report %s action taken by @%s: User @%s banned and their messages deleted where applicable.",
                 author_id,
+                user_name,
                 message_id_to_ban,
                 button_pressed_by,
                 (
                     forwarded_message_data[4]
-                    if forwarded_message_data[4] != 0
+                    if forwarded_message_data[4] not in [0, "0", None]
                     else "!UNDEFINED!"
                 ),
             )

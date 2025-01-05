@@ -485,12 +485,12 @@ async def on_shutdown(_dp):
     await asyncio.gather(*tasks)
 
     # save all unbanned checks to temp file to restart checks after bot restart
-    # check if active_user_checks_dict is not empty
+    # Check if active_user_checks_dict is not empty
     if active_user_checks_dict:
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
-                if _uname.startswith("{'username'"):
-                    _uname = active_user_checks_dict[_id]["username"]
+                if isinstance(_uname, dict) and "username" in _uname:
+                    _uname = _uname["username"]
                 LOGGER.debug(_uname)
                 file.write(f"{_id}:{_uname}\n")
     else:

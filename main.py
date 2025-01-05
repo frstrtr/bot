@@ -895,7 +895,7 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
-            "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:@%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
             user_name if user_name else "!UNDEFINED!",
             last_3_users_str,  # Last 3 elements
@@ -1105,18 +1105,38 @@ async def check_n_ban(message: types.Message, reason: str):
             banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(
                 message.from_user.id, None
             )
-            if len(active_user_checks_dict) > 5:
+
+            if len(active_user_checks_dict) > 3:
+                active_user_checks_dict_last3_list = list(
+                    active_user_checks_dict.items()
+                )[-3:]
+                active_user_checks_dict_last3_str = ", ".join(
+                    [
+                        f"{uid}: {uname}"
+                        for uid, uname in active_user_checks_dict_last3_list
+                    ]
+                )
                 LOGGER.info(
-                    "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
+                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    list(active_user_checks_dict.items())[:3],  # First 2 elements
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
+                    active_user_checks_dict_last3_str,  # Last 3 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
                 banned_users_dict[message.from_user.id] = message.from_user.username
                 LOGGER.info(
-                    "\033[91m%s removed from the active_user_checks_dict in check_n_ban: %s\033[0m",
+                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban: %s\033[0m",
                     message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     active_user_checks_dict,
                 )
             # stop the perform_checks coroutine if it is running for author_id
@@ -1211,17 +1231,25 @@ async def check_n_ban(message: types.Message, reason: str):
                     [f"{uid}: {uname}" for uid, uname in last_3_users]
                 )
                 LOGGER.info(
-                    "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
+                    "\033[93m%s:@%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    message.from_user.username,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     last_3_users_str,  # First 2 elements
                     len(banned_users_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[93m%s:%s added to banned users list in check_n_ban: %s\033[0m",
+                    "\033[93m%s:@%s added to banned users list in check_n_ban: %s\033[0m",
                     message.from_user.id,
-                    message.from_user.username,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
                     banned_users_dict,
                 )
 
@@ -1378,12 +1406,21 @@ async def perform_checks(
             user_id in active_user_checks_dict
         ):  # avoid case when manually banned by admin same time
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
-            if len(active_user_checks_dict) > 5:
+            if len(active_user_checks_dict) > 3:
+                active_user_checks_dict_last3_list = list(
+                    active_user_checks_dict.items()
+                )[-3:]
+                active_user_checks_dict_last3_str = ", ".join(
+                    [
+                        f"{uid}: {uname}"
+                        for uid, uname in active_user_checks_dict_last3_list
+                    ]
+                )
                 LOGGER.info(
                     "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
                     user_id,
                     user_name,
-                    list(active_user_checks_dict.items())[:3],  # First 2 elements
+                    active_user_checks_dict_last3_str,  # Last 3 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
@@ -1904,7 +1941,7 @@ if __name__ == "__main__":
                         )
             except IndexError:
                 LOGGER.debug(
-                    "%s:%s left and has no previous join/leave events or was already in lols/cas spam",
+                    "%s:@%s left and has no previous join/leave events or was already in lols/cas spam",
                     inout_userid,
                     inout_username,
                 )
@@ -2383,7 +2420,16 @@ if __name__ == "__main__":
                 banned_users_dict[author_id] = active_user_checks_dict.pop(
                     author_id, None
                 )
-                if len(active_user_checks_dict) > 5:
+                if len(active_user_checks_dict) > 3:
+                    active_user_checks_dict_last3_list = list(
+                        active_user_checks_dict.items()
+                    )[-3:]
+                    active_user_checks_dict_last3_str = ", ".join(
+                        [
+                            f"{uid}: {uname}"
+                            for uid, uname in active_user_checks_dict_last3_list
+                        ]
+                    )
                     LOGGER.info(
                         "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
                         author_id,
@@ -2392,7 +2438,7 @@ if __name__ == "__main__":
                             if forwarded_message_data[4] not in [0, "0", None]
                             else "!UNDEFINED!"
                         ),
-                        list(active_user_checks_dict.items())[:3],  # First 2 elements
+                        active_user_checks_dict_last3_str,  # Last 3 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
@@ -2713,7 +2759,7 @@ if __name__ == "__main__":
 
             # Create an inline keyboard with a link
             LOGGER.warning(
-                "\033[47m\033[34m%s:%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m Suspicious message link: %s",
+                "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m Suspicious message link: %s",
                 message.from_user.id,
                 (
                     message.from_user.username
@@ -2727,7 +2773,7 @@ if __name__ == "__main__":
             )
             # Log resulting dict
             LOGGER.info(
-                "%s:%s suspicious messages dict: %s",
+                "%s:@%s suspicious messages dict: %s",
                 message.from_user.id,
                 (
                     message.from_user.username
@@ -2998,7 +3044,7 @@ if __name__ == "__main__":
                     ),
                     message_link,
                 )
-                the_reason = f"\033[91m{message.from_id} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
+                the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 await check_n_ban(message, the_reason)
 
                 # At the point where you want to print the traceback
@@ -3245,11 +3291,25 @@ if __name__ == "__main__":
                 banned_users_dict[author_id] = active_user_checks_dict.pop(
                     author_id, None
                 )
-                if len(active_user_checks_dict) > 5:
+                if len(active_user_checks_dict) > 3:
+                    active_user_checks_dict_last3_list = list(
+                        active_user_checks_dict.items()
+                    )[-3:]
+                    active_user_checks_dict_last3_str = ", ".join(
+                        [
+                            f"{uid}: {uname}"
+                            for uid, uname in active_user_checks_dict_last3_list
+                        ]
+                    )
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
                         author_id,
-                        list(active_user_checks_dict.items())[:3],  # First 2 elements
+                        (
+                            forwarded_message_data[4]
+                            if forwarded_message_data[4] not in [0, "0", None]
+                            else "!UNDEFINED!"
+                        ),
+                        active_user_checks_dict_last3_str,  # Last 3 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
@@ -3364,14 +3424,15 @@ if __name__ == "__main__":
 
             user_id = int(command_args[1])
             LOGGER.debug(
-                "%d:!UNDEFINED! - User ID to check, requested by admin %d",
+                "%d:@!UNDEFINED! - User ID to check, requested by admin %d",
                 user_id,
                 message.from_user.id,
             )
 
             if user_id in active_user_checks_dict:
                 await message.reply(
-                    f"User {active_user_checks_dict[user_id]} is already being checked."
+                    f"User <code>{active_user_checks_dict[user_id]}</code> is already being checked.",
+                    parse_mode="HTML",
                 )
                 return
             else:
@@ -3472,7 +3533,7 @@ if __name__ == "__main__":
                 raise ValueError("Please provide the user ID to unban.")
 
             user_id = int(command_args[1])
-            LOGGER.debug("User ID to unban: %d", user_id)
+            LOGGER.debug("%d - User ID to unban", user_id)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)

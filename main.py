@@ -938,34 +938,34 @@ async def check_and_autoban(
     if lols_spam is True:  # not Timeout exaclty
         if user_id not in banned_users_dict:
             await lols_autoban(user_id, user_name)
-            banned_users_dict[user_id] = user_name
+            # banned_users_dict[user_id] = user_name
             action = "added to"
         else:
             action = "is already added to"
-        if len(banned_users_dict) > 3:  # prevent spamming the log
-            last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
-            last_3_users_str = ", ".join(
-                [f"{uid}: {uname}" for uid, uname in last_3_users]
-            )
-            LOGGER.info(
-                "\033[93m%s:@%s %s runtime banned users list: %s... %d totally\033[0m",
-                user_id,
-                user_name if user_name else "!UNDEFINED!",
-                action,
-                last_3_users_str,  # Last 3 elements as string
-                len(banned_users_dict),  # Total number of elements
-            )
-        else:  # less than 3 banned users
-            all_users_str = ", ".join(
-                [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
-            )
-            LOGGER.info(
-                "\033[93m%s:@%s %s runtime banned users list: %s\033[0m",
-                user_id,
-                user_name if user_name else "!UNDEFINED!",
-                action,
-                all_users_str,  # All elements as string
-            )
+        # if len(banned_users_dict) > 3:  # prevent spamming the log
+        #     last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+        #     last_3_users_str = ", ".join(
+        #         [f"{uid}: {uname}" for uid, uname in last_3_users]
+        #     )
+        #     LOGGER.info(
+        #         "\033[93m%s:@%s %s runtime banned users list: %s... %d totally\033[0m",
+        #         user_id,
+        #         user_name if user_name else "!UNDEFINED!",
+        #         action,
+        #         last_3_users_str,  # Last 3 elements as string
+        #         len(banned_users_dict),  # Total number of elements
+        #     )
+        # else:  # less than 3 banned users
+        #     all_users_str = ", ".join(
+        #         [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
+        #     )
+        #     LOGGER.info(
+        #         "\033[93m%s:@%s %s runtime banned users list: %s\033[0m",
+        #         user_id,
+        #         user_name if user_name else "!UNDEFINED!",
+        #         action,
+        #         all_users_str,  # All elements as string
+        #     )
         if action == "is already added to":
             return True
 

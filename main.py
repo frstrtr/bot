@@ -491,7 +491,7 @@ async def on_shutdown(_dp):
             for _id, _uname in active_user_checks_dict.items():
                 if isinstance(_uname, dict) and "username" in _uname:
                     _uname = _uname["username"]
-                LOGGER.debug(_uname)
+                # LOGGER.debug(_uname)
                 file.write(f"{_id}:{_uname}\n")
     else:
         # clear the file if no active checks
@@ -540,10 +540,10 @@ async def on_shutdown(_dp):
         message_thread_id=TECHNO_RESTART,
     )
     LOGGER.info(
-        "Runtime session shutdown stats:\n"
+        "\033[93m\nRuntime session shutdown stats:\n"
         "Bot started at: %s\n"
         "Current active user checks: %d\n"
-        "Spammers detected: %d",
+        "Spammers detected: %d\033[0m",
         bot_start_time,
         len(active_user_checks_dict),
         len(banned_users_dict),

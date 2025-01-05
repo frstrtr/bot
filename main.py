@@ -3757,7 +3757,7 @@ if __name__ == "__main__":
             button_pressed_by,
         )
         await BOT.send_message(
-            ADMIN_GROUP_ID,
+            callback_query.message.chat.id,
             f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "
             f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
             message_thread_id=callback_query.message.message_thread_id,

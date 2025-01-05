@@ -925,7 +925,7 @@ async def check_and_autoban(
                 [f"{uid}: {uname}" for uid, uname in last_3_users]
             )
             LOGGER.info(
-                "\033[93m%s:%s %s runtime banned users list: %s... %d totally\033[0m",
+                "\033[93m%s:@%s %s runtime banned users list: %s... %d totally\033[0m",
                 user_id,
                 user_name if user_name else "!UNDEFINED!",
                 action,
@@ -937,7 +937,7 @@ async def check_and_autoban(
                 [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
             )
             LOGGER.info(
-                "\033[93m%s:%s %s runtime banned users list: %s\033[0m",
+                "\033[93m%s:@%s %s runtime banned users list: %s\033[0m",
                 user_id,
                 user_name if user_name else "!UNDEFINED!",
                 action,

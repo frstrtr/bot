@@ -881,26 +881,30 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
         banned_users_dict[_id] = active_user_checks_dict.pop(
             _id, None
         )  # add and remove the user to the banned_users_dict
+        last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+        last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
             "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
             user_name,
-            list(active_user_checks_dict.items())[-3:],  # Last 3 elements
+            last_3_users_str,  # Last 3 elements
             len(active_user_checks_dict),  # Number of elements left
         )
     else:
         banned_users_dict[_id] = user_name
+        last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+        last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
             "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
             user_name if user_name else "!UNDEFINED!",
-            list(banned_users_dict.items())[-3:],  # Last 3 elements
+            last_3_users_str,  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
     if user_name and user_name != "!UNDEFINED!":  # exclude noname users
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (880)",
+            f"<code>{_id}</code>:@{user_name} (907)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )

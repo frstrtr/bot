@@ -850,12 +850,13 @@ async def ban_user_from_all_chats(
     for chat_id in channel_ids:
         try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
+            LOGGER.info("Successfully banned USER %s in %s", user_id, chat_id)
         except (
             utils.exceptions.BadRequest
         ) as e:  # if user were Deleted Account while banning
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s - error banning in chat %s (%s): %s. Deleted Account?",
+                "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT?",
                 user_id,
                 chat_name,
                 chat_id,
@@ -863,6 +864,21 @@ async def ban_user_from_all_chats(
             )
             await asyncio.sleep(1)
             # XXX remove user_id check coroutine and from monitoring list?
+            continue
+        try:
+            await BOT.ban_chat_sender_chat(chat_id, user_id)
+            LOGGER.info("Successfully banned CHANNEL %s in %s", user_id, chat_id)
+        except (
+            utils.exceptions.BadRequest
+        ) as e:  # if user were Deleted Account while banning
+            chat_name = get_channel_id_by_name(channel_dict, chat_id)
+            LOGGER.error(
+                "%s - error banning in chat %s (%s): %s. Deleted CHANNEL?",
+                user_id,
+                chat_name,
+                chat_id,
+                e,
+            )
             continue
 
     # RED color for the log

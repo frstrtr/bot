@@ -877,7 +877,7 @@ async def ban_user_from_all_chats(
     for chat_id in channel_ids:
         try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
-            LOGGER.info("Successfully banned USER %s in %s", user_id, chat_id)
+            # LOGGER.debug("Successfully banned USER %s in %s", user_id, chat_id)
         except BadRequest as e:  # if user were Deleted Account while banning
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
@@ -2855,10 +2855,15 @@ if __name__ == "__main__":
             )
 
             # check if message is forward from channel
-            if message.sender_chat:
+            if message.sender_chat or message.forward_from_chat:
                 try:
                     ban_chat_task = BOT.ban_chat_sender_chat(
-                        message.chat.id, message.sender_chat
+                        message.chat.id,
+                        (
+                            message.sender_chat
+                            if message.sender_chat
+                            else message.forward_from_chat
+                        ),
                     )
                     delete_message_task = BOT.delete_message(
                         message.chat.id, message.message_id
@@ -2867,7 +2872,12 @@ if __name__ == "__main__":
                         message.chat.id, message.from_id, revoke_messages=True
                     )
                     ban_rogue_chan_task = ban_rogue_chan(
-                        message.sender_chat, CHANNEL_IDS
+                        (
+                            message.sender_chat
+                            if message.sender_chat
+                            else message.forward_from_chat
+                        ),
+                        CHANNEL_IDS,
                     )
 
                     await asyncio.gather(

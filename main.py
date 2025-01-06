@@ -2323,33 +2323,41 @@ if __name__ == "__main__":
                 reply_markup=keyboard,
             )
 
-            if (
-                callback_query.message.chat.id == ADMIN_GROUP_ID
-                and admin_action_banner_message
-            ):
-                # remove personal report banner message if BAN button pressed in ADMIN group
-                try:
-                    await BOT.delete_message(
-                        report_chat_id, admin_action_banner_message.message_id
-                    )
-                except (
-                    MessageToDeleteNotFound
-                ):  # Message already deleted when replied in personal messages? XXX
-                    LOGGER.warning(
-                        "%s Message %s in BOT PM to delete not found. Already deleted?",
-                        callback_query.from_user.id,
-                        callback_query.message.message_id,
+            if banner_message_origin:
+                if (
+                    callback_query.message.chat.id == ADMIN_GROUP_ID
+                    and admin_action_banner_message
+                ):
+                    # remove personal report banner message if BAN button pressed in ADMIN group
+                    try:
+                        await BOT.delete_message(
+                            report_chat_id, admin_action_banner_message.message_id
+                        )
+                    except (
+                        MessageToDeleteNotFound
+                    ):  # Message already deleted when replied in personal messages? XXX
+                        LOGGER.warning(
+                            "%s Message %s in BOT PM to delete not found. Already deleted?",
+                            callback_query.from_user.id,
+                            callback_query.message.message_id,
+                        )
+                else:  # report was actioned in the personal chat
+                    # remove admin group banner buttons
+                    await BOT.edit_message_reply_markup(
+                        chat_id=ADMIN_GROUP_ID,
+                        message_id=banner_message_origin.message_id,
                     )
 
-            else:  # report was actioned in the personal chat
-                # remove admin group banner buttons
-                await BOT.edit_message_reply_markup(
-                    chat_id=ADMIN_GROUP_ID,
-                    message_id=banner_message_origin.message_id,
-                )
         except KeyError as e:
             LOGGER.error(
                 "\033[93m%s Error while removing the buttons: %s. Message reported by non-admin user?\033[0m",
+                callback_query.from_user.id,
+                e,
+            )
+
+        except AttributeError as e:
+            LOGGER.error(
+                "\033[93m%s Error accessing message_id: %s. Possible NoneType object.\033[0m",
                 callback_query.from_user.id,
                 e,
             )

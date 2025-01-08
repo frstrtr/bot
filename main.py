@@ -2724,8 +2724,29 @@ if __name__ == "__main__":
     )
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
-        # XXX
 
+        # check first if sender is an admin in the channel or admin group and skip the message
+        if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
+            message.from_user.id, ADMIN_GROUP_ID
+        ):
+            message_link = construct_message_link(
+                [message.chat.id, message.message_id, message.chat.username]
+            )
+            LOGGER.debug(
+                "\033[95m%s:@%s is admin, skipping the message %s in the chat %s.\033[0m Message link: %s",
+                message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
+                message.message_id,
+                message.chat.title,
+                message_link,
+            )
+            return
+
+        # XXX
         # Channel ban test
         # message_as_json = message.to_python()
         # LOGGER.info(json.dumps(message_as_json, indent=4, ensure_ascii=False))
@@ -2778,7 +2799,9 @@ if __name__ == "__main__":
         #         message.chat.title,
         #         message.chat.id,
         #     )
-        if message.from_user.id in active_user_checks_dict: # User not banned but suspicious
+        if (
+            message.from_user.id in active_user_checks_dict
+        ):  # User not banned but suspicious
             # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
             if not isinstance(active_user_checks_dict.get(message.from_user.id), dict):
                 # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
@@ -2948,8 +2971,8 @@ if __name__ == "__main__":
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
             # if (
-            #     message.chat.id == -1001461337235 or message.chat.id == -1001527478834
-            # ):  # mevrikiy or beautymauritius
+            #     message.chat.id == -100123456789 or message.chat.id == -100123456789
+            # ):  # XXX
             #     # temporal horse fighting
             #     await BOT.forward_message(
             #         TECHNOLOG_GROUP_ID,
@@ -2991,27 +3014,6 @@ if __name__ == "__main__":
             #     f"Forwarded from chat type?: {message.forward_from_chat.type=='channel'}\n"
             # )
             # HACK remove afer sandboxing
-
-            # check if sender is an admin in the channel or admin group and skip the message
-            if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
-                message.from_user.id, ADMIN_GROUP_ID
-            ):
-                message_link = construct_message_link(
-                    [message.chat.id, message.message_id, message.chat.username]
-                )
-                LOGGER.debug(
-                    "\033[95m%s:@%s is admin, skipping the message %s in the chat %s.\033[0m Message link: %s",
-                    message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
-                    message.message_id,
-                    message.chat.title,
-                    message_link,
-                )
-                return
 
             # Check if the message is from chat in settings
             if (

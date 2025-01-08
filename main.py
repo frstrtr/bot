@@ -13,7 +13,6 @@ import tracemalloc
 
 import aiohttp
 from aiogram import Dispatcher, types
-from aiogram import utils
 from datetime import timedelta
 
 # import requests
@@ -391,26 +390,22 @@ async def on_startup(_dp: Dispatcher):
     asyncio.create_task(load_and_start_checks())
 
 
-async def ban_rogue_chan(rogue_chan_id: int, chan_list) -> bool:
+async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
     """ban chat sender chat for Rogue channels"""
-    ROGUE_CHANNELS_LIST = [rogue_chan_id]
-    for rogue_channel_id in ROGUE_CHANNELS_LIST:
-        for chat_id in chan_list:
-            try:
-                await BOT.ban_chat_sender_chat(chat_id, rogue_channel_id)
-                LOGGER.info(
-                    "Successfully banned CHANNEL %s in %s", rogue_channel_id, chat_id
-                )
-                asyncio.sleep(1)  # pause 1 sec
-            except BadRequest as e:  # if user were Deleted Account while banning
-                # chat_name = get_channel_id_by_name(channel_dict, chat_id)
-                LOGGER.error(
-                    "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
-                    rogue_channel_id,
-                    chat_id,
-                    e,
-                )
-                continue
+    for chat_id in chan_list:
+        try:
+            await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
+            LOGGER.info("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
+            asyncio.sleep(1)  # pause 1 sec
+        except BadRequest as e:  # if user were Deleted Account while banning
+            # chat_name = get_channel_id_by_name(channel_dict, chat_id)
+            LOGGER.error(
+                "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
+                rogue_chat_id,
+                chat_id,
+                e,
+            )
+            continue
 
 
 async def load_and_start_checks():
@@ -421,6 +416,8 @@ async def load_and_start_checks():
     if not os.path.exists(active_checks_filename):
         LOGGER.error("File not found: %s", active_checks_filename)
         return
+    if not os.path.exists(banned_users_filename):
+        LOGGER.error("File not found: %s", banned_users_filename)
 
     try:
         with open(active_checks_filename, "r", encoding="utf-8") as file:
@@ -2729,6 +2726,20 @@ if __name__ == "__main__":
         """Function to store recent messages in the database."""
         # XXX
 
+        # Channel ban test
+        # message_as_json = message.to_python()
+        # LOGGER.info(json.dumps(message_as_json, indent=4, ensure_ascii=False))
+
+        # if message.sender_chat or message.forward_from_chat:
+        #     ban_chat_id = (message.sender_chat.id if message.sender_chat else None) or (
+        #         message.forward_from_chat.id if message.forward_from_chat else None
+        #     )
+        #     if ban_chat_id is not None:
+        #         await BOT.ban_chat_sender_chat(message.chat.id, ban_chat_id)
+        #         LOGGER.info("Channel Banned!")
+        #     else:
+        #         LOGGER.info("Channel not banned!")
+
         # create unified message link
         message_link = construct_message_link(
             [message.chat.id, message.message_id, message.chat.username]
@@ -2756,18 +2767,18 @@ if __name__ == "__main__":
         # )
 
         # check if message is from user from active_user_checks_dict or banned_users_dict set
-        if (
-            message.from_user.id in active_user_checks_dict
-            and message.from_user.id in banned_users_dict
-        ):
-            LOGGER.warning(
-                "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
-                message.from_user.id,
-                message.message_id,
-                message.chat.title,
-                message.chat.id,
-            )
-        elif message.from_user.id in active_user_checks_dict:
+        # if (
+        #     message.from_user.id in active_user_checks_dict
+        #     and message.from_user.id in banned_users_dict
+        # ):
+        #     LOGGER.warning(
+        #         "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
+        #         message.from_user.id,
+        #         message.message_id,
+        #         message.chat.title,
+        #         message.chat.id,
+        #     )
+        if message.from_user.id in active_user_checks_dict: # User not banned but suspicious
             # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
             if not isinstance(active_user_checks_dict.get(message.from_user.id), dict):
                 # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
@@ -2831,7 +2842,14 @@ if __name__ == "__main__":
             #     reply_markup=inline_kb,
             #     # message_thread_id=1,  # # main thread (#REPORTS)
             # )
-        elif message.from_user.id in banned_users_dict:
+        elif (
+            message.from_user.id in banned_users_dict
+            or (message.sender_chat and message.sender_chat.id in banned_users_dict)
+            or (
+                message.forward_from_chat
+                and message.forward_from_chat.id in banned_users_dict
+            )
+        ):
             LOGGER.warning(
                 "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
@@ -2856,13 +2874,26 @@ if __name__ == "__main__":
 
             # check if message is forward from channel
             if message.sender_chat or message.forward_from_chat:
+                if message.sender_chat:
+                    banned_users_dict[message.sender_chat.id] = (
+                        getattr(message.sender_chat, "username", None)
+                        or message.sender_chat.title
+                    )
+                if message.forward_from_chat:
+                    banned_users_dict[message.forward_from_chat.id] = (
+                        getattr(message.forward_from_chat, "username", None)
+                        or message.forward_from_chat.title
+                    )
                 try:
                     ban_chat_task = BOT.ban_chat_sender_chat(
-                        message.chat.id,
+                        message.chat.id,  # ban sender chat in the current chat ID
                         (
-                            message.sender_chat
-                            if message.sender_chat
-                            else message.forward_from_chat
+                            (message.sender_chat.id if message.sender_chat else None)
+                            or (
+                                message.forward_from_chat.id
+                                if message.forward_from_chat
+                                else None
+                            )
                         ),
                     )
                     delete_message_task = BOT.delete_message(
@@ -2871,13 +2902,20 @@ if __name__ == "__main__":
                     ban_member_task = BOT.ban_chat_member(
                         message.chat.id, message.from_id, revoke_messages=True
                     )
-                    ban_rogue_chan_task = ban_rogue_chan(
+                    ban_rogue_chan_task = ban_rogue_chat_everywhere(
                         (
-                            message.sender_chat
-                            if message.sender_chat
-                            else message.forward_from_chat
+                            (message.sender_chat.id if message.sender_chat else None)
+                            or (
+                                message.forward_from_chat.id
+                                if message.forward_from_chat
+                                else None
+                            )
                         ),
-                        CHANNEL_IDS,
+                        [
+                            chat_id
+                            for chat_id in CHANNEL_IDS
+                            if chat_id != message.chat.id
+                        ],  # exclude current chatID
                     )
 
                     await asyncio.gather(

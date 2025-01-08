@@ -4038,6 +4038,8 @@ if __name__ == "__main__":
     # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
     # TODO switch to aiogram 3.13.1 or higher
     # TODO fix database spammer store and find indexes, instead of date
+    # TODO sender_chat and forward_from_chat - add to banned database to find and check triple IDs user/senderChat/forwardChat and ban
+    # TODO refactor move all temp storage to DB: messages, banned IDs, bot_unhandled, active_checks?
     # XXX search and delete user messages if banned by admin and timely checks
     # XXX use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned FSM?
 

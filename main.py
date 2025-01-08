@@ -3916,6 +3916,7 @@ if __name__ == "__main__":
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user."""
         *_, user_id_legit = callback_query.data.split("_")
+        user_id_legit = int(user_id_legit)
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(

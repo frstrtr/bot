@@ -3638,6 +3638,53 @@ if __name__ == "__main__":
             LOGGER.error("Error in delete_message: %s", e)
             await message.reply("An error occurred while trying to delete the message.")
 
+    @DP.message_handler(commands=["banchan"], chat_id=ADMIN_GROUP_ID)
+    async def ban_channel(message: types.Message):
+        """Function to ban channel by its id."""
+
+        try:
+            command_args = message.text.split()
+            LOGGER.debug("Command arguments received: %s", command_args)
+
+            if len(command_args) < 2:
+                raise ValueError("No channel ID provided.")
+
+            rogue_chan_id = int(command_args[1])
+            LOGGER.debug("Channel ID to ban: %s", rogue_chan_id)
+
+            # Admin_ID
+            admin_id = message.from_user.id
+
+            # reply to the message # TODO confirm deletion
+            # await message.reply('Are you sure you want to delete the message?')
+
+            if not rogue_chan_id:
+                raise ValueError("Invalid channel ID provided.")
+
+            try:
+                await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
+                await message.reply(
+                    f"Channel {rogue_chan_id} banned where it is possible."
+                )
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"Channel <code>{rogue_chan_id}</code> by admin <code>{admin_id}</code> request.",
+                    parse_mode="HTML",
+                )
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    f"Channel <code>{rogue_chan_id}</code> by admin <code>{admin_id}</code> request.",
+                    parse_mode="HTML",
+                    message_thread_id=ADMIN_MANBAN,
+                )
+            except BadRequest as e:
+                LOGGER.error(
+                    "Failed to ban channel %d. Error: %s", rogue_chan_id, e
+                )
+        except ValueError as ve:
+            await message.reply(str(ve))
+
+
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):
         """Function to unban the user with userid in all channels listed in CHANNEL_NAMES."""

@@ -907,13 +907,14 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
 
-    # remove user from all known chats first
-    await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
-
     if _id in active_user_checks_dict:
         banned_users_dict[_id] = active_user_checks_dict.pop(
             _id, None
         )  # add and remove the user to the banned_users_dict
+
+        # remove user from all known chats first
+        await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
@@ -925,6 +926,10 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
         )
     else:
         banned_users_dict[_id] = user_name
+
+        # remove user from all known chats first
+        await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
@@ -1006,7 +1011,9 @@ async def check_and_autoban(
         if action == "is already added to":
             return True
 
-        if message_to_delete:  # delete the message if it exists
+        if (
+            message_to_delete
+        ):  # delete the message if it exists TODO manage more than one message
             await BOT.delete_message(message_to_delete[0], message_to_delete[1])
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await BOT.send_message(
@@ -1707,10 +1714,13 @@ if __name__ == "__main__":
         # await get_photo_details(update.from_user.id)
         # XXX
 
-        if update.old_chat_member.user.id in banned_users_dict: # prevent double actions if user already banned by other process
+        if (
+            update.old_chat_member.user.id in banned_users_dict
+        ):  # prevent double actions if user already banned by other process
             LOGGER.info(
                 "%s already banned - skipping actions.", update.old_chat_member.user.id
             )
+            return
 
         if update.from_user.id != update.old_chat_member.user.id:
             # Someone else changed user status
@@ -2758,21 +2768,6 @@ if __name__ == "__main__":
             )
             return
 
-        # XXX
-        # Channel ban test
-        # message_as_json = message.to_python()
-        # LOGGER.info(json.dumps(message_as_json, indent=4, ensure_ascii=False))
-
-        # if message.sender_chat or message.forward_from_chat:
-        #     ban_chat_id = (message.sender_chat.id if message.sender_chat else None) or (
-        #         message.forward_from_chat.id if message.forward_from_chat else None
-        #     )
-        #     if ban_chat_id is not None:
-        #         await BOT.ban_chat_sender_chat(message.chat.id, ban_chat_id)
-        #         LOGGER.info("Channel Banned!")
-        #     else:
-        #         LOGGER.info("Channel not banned!")
-
         # create unified message link
         message_link = construct_message_link(
             [message.chat.id, message.message_id, message.chat.username]
@@ -2793,24 +2788,19 @@ if __name__ == "__main__":
             )
         )
 
-        # Buttons in one line
-        # inline_kb = InlineKeyboardMarkup().add(
-        #     InlineKeyboardButton("View Original Message", url=message_link),
-        #     InlineKeyboardButton("Check lols data", url=lols_link),
-        # )
-
         # check if message is from user from active_user_checks_dict or banned_users_dict set
-        # if (
-        #     message.from_user.id in active_user_checks_dict
-        #     and message.from_user.id in banned_users_dict
-        # ):
-        #     LOGGER.warning(
-        #         "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
-        #         message.from_user.id,
-        #         message.message_id,
-        #         message.chat.title,
-        #         message.chat.id,
-        #     )
+        if (
+            message.from_user.id in active_user_checks_dict
+            and message.from_user.id in banned_users_dict
+        ):
+            LOGGER.warning(
+                "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+            )
+
         if (
             message.from_user.id in active_user_checks_dict
         ):  # User not banned but suspicious
@@ -2885,13 +2875,41 @@ if __name__ == "__main__":
                 and message.forward_from_chat.id in banned_users_dict
             )
         ):
-            LOGGER.warning(
-                "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
-                message.from_user.id,
-                message.message_id,
-                message.chat.title,
-                message.chat.id,
-            )
+            if message.sender_chat and message.sender_chat.id in banned_users_dict:
+                logger_text = (
+                    "\033[41m\033[37m%s SENDER CHAT: %s:%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
+                    message.from_user.id,
+                    message.sender_chat.id,
+                    getattr(message.sender_chat, "username", None)
+                    or message.sender_chat.title,
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                )
+            elif (
+                message.forward_from_chat
+                and message.forward_from_chat.id in banned_users_dict
+            ):
+                logger_text = (
+                    "\033[41m\033[37m%s FORWARDED FROM CHAT: %s:%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
+                    message.from_user.id,
+                    message.forward_from_chat.id,
+                    getattr(message.forward_from_chat, "username", None)
+                    or message.forward_from_chat.title,
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                )
+            else:
+                logger_text = (
+                    "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
+                    message.from_user.id,
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                )
+            LOGGER.warning(logger_text)
+
             # Forwarding banned user message to technolog originals
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
@@ -2907,8 +2925,8 @@ if __name__ == "__main__":
                 message_thread_id=ADMIN_AUTOBAN,
             )
 
-            # check if message is forward from channel
-            if message.sender_chat or message.forward_from_chat:
+            # check if message is forward from channel or posted as a channel XXX#1
+            if message.sender_chat or message.forward_from_chat and message.from_user.id in banned_users_dict:
                 if message.sender_chat:
                     banned_users_dict[message.sender_chat.id] = (
                         getattr(message.sender_chat, "username", None)

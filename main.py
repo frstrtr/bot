@@ -4018,7 +4018,7 @@ if __name__ == "__main__":
         # DEBUG:
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
         LOGGER.info(
-            "\033[95m%s Identified as legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            "\033[95m%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
             admin_id,
             button_pressed_by,
@@ -4045,6 +4045,37 @@ if __name__ == "__main__":
             for task in asyncio.all_tasks():
                 if task.get_name() == str(user_id_legit):
                     task.cancel()
+        # log that user checks is cancelled by admin
+        if user_id_legit in active_user_checks_dict:
+            del active_user_checks_dict[user_id_legit]
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(user_id_legit):
+                    task.cancel()
+
+        # Log that user checks are cancelled by admin
+        if len(active_user_checks_dict) > 3:
+            active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[
+                -3:
+            ]
+            active_user_checks_dict_last3_str = ", ".join(
+                [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
+            )
+            LOGGER.info(
+                "\033[95m%s removed from active checks dict by admin %s:@%s: %s... %d left\033[0m",
+                user_id_legit,
+                admin_id,
+                button_pressed_by,
+                active_user_checks_dict_last3_str,  # Last 3 elements
+                len(active_user_checks_dict),  # Number of elements left
+            )
+        else:
+            LOGGER.info(
+                "\033[95m%s removed from active checks dict by admin %s:@%s: %s\033[0m",
+                user_id_legit,
+                admin_id,
+                button_pressed_by,
+                active_user_checks_dict,
+            )
 
     @DP.message_handler(
         is_admin_user_message,

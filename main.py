@@ -1341,18 +1341,16 @@ async def perform_checks(
 
         # List of sleep times in seconds
         sleep_times = [
-            65,
-            125,
-            185,
-            245,
-            305,
-            605,
-            1205,
-            1805,
-            3605,
-            7205,
-            10805,
-        ]  # 1min, 2 min, 3min, 4 min, 5 min, 10min, 20min, 30min, 1hr, 2hrs, 3hrs
+            65,   # 1 min
+            185,  # 3 min
+            305,  # 5 min
+            605,  # 10 min
+            1205, # 20 min
+            1805, # 30 min
+            3605, # 1 hr
+            7205, # 2 hr
+            10805,# 3 hr
+        ]
 
         for sleep_time in sleep_times:
 

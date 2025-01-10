@@ -899,7 +899,7 @@ async def ban_user_from_all_chats(
 
     # RED color for the log
     LOGGER.info(
-        "\033[91m%s:@%s has been banned from all chats.\033[0m",
+        "\033[91m%s:@%s identified as a SPAMMER, and has been banned from all chats.\033[0m",
         user_id,
         user_name if user_name else "!UNDEFINED!",
     )

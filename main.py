@@ -2912,6 +2912,8 @@ if __name__ == "__main__":
                 f"<code>{message_link}</code>\nClick buttons below for more information:",
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_SUSPICIOUS,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
             )
 
             # check if message is forward from channel or posted as a channel XXX#1

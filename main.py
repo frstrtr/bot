@@ -2867,11 +2867,11 @@ if __name__ == "__main__":
             )
             # Send a new message with the inline keyboard link to the technolog originals
             await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
+                ADMIN_GROUP_ID,
                 f"<code>{message_link}</code>\nClick the button below to view the suspicious message:",
                 reply_markup=inline_kb,
                 parse_mode="HTML",
-                message_thread_id=TECHNO_ORIGINALS,
+                message_thread_id=ADMIN_SUSPICIOUS,
             )
             # Send warning to the Admin group with link to the message
             # await BOT.send_message(
@@ -2909,7 +2909,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                "Click buttons below for more information:",
+                f"<code>{message_link}</code>\nClick buttons below for more information:",
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_SUSPICIOUS,
             )

@@ -1368,7 +1368,7 @@ async def perform_checks(
             )  # Default to yellow if lols_spam is not in the map
 
             # Log the message with the appropriate color
-            LOGGER.info(
+            LOGGER.debug(
                 "%s%s:@%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,

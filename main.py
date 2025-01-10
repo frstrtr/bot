@@ -1290,7 +1290,7 @@ async def check_n_ban(message: types.Message, reason: str):
             await BOT.delete_message(message.chat.id, message.message_id)
         except MessageToDeleteNotFound:
             LOGGER.error(
-                "\033[93m%s:%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
+                "\033[93m%s:@%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
                 (
                     message.from_user.username
@@ -3336,8 +3336,9 @@ if __name__ == "__main__":
                     message_to_delete = message.chat.id, message.message_id
                     # FIXME remove -100 from public group id?
                     LOGGER.info(
-                        "%s Nightwatch Message to delete: %s",
+                        "%s:@%s Nightwatch Message to delete: %s",
                         message.from_id,
+                        message.from_user.username if message.from_user.username else "!UNDEFINED!",
                         message_to_delete,
                     )
                     asyncio.create_task(

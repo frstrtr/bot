@@ -2928,7 +2928,11 @@ if __name__ == "__main__":
             )
 
             # check if message is forward from channel or posted as a channel XXX#1
-            if message.sender_chat or message.forward_from_chat and message.from_user.id in banned_users_dict:
+            if (
+                message.sender_chat
+                or message.forward_from_chat
+                and message.from_user.id in banned_users_dict
+            ):
                 if message.sender_chat:
                     banned_users_dict[message.sender_chat.id] = (
                         getattr(message.sender_chat, "username", None)
@@ -3192,6 +3196,13 @@ if __name__ == "__main__":
                     ),
                     message_link,
                 )
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. [Message Link]({message_link}) Please check it out!",
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                    parse_mode="HTML",
+                )
+
                 the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 await check_n_ban(message, the_reason)
 

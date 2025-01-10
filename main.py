@@ -2878,41 +2878,17 @@ if __name__ == "__main__":
             )
         ):
             if message.sender_chat and message.sender_chat.id in banned_users_dict:
-                logger_text = (
-                    "\033[41m\033[37m%s SENDER CHAT: %s:%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
-                    message.from_user.id,
-                    message.sender_chat.id,
-                    getattr(message.sender_chat, "username", None)
-                    or message.sender_chat.title,
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                )
+                logger_text = f"\033[41m\033[37m{message.from_user.id} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             elif (
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
             ):
-                logger_text = (
-                    "\033[41m\033[37m%s FORWARDED FROM CHAT: %s:%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
-                    message.from_user.id,
-                    message.forward_from_chat.id,
-                    getattr(message.forward_from_chat, "username", None)
-                    or message.forward_from_chat.title,
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                )
+                logger_text = f"\033[41m\033[37m{message.from_user.id} FORWARDED FROM CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             else:
-                logger_text = (
-                    "\033[41m\033[37m%s is in banned_users_dict, DELETING the message %s in the chat %s (%s)\033[0m",
-                    message.from_user.id,
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                )
+                logger_text = f"\033[41m\033[37m{message.from_user.id} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             LOGGER.warning(logger_text)
 
-            # Forwarding banned user message to technolog originals
+            # Forwarding banned user message to ADMIN SUSPICIOUS
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
                 message.chat.id,

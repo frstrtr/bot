@@ -1413,7 +1413,7 @@ async def perform_checks(
         if user_id in active_user_checks_dict:
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
-                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
+                "\033[93m%s:@%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
                 user_id,
                 user_name,
                 active_user_checks_dict,
@@ -3449,8 +3449,13 @@ if __name__ == "__main__":
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s removed from active_user_checks_dict during ban by admin: %s\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin: %s\033[0m",
                         author_id,
+                        (
+                            forwarded_message_data[4]
+                            if forwarded_message_data[4] not in [0, "0", None]
+                            else "!UNDEFINED!"
+                        ),
                         active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id

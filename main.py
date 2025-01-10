@@ -2847,16 +2847,16 @@ if __name__ == "__main__":
                 message_link,
             )
             # Log resulting dict
-            LOGGER.info(
-                "%s:@%s suspicious messages dict: %s",
-                message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
-                active_user_checks_dict[message.from_user.id],
-            )
+            # LOGGER.debug(
+            #     "%s:@%s suspicious messages dict: %s",
+            #     message.from_user.id,
+            #     (
+            #         message.from_user.username
+            #         if message.from_user.username
+            #         else "!UNDEFINED!"
+            #     ),
+            #     active_user_checks_dict[message.from_user.id],
+            # )
             # Forward suspicious message to the technolog originals thread
             await BOT.forward_message(
                 TECHNOLOG_GROUP_ID,

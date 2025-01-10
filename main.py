@@ -2575,6 +2575,8 @@ if __name__ == "__main__":
                                 "Rate limited. Waiting for %s seconds.", wait_time
                             )
                             time.sleep(wait_time)
+                        else:
+                            continue  # Move to the next message after the last attempt
                     except MessageToDeleteNotFound:
                         LOGGER.warning(
                             "Message %s in chat %s (%s) not found for deletion.",
@@ -2582,7 +2584,7 @@ if __name__ == "__main__":
                             CHANNEL_DICT[channel_id],
                             channel_id,
                         )
-                        break  # No need to retry in this case
+                        continue  # Move to the next message
                     except ChatAdminRequired as inner_e:
                         LOGGER.error(
                             "Bot is not an admin in chat %s (%s). Error: %s",
@@ -2594,6 +2596,15 @@ if __name__ == "__main__":
                             TECHNOLOG_GROUP_ID,
                             f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
                         )
+                        continue  # Move to the next message
+                    except MessageCantBeDeleted:
+                        LOGGER.warning(
+                            "Message %s in chat %s (%s) can't be deleted. Too old message?",
+                            message_id,
+                            CHANNEL_DICT[channel_id],
+                            channel_id,
+                        )
+                        continue  # Move to the next message
                     # except Exception as inner_e:
                     #     LOGGER.error(
                     #         "Failed to delete message %s in chat %s (%s). Error: %s",
@@ -3144,7 +3155,7 @@ if __name__ == "__main__":
                     return
             elif (
                 user_is_1week_old
-            ):  # do lols check if user less than 48hr old sending a message
+            ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 LOGGER.info(

@@ -2857,15 +2857,15 @@ if __name__ == "__main__":
             #     ),
             #     active_user_checks_dict[message.from_user.id],
             # )
-            # Forward suspicious message to the technolog originals thread
+            # Forward suspicious message to the ADMIN SUSPICIOUS
             await BOT.forward_message(
-                TECHNOLOG_GROUP_ID,
+                ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                TECHNO_ORIGINALS,
+                ADMIN_SUSPICIOUS,
                 True,
             )
-            # Send a new message with the inline keyboard link to the technolog originals
+            # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"<code>{message_link}</code>\nClick the button below to view the suspicious message:",

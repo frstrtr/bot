@@ -1343,15 +1343,15 @@ async def perform_checks(
 
         # List of sleep times in seconds
         sleep_times = [
-            65,   # 1 min
+            65,  # 1 min
             185,  # 3 min
             305,  # 5 min
             605,  # 10 min
-            1205, # 20 min
-            1805, # 30 min
-            3605, # 1 hr
-            7205, # 2 hr
-            10805,# 3 hr
+            1205,  # 20 min
+            1805,  # 30 min
+            3605,  # 1 hr
+            7205,  # 2 hr
+            10805,  # 3 hr
         ]
 
         for sleep_time in sleep_times:
@@ -1720,7 +1720,9 @@ if __name__ == "__main__":
             update.old_chat_member.user.id in banned_users_dict
         ):  # prevent double actions if user already banned by other process
             LOGGER.info(
-                "%s already banned - skipping actions.", update.old_chat_member.user.id
+                "%s:@%s already banned - skipping actions.",
+                update.old_chat_member.user.id,
+                update.from_user.username or "!UNDEFINED!",
             )
             return
 
@@ -3340,7 +3342,11 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "%s:@%s Nightwatch Message to delete: %s",
                         message.from_id,
-                        message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                        (
+                            message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        ),
                         message_to_delete,
                     )
                     asyncio.create_task(
@@ -4009,6 +4015,7 @@ if __name__ == "__main__":
         """Function to stop checks for the user."""
         *_, user_id_legit = callback_query.data.split("_")
         user_id_legit = int(user_id_legit)
+        user_name = active_user_checks_dict[user_id_legit]
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
@@ -4021,8 +4028,9 @@ if __name__ == "__main__":
         # DEBUG:
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
         LOGGER.info(
-            "\033[95m%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
+            user_name,
             admin_id,
             button_pressed_by,
         )
@@ -4064,8 +4072,9 @@ if __name__ == "__main__":
                 [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
             )
             LOGGER.info(
-                "\033[95m%s removed from active checks dict by admin %s:@%s: %s... %d left\033[0m",
+                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s: %s... %d left\033[0m",
                 user_id_legit,
+                user_name,
                 admin_id,
                 button_pressed_by,
                 active_user_checks_dict_last3_str,  # Last 3 elements
@@ -4073,8 +4082,9 @@ if __name__ == "__main__":
             )
         else:
             LOGGER.info(
-                "\033[95m%s removed from active checks dict by admin %s:@%s: %s\033[0m",
+                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s: %s\033[0m",
                 user_id_legit,
+                user_name,
                 admin_id,
                 button_pressed_by,
                 active_user_checks_dict,

@@ -1216,7 +1216,7 @@ async def check_n_ban(message: types.Message, reason: str):
             else f"https://t.me/c/{message.chat.id}"
         )
         chat_link_name = (
-            f"{message.chat.title}:@{message.chat.username}"
+            f"@{message.chat.username}:({message.chat.title})"
             if message.chat.username
             else message.chat.title
         )

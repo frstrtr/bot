@@ -13,6 +13,7 @@ TECHNO_ORIGINALS = None
 TECHNO_UNHANDLED = None
 ADMIN_AUTOBAN = None
 ADMIN_MANBAN = None
+ADMIN_SUSPICIOUS = None
 TECHNO_RESTART = None
 TECHNO_INOUT = None
 ADMIN_USER_ID = None
@@ -42,7 +43,7 @@ def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
     global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, TECHNO_NAMES
-    global CHANNEL_NAMES, SPAM_TRIGGERS
+    global CHANNEL_NAMES, SPAM_TRIGGERS, ADMIN_SUSPICIOUS, TECHNO_ADMIN
     global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
@@ -83,12 +84,14 @@ def load_config():
         ADMIN_AUTOREPORTS = int(config_XML_root.find("admin_autoreports").text)
         ADMIN_AUTOBAN = int(config_XML_root.find("admin_autoban").text)
         ADMIN_MANBAN = int(config_XML_root.find("admin_manban").text)
+        ADMIN_SUSPICIOUS = int(config_XML_root.find("admin_suspicious").text)
         TECHNO_LOGGING = int(config_XML_root.find("techno_logging").text)
         TECHNO_ORIGINALS = int(config_XML_root.find("techno_originals").text)
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
         TECHNO_RESTART = int(config_XML_root.find("techno_restart").text)
         TECHNO_INOUT = int(config_XML_root.find("techno_inout").text)
         TECHNO_NAMES = int(config_XML_root.find("techno_names").text)
+        TECHNO_ADMIN = int(config_XML_root.find("techno_admin").text)
 
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
         CHANNEL_IDS = [

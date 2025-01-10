@@ -32,6 +32,8 @@ Functions:
     extract_chat_id_and_message_id_from_link(message_link):
         Extract chat ID and message ID from a message link.
         """
+
+
 import logging
 import subprocess
 import re

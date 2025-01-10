@@ -1078,6 +1078,8 @@ async def check_and_autoban(
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
+            else:
+                user_name = "!UNDEFINED!"
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)

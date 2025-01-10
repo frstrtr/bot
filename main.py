@@ -920,7 +920,7 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
-            "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:@%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
             user_name,
             last_3_users_str,  # Last 3 elements

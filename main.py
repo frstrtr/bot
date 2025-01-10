@@ -73,10 +73,12 @@ from utils.utils_config import (
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
     TECHNO_LOGGING,
+    TECHNO_ADMIN,
     TECHNO_ORIGINALS,
     TECHNO_UNHANDLED,
     ADMIN_AUTOBAN,
     ADMIN_MANBAN,
+    ADMIN_SUSPICIOUS,
     TECHNO_RESTART,
     TECHNO_INOUT,
     ADMIN_USER_ID,
@@ -2915,14 +2917,14 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                ADMIN_AUTOBAN,
+                ADMIN_SUSPICIOUS,
                 True,
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 "Click buttons below for more information:",
                 reply_markup=inline_kb,
-                message_thread_id=ADMIN_AUTOBAN,
+                message_thread_id=ADMIN_SUSPICIOUS,
             )
 
             # check if message is forward from channel or posted as a channel XXX#1
@@ -4031,6 +4033,7 @@ if __name__ == "__main__":
             f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}. "
             f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
             parse_mode="HTML",
+            message_thread_id=TECHNO_ADMIN,
             disable_web_page_preview=True,
         )
         # Removing user from active_user_checks dict and stop checks coroutines

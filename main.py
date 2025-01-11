@@ -424,12 +424,24 @@ async def load_and_start_checks():
 
     if not os.path.exists(banned_users_filename):
         LOGGER.error("File not found: %s", banned_users_filename)
+    else:
+        with open(banned_users_filename, "r", encoding="utf-8") as file:
+            for line in file:
+                user_id, user_name = (
+                    int(line.strip().split(":")[0]),
+                    line.strip().split(":")[1],
+                )
+                banned_users_dict[user_id] = user_name
+            LOGGER.info(
+                "Banned users dict (%s) loaded from file: %s",
+                len(banned_users_dict),
+                banned_users_dict,
+            )
 
     if not os.path.exists(active_checks_filename):
         LOGGER.error("File not found: %s", active_checks_filename)
         return
-
-    try:
+    else:
         with open(active_checks_filename, "r", encoding="utf-8") as file:
             for line in file:
                 user_id = int(line.strip().split(":")[0])
@@ -456,23 +468,11 @@ async def load_and_start_checks():
                     user_id,
                     user_name if user_name != "None" else "!UNDEFINED!",
                 )
-
-        if os.path.exists(banned_users_filename):
-            with open(banned_users_filename, "r", encoding="utf-8") as file:
-                for line in file:
-                    user_id, user_name = (
-                        int(line.strip().split(":")[0]),
-                        line.strip().split(":")[1],
-                    )
-                    banned_users_dict[user_id] = user_name
-                LOGGER.info(
-                    "Banned users (%s) list loaded from file: %s",
-                    len(banned_users_dict),
-                    banned_users_dict,
-                )
-
-    except FileNotFoundError as e:
-        LOGGER.error("Error loading checks and bans: %s", e)
+            LOGGER.info(
+                "Active users checks dict (%s) loaded from file: %s",
+                len(active_user_checks_dict),
+                active_user_checks_dict,
+            )
 
 
 async def sequential_shutdown_tasks(_id, _uname):
@@ -3120,7 +3120,7 @@ if __name__ == "__main__":
             # flag true if user joined the chat more than 3 days ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
             user_is_between_3hours_and_1week_old = (
-                10805 # 3 hours in seconds
+                10805  # 3 hours in seconds
                 <= (message.date - user_join_chat_date).total_seconds()
                 < 604805  # 3 hours in seconds and 1 week in seconds
             )

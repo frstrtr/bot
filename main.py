@@ -2892,14 +2892,14 @@ if __name__ == "__main__":
             )
         ):
             if message.sender_chat and message.sender_chat.id in banned_users_dict:
-                logger_text = f"\033[41m\033[37m{message.from_user.id} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             elif (
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
             ):
-                logger_text = f"\033[41m\033[37m{message.from_user.id} FORWARDED FROM CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             else:
-                logger_text = f"\033[41m\033[37m{message.from_user.id} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             LOGGER.warning(logger_text)
 
             # Forwarding banned user message to ADMIN SUSPICIOUS
@@ -3140,7 +3140,7 @@ if __name__ == "__main__":
             # XXX if user was in lols but before it was kicked it posted a message eventually
             # we can check it in runtime banned user list
             if message.from_user.id in banned_users_dict:
-                the_reason = f"{message.from_user.id} is banned before sending a message, but squizzed due to latency..."
+                the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is banned before sending a message, but squizzed due to latency..."
                 latency_message_link = construct_message_link(
                     [
                         message.chat.id,

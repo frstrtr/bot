@@ -3269,9 +3269,7 @@ if __name__ == "__main__":
                 # check for allowed channels for forwards
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
-                    the_reason = (
-                        f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
-                    )
+                    the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
                     if await check_n_ban(message, the_reason):
                         return
                     else:
@@ -3748,7 +3746,11 @@ if __name__ == "__main__":
 
         try:
             command_args = message.text.split()
-            LOGGER.debug("\033[95m%s admin command arguments received:%s\033[0m %s\033[0m", message.from_user.id, command_args)
+            LOGGER.debug(
+                "\033[95m%s admin command arguments received:\033[0m %s",
+                message.from_user.id,
+                command_args,
+            )
 
             if len(command_args) < 2:
                 raise ValueError("No channel ID provided.")
@@ -3788,7 +3790,10 @@ if __name__ == "__main__":
             try:
                 result = await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
                 if result is True:
-                    LOGGER.info("\033[91mChannel (%s) banned where it is possible.\033[0m", rogue_chan_id)
+                    LOGGER.info(
+                        "\033[91mChannel (%s) banned where it is possible.\033[0m",
+                        rogue_chan_id,
+                    )
                     await message.reply(
                         f"Channel {rogue_chan_id} banned where it is possible."
                     )

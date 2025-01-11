@@ -3748,7 +3748,7 @@ if __name__ == "__main__":
 
         try:
             command_args = message.text.split()
-            LOGGER.debug("Command arguments received: %s", command_args)
+            LOGGER.debug("\033[95m%s admin command arguments received:%s\033[0m %s\033[0m", message.from_user.id, command_args)
 
             if len(command_args) < 2:
                 raise ValueError("No channel ID provided.")
@@ -3764,7 +3764,7 @@ if __name__ == "__main__":
                 await message.reply(f"Channel {rogue_chan_id} already banned.")
                 return
 
-            LOGGER.debug("Rogue channel ID to ban: %s", rogue_chan_id)
+            LOGGER.debug("\033[93mRogue channel ID to ban: %s\033[0m", rogue_chan_id)
 
             # Admin_ID
             admin_id = message.from_user.id
@@ -3788,6 +3788,7 @@ if __name__ == "__main__":
             try:
                 result = await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
                 if result is True:
+                    LOGGER.info("\033[91mChannel (%s) banned where it is possible.\033[0m", rogue_chan_id)
                     await message.reply(
                         f"Channel {rogue_chan_id} banned where it is possible."
                     )

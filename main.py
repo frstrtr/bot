@@ -422,11 +422,12 @@ async def load_and_start_checks():
     active_checks_filename = "active_user_checks.txt"
     banned_users_filename = "banned_users.txt"  # TODO store banned user names too
 
+    if not os.path.exists(banned_users_filename):
+        LOGGER.error("File not found: %s", banned_users_filename)
+
     if not os.path.exists(active_checks_filename):
         LOGGER.error("File not found: %s", active_checks_filename)
         return
-    if not os.path.exists(banned_users_filename):
-        LOGGER.error("File not found: %s", banned_users_filename)
 
     try:
         with open(active_checks_filename, "r", encoding="utf-8") as file:

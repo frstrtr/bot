@@ -418,62 +418,79 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
         return True
 
 
-async def load_and_start_checks():
-    """Load all unfinished checks from file and start them with 1 sec interval"""
-    active_checks_filename = "active_user_checks.txt"
+async def load_banned_users():
+    """Coroutine to load banned users from file"""
     banned_users_filename = "banned_users.txt"
 
     if not os.path.exists(banned_users_filename):
         LOGGER.error("File not found: %s", banned_users_filename)
-    else:
-        with open(banned_users_filename, "r", encoding="utf-8") as file:
-            for line in file:
-                user_id, user_name = (
-                    int(line.strip().split(":")[0]),
-                    line.strip().split(":")[1],
-                )
-                banned_users_dict[user_id] = user_name
-            LOGGER.info(
-                "Banned users dict (%s) loaded from file: %s",
-                len(banned_users_dict),
-                banned_users_dict,
+        return
+
+    with open(banned_users_filename, "r", encoding="utf-8") as file:
+        for line in file:
+            user_id, user_name = (
+                int(line.strip().split(":")[0]),
+                line.strip().split(":")[1],
             )
+            banned_users_dict[user_id] = user_name
+        LOGGER.info(
+            "Banned users dict (%s) loaded from file: %s",
+            len(banned_users_dict),
+            banned_users_dict,
+        )
+
+
+async def load_active_user_checks():
+    """Coroutine to load checks non-blockingly from file"""
+    active_checks_filename = "active_user_checks.txt"
 
     if not os.path.exists(active_checks_filename):
         LOGGER.error("File not found: %s", active_checks_filename)
         return
-    else:
-        with open(active_checks_filename, "r", encoding="utf-8") as file:
-            for line in file:
-                user_id = int(line.strip().split(":")[0])
-                user_name = line.strip().split(":")[1]
-                active_user_checks_dict[user_id] = user_name
-                event_message = (
-                    f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
-                    + str(user_id)
-                    + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
-                )
-                # Start the check with 1 sec interval
-                asyncio.create_task(
-                    perform_checks(
-                        user_id=user_id,
-                        user_name=user_name if user_name != "None" else "!UNDEFINED!",
-                        event_record=event_message,
-                        inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
-                    )
-                )
-                # interval between checks
-                await asyncio.sleep(1)
-                LOGGER.info(
-                    "%s:@%s loaded from file & 3hr monitoring started ...",
-                    user_id,
-                    user_name if user_name != "None" else "!UNDEFINED!",
-                )
-            LOGGER.info(
-                "Active users checks dict (%s) loaded from file: %s",
-                len(active_user_checks_dict),
-                active_user_checks_dict,
+
+    with open(active_checks_filename, "r", encoding="utf-8") as file:
+        for line in file:
+            user_id = int(line.strip().split(":")[0])
+            user_name = line.strip().split(":")[1]
+            active_user_checks_dict[user_id] = user_name
+            event_message = (
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                + str(user_id)
+                + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
             )
+            # Start the check NON-BLOCKING
+            asyncio.create_task(
+                perform_checks(
+                    user_id=user_id,
+                    user_name=user_name if user_name != "None" else "!UNDEFINED!",
+                    event_record=event_message,
+                    inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
+                )
+            )
+            LOGGER.info(
+                "%s:@%s loaded from file & 3hr monitoring started ...",
+                user_id,
+                user_name if user_name != "None" else "!UNDEFINED!",
+            )
+            # Insert a 1-second interval between task creations
+            await asyncio.sleep(1)
+        LOGGER.info(
+            "Active users checks dict (%s) loaded from file: %s",
+            len(active_user_checks_dict),
+            active_user_checks_dict,
+        )
+
+
+async def load_and_start_checks():
+    """Load all unfinished checks from file and start them with 1 sec interval"""
+
+    # Run the load_banned_users function as a background task
+    asyncio.create_task(load_banned_users())
+
+    # Run the load_active_user_checks function as a background task
+    asyncio.create_task(load_active_user_checks())
+
+    LOGGER.debug("NON BLOCKING LOAD STARTUP CHECKS DONE!")
 
 
 async def sequential_shutdown_tasks(_id, _uname):

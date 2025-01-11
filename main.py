@@ -3149,7 +3149,7 @@ if __name__ == "__main__":
                     ]
                 )
                 LOGGER.info(
-                    "%s:%s latency message link: %s",
+                    "%s:@%s latency message link: %s",
                     message.from_user.id,
                     (
                         message.from_user.username

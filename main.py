@@ -2983,7 +2983,8 @@ if __name__ == "__main__":
                         (
                             message.sender_chat.username
                             or message.forward_from_chat.username
-                            if message.sender_chat.username or message.forward_from_chat.username
+                            if message.sender_chat.username
+                            or message.forward_from_chat.username
                             else "!NONAME!"
                         ),
                         message.chat.title,
@@ -3599,7 +3600,11 @@ if __name__ == "__main__":
             LOGGER.debug(
                 "\033[95m%d:@!UNDEFINED! - User ID to check, requested by admin @%s (%s %s)\033[0m",
                 user_id,
-                message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
                 message.from_user.first_name,
                 message.from_user.last_name if message.from_user.last_name else "",
             )
@@ -3717,6 +3722,16 @@ if __name__ == "__main__":
 
             # Admin_ID
             admin_id = message.from_user.id
+            admin_username = (
+                message.from_user.username
+                if message.from_user.username
+                else "!UNDEFINED!"
+            )
+            admin_name = (
+                message.from_user.first_name + message.from_user.last_name
+                if message.from_user.last_name
+                else message.from_user.first_name
+            )
 
             # reply to the message # TODO confirm deletion
             # await message.reply('Are you sure you want to delete the message?')
@@ -3732,12 +3747,12 @@ if __name__ == "__main__":
                     )
                     await BOT.send_message(
                         TECHNOLOG_GROUP_ID,
-                        f"Channel <code>{rogue_chan_id}</code> banned by admin <code>{admin_id}</code> request.",
+                        f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
                         parse_mode="HTML",
                     )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"Channel <code>{rogue_chan_id}</code> banned by admin <code>{admin_id}</code> request.",
+                        f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
                         parse_mode="HTML",
                         message_thread_id=ADMIN_MANBAN,
                     )

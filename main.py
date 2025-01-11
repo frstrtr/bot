@@ -420,7 +420,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
 async def load_and_start_checks():
     """Load all unfinished checks from file and start them with 1 sec interval"""
     active_checks_filename = "active_user_checks.txt"
-    banned_users_filename = "banned_users.txt"  # TODO store banned user names too
+    banned_users_filename = "banned_users.txt"
 
     if not os.path.exists(banned_users_filename):
         LOGGER.error("File not found: %s", banned_users_filename)
@@ -1615,7 +1615,7 @@ async def log_lists():
         for chunk in active_user_chunks:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Active user checks list: {' '.join(chunk)}",
+                f"Active user checks list:\n{' \n'.join(chunk)}",
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )
@@ -1629,7 +1629,7 @@ async def log_lists():
         for chunk in banned_user_chunks:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Banned users list: {' '.join(chunk)}",
+                f"Banned users list:\n{' \n'.join(chunk)}",
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )

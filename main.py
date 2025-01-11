@@ -2955,28 +2955,50 @@ if __name__ == "__main__":
                     ban_member_task = BOT.ban_chat_member(
                         message.chat.id, message.from_id, revoke_messages=True
                     )
-                    ban_rogue_chan_task = ban_rogue_chat_everywhere(
-                        (
-                            (message.sender_chat.id if message.sender_chat else None)
-                            or (
-                                message.forward_from_chat.id
-                                if message.forward_from_chat
-                                else None
-                            )
-                        ),
-                        [
-                            chat_id
-                            for chat_id in CHANNEL_IDS
-                            if chat_id != message.chat.id
-                        ],  # exclude current chatID
+                    # check if banned already
+                    rogue_chat_id = (
+                        message.sender_chat.id or message.forward_from_chat.id
                     )
+                    if rogue_chat_id not in banned_users_dict:
+                        ban_rogue_chan_task = ban_rogue_chat_everywhere(
+                            (
+                                (
+                                    message.sender_chat.id
+                                    if message.sender_chat
+                                    else None
+                                )
+                                or (
+                                    message.forward_from_chat.id
+                                    if message.forward_from_chat
+                                    else None
+                                )
+                            ),
+                            [
+                                chat_id
+                                for chat_id in CHANNEL_IDS
+                                if chat_id != message.chat.id
+                            ],  # exclude current chatID
+                        )
+                    else:
+                        LOGGER.info(
+                            "\033[93mRogue chat %s already banned.\033[0m",
+                            rogue_chat_id,
+                        )
+                        ban_rogue_chan_task = (
+                            None  # Prevent banning already banned channel
+                        )
 
-                    await asyncio.gather(
+                    tasks = [
                         ban_chat_task,
                         delete_message_task,
                         ban_member_task,
                         ban_rogue_chan_task,
-                    )
+                    ]
+
+                    # Filter out None values
+                    tasks = [task for task in tasks if task is not None]
+                    await asyncio.gather(tasks)
+
                     log_chan_data = (
                         "Channel %s (%s):@%s banned in chat %s (%s)",
                         message.sender_chat.title or message.forward_from_chat.title,
@@ -3718,6 +3740,12 @@ if __name__ == "__main__":
             if not rogue_chan_id.startswith("-100"):
                 rogue_chan_id = f"-100{rogue_chan_id}"
             rogue_chan_id = int(rogue_chan_id)
+
+            if (
+                rogue_chan_id in banned_users_dict
+            ):  # check if channel already banned to prevent unneccessary actions
+                await message.reply(f"Channel {rogue_chan_id} already banned.")
+                return
 
             LOGGER.debug("Rogue channel ID to ban: %s", rogue_chan_id)
 

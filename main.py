@@ -1104,7 +1104,7 @@ async def check_and_autoban(
         # LOGGER.debug("event_record: %s", event_record)
         # user is not spammer but kicked or restricted by admin
         LOGGER.info(
-            "%s:@%s kicked/restricted by admin, but is not now in the lols database.",
+            "\033[95m%s:@%s kicked/restricted by admin, but is not now in the lols database.\033[0m",
             user_id,
             user_name,
         )
@@ -3597,9 +3597,11 @@ if __name__ == "__main__":
 
             user_id = int(command_args[1])
             LOGGER.debug(
-                "%d:@!UNDEFINED! - User ID to check, requested by admin %d",
+                "\033[95m%d:@!UNDEFINED! - User ID to check, requested by admin @%s (%s %s)\033[0m",
                 user_id,
-                message.from_user.id,
+                message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                message.from_user.first_name,
+                message.from_user.last_name if message.from_user.last_name else "",
             )
 
             if user_id in active_user_checks_dict:

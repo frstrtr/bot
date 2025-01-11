@@ -398,7 +398,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
-            LOGGER.info("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
+            # LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
         except BadRequest as e:  # if user were Deleted Account while banning
             # chat_name = get_channel_id_by_name(channel_dict, chat_id)
@@ -410,6 +410,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
+    LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
     else:
@@ -2975,12 +2976,21 @@ if __name__ == "__main__":
                         ban_member_task,
                         ban_rogue_chan_task,
                     )
-
-                    LOGGER.info(
-                        "Channel %s banned in chat %s",
-                        message.sender_chat,
+                    log_chan_data = (
+                        "Channel %s (%s):@%s banned in chat %s (%s)",
+                        message.sender_chat.title or message.forward_from_chat.title,
+                        message.sender_chat.id or message.forward_from_chat.id,
+                        (
+                            message.sender_chat.username
+                            or message.forward_from_chat.username
+                            if message.sender_chat.username or message.forward_from_chat.username
+                            else "!NONAME!"
+                        ),
+                        message.chat.title,
                         message.chat.id,
+                        message.chat.username if message.chat.username else "!NONAME!",
                     )
+                    LOGGER.info(log_chan_data)
                 except BadRequest as e:
                     LOGGER.error(
                         "Error banning channel %s in chat %s: %s",

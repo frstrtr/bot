@@ -1615,7 +1615,7 @@ async def log_lists():
         for chunk in active_user_chunks:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Active user checks list:\n{' \n'.join(chunk)}",
+                f"Active user checks list:\n{chr(10).join(chunk)}",
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )
@@ -1629,7 +1629,7 @@ async def log_lists():
         for chunk in banned_user_chunks:
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Banned users list:\n{' \n'.join(chunk)}",
+                f"Banned users list:\n{chr(10).join(chunk)}",
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
             )
@@ -3119,9 +3119,11 @@ if __name__ == "__main__":
 
             # flag true if user joined the chat more than 3 days ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
-            user_is_1week_old = (
-                message.date - user_join_chat_date
-            ).total_seconds() < 604805  # ONE week and 5 seconds
+            user_is_between_3hours_and_1week_old = (
+                10805 # 3 hours in seconds
+                <= (message.date - user_join_chat_date).total_seconds()
+                < 604805  # 3 hours in seconds and 1 week in seconds
+            )
             # user_is_1day_old = (
             #     message.date - user_join_chat_date
             # ).total_seconds() < 86400  # 1 days and 5 seconds
@@ -3159,7 +3161,7 @@ if __name__ == "__main__":
                 if await check_n_ban(message, the_reason):
                     return
             elif (
-                user_is_1week_old
+                user_is_between_3hours_and_1week_old
             ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)

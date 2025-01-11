@@ -3270,7 +3270,7 @@ if __name__ == "__main__":
                 if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
                     # this is possibly a spam
                     the_reason = (
-                        f"{message.from_id} forwarded message from unknown channel"
+                        f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
                     )
                     if await check_n_ban(message, the_reason):
                         return

@@ -3826,6 +3826,12 @@ if __name__ == "__main__":
             user_id = int(command_args[1])
             LOGGER.debug("%d - User ID to unban", user_id)
 
+            # remove from banned and checks dicts
+            if user_id in active_user_checks_dict:
+                del active_user_checks_dict[user_id]
+            if user_id in banned_users_dict:
+                del banned_users_dict[user_id]
+
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)
                 if channel_id:

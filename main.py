@@ -1541,8 +1541,10 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     return task  # Return the task so the caller can manage it
 
 
-async def log_lists():
-    """Function to log the banned users and active user checks lists."""
+async def log_lists(msg_thread_id = ADMIN_AUTOBAN):
+    """Function to log the banned users and active user checks lists.
+    : params:: msg_thread_id : int Message Thread ID"""
+
     # TODO log summary numbers of banned users and active user checks totals
     LOGGER.info(
         "\033[93m%s banned users list: %s\033[0m",
@@ -1640,10 +1642,11 @@ async def log_lists():
             split_list(active_user_checks_list, max_message_length)
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
+
         await BOT.send_message(
             ADMIN_GROUP_ID,
             f"Current user checks list: {len(active_user_checks_dict)}",
-            message_thread_id=ADMIN_AUTOBAN,
+            message_thread_id=msg_thread_id,
             parse_mode="HTML",
         )
         # Send active user checks list in chunks
@@ -1651,13 +1654,13 @@ async def log_lists():
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"Active user checks list:\n{chr(10).join(chunk)}",
-                message_thread_id=ADMIN_AUTOBAN,
+                message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
         await BOT.send_message(
             ADMIN_GROUP_ID,
             f"Current banned users list: {len(banned_users_dict)}",
-            message_thread_id=ADMIN_AUTOBAN,
+            message_thread_id=msg_thread_id,
             parse_mode="HTML",
         )
         # Send banned users list in chunks
@@ -1665,7 +1668,7 @@ async def log_lists():
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"Banned users list:\n{chr(10).join(chunk)}",
-                message_thread_id=ADMIN_AUTOBAN,
+                message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
     except BadRequest as e:
@@ -3838,7 +3841,7 @@ if __name__ == "__main__":
     @DP.message_handler(commands=["loglists"], chat_id=ADMIN_GROUP_ID)
     async def log_lists_handler(message: types.Message):
         """Function to log active checks and banned users dict."""
-        await log_lists()
+        await log_lists(message.message_thread_id)
 
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)

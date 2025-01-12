@@ -4281,7 +4281,11 @@ if __name__ == "__main__":
     # TODO sender_chat and forward_from_chat - add to banned database to find and check triple IDs user/senderChat/forwardChat and ban
     # TODO refactor move all temp storage to DB: messages, banned IDs, bot_unhandled, active_checks?
     # XXX search and delete user messages if banned by admin and timely checks
-    # XXX use active checks list and banned users list to store recent messages links during runtime to delete it if user is banned FSM?
+    # XXX use active checks list and banned users list to retrieve recent messages links during runtime to delete it if user is banned FSM?
+    # XXX store nested dict when memorizing active user checks and banned users
+    # XXX autoban rogue channels
+    # XXX manage forwards from banned users as spam
+    # XXX preserve banned channels list by storing it in the DB
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

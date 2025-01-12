@@ -3031,7 +3031,7 @@ if __name__ == "__main__":
 
                     # Filter out None values
                     tasks = [task for task in tasks if task is not None]
-                    await asyncio.gather(tasks)
+                    await asyncio.gather(*tasks)
 
                     log_chan_data = (
                         "Channel %s (%s):@%s banned in chat %s (%s)",

@@ -2985,7 +2985,8 @@ if __name__ == "__main__":
                     )
                     # check if banned already
                     rogue_chat_id = (
-                        message.sender_chat.id or message.forward_from_chat.id
+                        (message.sender_chat.id if message.sender_chat else None) or
+                        (message.forward_from_chat.id if message.forward_from_chat else None)
                     )
                     if rogue_chat_id not in banned_users_dict:
                         ban_rogue_chan_task = ban_rogue_chat_everywhere(

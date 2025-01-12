@@ -3838,7 +3838,7 @@ if __name__ == "__main__":
     @DP.message_handler(commands=["loglists"], chat_id=ADMIN_GROUP_ID)
     async def log_lists_handler(message: types.Message):
         """Function to log active checks and banned users dict."""
-        log_lists()
+        await log_lists()
 
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)

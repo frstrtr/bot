@@ -8,8 +8,9 @@ import json
 import time
 import html
 import tracemalloc
+import ast
 
-# import tracemalloc # for memory usage debugging
+import tracemalloc # for memory usage debugging
 
 import aiohttp
 from aiogram import Dispatcher, types
@@ -1561,13 +1562,23 @@ async def log_lists():
 
     # read current banned users list from the file
     banned_users_filename = "banned_users.txt"
+    
     if os.path.exists(banned_users_filename):
         with open(banned_users_filename, "r", encoding="utf-8") as file:
             # append users to the set
             for line in file:
-                user_id, user_name = line.strip().split(":")
-                banned_users_dict[int(user_id)] = user_name
+                parts = line.strip().split(":", 1)
+                if len(parts) == 2:
+                    user_id, user_name = parts
+                    try:
+                        user_name = ast.literal_eval(user_name.strip())
+                    except (ValueError, SyntaxError):
+                        pass  # keep user_name as string if it's not a valid dict
+                    banned_users_dict[int(user_id)] = user_name
+                else:
+                    LOGGER.warning("\033[93mSkipping invalid line: %s\033[0m", line)
         os.remove(banned_users_filename)  # remove the file after reading
+        
     # save banned users list to the file with the current date to the inout folder
     with open(filename, "w", encoding="utf-8") as file:
         for _id, _username in banned_users_dict.items():

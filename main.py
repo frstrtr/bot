@@ -643,9 +643,14 @@ async def handle_forwarded_reports_with_details(
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    technnolog_spam_message_copy = await BOT.forward_message(
-        TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
-    )
+    try: # if it was already removed earlier
+        technnolog_spam_message_copy = await BOT.forward_message(
+            TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
+        )
+    except MessageToForwardNotFound:
+        LOGGER.error("%s:@%s Message to forward not found: %s", spammer_id, '!UNDEFINED!', message.message_id)
+        return
+    
     message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:

@@ -1545,7 +1545,6 @@ async def log_lists(msg_thread_id = ADMIN_AUTOBAN):
     """Function to log the banned users and active user checks lists.
     : params:: msg_thread_id : int Message Thread ID"""
 
-    # TODO log summary numbers of banned users and active user checks totals
     LOGGER.info(
         "\033[93m%s banned users list: %s\033[0m",
         len(banned_users_dict),

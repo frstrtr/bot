@@ -1416,7 +1416,8 @@ async def perform_checks(
                     suspicious_messages = {
                         k: v
                         for k, v in active_user_checks_dict[user_id].items()
-                        if k != "username" # unpack message links only, leave username record
+                        if k
+                        != "username"  # unpack message links only, leave username record
                     }
                     if suspicious_messages:
                         chat_id, message_id = next(iter(suspicious_messages)).split("_")
@@ -1425,7 +1426,11 @@ async def perform_checks(
                             int(message_id),
                         ]
             else:
-                LOGGER.warning("%s:@%s User ID not found in active_user_checks_dict", user_id, user_name)
+                LOGGER.warning(
+                    "%s:@%s User ID not found in active_user_checks_dict",
+                    user_id,
+                    user_name,
+                )
 
             if await check_and_autoban(
                 event_record,
@@ -3325,8 +3330,13 @@ if __name__ == "__main__":
                         return
                     else:
                         LOGGER.info(
-                            "\033[93m%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
+                            "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
                             message.from_user.id,
+                            (
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
                             message.chat.title,
                         )
                         await take_heuristic_action(message, the_reason)

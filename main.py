@@ -2745,7 +2745,7 @@ if __name__ == "__main__":
                     active_user_checks_dict,
                 )
             LOGGER.info(
-                "%s:@%s Report %s action taken by @%s: User @%s banned and their messages deleted where applicable.",
+                "\033[95m%s:@%s Report %s action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
                 user_name,
                 message_id_to_ban,

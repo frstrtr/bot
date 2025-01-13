@@ -2448,12 +2448,17 @@ if __name__ == "__main__":
         # get the message ID to ban and who pressed the button
         button_pressed_by = callback_query.from_user.username
         try:
-            *_, message_id_to_ban = callback_query.data.split("_")
-            message_id_to_ban = int(message_id_to_ban)
+            *_, report_id_to_ban = callback_query.data.split("_")
+            report_id_to_ban = int(report_id_to_ban)
+            LOGGER.info(
+                "\033[95m%s:@ADMIN requested to ban message %s\033[0m",
+                button_pressed_by,
+                report_id_to_ban,
+            )
 
             CURSOR.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
-                (message_id_to_ban,),
+                (report_id_to_ban,),
             )
             result = CURSOR.fetchone()
 
@@ -2472,9 +2477,9 @@ if __name__ == "__main__":
             #  result for sender:
             #
             # ФАЛЬШ СУПЕР , date: 2025-01-04 22:13:02, from chat title: ФАЛЬШ СУПЕР
-            #            [0]            [1]      [2]                [3]         [4]      [5]    [6]    [7]
-            #            ChatID        MsgID    ChatUsername       UserID     UserName  User1  User2   MessageForwardDate
-            # Result: (-1001753683146, 3255, 'mauritiusTransfer', 8095305945, 'aqqwrn', 'нелл', None, '2025-01-05 02:35:53')
+            #            [0]            [1]      [2]                 [3]         [4]        [5]    [6]    [7]
+            #            ChatID        MsgID    ChatUsername        UserID     UserName    User1  User2   MessageForwardDate
+            # Result: (-1001753683146, 3255, 'exampleChatUsername', 66666666, 'userUser', 'нелл', None, '2025-01-05 02:35:53')
 
             # XXXfixed find safe solution to get the author_id from the forwarded_message_data
             author_id = eval(forwarded_message_data)[3]
@@ -2494,7 +2499,7 @@ if __name__ == "__main__":
             #     return
 
             LOGGER.debug(
-                "%s Message timestamp:%-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
                 author_id,
                 (
                     f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"
@@ -2531,25 +2536,27 @@ if __name__ == "__main__":
                         ]
                     )
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\033[0m %s... %d totally",
                         author_id,
                         (
                             forwarded_message_data[4]
                             if forwarded_message_data[4] not in [0, "0", None]
                             else "!UNDEFINED!"
                         ),
+                        button_pressed_by,
                         active_user_checks_dict_last3_str,  # Last 3 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin: %s\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\033[0m %s",
                         author_id,
                         (
                             forwarded_message_data[4]
                             if forwarded_message_data[4] not in [0, "0", None]
                             else "!UNDEFINED!"
                         ),
+                        button_pressed_by,
                         active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id
@@ -2568,7 +2575,7 @@ if __name__ == "__main__":
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
             )
             LOGGER.debug(
-                "%s:@%s hbn forwared_message_data: %s",
+                "%s:@%s (#HBN) forwared_message_data: %s",
                 author_id,
                 (
                     forwarded_message_data[4]
@@ -2718,13 +2725,13 @@ if __name__ == "__main__":
 
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Report {message_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
             )
             if forwarded_message_data[4] not in [0, "0", None]:
@@ -2753,7 +2760,7 @@ if __name__ == "__main__":
                 "\033[95m%s:@%s Report %s action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
                 user_name,
-                message_id_to_ban,
+                report_id_to_ban,
                 button_pressed_by,
                 (
                     forwarded_message_data[4]

@@ -3563,7 +3563,7 @@ if __name__ == "__main__":
                 original_message_timestamp,
             ) = result
             LOGGER.debug(
-                "Original chat ID: %s, Original message ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "\033[93mOriginal chat ID: %s, Original message ID: %s,\n\t\t\tForwarded message data: %s,\n\t\t\tOriginal message timestamp: %s\033[0m",
                 original_chat_id,
                 original_message_id,
                 forwarded_message_data,

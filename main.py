@@ -188,9 +188,9 @@ def get_spammer_details(
 
     LOGGER.debug(
         "\033[93m%s getting chat ID and message ID\n"
-        "%s firstName : %s : lastName : %s,\n"
-        "%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "%s forwardSenderName: %s, forwardedFromID: %s\n\033[0m",
+        "\t\t\t%s firstName : %s : lastName : %s,\n"
+        "\t\t\t%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "\t\t\t%s forwardSenderName: %s, forwardedFromID: %s\n\033[0m",
         spammer_id_str,
         spammer_id_str,
         spammer_first_name,
@@ -2550,7 +2550,7 @@ if __name__ == "__main__":
             #     return
 
             LOGGER.debug(
-                "%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s, Forwarded message data: %s, Original message timestamp: %s",
+                "\033[93m%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s,\n\t\t\tForwarded message data: %s,\n\t\t\tOriginal message timestamp: %s\033[0m",
                 author_id,
                 (
                     f"{result[3]:10}" if result[3] is not None else f"{' ' * 10}"

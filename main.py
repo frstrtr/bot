@@ -3402,7 +3402,7 @@ if __name__ == "__main__":
                 message
             ) and check_message_for_emojis(message):
                 the_reason = f"{message.from_id} message contains 5+ spammy capital letters and 5+ spammy regular emojis"
-                if check_n_ban(message, the_reason):
+                if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(

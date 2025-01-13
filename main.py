@@ -4362,6 +4362,7 @@ if __name__ == "__main__":
     # XXX autoban rogue channels
     # XXX manage forwards from banned users as spam
     # XXX preserve banned channels list by storing it in the DB
+    # XXX mark and check banned users in Database instead of file, leaving active checks intact as file (mark join and leave as 1 in database - to indicate banned)
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

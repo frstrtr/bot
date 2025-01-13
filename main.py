@@ -302,8 +302,9 @@ async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
-        "%-10s : %s. Sending automated report to the admin group for review...",
-        f"{message.from_id:10}",
+        # "%-10s : %s. Sending automated report to the admin group for review...",
+        "%s. Sending automated report to the admin group for review...",
+        # f"{message.from_id:10}",
         reason,
     )
 
@@ -826,12 +827,15 @@ async def handle_forwarded_reports_with_details(
 
     # TODO parameters to pass to callback function callback_query_handler() to prevent errors
     # Store the admin action banner message data
+    # AUTOREPORT ALWAYS IN ADMIN_GROUP_ID so there is no ADMIN action banner message
     # DP["admin_action_banner_message"] = admin_action_banner_message
+
     DP["admin_group_banner_autoreport_message"] = (
         admin_group_banner_autoreport_message  # AUTOREPORT manage state
     )
     # always store the report chat ID with admin personal chat ID
     # DP["report_chat_id"] = message.chat.id
+    DP["autoreport_chat_id"] = message.chat.id
 
 
 async def lols_cas_check(user_id):
@@ -2289,14 +2293,19 @@ if __name__ == "__main__":
         try:  # If Topic_closed error
             if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
 
-                # NOTE how to remove buttons if it was pressed in other dialogue?
-
-                # Send report to the admin group
+                # Forward reported message to the ADMIN group REPORT thread
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                )
+                # Send report banner to the admin group
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
                     reply_markup=keyboard,
                     parse_mode="HTML",
+                    disable_web_page_preview=True,
                 )
                 # XXX Send report action banner to the reporter/var to revoke the message
                 admin_action_banner_message = await message.answer(
@@ -2326,14 +2335,25 @@ if __name__ == "__main__":
                 # XXX return admin personal report banner message object
                 return admin_action_banner_message
 
-            else:  # send report to AUTOREPORT thread of the admin group
+            else:  # send report to AUTOREPORT thread of the admin group if reported by non-admin user
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=ADMIN_AUTOREPORTS,
+                )
                 admin_group_banner_message = await BOT.send_message(
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
                     reply_markup=keyboard,
                     parse_mode="HTML",
                     message_thread_id=ADMIN_AUTOREPORTS,
+                    disable_web_page_preview=True,
                 )
+                # store state
+                DP["admin_group_banner_message"] = admin_group_banner_message
+                DP["report_chat_id"] = message.chat.id
+                return admin_group_banner_message
 
         except BadRequest as e:
             LOGGER.error("Error while sending the banner to the admin group: %s", e)
@@ -2344,35 +2364,50 @@ if __name__ == "__main__":
     @DP.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
     async def ask_confirmation(callback_query: CallbackQuery):
         """Function to ask for confirmation before banning the user."""
-        *_, message_id_to_ban = callback_query.data.split("_")
+        *_, report_id_to_ban = callback_query.data.split("_")
 
         # DEBUG:
         # logger.debug(f"Report {callback_query} confirmed for banning.")
 
         keyboard = InlineKeyboardMarkup(row_width=2)
         confirm_btn = InlineKeyboardButton(
-            "🟢 Confirm", callback_data=f"do_ban_{message_id_to_ban}"
+            "🟢 Confirm", callback_data=f"do_ban_{report_id_to_ban}"
         )
         cancel_btn = InlineKeyboardButton(
-            "🔴 Cancel", callback_data=f"reset_ban_{message_id_to_ban}"
+            "🔴 Cancel", callback_data=f"reset_ban_{report_id_to_ban}"
         )
 
         keyboard.add(confirm_btn, cancel_btn)
 
-        try:  # KeyError if it was reported by non-admin user
+        try:
             banner_message_origin: types.Message = DP.get(
                 "admin_group_banner_message"
             ) or DP.get(
                 "admin_group_banner_autoreport_message"
             )  # check message object for AUTO/MANUAL report origin
+            if banner_message_origin is None:
+                LOGGER.error(
+                    "Admin Group Banner Message is None. Cannot proceed with the action."
+                )
+                return  # or handle the error appropriately)
 
-            admin_action_banner_message: types.Message = DP.get(
+            # # BUG None if autoreport!!! get "admin_action_banner_autoreport_message" in that case instead and check for None
+            action_banner_message: types.Message = DP.get(
                 "admin_action_banner_message"
+            ) or DP.get(
+                "admin_action_banner_autoreport_message"
             )  # if this is MANUAL action by ADMIN
+            if action_banner_message is None:
+                LOGGER.error(
+                    "\033[93mPersonal action Banner Autoreport message is None. This is AUTOREPORT or non-ADMIN user report!\033[0m"
+                )
+                # return  # or handle the error appropriately
 
-            report_chat_id = DP.get(
-                "report_chat_id"
-            )  # store chat where action happened
+            # BUG None if autoreport!!! get "autoreport_chat_id" in that case instead and check for None
+            report_chat_id = DP.get("report_chat_id") or DP.get("autoreport_chat_id")
+            if report_chat_id is None:
+                LOGGER.error("Report chat ID is None. Cannot proceed with the action.")
+                return  # or handle the error appropriately
 
             # LOGGER.debug(
             #     "agbm: %s, agbam: %s, aabm: %s, rcid: %s",
@@ -2385,8 +2420,12 @@ if __name__ == "__main__":
             # clear states
             DP["admin_group_banner_message"] = None
             DP["admin_group_banner_autoreport_message"] = None
+
             DP["admin_action_banner_message"] = None
+            DP["admin_action_banner_autoreport_message"] = None
+
             DP["report_chat_id"] = None
+            DP["autoreport_chat_id"] = None
 
             # Edit messages to remove buttons or messages
             # check where the callback_query was pressed
@@ -2400,27 +2439,24 @@ if __name__ == "__main__":
             if banner_message_origin:
                 if (
                     callback_query.message.chat.id == ADMIN_GROUP_ID
-                    and admin_action_banner_message
+                    and action_banner_message  # Action done in Admin group and reported by admin
                 ):
-                    # remove personal report banner message if BAN button pressed in ADMIN group
-                    try:
-                        await BOT.delete_message(
-                            report_chat_id, admin_action_banner_message.message_id
-                        )
-                    except (
-                        MessageToDeleteNotFound
-                    ):  # Message already deleted when replied in personal messages? XXX
-                        LOGGER.warning(
-                            "%s Message %s in BOT PM to delete not found. Already deleted?",
-                            callback_query.from_user.id,
-                            callback_query.message.message_id,
-                        )
+                    await BOT.edit_message_reply_markup(
+                        chat_id=action_banner_message.chat.id,
+                        message_id=action_banner_message.message_id,
+                    )
+                elif (
+                    callback_query.message.chat.id == ADMIN_GROUP_ID
+                    and action_banner_message is None
+                ):
+                    return  # Action done in Admin group and this is AUTOREPORT or report from non-admin user do nothing
                 else:  # report was actioned in the personal chat
                     # remove admin group banner buttons
                     await BOT.edit_message_reply_markup(
                         chat_id=ADMIN_GROUP_ID,
                         message_id=banner_message_origin.message_id,
                     )
+                    return
 
         except KeyError as e:
             LOGGER.error(
@@ -2790,7 +2826,7 @@ if __name__ == "__main__":
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
 
         LOGGER.info(
-            "%s Report %s button ACTION CANCELLED by @%s !!!",
+            "\033[95m%s Report %s button ACTION CANCELLED by @%s !!!\033[0m",
             admin_id,
             report_id_to_ban,
             button_pressed_by,

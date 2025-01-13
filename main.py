@@ -1410,19 +1410,22 @@ async def perform_checks(
             )
 
             # getting message to delete link if it is in the checks dict
-            # XXX removes only one recorded message!!! What if there is more than one?
-            if isinstance(active_user_checks_dict[user_id], dict):
-                suspicious_messages = {
-                    k: v
-                    for k, v in active_user_checks_dict[user_id].items()
-                    if k != "username"
-                }
-                if suspicious_messages:
-                    chat_id, message_id = next(iter(suspicious_messages)).split("_")
-                    message_to_delete = [
-                        int(str(chat_id).replace("-100", "", 1)),
-                        int(message_id),
-                    ]
+            # XXX what if there is more than one message link?
+            if user_id in active_user_checks_dict:
+                if isinstance(active_user_checks_dict[user_id], dict):
+                    suspicious_messages = {
+                        k: v
+                        for k, v in active_user_checks_dict[user_id].items()
+                        if k != "username" # unpack message links only, leave username record
+                    }
+                    if suspicious_messages:
+                        chat_id, message_id = next(iter(suspicious_messages)).split("_")
+                        message_to_delete = [
+                            int(str(chat_id).replace("-100", "", 1)),
+                            int(message_id),
+                        ]
+            else:
+                LOGGER.warning("%s:@%s User ID not found in active_user_checks_dict", user_id, user_name)
 
             if await check_and_autoban(
                 event_record,

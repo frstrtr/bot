@@ -1705,9 +1705,6 @@ async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
     except BadRequest as e:
         LOGGER.error("Error sending active_user_checks_dict: %s", e)
 
-    # empty banned_users_dict
-    banned_users_dict.clear()
-
 
 # async def get_photo_details(user_id: int):
 #     """Function to get the photo details of the user profile with the given ID.
@@ -4341,6 +4338,8 @@ if __name__ == "__main__":
     async def scheduled_log():
         """Function to schedule the log_lists function to run daily at 00:00."""
         await log_lists()
+        # empty banned_users_dict
+        banned_users_dict.clear()
 
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport

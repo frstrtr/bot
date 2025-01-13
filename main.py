@@ -10,7 +10,7 @@ import html
 import tracemalloc
 import ast
 
-import tracemalloc # for memory usage debugging
+import tracemalloc  # for memory usage debugging
 
 import aiohttp
 from aiogram import Dispatcher, types
@@ -643,14 +643,19 @@ async def handle_forwarded_reports_with_details(
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
-    try: # if it was already removed earlier
+    try:  # if it was already removed earlier
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
     except MessageToForwardNotFound:
-        LOGGER.error("%s:@%s Message to forward not found: %s", spammer_id, '!UNDEFINED!', message.message_id)
+        LOGGER.error(
+            "%s:@%s Message to forward not found: %s",
+            spammer_id,
+            "!UNDEFINED!",
+            message.message_id,
+        )
         return
-    
+
     message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
@@ -1541,7 +1546,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     return task  # Return the task so the caller can manage it
 
 
-async def log_lists(msg_thread_id = ADMIN_AUTOBAN):
+async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
     """Function to log the banned users and active user checks lists.
     : params:: msg_thread_id : int Message Thread ID"""
 
@@ -1568,7 +1573,7 @@ async def log_lists(msg_thread_id = ADMIN_AUTOBAN):
 
     # read current banned users list from the file
     banned_users_filename = "banned_users.txt"
-    
+
     if os.path.exists(banned_users_filename):
         with open(banned_users_filename, "r", encoding="utf-8") as file:
             # append users to the set
@@ -1584,7 +1589,7 @@ async def log_lists(msg_thread_id = ADMIN_AUTOBAN):
                 else:
                     LOGGER.warning("\033[93mSkipping invalid line: %s\033[0m", line)
         os.remove(banned_users_filename)  # remove the file after reading
-        
+
     # save banned users list to the file with the current date to the inout folder
     with open(filename, "w", encoding="utf-8") as file:
         for _id, _username in banned_users_dict.items():
@@ -2992,8 +2997,11 @@ if __name__ == "__main__":
                     )
                     # check if banned already
                     rogue_chat_id = (
-                        (message.sender_chat.id if message.sender_chat else None) or
-                        (message.forward_from_chat.id if message.forward_from_chat else None)
+                        message.sender_chat.id if message.sender_chat else None
+                    ) or (
+                        message.forward_from_chat.id
+                        if message.forward_from_chat
+                        else None
                     )
                     if rogue_chat_id not in banned_users_dict:
                         ban_rogue_chan_task = ban_rogue_chat_everywhere(
@@ -3037,14 +3045,35 @@ if __name__ == "__main__":
 
                     log_chan_data = (
                         "Channel %s (%s):@%s banned in chat %s (%s)",
-                        message.sender_chat.title or message.forward_from_chat.title,
-                        message.sender_chat.id or message.forward_from_chat.id,
                         (
-                            message.sender_chat.username
-                            or message.forward_from_chat.username
-                            if message.sender_chat.username
-                            or message.forward_from_chat.username
-                            else "!NONAME!"
+                            message.sender_chat.title
+                            if message.sender_chat
+                            else (
+                                message.forward_from_chat.title
+                                if message.forward_from_chat
+                                else "!NO sender/forwarder chat TITLE!"
+                            )
+                        ),
+                        (
+                            message.sender_chat.id
+                            if message.sender_chat
+                            else (
+                                message.forward_from_chat.id
+                                if message.forward_from_chat
+                                else "!NO sender/forwarder chat ID!"
+                            )
+                        ),
+                        (
+                            (
+                                message.sender_chat.username
+                                if message.sender_chat
+                                else (
+                                    message.forward_from_chat.username
+                                    if message.forward_from_chat
+                                    else None
+                                )
+                            )
+                            or "!NONAME!"
                         ),
                         message.chat.title,
                         message.chat.id,
@@ -3841,7 +3870,6 @@ if __name__ == "__main__":
     async def log_lists_handler(message: types.Message):
         """Function to log active checks and banned users dict."""
         await log_lists(message.message_thread_id)
-
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):

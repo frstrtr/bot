@@ -1047,10 +1047,25 @@ async def check_and_autoban(
         if action == "is already added to":
             return True
 
-        if (
-            message_to_delete
-        ):  # delete the message if it exists TODO manage more than one message
-            await BOT.delete_message(message_to_delete[0], message_to_delete[1])
+        if message_to_delete:
+            LOGGER.debug("%s message to delete list (#CNAB)", message_to_delete)
+            try:
+                await BOT.delete_message(message_to_delete[0], message_to_delete[1])
+            except ChatNotFound:
+                LOGGER.error(
+                    "%s:@%s Chat not found: %s",
+                    user_id,
+                    user_name,
+                    message_to_delete[0],
+                )
+            except MessageToDeleteNotFound:
+                LOGGER.error(
+                    "%s:@%s Message to delete not found: %s",
+                    user_id,
+                    user_name,
+                    message_to_delete[1],
+                )
+
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await BOT.send_message(
                 ADMIN_GROUP_ID,

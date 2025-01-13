@@ -3110,40 +3110,10 @@ if __name__ == "__main__":
                     await asyncio.gather(*tasks)
 
                     log_chan_data = (
-                        "Channel %s (%s):@%s banned in chat %s (%s)",
-                        (
-                            message.sender_chat.title
-                            if message.sender_chat
-                            else (
-                                message.forward_from_chat.title
-                                if message.forward_from_chat
-                                else "!NO sender/forwarder chat TITLE!"
-                            )
-                        ),
-                        (
-                            message.sender_chat.id
-                            if message.sender_chat
-                            else (
-                                message.forward_from_chat.id
-                                if message.forward_from_chat
-                                else "!NO sender/forwarder chat ID!"
-                            )
-                        ),
-                        (
-                            (
-                                message.sender_chat.username
-                                if message.sender_chat
-                                else (
-                                    message.forward_from_chat.username
-                                    if message.forward_from_chat
-                                    else None
-                                )
-                            )
-                            or "!NONAME!"
-                        ),
-                        message.chat.title,
-                        message.chat.id,
-                        message.chat.username if message.chat.username else "!NONAME!",
+                        f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "
+                        f"({message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}):"
+                        f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
+                        f"banned in chat {message.chat.title} ({message.chat.id})"
                     )
                     LOGGER.info(log_chan_data)
                 except BadRequest as e:

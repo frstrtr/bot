@@ -3430,7 +3430,7 @@ if __name__ == "__main__":
                         + entity_spam_trigger
                         + " inside"
                     )
-                    if check_n_ban(message, the_reason):
+                    if await check_n_ban(message, the_reason):
                         return
                     else:
                         LOGGER.info(

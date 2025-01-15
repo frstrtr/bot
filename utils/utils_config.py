@@ -137,6 +137,7 @@ def load_config():
 
         BOT = Bot(token=API_TOKEN)
         DP = Dispatcher(BOT)
+        DP["forwarded_reports_states"] = {}
         ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 
     except FileNotFoundError as e:

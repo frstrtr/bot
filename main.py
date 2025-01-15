@@ -825,17 +825,21 @@ async def handle_forwarded_reports_with_details(
         disable_web_page_preview=True,
     )
 
-    # TODO parameters to pass to callback function callback_query_handler() to prevent errors
     # Store the admin action banner message data
     # AUTOREPORT ALWAYS IN ADMIN_GROUP_ID so there is no ADMIN action banner message
-    # DP["admin_action_banner_message"] = admin_action_banner_message
 
-    DP["admin_group_banner_autoreport_message"] = (
-        admin_group_banner_autoreport_message  # AUTOREPORT manage state
-    )
-    # always store the report chat ID with admin personal chat ID
-    # DP["report_chat_id"] = message.chat.id
-    DP["autoreport_chat_id"] = message.chat.id
+    forwarded_report_state = DP.get("forwarded_reports_states")
+    forwarded_report_state[report_id] = {}
+    # Add the new state to the forwarded_reports_states dictionary
+    forwarded_report_state[report_id] = {
+        "original_forwarded_message": message,
+        "admin_group_banner_message": admin_group_banner_autoreport_message,
+        "action_banner_message": None,  # AUTOREPORT have no ADMIN ACTION
+        "report_chat_id": message.chat.id,
+    }
+    DP["forwarded_reports_states"] = forwarded_report_state
+
+    return
 
 
 async def lols_cas_check(user_id):
@@ -2330,11 +2334,18 @@ if __name__ == "__main__":
                     reply_markup=keyboard,
                 )
 
-                # Store the admin action banner message data
-                DP["admin_action_banner_message"] = admin_action_banner_message
-                DP["admin_group_banner_message"] = admin_group_banner_message
-                # always store the report chat ID with admin personal chat ID
-                DP["report_chat_id"] = message.chat.id
+                # Store the admin action banner message data XXX
+                forwarded_report_state = DP.get("forwarded_reports_states")
+                forwarded_report_state[report_id] = {}
+                # Add the new state to the forwarded_reports_states dictionary
+                forwarded_report_state[report_id] = {
+                    "original_forwarded_message": message,
+                    "admin_group_banner_message": admin_group_banner_message,
+                    "action_banner_message": admin_action_banner_message,
+                    "report_chat_id": message.chat.id,
+                }
+
+                DP["forwarded_reports_states"] = forwarded_report_state
 
                 # Construct link to the published banner and send it to the reporter
                 private_chat_id = int(
@@ -2363,8 +2374,57 @@ if __name__ == "__main__":
                     disable_web_page_preview=True,
                 )
                 # store state
-                DP["admin_group_banner_message"] = admin_group_banner_message
-                DP["report_chat_id"] = message.chat.id
+                # Store the admin action banner message data XXX
+                # XXX
+                # # import asyncio
+
+                # # Initialize the lock
+                # dp_lock = asyncio.Lock()
+
+                # async def store_state(report_id, message, admin_group_banner_message, admin_action_banner_message):
+                #     async with dp_lock:
+                #         # Retrieve the existing forwarded_reports_states dictionary from DP
+                #         forwarded_report_state = DP.get("forwarded_reports_states", {})
+
+                #         # Add the new state to the forwarded_reports_states dictionary
+                #         forwarded_report_state[report_id] = {
+                #             "original_forwarded_message": message,
+                #             "admin_group_banner_message": admin_group_banner_message,
+                #             "action_banner_message": admin_action_banner_message,
+                #             "report_chat_id": message.chat.id,
+                #         }
+
+                #         # Update the DP dictionary with the modified forwarded_reports_states dictionary
+                #         DP["forwarded_reports_states"] = forwarded_report_state
+
+                # async def handle_admin_action(report_id, message, admin_group_banner_message, admin_action_banner_message):
+                #     # Your existing code to handle the admin action
+                #     await BOT.send_message(
+                #         ADMIN_GROUP_ID,
+                #         admin_ban_banner,
+                #         reply_markup=keyboard,
+                #         parse_mode="HTML",
+                #         message_thread_id=ADMIN_AUTOREPORTS,
+                #         disable_web_page_preview=True,
+                #     )
+
+                #     # Store the state
+                #     await store_state(report_id, message, admin_group_banner_message, admin_action_banner_message)
+
+                #     return admin_group_banner_message
+                # XXX we need to lock
+                forwarded_report_state = DP.get("forwarded_reports_states")
+                forwarded_report_state[report_id] = {}
+                # Add the new state to the forwarded_reports_states dictionary
+                forwarded_report_state[report_id] = {
+                    "original_forwarded_message": message,
+                    "admin_group_banner_message": admin_group_banner_message,
+                    "action_banner_message": admin_action_banner_message,
+                    "report_chat_id": message.chat.id,
+                }
+
+                DP["forwarded_reports_states"] = forwarded_report_state
+
                 return admin_group_banner_message
 
         except BadRequest as e:
@@ -2391,57 +2451,33 @@ if __name__ == "__main__":
 
         keyboard.add(confirm_btn, cancel_btn)
 
+        # """
+        forwarded_reports_states: dict = DP.get("forwarded_reports_states")
+        if forwarded_reports_states is None:
+            LOGGER.warning("No states recorded!")
+            # reply message and remove buttons
+            return
+        # unpack states for the report_id to ban
+        banner_message_origin: types.Message = forwarded_reports_states[
+            report_id_to_ban
+        ]["banner_message_origin"]
+        action_banner_message: types.Message = forwarded_reports_states[
+            report_id_to_ban
+        ]["action_banner_message"]
+        report_chat_id: int = forwarded_reports_states[report_id_to_ban][
+            "report_chat_id"
+        ]
+        # check received states for None
+
+        # clear states for the designated report_id_to_ban
+        del forwarded_reports_states[report_id_to_ban]
+        # update DP states storage
+        DP["forwarded_reports_states"] = forwarded_reports_states
+
+        # Edit messages to remove buttons or messages
+        # check where the callback_query was pressed
+        # remove buttons and add Confirm/Cancel buttons in the same chat
         try:
-            banner_message_origin: types.Message = DP.get(
-                "admin_group_banner_message"
-            ) or DP.get(
-                "admin_group_banner_autoreport_message"
-            )  # check message object for AUTO/MANUAL report origin
-            if banner_message_origin is None:
-                LOGGER.error(
-                    "Admin Group Banner Message is None. Cannot proceed with the action."
-                )
-                return  # or handle the error appropriately)
-
-            # # BUG None if autoreport!!! get "admin_action_banner_autoreport_message" in that case instead and check for None
-            action_banner_message: types.Message = DP.get(
-                "admin_action_banner_message"
-            ) or DP.get(
-                "admin_action_banner_autoreport_message"
-            )  # if this is MANUAL action by ADMIN
-            if action_banner_message is None:
-                LOGGER.error(
-                    "\033[93mPersonal action Banner Autoreport message is None. This is AUTOREPORT or non-ADMIN user report!\033[0m"
-                )
-                # return  # or handle the error appropriately
-
-            # BUG None if autoreport!!! get "autoreport_chat_id" in that case instead and check for None
-            report_chat_id = DP.get("report_chat_id") or DP.get("autoreport_chat_id")
-            if report_chat_id is None:
-                LOGGER.error("Report chat ID is None. Cannot proceed with the action.")
-                return  # or handle the error appropriately
-
-            # LOGGER.debug(
-            #     "agbm: %s, agbam: %s, aabm: %s, rcid: %s",
-            #     DP.get("admin_group_banner_message"),
-            #     DP.get("admin_group_banner_autoreport_message"),
-            #     DP.get("admin_action_banner_message"),
-            #     DP.get("report_chat_id"),
-            # )
-
-            # clear states
-            DP["admin_group_banner_message"] = None
-            DP["admin_group_banner_autoreport_message"] = None
-
-            DP["admin_action_banner_message"] = None
-            DP["admin_action_banner_autoreport_message"] = None
-
-            DP["report_chat_id"] = None
-            DP["autoreport_chat_id"] = None
-
-            # Edit messages to remove buttons or messages
-            # check where the callback_query was pressed
-            # remove buttons and add Confirm/Cancel buttons in the same chat
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
@@ -2470,6 +2506,7 @@ if __name__ == "__main__":
                     )
                     return
 
+        # FIXME exceptions type
         except KeyError as e:
             LOGGER.error(
                 "\033[93m%s Error while removing the buttons: %s. Message reported by non-admin user?\033[0m",
@@ -3849,7 +3886,10 @@ if __name__ == "__main__":
             if (
                 rogue_chan_id in banned_users_dict
             ):  # check if channel already banned to prevent unneccessary actions
-                LOGGER.debug("\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m", rogue_chan_id)
+                LOGGER.debug(
+                    "\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m",
+                    rogue_chan_id,
+                )
                 await message.reply(f"Channel {rogue_chan_id} already banned.")
                 return
 
@@ -4198,6 +4238,14 @@ if __name__ == "__main__":
         button_pressed_by = callback_query.from_user.username
         admin_id = callback_query.from_user.id
 
+        # Unpack user_name
+        user_name_dict = active_user_checks_dict.get(user_id_legit, "!UNDEFINED!")
+        # check if user_name_dict is a dict
+        if isinstance(user_name_dict, dict):
+            user_name = user_name_dict["username"]
+        else:
+            user_name = user_name_dict
+
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
@@ -4207,19 +4255,19 @@ if __name__ == "__main__":
         # check if user already left active checks or button pressed after 3 hrs after report
         if user_id_legit not in active_user_checks_dict:
             LOGGER.error(
-                "%s legitimized by %s(%s) not found in active_user_checks_dict",
+                "%s:@%s legitimized by %s(%s) not found in active_user_checks_dict",
                 user_id_legit,
+                user_name,
                 button_pressed_by,
                 admin_id,
             )
             await callback_query.answer("User not found in active checks.")
             return
 
-        # DEBUG:
-        # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
         LOGGER.info(
-            "\033[95m%s:@!UNKNOWN! Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
+            user_name,
             admin_id,
             button_pressed_by,
         )
@@ -4278,6 +4326,7 @@ if __name__ == "__main__":
                 button_pressed_by,
                 active_user_checks_dict,
             )
+        return
 
     @DP.message_handler(
         is_admin_user_message,

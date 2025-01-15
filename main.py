@@ -4293,12 +4293,6 @@ if __name__ == "__main__":
             for task in asyncio.all_tasks():
                 if task.get_name() == str(user_id_legit):
                     task.cancel()
-        # log that user checks is cancelled by admin
-        if user_id_legit in active_user_checks_dict:
-            del active_user_checks_dict[user_id_legit]
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(user_id_legit):
-                    task.cancel()
 
         # Log that user checks are cancelled by admin
         if len(active_user_checks_dict) > 3:

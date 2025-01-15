@@ -3849,6 +3849,7 @@ if __name__ == "__main__":
             if (
                 rogue_chan_id in banned_users_dict
             ):  # check if channel already banned to prevent unneccessary actions
+                LOGGER.debug("\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m", rogue_chan_id)
                 await message.reply(f"Channel {rogue_chan_id} already banned.")
                 return
 

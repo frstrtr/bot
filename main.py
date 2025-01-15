@@ -412,7 +412,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
-    LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
+    # LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
     else:
@@ -814,6 +814,7 @@ async def handle_forwarded_reports_with_details(
         found_message_data[0],  # from_chat_id
         found_message_data[1],  # message_id
         message_thread_id=ADMIN_AUTOREPORTS,
+        disable_notification=True,
     )
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     admin_group_banner_autoreport_message = await BOT.send_message(
@@ -1053,8 +1054,13 @@ async def check_and_autoban(
 
         if message_to_delete:
             LOGGER.debug("%s message to delete list (#CNAB)", message_to_delete)
+            origin_chat_id = (
+                int(f"-100{message_to_delete[0]}")
+                if message_to_delete[0] > 0
+                else message_to_delete[0]
+            )
             try:
-                await BOT.delete_message(message_to_delete[0], message_to_delete[1])
+                await BOT.delete_message(origin_chat_id, message_to_delete[1])
             except ChatNotFound:
                 LOGGER.error(
                     "%s:@%s Chat not found: %s",
@@ -2314,6 +2320,7 @@ if __name__ == "__main__":
                     ADMIN_GROUP_ID,
                     message.chat.id,
                     message.message_id,
+                    disable_notification=True,
                 )
                 # Send report banner to the admin group
                 admin_group_banner_message = await BOT.send_message(
@@ -2436,7 +2443,8 @@ if __name__ == "__main__":
     @DP.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
     async def ask_confirmation(callback_query: CallbackQuery):
         """Function to ask for confirmation before banning the user."""
-        *_, report_id_to_ban = callback_query.data.split("_")
+        *_, report_id_to_ban_str = callback_query.data.split("_")
+        report_id_to_ban = int(report_id_to_ban_str)
 
         # DEBUG:
         # logger.debug(f"Report {callback_query} confirmed for banning.")
@@ -2453,24 +2461,29 @@ if __name__ == "__main__":
 
         # """
         forwarded_reports_states: dict = DP.get("forwarded_reports_states")
+        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
         if forwarded_reports_states is None:
             LOGGER.warning("No states recorded!")
             # reply message and remove buttons
             return
+        """                forwarded_report_state[report_id] = {
+                    "original_forwarded_message": message,
+                    "admin_group_banner_message": admin_group_banner_message,
+                    "action_banner_message": admin_action_banner_message,
+                    "report_chat_id": message.chat.id,"""
         # unpack states for the report_id to ban
-        banner_message_origin: types.Message = forwarded_reports_states[
-            report_id_to_ban
-        ]["banner_message_origin"]
-        action_banner_message: types.Message = forwarded_reports_states[
-            report_id_to_ban
-        ]["action_banner_message"]
-        report_chat_id: int = forwarded_reports_states[report_id_to_ban][
-            "report_chat_id"
+        admin_group_banner_message: types.Message = forwarded_report_state[
+            "admin_group_banner_message"
         ]
+        action_banner_message: types.Message = forwarded_report_state[
+            "action_banner_message"
+        ]
+        report_chat_id: int = forwarded_report_state["report_chat_id"]
         # check received states for None
 
         # clear states for the designated report_id_to_ban
         del forwarded_reports_states[report_id_to_ban]
+
         # update DP states storage
         DP["forwarded_reports_states"] = forwarded_reports_states
 
@@ -2484,7 +2497,7 @@ if __name__ == "__main__":
                 reply_markup=keyboard,
             )
 
-            if banner_message_origin:
+            if admin_group_banner_message:
                 if (
                     callback_query.message.chat.id == ADMIN_GROUP_ID
                     and action_banner_message  # Action done in Admin group and reported by admin
@@ -2502,7 +2515,7 @@ if __name__ == "__main__":
                     # remove admin group banner buttons
                     await BOT.edit_message_reply_markup(
                         chat_id=ADMIN_GROUP_ID,
-                        message_id=banner_message_origin.message_id,
+                        message_id=admin_group_banner_message.message_id,
                     )
                     return
 
@@ -3007,8 +3020,8 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                ADMIN_SUSPICIOUS,
-                True,
+                message_thread_id=ADMIN_SUSPICIOUS,
+                disable_notification=True,
             )
             # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
             await BOT.send_message(

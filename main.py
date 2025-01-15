@@ -3430,7 +3430,7 @@ if __name__ == "__main__":
                         + entity_spam_trigger
                         + " inside"
                     )
-                    if await check_n_ban(message, the_reason):
+                    if check_n_ban(message, the_reason):
                         return
                     else:
                         LOGGER.info(
@@ -4194,7 +4194,8 @@ if __name__ == "__main__":
         """Function to stop checks for the user."""
         *_, user_id_legit = callback_query.data.split("_")
         user_id_legit = int(user_id_legit)
-        user_name = active_user_checks_dict[user_id_legit]
+        button_pressed_by = callback_query.from_user.username
+        admin_id = callback_query.from_user.id
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
@@ -4202,14 +4203,22 @@ if __name__ == "__main__":
             message_id=callback_query.message.message_id,
         )
 
-        button_pressed_by = callback_query.from_user.username
-        admin_id = callback_query.from_user.id
+        # check if user already left active checks or button pressed after 3 hrs after report
+        if user_id_legit not in active_user_checks_dict:
+            LOGGER.error(
+                "%s legitimized by %s(%s) not found in active_user_checks_dict",
+                user_id_legit,
+                button_pressed_by,
+                admin_id,
+            )
+            await callback_query.answer("User not found in active checks.")
+            return
+
         # DEBUG:
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
         LOGGER.info(
-            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            "\033[95m%s:@!UNKNOWN! Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
-            user_name,
             admin_id,
             button_pressed_by,
         )

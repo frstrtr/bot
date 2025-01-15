@@ -1540,16 +1540,18 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
 
     """
     if user_id in running_watchdogs:
+        # skip firing new coro but await existing one
         LOGGER.info(
             "\033[93m%s:@%s Watchdog is already set. Skipping new task.\033[0m",
             user_id,
             user_name,
         )
-        return  # Do nothing; a watchdog is already active.
-        # return await running_watchdogs[
-        #     user_id
-        # ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
-
+        # return  # Do nothing; a watchdog is already active.
+        await running_watchdogs[
+            user_id
+        ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
+        return
+    
     # Create the task and store it in the running_watchdogs dictionary
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task

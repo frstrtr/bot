@@ -25,6 +25,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     ChatMemberStatus,
+    ChatActions,
 )
 
 from aiogram import executor
@@ -1561,22 +1562,11 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
             user_id,
             user_name,
         )
-        # Cancel the existing task
-        running_watchdogs[user_id].cancel()
-        try:
-
-            # Check if its successfully cancelled
-            await running_watchdogs[user_id]
-
-        except asyncio.CancelledError:
-            LOGGER.info(
-                "\033[93m%s:@%s Existing watchdog task cancelled successfully!.\033[0m",
-                user_id,
-                user_name,
-            )
-
-    # clear dict record
-    # del running_watchdogs[user_id]
+        # return  # Do nothing; a watchdog is already active.
+        await running_watchdogs[
+            user_id
+        ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
+        return
 
     # Create the task and store it in the running_watchdogs dictionary
     task = asyncio.create_task(coro, name=str(user_id))

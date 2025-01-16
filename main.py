@@ -1456,10 +1456,23 @@ async def perform_checks(
                         ]
             else:
                 LOGGER.warning(
-                    "%s:@%s User ID not found in active_user_checks_dict",
+                    "%s:@%s User ID not found in active_user_checks_dict. Skipping...",
                     user_id,
                     user_name,
                 )
+                # cancel cycle and cancel task if it is available
+                if user_id in running_watchdogs:
+                    running_watchdogs[user_id].cancel()
+                try:
+                    await running_watchdogs[user_id]
+                except asyncio.CancelledError:
+                    LOGGER.info(
+                        "%s:@%s Watchdog disabled.",
+                        user_id,
+                        user_name,
+                    )
+                # stop cycle
+                break
 
             if await check_and_autoban(
                 event_record,

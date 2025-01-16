@@ -1198,12 +1198,12 @@ async def check_n_ban(message: types.Message, reason: str):
     if lolscheck is True:
         # send message to the admin group AUTOREPORT thread
         LOGGER.info(
-            "%s in %s (%s):@%s message %s",
+            "%s in %s (%s):%s message %s",
             reason,
             message.chat.title,
             message.chat.id,
-            message.message_id,
             message.chat.username if message.chat.username else "!NONAME!",
+            message.message_id,
         )
         time_passed = reason.split("...")[0].split()[-1]
         # delete id from the active_user_checks_dict

@@ -1504,7 +1504,10 @@ async def perform_checks(
         if (
             user_id in active_user_checks_dict
         ):  # avoid case when manually banned by admin same time
-            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+            # banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+            del active_user_checks_dict[
+                user_id
+            ]  # remove user from active checks dict as LEGIT
             if len(active_user_checks_dict) > 3:
                 active_user_checks_dict_last3_list = list(
                     active_user_checks_dict.items()
@@ -2961,12 +2964,12 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup()
 
         # Add buttons to the keyboard, each in a new row
-        inline_kb.add(InlineKeyboardButton("View Original Message", url=message_link))
-        inline_kb.add(InlineKeyboardButton("Check LOLS Data", url=lols_link))
+        inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
         # Add callback data button to prevent further checks
         inline_kb.add(
             InlineKeyboardButton(
-                "Seems legit, STOP checks",
+                "🟢Seems legit, STOP checks",
                 callback_data=f"stop_checks_{message.from_user.id}",
             )
         )
@@ -3079,7 +3082,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\nClick buttons below for more information:",
+                f"<code>{message_link}</code>\n{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick buttons below for more information:",
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_SUSPICIOUS,
                 parse_mode="HTML",

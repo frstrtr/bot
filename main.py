@@ -1,5 +1,6 @@
 import asyncio
 import aiocron
+import argparse
 from datetime import datetime
 import os
 import random
@@ -25,7 +26,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     ChatMemberStatus,
-    ChatActions,
+    ChatActions,  # for banchan actions
 )
 
 from aiogram import executor
@@ -106,16 +107,28 @@ from utils.utils_config import (
     ALLOWED_CONTENT_TYPES,
 )
 
+# Parse command line arguments
+parser = argparse.ArgumentParser(
+    description="Run the bot with specified logging level."
+)
+parser.add_argument(
+    "--log-level",
+    type=str,
+    default="INFO",
+    choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    help="Set the logging level (default: INFO)",
+)
+args = parser.parse_args()
 
 # LOGGER init
-LOGGER = initialize_logger()
+LOGGER = initialize_logger(args.log_level)
 
 tracemalloc.start()
 
 # List of predetermined sentences to check for
 PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt", LOGGER)
 
-bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+bot_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
 
 # Set to keep track of active user IDs

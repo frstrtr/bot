@@ -1250,27 +1250,31 @@ async def check_n_ban(message: types.Message, reason: str):
                 if task.get_name() == str(message.from_user.id):
                     task.cancel()
         # forward the telefragged message to the admin group
-        await message.forward(
-            chat_id=ADMIN_GROUP_ID,
-            message_thread_id=ADMIN_AUTOBAN,
-            disable_notification=True,
-        )
-        # try:
-        #     await BOT.forward_message(
-        #         ADMIN_GROUP_ID,
-        #         message.chat.id,
-        #         message.message_id,
-        #         message_thread_id=ADMIN_AUTOBAN,
-        #     )
-        # except MessageToForwardNotFound as e:
-        #     LOGGER.error(
-        #         "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
-        #         message.from_user.id,
-        #         message.message_id,
-        #         message.chat.title,
-        #         message.chat.id,
-        #         e,
-        #     )
+        try:
+            if message is not None:
+                await message.forward(
+                    chat_id=ADMIN_GROUP_ID,
+                    message_thread_id=ADMIN_AUTOBAN,
+                    disable_notification=True,
+                )
+                LOGGER.debug("%s message.forward #CNB", message.from_user.id)
+            else:
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=ADMIN_AUTOBAN,
+                )
+                LOGGER.debug("%s BOT.forward_message #CNB", message.from_user.id)
+        except MessageToForwardNotFound as e:
+            LOGGER.error(
+                "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+                e,
+            )
         # send the telefrag log message to the admin group
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(

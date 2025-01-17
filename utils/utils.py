@@ -48,15 +48,14 @@ import emoji
 from aiogram import types
 
 
-def initialize_logger():
+def initialize_logger(log_level="INFO"):
     """Initialize the logger."""
+
     # Configure logging to use UTF-8 encoding
     logger = logging.getLogger(__name__)
     if not logger.hasHandlers():
-        logger.setLevel(
-            # logging.DEBUG
-            logging.INFO
-        )  # Set the logging level to INFO for detailed output
+        log_level = getattr(logging, log_level.upper(), logging.INFO)
+        logger.setLevel(log_level)  # Set the logging level based on the argument
 
         # Create handlers
         stream_handler = logging.StreamHandler(sys.stdout)

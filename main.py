@@ -96,8 +96,8 @@ from utils.utils_config import (
     BOT_USERID,
     LOG_GROUP,
     LOG_GROUP_NAME,
-    TECHNO_LOG_GROUP,
-    TECHNO_LOG_GROUP_NAME,
+    TECHNOLOG_GROUP,
+    TECHNOLOG_GROUP_NAME,
     DP,
     BOT,
     LOGGER,
@@ -584,7 +584,7 @@ async def on_shutdown(_dp):
     # number of active user checks forwarded to the next session
 
     await BOT.send_message(
-        TECHNO_LOG_GROUP,
+        TECHNOLOG_GROUP,
         (
             "Runtime session shutdown stats:\n"
             f"Bot started at: {bot_start_time}\n"
@@ -697,7 +697,7 @@ async def handle_forwarded_reports_with_details(
     LOGGER.debug(
         "%-10s - message data: %s", f"{found_message_data[3]:10}", found_message_data
     )
-    # logger.debug("message object: %s", message)
+    # LOGGER.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
     received_date = message.date if message.date else None
@@ -1803,7 +1803,7 @@ if __name__ == "__main__":
     LOGGER.info("Using bot id: %s", BOT_USERID)
     LOGGER.info("Using log group: %s, id: %s", LOG_GROUP_NAME, LOG_GROUP)
     LOGGER.info(
-        "Using techno log group: %s, id: %s", TECHNO_LOG_GROUP_NAME, TECHNO_LOG_GROUP
+        "Using techno log group: %s, id: %s", TECHNOLOG_GROUP_NAME, TECHNOLOG_GROUP
     )
     channel_info = [f"{name}({id_})" for name, id_ in zip(CHANNEL_NAMES, CHANNEL_IDS)]
     LOGGER.info("Monitoring chats: %s", ", ".join(channel_info))
@@ -1902,7 +1902,7 @@ if __name__ == "__main__":
         )
 
         await BOT.send_message(
-            TECHNO_LOG_GROUP,
+            TECHNOLOG_GROUP,
             inout_logmessage,
             message_thread_id=TECHNO_INOUT,
             parse_mode="HTML",

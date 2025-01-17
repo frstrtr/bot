@@ -29,8 +29,8 @@ BOT_NAME = None
 BOT_USERID = None
 LOG_GROUP = None
 LOG_GROUP_NAME = None
-TECHNO_LOG_GROUP = None
-TECHNO_LOG_GROUP_NAME = None
+TECHNOLOG_GROUP = None
+TECHNOLOG_GROUP_NAME = None
 DP = None
 BOT = None
 ALLOWED_UPDATES = []
@@ -46,7 +46,7 @@ def load_config():
     global CHANNEL_NAMES, SPAM_TRIGGERS, ADMIN_SUSPICIOUS, TECHNO_ADMIN
     global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
-    global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNO_LOG_GROUP, TECHNO_LOG_GROUP_NAME
+    global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNOLOG_GROUP, TECHNOLOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
     global API_TOKEN
 
@@ -132,8 +132,8 @@ def load_config():
         BOT_USERID = int(API_TOKEN.split(":")[0])
         LOG_GROUP = config_XML_root.find("log_group").text
         LOG_GROUP_NAME = config_XML_root.find("log_group_name").text
-        TECHNO_LOG_GROUP = config_XML_root.find("techno_log_group").text
-        TECHNO_LOG_GROUP_NAME = config_XML_root.find("techno_log_group_name").text
+        TECHNOLOG_GROUP = config_XML_root.find("techno_log_group").text
+        TECHNOLOG_GROUP_NAME = config_XML_root.find("techno_log_group_name").text
 
         BOT = Bot(token=API_TOKEN)
         DP = Dispatcher(BOT)

@@ -3216,6 +3216,14 @@ if __name__ == "__main__":
                         f"banned in chat {message.chat.title} ({message.chat.id})"
                     )
                     LOGGER.info(log_chan_data)
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        log_chan_data,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        disable_web_page_preview=True,
+                        disable_notification=True,
+                    )
                     return  # stop actions for this message forwarded from channel/chat
                 except BadRequest as e:
                     LOGGER.error(

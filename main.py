@@ -1202,8 +1202,8 @@ async def check_n_ban(message: types.Message, reason: str):
             reason,
             message.chat.title,
             message.chat.id,
-            message.message_id,
             message.chat.username if message.chat.username else "!NONAME!",
+            message.message_id,
         )
         time_passed = reason.split("...")[0].split()[-1]
         # delete id from the active_user_checks_dict

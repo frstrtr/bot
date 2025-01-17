@@ -204,21 +204,17 @@ def get_spammer_details(
 
     LOGGER.debug(
         "\033[93m%s getting chat ID and message ID\n"
-        "\t\t\t%s firstName : %s : lastName : %s,\n"
-        "\t\t\t%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "\t\t\t%s forwardSenderName: %s, forwardedFromID: %s,\n"
-        "\t\t\t%s forwardedFromChatID: %s, forwardSenderChatID: %s\n\033[0m",
-        spammer_id_str,
+        "\t\t\tfirstName : %s : lastName : %s,\n"
+        "\t\t\tmessageForwardDate: %s, forwardedFromChatTitle: %s,\n"
+        "\t\t\tforwardSenderName: %s, forwardedFromID: %s,\n"
+        "\t\t\tforwardedFromChatID: %s, forwardSenderChatID: %s\n\033[0m",
         spammer_id_str,
         spammer_first_name,
         spammer_last_name,
-        spammer_id_str,
         message_forward_date,
         forward_from_chat_title,
-        spammer_id_str,
         forward_sender_name,
         forwarded_from_id,
-        spammer_id_str,
         forwarded_from_chat_id,
         froward_sender_chat_id,
     )

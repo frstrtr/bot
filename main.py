@@ -3067,7 +3067,7 @@ if __name__ == "__main__":
             # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\n{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick the button below to view the suspicious message:",
+                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
                 reply_markup=inline_kb,
                 parse_mode="HTML",
                 message_thread_id=ADMIN_SUSPICIOUS,

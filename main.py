@@ -4289,7 +4289,7 @@ if __name__ == "__main__":
         user_name_dict = active_user_checks_dict.get(user_id_legit, "!UNDEFINED!")
         # check if user_name_dict is a dict
         if isinstance(user_name_dict, dict):
-            user_name = user_name_dict["username"]
+            user_name = str(user_name_dict["username"]).lstrip("@")
         else:
             user_name = user_name_dict
 

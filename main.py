@@ -1887,6 +1887,8 @@ if __name__ == "__main__":
             if update.chat.username
             else f'<a href="https://t.me/c/{str(update.chat.id)[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
         )
+        # Get current date and time DD-MM-YY HH:MM
+        greet_timestamp = datetime.now().strftime("%d-%m-%y %H:%M")
         # Construct the log message
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
@@ -1895,6 +1897,7 @@ if __name__ == "__main__":
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"
             f"💬 {universal_chatlink}\n"
+            f"🕔 {greet_timestamp}\n"
             f"🔗 <b>profile links:</b>\n"
             f"   ├ <b><a href='tg://user?id={inout_userid}'>id based profile link</a></b>\n"
             f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"

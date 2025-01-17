@@ -1198,12 +1198,12 @@ async def check_n_ban(message: types.Message, reason: str):
     if lolscheck is True:
         # send message to the admin group AUTOREPORT thread
         LOGGER.info(
-            "%s in %s (%s):%s message %s",
+            "%s in %s (%s):@%s message %s",
             reason,
             message.chat.title,
             message.chat.id,
-            message.chat.username if message.chat.username else "!NONAME!",
             message.message_id,
+            message.chat.username if message.chat.username else "!NONAME!",
         )
         time_passed = reason.split("...")[0].split()[-1]
         # delete id from the active_user_checks_dict
@@ -1250,28 +1250,22 @@ async def check_n_ban(message: types.Message, reason: str):
                 if task.get_name() == str(message.from_user.id):
                     task.cancel()
         # forward the telefragged message to the admin group
-        message.forward(
-            chat_id=ADMIN_GROUP_ID,
-            message_thread_id=ADMIN_AUTOBAN,
-            disable_notification=True,
-        )
-        # try:
-        #     await BOT.forward_message(
-        #         ADMIN_GROUP_ID,
-        #         message.chat.id,
-        #         message.message_id,
-        #         message_thread_id=ADMIN_AUTOBAN,
-        #     )
-        # except MessageToForwardNotFound as e:
-        #     LOGGER.error(
-        #         "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
-        #         message.from_user.id,
-        #         message.message_id,
-        #         message.chat.title,
-        #         message.chat.id,
-        #         e,
-        #     )
-
+        try:
+            await BOT.forward_message(
+                ADMIN_GROUP_ID,
+                message.chat.id,
+                message.message_id,
+                message_thread_id=ADMIN_AUTOBAN,
+            )
+        except MessageToForwardNotFound as e:
+            LOGGER.error(
+                "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
+                message.from_user.id,
+                message.message_id,
+                message.chat.title,
+                message.chat.id,
+                e,
+            )
         # send the telefrag log message to the admin group
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
@@ -1297,7 +1291,6 @@ async def check_n_ban(message: types.Message, reason: str):
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        # send @NAMES thread user name
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
@@ -1475,10 +1468,21 @@ async def perform_checks(
                     await running_watchdogs[user_id]
                 except asyncio.CancelledError:
                     LOGGER.info(
-                        "%s:@%s Watchdog disabled.",
+                        "%s:@%s Watchdog disabled.(Cancelled)",
                         user_id,
                         user_name,
                     )
+                    # stop cycle
+                    break
+                except KeyError as e:
+                    LOGGER.info(
+                        "%s:@%s Watchdog disabled.(%s)",
+                        user_id,
+                        user_name,
+                        e,
+                    )
+                    # stop cycle
+                    break
                 # stop cycle
                 break
 

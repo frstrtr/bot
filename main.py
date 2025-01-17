@@ -3115,11 +3115,23 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
             )
 
-            # check if message is forward from channel or posted as a channel XXX#1
+            # check if message is forward from banned channel or posted as a banned channel XXX#1
+            chan_id = (
+                message.sender_chat.id
+                if message.sender_chat
+                else (
+                    message.forward_from_chat.id
+                    if message.forward_from_chat
+                    else message.from_user.id
+                )
+            )
             if (
                 message.sender_chat
                 or message.forward_from_chat
-                and message.from_user.id in banned_users_dict
+                and (
+                    message.from_user.id in banned_users_dict
+                    or chan_id in banned_users_dict
+                )
             ):
                 if message.sender_chat:
                     banned_users_dict[message.sender_chat.id] = (
@@ -3179,7 +3191,7 @@ if __name__ == "__main__":
                         )
                     else:
                         LOGGER.info(
-                            "\033[93mRogue chat %s already banned.\033[0m",
+                            "\033[93mRogue chat %s already banned.Chan AUTOBAN cancelled.\033[0m",
                             rogue_chat_id,
                         )
                         ban_rogue_chan_task = (
@@ -3204,6 +3216,7 @@ if __name__ == "__main__":
                         f"banned in chat {message.chat.title} ({message.chat.id})"
                     )
                     LOGGER.info(log_chan_data)
+                    return  # stop actions for this message forwarded from channel/chat
                 except BadRequest as e:
                     LOGGER.error(
                         "Error banning channel %s in chat %s: %s",
@@ -3211,13 +3224,13 @@ if __name__ == "__main__":
                         message.chat.id,
                         e,
                     )
+                    return  # stop processing further this message
             else:
                 await BOT.delete_message(message.chat.id, message.message_id)
                 await BOT.ban_chat_member(
                     message.chat.id, message.from_id, revoke_messages=True
                 )
-
-            # return
+            return
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group

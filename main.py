@@ -3108,7 +3108,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\n{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick buttons below for more information:",
+                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick buttons below for more information:",
                 reply_markup=inline_kb,
                 message_thread_id=ADMIN_SUSPICIOUS,
                 parse_mode="HTML",

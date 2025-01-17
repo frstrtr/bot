@@ -54,7 +54,8 @@ def initialize_logger():
     logger = logging.getLogger(__name__)
     if not logger.hasHandlers():
         logger.setLevel(
-            logging.DEBUG
+            # logging.DEBUG
+            logging.INFO
         )  # Set the logging level to INFO for detailed output
 
         # Create handlers

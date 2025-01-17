@@ -1925,9 +1925,10 @@ if __name__ == "__main__":
         color = status_colors.get(inout_status, "")  # Default to no color
         reset_color = "\033[0m" if color else ""  # Reset color if a color was used
         LOGGER.info(
-            "%s%s --> %s in %s%s",
+            "%s%s:@%s --> %s in %s%s",
             color,
             inout_userid,
+            inout_username,
             inout_status,
             inout_chattitle,
             reset_color,
@@ -4452,8 +4453,9 @@ if __name__ == "__main__":
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "%s changed in user_changed_message function: %s --> %s, deleting system message...",
+            "%s:@%s changed in user_changed_message function: %s --> %s, deleting system message...",
             message.from_id,
+            message.from_user.username if message.from_user.username else "!UNDEFINED!",
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
         )

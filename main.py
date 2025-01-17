@@ -3237,6 +3237,12 @@ if __name__ == "__main__":
                     tasks = [task for task in tasks if task is not None]
                     await asyncio.gather(*tasks)
 
+                    admin_log_chan_data = (
+                        f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "
+                        f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>):"
+                        f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
+                        f"banned in chat {message.chat.title} (<code>{message.chat.id}</code>)"
+                    )
                     log_chan_data = (
                         f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "
                         f"({message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}):"
@@ -3246,7 +3252,7 @@ if __name__ == "__main__":
                     LOGGER.info(log_chan_data)
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        log_chan_data,
+                        admin_log_chan_data,
                         parse_mode="HTML",
                         message_thread_id=ADMIN_SUSPICIOUS,
                         disable_web_page_preview=True,

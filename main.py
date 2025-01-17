@@ -186,6 +186,7 @@ def get_spammer_details(
     forward_sender_name="",
     forward_from_chat_title="",
     forwarded_from_id=None,
+    forwarded_from_chat_id=None,
 ):
     """Function to get chat ID and message ID by sender name and date
     or if the message is a forward of a forward then using
@@ -204,7 +205,8 @@ def get_spammer_details(
         "\033[93m%s getting chat ID and message ID\n"
         "\t\t\t%s firstName : %s : lastName : %s,\n"
         "\t\t\t%s messageForwardDate: %s, forwardedFromChatTitle: %s,\n"
-        "\t\t\t%s forwardSenderName: %s, forwardedFromID: %s\n\033[0m",
+        "\t\t\t%s forwardSenderName: %s, forwardedFromID: %s",
+        "\t\t\t%s forwardedFromChatID: %s\n\033[0m",
         spammer_id_str,
         spammer_id_str,
         spammer_first_name,
@@ -215,6 +217,8 @@ def get_spammer_details(
         spammer_id_str,
         forward_sender_name,
         forwarded_from_id,
+        spammer_id,
+        forwarded_from_chat_id,
     )
 
     # Common SQL and parameters for both cases
@@ -343,6 +347,7 @@ async def take_heuristic_action(message: types.Message, reason):
         message.forward_sender_name,
         message.forward_from_chat.title if message.forward_from_chat else None,
         forwarded_from_id=message.from_user.id,
+        forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
     )
     await handle_forwarded_reports_with_details(
         message,
@@ -687,6 +692,7 @@ async def handle_forwarded_reports_with_details(
                 message.forward_date,
                 forward_sender_name,
                 forward_from_chat_title,
+                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
             )
             LOGGER.debug(
                 "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
@@ -2178,6 +2184,7 @@ if __name__ == "__main__":
                 forward_sender_name,
                 forward_from_chat_title,
                 forwarded_from_id=spammer_id,
+                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
             )
 
         # For users with open profiles, or if previous fetch didn't work.
@@ -2190,6 +2197,7 @@ if __name__ == "__main__":
                 forward_sender_name,
                 forward_from_chat_title,
                 forwarded_from_id=None,
+                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
             )
 
         # Try getting details for forwarded messages from channels.
@@ -2201,6 +2209,7 @@ if __name__ == "__main__":
                 message.forward_date,
                 forward_sender_name,
                 forward_from_chat_title,
+                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
             )
 
         if not found_message_data:
@@ -2212,6 +2221,7 @@ if __name__ == "__main__":
                     message.forward_date,
                     forward_sender_name,
                     forward_from_chat_title,
+                    forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
                 )
                 LOGGER.debug(
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."

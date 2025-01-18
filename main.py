@@ -2618,8 +2618,9 @@ if __name__ == "__main__":
             *_, report_id_to_ban = callback_query.data.split("_")
             report_id_to_ban = int(report_id_to_ban)
             LOGGER.info(
-                "\033[95m%s:@ADMIN requested to ban REPORT %s\033[0m",
+                "\033[95m%s:@%s requested to ban REPORT %s\033[0m",
                 button_pressed_by,
+                callback_query.from_user.id,
                 report_id_to_ban,
             )
 

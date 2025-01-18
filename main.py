@@ -345,7 +345,9 @@ async def take_heuristic_action(message: types.Message, reason):
         message.forward_sender_name,
         message.forward_from_chat.title if message.forward_from_chat else None,
         forwarded_from_id=message.from_user.id,
-        forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
+        forwarded_from_chat_id=(
+            message.forward_from_chat.id if message.forward_from_chat else None
+        ),
         froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
     )
     await handle_forwarded_reports_with_details(
@@ -691,8 +693,12 @@ async def handle_forwarded_reports_with_details(
                 message.forward_date,
                 forward_sender_name,
                 forward_from_chat_title,
-                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
-                froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
+                forwarded_from_chat_id=(
+                    message.forward_from_chat.id if message.forward_from_chat else None
+                ),
+                froward_sender_chat_id=(
+                    message.sender_chat.id if message.sender_chat else None
+                ),
             )
             LOGGER.debug(
                 "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
@@ -2184,8 +2190,12 @@ if __name__ == "__main__":
                 forward_sender_name,
                 forward_from_chat_title,
                 forwarded_from_id=spammer_id,
-                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
-                froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
+                forwarded_from_chat_id=(
+                    message.forward_from_chat.id if message.forward_from_chat else None
+                ),
+                froward_sender_chat_id=(
+                    message.sender_chat.id if message.sender_chat else None
+                ),
             )
 
         # For users with open profiles, or if previous fetch didn't work.
@@ -2198,8 +2208,12 @@ if __name__ == "__main__":
                 forward_sender_name,
                 forward_from_chat_title,
                 forwarded_from_id=None,
-                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
-                froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
+                forwarded_from_chat_id=(
+                    message.forward_from_chat.id if message.forward_from_chat else None
+                ),
+                froward_sender_chat_id=(
+                    message.sender_chat.id if message.sender_chat else None
+                ),
             )
 
         # Try getting details for forwarded messages from channels.
@@ -2211,8 +2225,12 @@ if __name__ == "__main__":
                 message.forward_date,
                 forward_sender_name,
                 forward_from_chat_title,
-                forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
-                froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
+                forwarded_from_chat_id=(
+                    message.forward_from_chat.id if message.forward_from_chat else None
+                ),
+                froward_sender_chat_id=(
+                    message.sender_chat.id if message.sender_chat else None
+                ),
             )
 
         if not found_message_data:
@@ -2224,8 +2242,14 @@ if __name__ == "__main__":
                     message.forward_date,
                     forward_sender_name,
                     forward_from_chat_title,
-                    forwarded_from_chat_id=message.forward_from_chat.id if message.forward_from_chat else None,
-                    froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
+                    forwarded_from_chat_id=(
+                        message.forward_from_chat.id
+                        if message.forward_from_chat
+                        else None
+                    ),
+                    froward_sender_chat_id=(
+                        message.sender_chat.id if message.sender_chat else None
+                    ),
                 )
                 LOGGER.debug(
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
@@ -3444,8 +3468,12 @@ if __name__ == "__main__":
             ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
+                if message.chat.username:
+                    message_link = construct_message_link(
+                        [message.chat.id, message.message_id, message.chat.username]
+                    )
                 LOGGER.info(
-                    "%s:@%s sent message and joined the chat %s %s ago",
+                    "%s:@%s sent message and joined the chat %s %s ago\n\t\t\tmessage link: %s",
                     message.from_id,
                     (
                         message.from_user.username
@@ -3454,21 +3482,9 @@ if __name__ == "__main__":
                     ),
                     message.chat.title,
                     human_readable_time,
-                )
-                if message.chat.username:
-                    message_link = construct_message_link(
-                        [message.chat.id, message.message_id, message.chat.username]
-                    )
-                LOGGER.info(
-                    "%s:@%s message link: %s",
-                    message.from_id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
                     message_link,
                 )
+
                 await BOT.send_message(
                     ADMIN_GROUP_ID,
                     f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. [Message Link]({message_link}) Please check it out!",

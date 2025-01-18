@@ -430,7 +430,9 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
     else:
-        LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
+        LOGGER.info(
+            "%s  CHANNEL successfully banned where it was possible", rogue_chat_id
+        )
         banned_users_dict[rogue_chat_id] = "Rogue chat"
         return True
 
@@ -2651,7 +2653,9 @@ if __name__ == "__main__":
             )
             # get report states
             forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-            forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
+            forwarded_report_state: dict = forwarded_reports_states.get(
+                report_id_to_ban
+            )
             original_forwarded_message: types.Message = forwarded_report_state[
                 "original_forwarded_message"
             ]
@@ -2935,8 +2939,11 @@ if __name__ == "__main__":
                     channel_id_to_ban,
                     CHANNEL_IDS,
                 )
-                chan_ban_msg = f"{channel_id_to_ban} also banned by AUTOREPORT#{report_id_to_ban}"
-                
+                chan_ban_msg = (
+                    f"{channel_id_to_ban} also banned by AUTOREPORT#{report_id_to_ban}"
+                )
+            else:
+                chan_ban_msg = ""
 
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
@@ -3195,93 +3202,68 @@ if __name__ == "__main__":
             )
 
             # check if message is forward from banned channel or posted as a banned channel XXX#1
-            chan_id = (
+            rogue_chan_id = (
                 message.sender_chat.id
                 if message.sender_chat
                 else (
-                    message.forward_from_chat.id
-                    if message.forward_from_chat
-                    else message.from_user.id
+                    message.forward_from_chat.id if message.forward_from_chat else None
                 )
             )
-            if (
-                message.sender_chat
-                or message.forward_from_chat
-                and (
-                    message.from_user.id in banned_users_dict
-                    or chan_id in banned_users_dict
-                )
+            if rogue_chan_id and (
+                message.from_user.id in banned_users_dict
+                or rogue_chan_id in banned_users_dict
             ):
-                if message.sender_chat:
-                    banned_users_dict[message.sender_chat.id] = (
-                        getattr(message.sender_chat, "username", None)
-                        or message.sender_chat.title
-                    )
-                if message.forward_from_chat:
-                    banned_users_dict[message.forward_from_chat.id] = (
-                        getattr(message.forward_from_chat, "username", None)
-                        or message.forward_from_chat.title
-                    )
                 try:
-                    ban_chat_task = BOT.ban_chat_sender_chat(
-                        message.chat.id,  # ban sender chat in the current chat ID
-                        (
-                            (message.sender_chat.id if message.sender_chat else None)
-                            or (
-                                message.forward_from_chat.id
-                                if message.forward_from_chat
-                                else None
-                            )
-                        ),
-                    )
                     delete_message_task = BOT.delete_message(
                         message.chat.id, message.message_id
                     )
-                    ban_member_task = BOT.ban_chat_member(
-                        message.chat.id, message.from_id, revoke_messages=True
+                    # ban_member_task = BOT.ban_chat_member(
+                    #     message.chat.id, message.from_id, revoke_messages=True
+                    # )
+                    ban_member_task = check_and_autoban(
+                        f"{message.from_user.id} CHANNELLED a SPAM message from ({rogue_chan_id})",
+                        message.from_user.id,
+                        f"{message.from_user.id} CHANNELLED a SPAM message from ({rogue_chan_id})",
+                        (
+                            message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        ),
+                        lols_spam=True,
+                        message_to_delete=None,
                     )
-                    # check if banned already
-                    rogue_chat_id = (
-                        message.sender_chat.id if message.sender_chat else None
-                    ) or (
-                        message.forward_from_chat.id
-                        if message.forward_from_chat
-                        else None
+                    # ban channel in the rest of chats
+                    ban_rogue_chan_task = ban_rogue_chat_everywhere(
+                        rogue_chan_id,
+                        CHANNEL_IDS,
                     )
-                    if rogue_chat_id not in banned_users_dict:
-                        ban_rogue_chan_task = ban_rogue_chat_everywhere(
-                            (
-                                (
-                                    message.sender_chat.id
-                                    if message.sender_chat
-                                    else None
-                                )
-                                or (
-                                    message.forward_from_chat.id
-                                    if message.forward_from_chat
-                                    else None
-                                )
-                            ),
-                            [
-                                chat_id
-                                for chat_id in CHANNEL_IDS
-                                if chat_id != message.chat.id
-                            ],  # exclude current chatID
+                    # add rogue channel to banned_users_dict
+                    if (
+                        message.sender_chat
+                        and message.sender_chat.id not in banned_users_dict
+                    ):
+                        banned_users_dict[message.sender_chat.id] = (
+                            getattr(message.sender_chat, "username", None)
+                            or message.sender_chat.title
                         )
-                    else:
-                        LOGGER.info(
-                            "\033[93mRogue chat %s already banned.Chan AUTOBAN cancelled.\033[0m",
-                            rogue_chat_id,
+                    elif (
+                        message.forward_from_chat
+                        and message.forward_from_chat.id not in banned_users_dict
+                    ):
+                        banned_users_dict[message.forward_from_chat.id] = (
+                            getattr(message.forward_from_chat, "username", None)
+                            or message.forward_from_chat.title
                         )
+                    elif rogue_chan_id in banned_users_dict:
                         ban_rogue_chan_task = (
                             None  # Prevent banning already banned channel
                         )
 
                     tasks = [
-                        ban_chat_task,
+                        # ban_chat_task,
                         delete_message_task,
                         ban_member_task,
-                        ban_rogue_chan_task,
+                        ban_rogue_chan_task if rogue_chan_id else None,
                     ]
 
                     # Filter out None values

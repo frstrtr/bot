@@ -4498,7 +4498,7 @@ if __name__ == "__main__":
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "%s:@%s changed in user_changed_message function: %s --> %s, deleting system message...",
+            "%s:@%s changed in user_changed_message function:\n\t\t\t%s --> %s, deleting system message...",
             message.from_id,
             message.from_user.username if message.from_user.username else "!UNDEFINED!",
             getattr(message, "left_chat_member", ""),

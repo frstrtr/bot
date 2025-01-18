@@ -297,17 +297,12 @@ def get_spammer_details(
     result_3_formatted = f"{result[3]:10}" if result[3] is not None else " " * 10
 
     LOGGER.info(
-        "\033[92m%-10s - result for sender: %s %s, date: %s, from chat title: %s Result: %s\033[0m",
+        "\033[92m%-10s - result for sender: %s %s, date: %s, from chat title: %s\n\t\t\tResult: %s\033[0m",
         result_3_formatted,  # padding left align 10 chars
         spammer_first_name,
         spammer_last_name,
         message_forward_date,
         forward_from_chat_title,
-        result,
-    )
-    LOGGER.debug(
-        "\033[92m%-10s Result: %s\033[0m",
-        result_3_formatted,  # padding left align 10 chars
         result,
     )
 

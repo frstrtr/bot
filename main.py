@@ -362,9 +362,9 @@ async def on_startup(_dp: Dispatcher):
     _commit_info = get_latest_commit_info(LOGGER)
 
     bot_start_message = (
-        f"\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+        f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
-        "Финальная битва между людьми и роботами...\n"
+        "Финальная битва между людьми и роботами...\033[0m\n"
     )
     LOGGER.info(bot_start_message)
 

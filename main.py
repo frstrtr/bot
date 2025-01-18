@@ -451,7 +451,7 @@ async def load_banned_users():
             )
             banned_users_dict[user_id] = user_name
         LOGGER.info(
-            "Banned users dict (%s) loaded from file: %s",
+            "\033[91mBanned users dict (%s) loaded from file: %s\033[0m",
             len(banned_users_dict),
             banned_users_dict,
         )
@@ -492,7 +492,7 @@ async def load_active_user_checks():
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
         LOGGER.info(
-            "Active users checks dict (%s) loaded from file: %s",
+            "\033[93mActive users checks dict (%s) loaded from file: %s\033[0m",
             len(active_user_checks_dict),
             active_user_checks_dict,
         )
@@ -3081,7 +3081,7 @@ if __name__ == "__main__":
 
             # Create an inline keyboard with a link
             LOGGER.warning(
-                "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m \n\t\t\tSuspicious message link: %s",
+                "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
                 message.from_user.id,
                 (
                     message.from_user.username
@@ -3468,7 +3468,7 @@ if __name__ == "__main__":
                         [message.chat.id, message.message_id, message.chat.username]
                     )
                 LOGGER.info(
-                    "%s:@%s sent message and joined the chat %s %s ago\n\t\t\tmessage link: %s",
+                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tmessage link: %s",
                     message.from_id,
                     (
                         message.from_user.username

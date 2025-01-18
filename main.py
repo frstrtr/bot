@@ -714,9 +714,9 @@ async def handle_forwarded_reports_with_details(
     if not found_message_data:  # Last resort. Give up.
         return
 
-    LOGGER.debug(
-        "%-10s - message data: %s", f"{found_message_data[3]:10}", found_message_data
-    )
+    # LOGGER.debug(
+    #     "%-10s - message data: %s", f"{found_message_data[3]:10}", found_message_data
+    # )
     # LOGGER.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date

@@ -427,10 +427,10 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
-    # LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
     else:
+        LOGGER.info("%s  CHANNEL successfully banned where it was possible", rogue_chat_id)
         banned_users_dict[rogue_chat_id] = "Rogue chat"
         return True
 
@@ -2547,7 +2547,7 @@ if __name__ == "__main__":
 
         keyboard.add(confirm_btn, cancel_btn)
 
-        # """
+        # get report states
         forwarded_reports_states: dict = DP.get("forwarded_reports_states")
         forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
         if forwarded_reports_states is None:
@@ -2560,17 +2560,24 @@ if __name__ == "__main__":
                     "action_banner_message": admin_action_banner_message,
                     "report_chat_id": message.chat.id,"""
         # unpack states for the report_id to ban
+        # original_forwarded_message: types.Message = forwarded_report_state[
+        #     "original_forwarded_message"
+        # ]
         admin_group_banner_message: types.Message = forwarded_report_state[
             "admin_group_banner_message"
         ]
         action_banner_message: types.Message = forwarded_report_state[
             "action_banner_message"
         ]
-        report_chat_id: int = forwarded_report_state["report_chat_id"]
+        # report_chat_id: int = forwarded_report_state["report_chat_id"]
         # check received states for None
 
-        # clear states for the designated report_id_to_ban
-        del forwarded_reports_states[report_id_to_ban]
+        # clear admin and personal banner states for this report
+        del forwarded_report_state["action_banner_message"]
+        del forwarded_report_state["admin_group_banner_message"]
+
+        # update states for the designated report_id_to_ban
+        forwarded_reports_states[report_id_to_ban] = forwarded_report_state
 
         # update DP states storage
         DP["forwarded_reports_states"] = forwarded_reports_states
@@ -2642,7 +2649,12 @@ if __name__ == "__main__":
                 callback_query.from_user.id,
                 report_id_to_ban,
             )
-
+            # get report states
+            forwarded_reports_states: dict = DP.get("forwarded_reports_states")
+            forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
+            original_forwarded_message: types.Message = forwarded_report_state[
+                "original_forwarded_message"
+            ]
             CURSOR.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
                 (report_id_to_ban,),
@@ -2906,19 +2918,38 @@ if __name__ == "__main__":
                 author_id,
                 user_name,
             )
+            # Take actions to ban channels
+            channel_id_to_ban = (
+                original_forwarded_message.forward_from_chat.id
+                if original_forwarded_message.forward_from_chat
+                else (
+                    original_forwarded_message.sender_chat.id
+                    if original_forwarded_message.sender_chat
+                    else None
+                )
+            )
+            if channel_id_to_ban:
+                del forwarded_report_state
+                del forwarded_reports_states[report_id_to_ban]
+                await ban_rogue_chat_everywhere(
+                    channel_id_to_ban,
+                    CHANNEL_IDS,
+                )
+                chan_ban_msg = f"{channel_id_to_ban} also banned by AUTOREPORT#{report_id_to_ban}"
+                
 
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
 
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 parse_mode="HTML",
             )
             if forwarded_message_data[4] not in [0, "0", None]:

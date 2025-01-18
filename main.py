@@ -980,7 +980,7 @@ async def lols_autoban(_id, user_name="!UNDEFINED!"):
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
-            "\033[91m%s:@%s removed from active_user_checks_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:@%s removed from active_user_checks_dict during lols_autoban:\n\t\t\t%s... %d totally\033[0m",
             _id,
             user_name,
             last_3_users_str,  # Last 3 elements
@@ -1243,7 +1243,7 @@ async def check_n_ban(message: types.Message, reason: str):
                     ]
                 )
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban: %s... %d totally\033[0m",
+                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s... %d totally\033[0m",
                     message.from_user.id,
                     (
                         message.from_user.username
@@ -1256,7 +1256,7 @@ async def check_n_ban(message: types.Message, reason: str):
             else:
                 banned_users_dict[message.from_user.id] = message.from_user.username
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban: %s\033[0m",
+                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s\033[0m",
                     message.from_user.id,
                     (
                         message.from_user.username
@@ -1535,7 +1535,7 @@ async def perform_checks(
         if user_id in active_user_checks_dict:
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
-                "\033[93m%s:@%s removed from active_user_checks_dict during perform_checks: \033[0m%s",
+                "\033[93m%s:@%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s",
                 user_id,
                 user_name,
                 active_user_checks_dict,
@@ -1573,7 +1573,7 @@ async def perform_checks(
                     ]
                 )
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s... %d totally\033[0m",
+                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block:\n\t\t\t%s... %d totally\033[0m",
                     user_id,
                     user_name,
                     active_user_checks_dict_last3_str,  # Last 3 elements
@@ -1581,7 +1581,7 @@ async def perform_checks(
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block: %s\033[0m",
+                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block:\n\t\t\t%s\033[0m",
                     user_id,
                     user_name,
                     active_user_checks_dict,
@@ -2723,7 +2723,7 @@ if __name__ == "__main__":
                         ]
                     )
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\033[0m %s... %d totally",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s... %d totally",
                         author_id,
                         (
                             forwarded_message_data[4]
@@ -2736,7 +2736,7 @@ if __name__ == "__main__":
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\033[0m %s",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s",
                         author_id,
                         (
                             forwarded_message_data[4]
@@ -2938,7 +2938,7 @@ if __name__ == "__main__":
                     active_user_checks_dict.pop(forwarded_message_data[3], None)
                 )
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin: %s\033[0m",
+                    "\033[91m%s:@%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin:\n\t\t\t%s\033[0m",
                     forwarded_message_data[3],
                     user_name,
                     active_user_checks_dict,
@@ -3753,7 +3753,7 @@ if __name__ == "__main__":
                         ]
                     )
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin: %s... %d totally\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s... %d totally\033[0m",
                         author_id,
                         (
                             forwarded_message_data[4]
@@ -3765,7 +3765,7 @@ if __name__ == "__main__":
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin: %s\033[0m",
+                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s\033[0m",
                         author_id,
                         (
                             forwarded_message_data[4]
@@ -4424,7 +4424,7 @@ if __name__ == "__main__":
                 [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
             )
             LOGGER.info(
-                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s: %s... %d left\033[0m",
+                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
                 user_id_legit,
                 user_name,
                 admin_id,
@@ -4434,7 +4434,7 @@ if __name__ == "__main__":
             )
         else:
             LOGGER.info(
-                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s: %s\033[0m",
+                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
                 user_id_legit,
                 user_name,
                 admin_id,

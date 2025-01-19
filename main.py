@@ -3238,7 +3238,7 @@ if __name__ == "__main__":
                         message_to_delete=None,
                     )
                     # ban channel in the rest of chats
-                    ban_rogue_chan_task = ban_rogue_chat_everywhere(
+                    ban_rogue_chan_task = await ban_rogue_chat_everywhere(
                         rogue_chan_id,
                         CHANNEL_IDS,
                     )

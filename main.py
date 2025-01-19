@@ -68,7 +68,7 @@ from utils.utils_decorators import (
     is_not_bot_action,
     is_forwarded_from_unknown_channel_message,
     is_admin_user_message,
-    is_channel_message,
+    is_in_monitored_channel,
     is_valid_message,
 )
 
@@ -309,7 +309,7 @@ def get_spammer_details(
     return result
 
 
-async def take_heuristic_action(message: types.Message, reason):
+async def handle_autoreport(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
@@ -3039,7 +3039,7 @@ if __name__ == "__main__":
         )
 
     @DP.message_handler(
-        is_channel_message,
+        is_in_monitored_channel,
         content_types=ALLOWED_CONTENT_TYPES,
     )
     async def store_recent_messages(message: types.Message):
@@ -3076,12 +3076,14 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup()
 
         # Add buttons to the keyboard, each in a new row
-        inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
-        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+        inline_kb.add(
+            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+        )
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
         # Add callback data button to prevent further checks
         inline_kb.add(
             InlineKeyboardButton(
-                "🟢Seems legit, STOP checks",
+                "🟢 Seems legit, STOP checks 🟢",
                 callback_data=f"stop_checks_{message.from_user.id}",
             )
         )
@@ -3172,6 +3174,7 @@ if __name__ == "__main__":
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
             )
+            or await lols_cas_check(message.from_user.id)
         ):
             if message.sender_chat and message.sender_chat.id in banned_users_dict:
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
@@ -3212,6 +3215,7 @@ if __name__ == "__main__":
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict
                 or rogue_chan_id in banned_users_dict
+                or await lols_cas_check(message.from_user.id)
             ):
                 try:
                     delete_message_task = BOT.delete_message(
@@ -3514,28 +3518,25 @@ if __name__ == "__main__":
                 return
 
             elif (
-                message.forward_from_chat.type if message.forward_from_chat else None
-            ) == types.ChatType.CHANNEL:
-                # or (message.forward_origin.type if message.forward_origin else None) == types.ChatType.CHANNEL:
-                # check if it is forward from channel
-                # check for allowed channels for forwards
-                if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
-                    # this is possibly a spam
-                    the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
-                    if await check_n_ban(message, the_reason):
-                        return
-                    else:
-                        LOGGER.info(
-                            "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
-                            message.from_user.id,
-                            (
-                                message.from_user.username
-                                if message.from_user.username
-                                else "!UNDEFINED!"
-                            ),
-                            message.chat.title,
-                        )
-                        await take_heuristic_action(message, the_reason)
+                message.forward_from_chat
+                and message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
+            ):
+                # this is possibly a spam
+                the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
+                if await check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
+                        message.from_user.id,
+                        (
+                            message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        ),
+                        message.chat.title,
+                    )
+                    await handle_autoreport(message, the_reason)
 
             elif has_custom_emoji_spam(
                 message
@@ -3552,7 +3553,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await take_heuristic_action(message, the_reason)
+                    await handle_autoreport(message, the_reason)
 
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
@@ -3564,7 +3565,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await take_heuristic_action(message, the_reason)
+                    await handle_autoreport(message, the_reason)
 
             elif check_message_for_capital_letters(
                 message
@@ -3578,7 +3579,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await take_heuristic_action(message, the_reason)
+                    await handle_autoreport(message, the_reason)
 
             elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
@@ -3592,7 +3593,7 @@ if __name__ == "__main__":
                             "%s is possibly a bot typing histerically...",
                             message.from_id,
                         )
-                        await take_heuristic_action(message, the_reason)
+                        await handle_autoreport(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old and entity_spam_trigger:
                     # this is possibly a spam
@@ -3609,7 +3610,7 @@ if __name__ == "__main__":
                             message.from_user.id,
                             entity_spam_trigger,
                         )
-                        await take_heuristic_action(message, the_reason)
+                        await handle_autoreport(message, the_reason)
 
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
@@ -3620,7 +3621,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
-                    await take_heuristic_action(message, the_reason)
+                    await handle_autoreport(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")

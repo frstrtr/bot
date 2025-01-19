@@ -41,6 +41,7 @@ from aiogram.utils.exceptions import (
     MessageToForwardNotFound,
     MessageIdInvalid,
     ChatAdminRequired,
+    BotKicked,
 )
 
 # load utilities
@@ -4520,7 +4521,12 @@ if __name__ == "__main__":
         )
 
         # remove system message about user join/left where applicable
-        await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+        try:
+            await BOT.delete_message(
+                message_id=message.message_id, chat_id=message.chat.id
+            )
+        except BotKicked:
+            LOGGER.warning("\033[91mBot was kicked from the chat, unable to delete message.\033[0m")
 
     # scheduler to run the log_lists function daily at 04:00
     @aiocron.crontab("0 4 * * *")

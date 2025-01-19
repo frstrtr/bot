@@ -3481,7 +3481,7 @@ if __name__ == "__main__":
                         [message.chat.id, message.message_id, message.chat.username]
                     )
                 LOGGER.info(
-                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tmessage link: %s",
+                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
                     message.from_id,
                     (
                         message.from_user.username
@@ -3495,7 +3495,7 @@ if __name__ == "__main__":
 
                 await BOT.send_message(
                     ADMIN_GROUP_ID,
-                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. [Message Link]({message_link}) Please check it out!",
+                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
                     message_thread_id=ADMIN_SUSPICIOUS,
                     parse_mode="HTML",
                 )

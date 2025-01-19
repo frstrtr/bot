@@ -41,7 +41,7 @@ def is_forwarded_from_unknown_channel_message(
     )
 
 
-def is_channel_message(message: types.Message) -> bool:
+def is_in_monitored_channel(message: types.Message) -> bool:
     """Check if the message is from one of the specified channels."""
     return message.chat.id in CHANNEL_IDS
 

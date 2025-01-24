@@ -3263,8 +3263,6 @@ if __name__ == "__main__":
                         )
 
                     tasks = [
-                        # ban_chat_task,
-                        # delete_message_task,
                         ban_member_task,
                         ban_rogue_chan_task if rogue_chan_id else None,
                     ]

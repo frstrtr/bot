@@ -41,7 +41,6 @@ from aiogram.utils.exceptions import (
     MessageToForwardNotFound,
     MessageIdInvalid,
     ChatAdminRequired,
-    BotKicked,
 )
 
 # load utilities
@@ -310,7 +309,7 @@ def get_spammer_details(
     return result
 
 
-async def handle_autoreport(message: types.Message, reason):
+async def take_heuristic_action(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
@@ -2648,8 +2647,8 @@ if __name__ == "__main__":
             report_id_to_ban = int(report_id_to_ban)
             LOGGER.info(
                 "\033[95m%s:@%s requested to ban REPORT %s\033[0m",
-                callback_query.from_user.id,
                 button_pressed_by,
+                callback_query.from_user.id,
                 report_id_to_ban,
             )
             # get report states
@@ -3077,14 +3076,12 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup()
 
         # Add buttons to the keyboard, each in a new row
-        inline_kb.add(
-            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-        )
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
+        inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
         # Add callback data button to prevent further checks
         inline_kb.add(
             InlineKeyboardButton(
-                "🟢 Seems legit, STOP checks 🟢",
+                "🟢Seems legit, STOP checks",
                 callback_data=f"stop_checks_{message.from_user.id}",
             )
         )
@@ -3175,7 +3172,6 @@ if __name__ == "__main__":
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
             )
-            or await lols_cas_check(message.from_user.id)
         ):
             if message.sender_chat and message.sender_chat.id in banned_users_dict:
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
@@ -3216,7 +3212,6 @@ if __name__ == "__main__":
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict
                 or rogue_chan_id in banned_users_dict
-                or await lols_cas_check(message.from_user.id)
             ):
                 try:
                     delete_message_task = BOT.delete_message(
@@ -3238,7 +3233,7 @@ if __name__ == "__main__":
                         message_to_delete=None,
                     )
                     # ban channel in the rest of chats
-                    ban_rogue_chan_task = await ban_rogue_chat_everywhere(
+                    ban_rogue_chan_task = ban_rogue_chat_everywhere(
                         rogue_chan_id,
                         CHANNEL_IDS,
                     )
@@ -3486,7 +3481,7 @@ if __name__ == "__main__":
                         [message.chat.id, message.message_id, message.chat.username]
                     )
                 LOGGER.info(
-                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
+                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tmessage link: %s",
                     message.from_id,
                     (
                         message.from_user.username
@@ -3500,7 +3495,7 @@ if __name__ == "__main__":
 
                 await BOT.send_message(
                     ADMIN_GROUP_ID,
-                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
+                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. [Message Link]({message_link}) Please check it out!",
                     message_thread_id=ADMIN_SUSPICIOUS,
                     parse_mode="HTML",
                 )
@@ -3519,25 +3514,28 @@ if __name__ == "__main__":
                 return
 
             elif (
-                message.forward_from_chat
-                and message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
-            ):
-                # this is possibly a spam
-                the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
-                if await check_n_ban(message, the_reason):
-                    return
-                else:
-                    LOGGER.info(
-                        "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
-                        message.from_user.id,
-                        (
-                            message.from_user.username
-                            if message.from_user.username
-                            else "!UNDEFINED!"
-                        ),
-                        message.chat.title,
-                    )
-                    await handle_autoreport(message, the_reason)
+                message.forward_from_chat.type if message.forward_from_chat else None
+            ) == types.ChatType.CHANNEL:
+                # or (message.forward_origin.type if message.forward_origin else None) == types.ChatType.CHANNEL:
+                # check if it is forward from channel
+                # check for allowed channels for forwards
+                if message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS:
+                    # this is possibly a spam
+                    the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
+                    if await check_n_ban(message, the_reason):
+                        return
+                    else:
+                        LOGGER.info(
+                            "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
+                            message.from_user.id,
+                            (
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
+                            message.chat.title,
+                        )
+                        await take_heuristic_action(message, the_reason)
 
             elif has_custom_emoji_spam(
                 message
@@ -3554,7 +3552,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await take_heuristic_action(message, the_reason)
 
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
@@ -3566,7 +3564,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await take_heuristic_action(message, the_reason)
 
             elif check_message_for_capital_letters(
                 message
@@ -3580,7 +3578,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await take_heuristic_action(message, the_reason)
 
             elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
@@ -3594,7 +3592,7 @@ if __name__ == "__main__":
                             "%s is possibly a bot typing histerically...",
                             message.from_id,
                         )
-                        await handle_autoreport(message, the_reason)
+                        await take_heuristic_action(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old and entity_spam_trigger:
                     # this is possibly a spam
@@ -3611,7 +3609,7 @@ if __name__ == "__main__":
                             message.from_user.id,
                             entity_spam_trigger,
                         )
-                        await handle_autoreport(message, the_reason)
+                        await take_heuristic_action(message, the_reason)
 
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
@@ -3622,7 +3620,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
-                    await handle_autoreport(message, the_reason)
+                    await take_heuristic_action(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
@@ -4143,28 +4141,40 @@ if __name__ == "__main__":
     async def log_all_unhandled_messages(message: types.Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
-            # logger.debug(f"Received UNHANDLED message object:\n{message}")
+            # Check if the message was sent in a chat with the bot and not directly to the bot
+            if message.chat.type in ["group", "supergroup", "channel"]:
 
-            # Send unhandled message to the technolog group
-            # await BOT.send_message(
-            #     TECHNOLOG_GROUP_ID,
-            #     f"Received UNHANDLED message object:\n{message}",
-            #     message_thread_id=TECHNO_UNHANDLED,
-            # )
-            await message.forward(
-                TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
-            )  # forward all unhandled messages to technolog group
+                # logger.debug(f"Received UNHANDLED message object:\n{message}")
 
-            # Convert the Message object to a dictionary
-            message_dict = message.to_python()
-            formatted_message = json.dumps(
-                message_dict, indent=4, ensure_ascii=False
-            )  # Convert back to a JSON string with indentation and human-readable characters
+                # Send unhandled message to the technolog group
+                # await BOT.send_message(
+                #     TECHNOLOG_GROUP_ID,
+                #     f"Received UNHANDLED message object:\n{message}",
+                #     message_thread_id=TECHNO_UNHANDLED,
+                # )
+                await message.forward(
+                    TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
+                )  # forward all unhandled messages to technolog group
 
-            # LOGGER.debug(
-            #     "\nReceived message object:\n %s\n",
-            #     formatted_message,
-            # )
+                # Convert the Message object to a dictionary
+                message_dict = message.to_python()
+                formatted_message = json.dumps(
+                    message_dict, indent=4, ensure_ascii=False
+                )  # Convert back to a JSON string with indentation and human-readable characters
+
+                # LOGGER.debug(
+                #     "\nReceived message object:\n %s\n",
+                #     formatted_message,
+                # )
+            elif message.text == "/start": # /start bot command in PRIVATE message
+                # /start easteregg
+                await BOT.send_message(
+                    message.chat.id,
+                    "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
+                )
+                # await message.reply(
+                #     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
+                # )
 
             if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
                 formatted_message = (
@@ -4176,16 +4186,6 @@ if __name__ == "__main__":
                 formatted_message,
                 message_thread_id=TECHNO_UNHANDLED,
             )
-
-            # /start easteregg
-            if message.text == "/start":
-                await BOT.send_message(
-                    message.chat.id,
-                    "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
-                )
-                # await message.reply(
-                #     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
-                # )
 
             # LOGGER.debug("Received message %s", message)
             LOGGER.debug("-----------DEBUG INFO-----------")
@@ -4521,12 +4521,7 @@ if __name__ == "__main__":
         )
 
         # remove system message about user join/left where applicable
-        try:
-            await BOT.delete_message(
-                message_id=message.message_id, chat_id=message.chat.id
-            )
-        except BotKicked:
-            LOGGER.warning("\033[91mBot was kicked from the chat, unable to delete message.\033[0m")
+        await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
 
     # scheduler to run the log_lists function daily at 04:00
     @aiocron.crontab("0 4 * * *")

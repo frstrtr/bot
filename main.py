@@ -3188,6 +3188,9 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             LOGGER.warning(logger_text)
 
+            # delete message immidiately
+            await BOT.delete_message(message.chat.id, message.message_id)
+
             # Forwarding banned user message to ADMIN SUSPICIOUS
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
@@ -3219,12 +3222,7 @@ if __name__ == "__main__":
                 or await lols_cas_check(message.from_user.id)
             ):
                 try:
-                    delete_message_task = BOT.delete_message(
-                        message.chat.id, message.message_id
-                    )
-                    # ban_member_task = BOT.ban_chat_member(
-                    #     message.chat.id, message.from_id, revoke_messages=True
-                    # )
+                    # ban spammer in all chats
                     ban_member_task = check_and_autoban(
                         f"{message.from_user.id} CHANNELLED a SPAM message from ({rogue_chan_id})",
                         message.from_user.id,
@@ -3266,7 +3264,7 @@ if __name__ == "__main__":
 
                     tasks = [
                         # ban_chat_task,
-                        delete_message_task,
+                        # delete_message_task,
                         ban_member_task,
                         ban_rogue_chan_task if rogue_chan_id else None,
                     ]

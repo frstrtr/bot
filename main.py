@@ -366,7 +366,7 @@ async def on_startup(_dp: Dispatcher):
         f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
         "Финальная битва между людьми и роботами...\033[0m\n"
-    )    
+    )
     bot_start_message = (
         f"Bot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
@@ -3091,6 +3091,18 @@ if __name__ == "__main__":
                 callback_data=f"stop_checks_{message.from_user.id}",
             )
         )
+        inline_kb.add(
+            InlineKeyboardButton(
+                "❌ BAN ❌",
+                callback_data=f"do_ban_{message.message_id}",
+            )
+        )
+        inline_kb.add(
+            InlineKeyboardButton(
+                "❌ Delete Message ❌",
+                callback_data=f"del_msg_{message.message_id}_{message.chat.id}",
+            )
+        )
 
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
@@ -4426,10 +4438,24 @@ if __name__ == "__main__":
         else:
             user_name = user_name_dict
 
+        # # create unified message link
+        # message_link = construct_message_link(
+        #     [message.chat.id, message.message_id, message.chat.username]
+        # )
+        lols_link = f"https://t.me/lolsbotcatcherbot?start={user_id_legit}"
+
+        # Create the inline keyboard
+        inline_kb = InlineKeyboardMarkup()
+
+        # # Add buttons to the keyboard, each in a new row
+        # inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
+            reply_markup=inline_kb,
         )
 
         # check if user already left active checks or button pressed after 3 hrs after report

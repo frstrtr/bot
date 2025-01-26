@@ -3188,22 +3188,23 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             LOGGER.warning(logger_text)
 
-            # delete message immidiately
-            await BOT.delete_message(message.chat.id, message.message_id)
-
             # Forwarding banned user message to ADMIN SUSPICIOUS
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                ADMIN_SUSPICIOUS,
+                ADMIN_AUTOBAN,
                 True,
             )
+
+            # delete message immidiately
+            await BOT.delete_message(message.chat.id, message.message_id)
+
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick buttons below for more information:",
                 reply_markup=inline_kb,
-                message_thread_id=ADMIN_SUSPICIOUS,
+                message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
             )
@@ -3288,7 +3289,7 @@ if __name__ == "__main__":
                         ADMIN_GROUP_ID,
                         admin_log_chan_data,
                         parse_mode="HTML",
-                        message_thread_id=ADMIN_SUSPICIOUS,
+                        message_thread_id=ADMIN_AUTOBAN,
                         disable_web_page_preview=True,
                         disable_notification=True,
                     )
@@ -3302,11 +3303,25 @@ if __name__ == "__main__":
                     )
                     return  # stop processing further this message
             else:
+                # LATENCY squezzed spammer?
+                LOGGER.debug(
+                    "\033[91m%s:@%s banned everywhere and message %s deleted in chat %s (%s) @%s #LSS\033[0m",
+                    message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                    message.chat.username if message.chat.username else "NoName",
+                )
                 await BOT.delete_message(message.chat.id, message.message_id)
                 await BOT.ban_chat_member(
                     message.chat.id, message.from_id, revoke_messages=True
                 )
-            return
+                return
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group

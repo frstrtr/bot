@@ -3305,7 +3305,7 @@ if __name__ == "__main__":
             else:
                 # LATENCY squezzed spammer?
                 LOGGER.debug(
-                    "\033[91m%s:@%s banned everywhere and message %s deleted in chat %s (%s) @%s #LSS\033[0m",
+                    "\033[91m%s:@%s banned and message %s deleted in chat %s (%s) @%s #LSS\033[0m",
                     message.from_user.id,
                     (
                         message.from_user.username
@@ -3317,10 +3317,36 @@ if __name__ == "__main__":
                     message.chat.id,
                     message.chat.username if message.chat.username else "NoName",
                 )
-                await BOT.delete_message(message.chat.id, message.message_id)
-                await BOT.ban_chat_member(
-                    message.chat.id, message.from_id, revoke_messages=True
+                try:
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                except MessageToDeleteNotFound as e:
+                    LOGGER.error(
+                        "\033[93m%s:@%s message %s to delete not found in chat %s (%s) @%s #LSS\033[0m:\n%s",
+                        message.from_user.id,
+                        (
+                            message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        ),
+                        message.message_id,
+                        message.chat.title,
+                        message.chat.id,
+                        message.chat.username if message.chat.username else "NoName",
+                        e,
+                    )
+                await ban_user_from_all_chats(
+                    message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
+                    CHANNEL_IDS,
+                    CHANNEL_DICT,
                 )
+                # BOT.ban_chat_member(
+                #     message.chat.id, message.from_id, revoke_messages=True
+                # )
                 return
         try:
             # Log the full message object for debugging

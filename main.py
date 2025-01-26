@@ -3094,13 +3094,13 @@ if __name__ == "__main__":
         inline_kb.add(
             InlineKeyboardButton(
                 "❌ BAN ❌",
-                callback_data=f"do_ban_{message.message_id}",
+                callback_data=f"suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
         inline_kb.add(
             InlineKeyboardButton(
                 "❌ Delete Message ❌",
-                callback_data=f"del_msg_{message.message_id}_{message.chat.id}",
+                callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
 
@@ -4526,6 +4526,97 @@ if __name__ == "__main__":
                 button_pressed_by,
                 active_user_checks_dict,
             )
+        return
+
+    @DP.callback_query_handler(
+        lambda c: c.data.startswith("suspicious_ban_")
+        or c.data.startswith("suspicious_delmsg_")
+    )
+    async def ban_suspicious_sender(callback_query: CallbackQuery):
+        """Function to ban suspicious sender."""
+        # suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}
+        # suspicious_delmsg_{message.chat.id}_{message.message_id}
+        *_, comand, susp_chat_id, susp_message_id, susp_user_id = (
+            callback_query.data.split("_")
+        )
+        susp_user_id = int(susp_user_id)
+        susp_message_id = int(susp_message_id)
+        susp_chat_id = int(susp_chat_id)
+        admin_id = callback_query.from_user.id
+        admin_username = (
+            callback_query.from_user.username
+            if callback_query.from_user.username
+            else "!NoName!"
+        )
+
+        # Unpack user_name
+        susp_user_name_dict = active_user_checks_dict.get(susp_user_id, "!UNDEFINED!")
+        # check if user_name_dict is a dict
+        if isinstance(susp_user_name_dict, dict):
+            susp_user_name = str(susp_user_name_dict["username"]).lstrip("@")
+        else:
+            susp_user_name = susp_user_name_dict
+
+        # # create unified message link
+        lols_link = f"https://t.me/lolsbotcatcherbot?start={susp_user_id}"
+
+        # Create the inline keyboard
+        inline_kb = InlineKeyboardMarkup()
+
+        # # Add buttons to the keyboard, each in a new row
+        # inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+
+        # remove buttons from the admin group
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            reply_markup=inline_kb,
+        )
+
+        if comand != "delmsg":
+            # ban user in chat
+            try:
+                await BOT.ban_chat_member(
+                    chat_id=susp_chat_id,
+                    user_id=susp_user_id,
+                )
+                LOGGER.info(
+                    "%s:@%s SUSPICIOUS banned in chat (%s) by admin @%s(%s)",
+                    susp_user_id,
+                    susp_user_name,
+                    susp_chat_id,
+                    admin_username,
+                    admin_id,
+                )
+                callback_answer = "User banned in ONE chat and the message were deleted.\nForward message to the bot to ban user everywhere!"
+            except BadRequest as e:
+                LOGGER.error("Suspicious user not found: %s", e)
+                callback_answer = "User not found in chat."
+        else:
+            callback_answer = "User suspicious message were deleted.\nForward message to the bot to ban user everywhere!"
+        # delete suspicious message
+        try:
+            await BOT.delete_message(
+                susp_chat_id,
+                susp_message_id,
+            )
+            LOGGER.info(
+                "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
+                susp_user_id,
+                susp_user_name,
+                susp_message_id,
+                susp_chat_id,
+            )
+        except MessageToDeleteNotFound as e:
+            LOGGER.error("Suspicious message to delete not found: %s", e)
+            callback_answer = "Suspicious message to delete not found."
+
+        await callback_query.answer(
+            callback_answer,
+            show_alert=True,
+            cache_time=0,
+        )
         return
 
     @DP.message_handler(

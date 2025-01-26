@@ -3082,12 +3082,12 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup()
 
         # Add buttons to the keyboard, each in a new row
-        inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
-        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+        inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
         # Add callback data button to prevent further checks
         inline_kb.add(
             InlineKeyboardButton(
-                "🟢Seems legit, STOP checks",
+                "🟢 Seems legit, STOP checks 🟢",
                 callback_data=f"stop_checks_{message.from_user.id}",
             )
         )
@@ -4565,7 +4565,7 @@ if __name__ == "__main__":
 
         # # Add buttons to the keyboard, each in a new row
         # inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
-        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(

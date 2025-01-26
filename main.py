@@ -362,12 +362,17 @@ async def on_startup(_dp: Dispatcher):
     """Function to handle the bot startup."""
     _commit_info = get_latest_commit_info(LOGGER)
 
-    bot_start_message = (
+    bot_start_log_message = (
         f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
         "Финальная битва между людьми и роботами...\033[0m\n"
+    )    
+    bot_start_message = (
+        f"Bot restarted at {bot_start_time}\n{'-' * 40}\n"
+        f"Commit info: {_commit_info}\n"
+        "Финальная битва между людьми и роботами..."
     )
-    LOGGER.info(bot_start_message)
+    LOGGER.info(bot_start_log_message)
 
     # NOTE Leave chats which is not in settings file
     # await BOT.leave_chat(-1002174154456)

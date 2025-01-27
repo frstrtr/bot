@@ -4843,7 +4843,15 @@ if __name__ == "__main__":
         )
 
         # remove system message about user join/left where applicable
-        await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+        try:
+            await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+        except MessageCantBeDeleted as e:
+            LOGGER.error("Message can't be deleted: %s", e)
+            await BOT.send_message(
+                chat_id=message.chat.id,
+                text="Sorry, I can't delete this message.",
+                reply_to_message_id=message.message_id
+            )
 
     # scheduler to run the log_lists function daily at 04:00
     @aiocron.crontab("0 4 * * *")

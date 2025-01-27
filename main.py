@@ -3060,6 +3060,9 @@ if __name__ == "__main__":
                     message.message_id,
                     message_thread_id=TECHNO_ORIGINALS,
                 )
+            except BadRequest as e:
+                LOGGER.error("Channel message processing error: %s", e)
+            try:
                 await BOT.delete_message(message.chat.id, message.message_id)
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
@@ -3083,8 +3086,6 @@ if __name__ == "__main__":
                 )
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Channel message already deleted! %s", e)
-            except BadRequest as e:
-                LOGGER.error("Channel message processing error: %s", e)
 
             # return  # XXX STOP processing
 

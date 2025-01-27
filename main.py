@@ -3052,7 +3052,7 @@ if __name__ == "__main__":
         """Function to store recent messages in the database."""
 
         # XXX check if message is Channel message
-        if message.forward_sender_name:
+        if message.sender_chat:
             try:
                 await BOT.delete_message(message.chat.id, message.message_id)
                 # Convert the Message object to a dictionary

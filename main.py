@@ -3051,6 +3051,29 @@ if __name__ == "__main__":
     async def store_recent_messages(message: types.Message):
         """Function to store recent messages in the database."""
 
+        # XXX check if message is Channel message
+        if message.forward_sender_name:
+            try:
+                await BOT.delete_message(message.chat.id, message.message_id)
+                # Convert the Message object to a dictionary
+                message_dict = message.to_python()
+                formatted_message = json.dumps(
+                    message_dict, indent=4, ensure_ascii=False
+                )  # Convert back to a JSON string with indentation and human-readable characters
+                LOGGER.debug(
+                    "\nReceived CHANNEL message object:\n %s\n",
+                    formatted_message,
+                )
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    formatted_message,
+                    disable_web_page_preview=True,
+                    message_thread_id=TECHNO_ADMIN,
+                )
+            except MessageToDeleteNotFound as e:
+                LOGGER.error("Channel message already deleted! %s", e)
+            # return  # XXX STOP processing
+
         # check first if sender is an admin in the channel or admin group and skip the message
         if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
             message.from_user.id, ADMIN_GROUP_ID
@@ -3082,7 +3105,9 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup()
 
         # Add buttons to the keyboard, each in a new row
-        inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+        inline_kb.add(
+            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+        )
         inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
         # Add callback data button to prevent further checks
         inline_kb.add(
@@ -3103,7 +3128,6 @@ if __name__ == "__main__":
                 callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
-
         # check if message is from user from active_user_checks_dict or banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict

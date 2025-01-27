@@ -3080,7 +3080,11 @@ if __name__ == "__main__":
                 )
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    formatted_message_tlgrm if formatted_message_tlgrm else formatted_message,
+                    (
+                        formatted_message_tlgrm
+                        if formatted_message_tlgrm
+                        else formatted_message
+                    ),
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )
@@ -3133,6 +3137,12 @@ if __name__ == "__main__":
         )
         inline_kb.add(
             InlineKeyboardButton(
+                "❌ Global BAN ❌",
+                callback_data=f"suspicious_globalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+            )
+        )
+        inline_kb.add(
+            InlineKeyboardButton(
                 "❌ BAN ❌",
                 callback_data=f"suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
@@ -3143,7 +3153,7 @@ if __name__ == "__main__":
                 callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
-        # check if message is from user from active_user_checks_dict or banned_users_dict set
+        # check if message is from user from active_user_checks_dict and banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict
             and message.from_user.id in banned_users_dict
@@ -4568,25 +4578,32 @@ if __name__ == "__main__":
         return
 
     @DP.callback_query_handler(
-        lambda c: c.data.startswith("suspicious_ban_")
+        lambda c: c.data.startswith("suspicious_globalban_")
+        or c.data.startswith("suspicious_ban_")
         or c.data.startswith("suspicious_delmsg_")
+        or c.data.startswith("confirmdelmsg_")
+        or c.data.startswith("canceldelmsg_")
+        or c.data.startswith("confirmban_")
+        or c.data.startswith("cancelban_")
+        or c.data.startswith("confirmglobalban_")
+        or c.data.startswith("cancelglobalban_")
     )
-    async def ban_suspicious_sender(callback_query: CallbackQuery):
-        """Function to ban suspicious sender."""
-        # suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}
-        # suspicious_delmsg_{message.chat.id}_{message.message_id}
+    async def handle_suspicious_sender(callback_query: CallbackQuery):
+        """Function to handle the suspicious sender."""
         *_, comand, susp_chat_id, susp_message_id, susp_user_id = (
             callback_query.data.split("_")
         )
         susp_user_id = int(susp_user_id)
         susp_message_id = int(susp_message_id)
         susp_chat_id = int(susp_chat_id)
+        susp_chat_username = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
         admin_id = callback_query.from_user.id
         admin_username = (
             callback_query.from_user.username
             if callback_query.from_user.username
             else "!NoName!"
         )
+        callback_answer = None
 
         # Unpack user_name
         susp_user_name_dict = active_user_checks_dict.get(susp_user_id, "!UNDEFINED!")
@@ -4596,15 +4613,76 @@ if __name__ == "__main__":
         else:
             susp_user_name = susp_user_name_dict
 
-        # # create unified message link
+        # create unified message link
+        message_link = construct_message_link(
+            [susp_chat_id, susp_message_id, susp_chat_username]
+        )
+        # create lols check link
         lols_link = f"https://t.me/lolsbotcatcherbot?start={susp_user_id}"
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()
 
         # # Add buttons to the keyboard, each in a new row
-        # inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
+        inline_kb.add(
+            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+        )
         inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
+
+        if comand == "globalban":
+            inline_kb.add(
+                InlineKeyboardButton(
+                    "Confirm global ban",
+                    callback_data=f"confirmglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+                InlineKeyboardButton(
+                    "Cancel global ban",
+                    callback_data=f"cancelglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+            )
+            # remove buttons from the admin group and add cancel/confirm buttons
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=inline_kb,
+            )
+            return
+        elif comand == "ban":
+            inline_kb.add(
+                InlineKeyboardButton(
+                    "Confirm ban",
+                    callback_data=f"confirmban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+                InlineKeyboardButton(
+                    "Cancel ban",
+                    callback_data=f"cancelban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+            )
+            # remove buttons from the admin group and add cancel/confirm buttons
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=inline_kb,
+            )
+            return
+        elif comand == "delmsg":
+            inline_kb.add(
+                InlineKeyboardButton(
+                    "Confirm delmsg",
+                    callback_data=f"confirmdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+                InlineKeyboardButton(
+                    "Cancel delmsg",
+                    callback_data=f"canceldelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+            )
+            # remove buttons from the admin group and add cancel/confirm buttons
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=inline_kb,
+            )
+            return
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
@@ -4613,17 +4691,41 @@ if __name__ == "__main__":
             reply_markup=inline_kb,
         )
 
-        if comand != "delmsg":
+        if comand == "confirmglobalban":
+            # ban user in all chats
+            try:
+                await BOT.delete_message(susp_chat_id, susp_message_id)
+                await ban_user_from_all_chats(
+                    susp_user_id,
+                    susp_user_name,
+                    CHANNEL_IDS,
+                    CHANNEL_DICT,
+                )
+                LOGGER.info(
+                    "%s:@%s SUSPICIOUS banned globally by admin @%s(%s)",
+                    susp_user_id,
+                    susp_user_name,
+                    admin_username,
+                    admin_id,
+                )
+                callback_answer = "User banned globally and the message were deleted!"
+            except BadRequest as e:
+                LOGGER.error("Suspicious user not found: %s", e)
+                callback_answer = "User not found in chat."
+        elif comand == "confirmban":
             # ban user in chat
             try:
+                await BOT.delete_message(susp_chat_id, susp_message_id)
                 await BOT.ban_chat_member(
                     chat_id=susp_chat_id,
                     user_id=susp_user_id,
+                    revoke_messages=True,
                 )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS banned in chat (%s) by admin @%s(%s)",
+                    "%s:@%s SUSPICIOUS banned in chat @%s(%s) by admin @%s(%s)",
                     susp_user_id,
                     susp_user_name,
+                    susp_chat_username,
                     susp_chat_id,
                     admin_username,
                     admin_id,
@@ -4632,30 +4734,50 @@ if __name__ == "__main__":
             except BadRequest as e:
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
-        else:
+        elif comand == "confirmdelmsg":
             callback_answer = "User suspicious message were deleted.\nForward message to the bot to ban user everywhere!"
-        # delete suspicious message
-        try:
-            await BOT.delete_message(
-                susp_chat_id,
-                susp_message_id,
-            )
-            LOGGER.info(
-                "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
-                susp_user_id,
-                susp_user_name,
-                susp_message_id,
-                susp_chat_id,
-            )
-        except MessageToDeleteNotFound as e:
-            LOGGER.error("Suspicious message to delete not found: %s", e)
-            callback_answer = "Suspicious message to delete not found."
+            # delete suspicious message
+            try:
+                await BOT.delete_message(
+                    susp_chat_id,
+                    susp_message_id,
+                )
+                LOGGER.info(
+                    "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
+                    susp_user_id,
+                    susp_user_name,
+                    susp_message_id,
+                    susp_chat_id,
+                )
+            except MessageToDeleteNotFound as e:
+                LOGGER.error("Suspicious message to delete not found: %s", e)
+                callback_answer = "Suspicious message to delete not found."
+        elif comand in ["canceldelmsg", "cancelban", "cancelglobalban"]:
+            LOGGER.info("Action cancelled by admin: @%s(%s)", admin_username, admin_id)
+            callback_answer = "Action cancelled."
 
         await callback_query.answer(
             callback_answer,
             show_alert=True,
             cache_time=0,
         )
+
+        bot_reply_action_message = (
+            f"{callback_answer}\n"
+            f"Suspicious user @{susp_user_name}:(<code>{susp_user_id}</code>) "
+            f"<a href='{message_link}'>Message:{message_link}</a>\n"
+            f"Action done by admin @{admin_username}"
+        )
+
+        await BOT.send_message(
+            callback_query.message.chat.id,
+            bot_reply_action_message,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            message_thread_id=callback_query.message.message_thread_id,
+            # reply_to_message_id=callback_query.message.message_id,
+        )
+
         return
 
     @DP.message_handler(

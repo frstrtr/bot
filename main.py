@@ -3083,6 +3083,9 @@ if __name__ == "__main__":
                 )
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Channel message already deleted! %s", e)
+            except BadRequest as e:
+                LOGGER.error("Channel message processing error: %s", e)
+
             # return  # XXX STOP processing
 
         # check first if sender is an admin in the channel or admin group and skip the message

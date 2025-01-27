@@ -3054,19 +3054,30 @@ if __name__ == "__main__":
         # XXX check if message is Channel message
         if message.sender_chat:
             try:
+                await BOT.forward_message(
+                    TECHNOLOG_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=TECHNO_ORIGINALS,
+                )
                 await BOT.delete_message(message.chat.id, message.message_id)
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
                 formatted_message = json.dumps(
                     message_dict, indent=4, ensure_ascii=False
                 )  # Convert back to a JSON string with indentation and human-readable characters
+                formatted_message_tlgrm: str = None
+                if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+                    formatted_message_tlgrm = (
+                        formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+                    )
                 LOGGER.debug(
                     "\nReceived CHANNEL message object:\n %s\n",
                     formatted_message,
                 )
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    formatted_message,
+                    formatted_message_tlgrm if formatted_message_tlgrm else formatted_message,
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )

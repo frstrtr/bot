@@ -3052,7 +3052,11 @@ if __name__ == "__main__":
         """Function to store recent messages in the database."""
 
         # XXX check if message is Channel message
-        if message.sender_chat:
+        if (
+            message.sender_chat
+            and message.sender_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
+            and message.sender_chat.id not in CHANNEL_IDS
+        ):
             try:
                 await BOT.forward_message(
                     TECHNOLOG_GROUP_ID,
@@ -4844,13 +4848,15 @@ if __name__ == "__main__":
 
         # remove system message about user join/left where applicable
         try:
-            await BOT.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+            await BOT.delete_message(
+                message_id=message.message_id, chat_id=message.chat.id
+            )
         except MessageCantBeDeleted as e:
             LOGGER.error("Message can't be deleted: %s", e)
             await BOT.send_message(
                 chat_id=message.chat.id,
                 text="Sorry, I can't delete this message.",
-                reply_to_message_id=message.message_id
+                reply_to_message_id=message.message_id,
             )
 
     # scheduler to run the log_lists function daily at 04:00

@@ -4600,7 +4600,7 @@ if __name__ == "__main__":
         susp_user_id = int(susp_user_id)
         susp_message_id = int(susp_message_id)
         susp_chat_id = int(susp_chat_id)
-        susp_chat_username = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
+        susp_chat_title = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
         admin_id = callback_query.from_user.id
         admin_username = (
             callback_query.from_user.username
@@ -4619,7 +4619,7 @@ if __name__ == "__main__":
 
         # create unified message link
         message_link = construct_message_link(
-            [susp_chat_id, susp_message_id, susp_chat_username]
+            [susp_chat_id, susp_message_id, None]
         )
         # create lols check link
         lols_link = f"https://t.me/lolsbotcatcherbot?start={susp_user_id}"
@@ -4729,7 +4729,7 @@ if __name__ == "__main__":
                     "%s:@%s SUSPICIOUS banned in chat @%s(%s) by admin @%s(%s)",
                     susp_user_id,
                     susp_user_name,
-                    susp_chat_username,
+                    susp_chat_title,
                     susp_chat_id,
                     admin_username,
                     admin_id,

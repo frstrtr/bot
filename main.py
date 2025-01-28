@@ -955,7 +955,7 @@ async def ban_user_from_all_chats(
         except BadRequest as e:  # if user were Deleted Account while banning
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT?",
+                "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT?",
                 user_id,
                 chat_name,
                 chat_id,
@@ -3340,6 +3340,10 @@ if __name__ == "__main__":
 
                     # Filter out None values
                     tasks = [task for task in tasks if task is not None]
+
+                    # Ensure all tasks are coroutines or awaitables
+                    tasks = [asyncio.ensure_future(task) for task in tasks]
+
                     await asyncio.gather(*tasks)
 
                     admin_log_chan_data = (
@@ -4726,7 +4730,7 @@ if __name__ == "__main__":
                     revoke_messages=True,
                 )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS banned in chat @%s(%s) by admin @%s(%s)",
+                    "%s:@%s SUSPICIOUS banned in chat %s (%s) by admin @%s(%s)",
                     susp_user_id,
                     susp_user_name,
                     susp_chat_title,

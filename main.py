@@ -3342,7 +3342,8 @@ if __name__ == "__main__":
                     tasks = [task for task in tasks if task is not None]
 
                     # Ensure all tasks are coroutines or awaitables
-                    tasks = [asyncio.ensure_future(task) for task in tasks]
+                    tasks = [task for task in tasks if asyncio.iscoroutine(task) or isinstance(task, asyncio.Future)]
+
 
                     await asyncio.gather(*tasks)
 

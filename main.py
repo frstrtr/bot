@@ -8,10 +8,8 @@ import sqlite3
 import json
 import time
 import html
-import tracemalloc
+import tracemalloc # for memory usage debugging
 import ast
-
-import tracemalloc  # for memory usage debugging
 
 import aiohttp
 from aiogram import Dispatcher, types
@@ -26,7 +24,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     ChatMemberStatus,
-    ChatActions,  # for banchan actions
+    # ChatActions,  # for banchan actions
 )
 
 from aiogram import executor
@@ -41,7 +39,7 @@ from aiogram.utils.exceptions import (
     MessageToForwardNotFound,
     MessageIdInvalid,
     ChatAdminRequired,
-    BotKicked,
+    # BotKicked,
 )
 
 # load utilities
@@ -76,7 +74,7 @@ from utils.utils_decorators import (
 from utils.utils_config import (
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
-    TECHNO_LOGGING,
+    # TECHNO_LOGGING,
     TECHNO_ADMIN,
     TECHNO_ORIGINALS,
     TECHNO_UNHANDLED,
@@ -2562,11 +2560,11 @@ if __name__ == "__main__":
             LOGGER.warning("No states recorded!")
             # reply message and remove buttons
             return
-        """                forwarded_report_state[report_id] = {
-                    "original_forwarded_message": message,
-                    "admin_group_banner_message": admin_group_banner_message,
-                    "action_banner_message": admin_action_banner_message,
-                    "report_chat_id": message.chat.id,"""
+        # """                forwarded_report_state[report_id] = {
+        #             "original_forwarded_message": message,
+        #             "admin_group_banner_message": admin_group_banner_message,
+        #             "action_banner_message": admin_action_banner_message,
+        #             "report_chat_id": message.chat.id,"""
         # unpack states for the report_id to ban
         # original_forwarded_message: types.Message = forwarded_report_state[
         #     "original_forwarded_message"

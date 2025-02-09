@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import os
 from aiogram import Bot, Dispatcher, types
 import logging
 
@@ -74,10 +75,12 @@ def load_config():
 
     try:
         # Load the XML
-        config_XML = ET.parse("config.xml")
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config.xml")
+        config_XML = ET.parse(config_path)
         config_XML_root = config_XML.getroot()
 
-        channels_XML = ET.parse("groups.xml")
+        channels_path = os.path.join(os.path.dirname(__file__), "..", "groups.xml")
+        channels_XML = ET.parse(channels_path)
         channels_root = channels_XML.getroot()
 
         # Assign configuration values to variables

@@ -308,7 +308,7 @@ def get_spammer_details(
     return result
 
 
-async def handle_autoreport(message: types.Message, reason):
+async def submit_autoreport(message: types.Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
@@ -2944,7 +2944,7 @@ if __name__ == "__main__":
                     CHANNEL_IDS,
                 )
                 chan_ban_msg = (
-                    f"{channel_id_to_ban} also banned by AUTOREPORT#{report_id_to_ban}"
+                    f"<a href='https://t.me/c/{str(channel_id_to_ban)[4:]}'>Channel</a>:(<code>{channel_id_to_ban}</code>) also banned by AUTOREPORT#{report_id_to_ban}. "
                 )
             else:
                 chan_ban_msg = ""
@@ -3647,7 +3647,7 @@ if __name__ == "__main__":
                         ),
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await submit_autoreport(message, the_reason)
 
             elif has_custom_emoji_spam(
                 message
@@ -3664,7 +3664,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await submit_autoreport(message, the_reason)
 
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
@@ -3676,7 +3676,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await submit_autoreport(message, the_reason)
 
             elif check_message_for_capital_letters(
                 message
@@ -3690,7 +3690,7 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await handle_autoreport(message, the_reason)
+                    await submit_autoreport(message, the_reason)
 
             elif not user_is_old:
                 # check if the message is sent less then 10 seconds after joining the chat
@@ -3704,7 +3704,7 @@ if __name__ == "__main__":
                             "%s is possibly a bot typing histerically...",
                             message.from_id,
                         )
-                        await handle_autoreport(message, the_reason)
+                        await submit_autoreport(message, the_reason)
                 # check if the message is sent less then 1 hour after joining the chat
                 elif user_is_1hr_old and entity_spam_trigger:
                     # this is possibly a spam
@@ -3721,7 +3721,7 @@ if __name__ == "__main__":
                             message.from_user.id,
                             entity_spam_trigger,
                         )
-                        await handle_autoreport(message, the_reason)
+                        await submit_autoreport(message, the_reason)
 
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
@@ -3732,7 +3732,7 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
-                    await handle_autoreport(message, the_reason)
+                    await submit_autoreport(message, the_reason)
 
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")

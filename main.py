@@ -1,19 +1,19 @@
-import asyncio
-import aiocron
-import argparse
+from datetime import timedelta
 from datetime import datetime
+import argparse
+import asyncio
 import os
 import random
 import sqlite3
 import json
 import time
 import html
-import tracemalloc # for memory usage debugging
+import tracemalloc  # for memory usage debugging
 import ast
+import aiocron
 
 import aiohttp
 from aiogram import Dispatcher, types
-from datetime import timedelta
 
 # import requests
 # from PIL import Image
@@ -2943,9 +2943,7 @@ if __name__ == "__main__":
                     channel_id_to_ban,
                     CHANNEL_IDS,
                 )
-                chan_ban_msg = (
-                    f"<a href='https://t.me/c/{str(channel_id_to_ban)[4:]}'>Channel</a>:(<code>{channel_id_to_ban}</code>) also banned by AUTOREPORT#{report_id_to_ban}. "
-                )
+                chan_ban_msg = f"<a href='https://t.me/c/{str(channel_id_to_ban)[4:]}'>Channel</a>:(<code>{channel_id_to_ban}</code>) also banned by AUTOREPORT#{report_id_to_ban}. "
             else:
                 chan_ban_msg = ""
 
@@ -3093,7 +3091,7 @@ if __name__ == "__main__":
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Channel message already deleted! %s", e)
 
-            # return  # XXX STOP processing
+            # return  # XXX STOP processing and do not store message in the DB
 
         # check first if sender is an admin in the channel or admin group and skip the message
         if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
@@ -3234,7 +3232,7 @@ if __name__ == "__main__":
             #     reply_markup=inline_kb,
             #     # message_thread_id=1,  # # main thread (#REPORTS)
             # )
-        elif (
+        elif (  # TODO replace CHANNEL check with p2p network!!!
             message.from_user.id in banned_users_dict
             or (message.sender_chat and message.sender_chat.id in banned_users_dict)
             or (
@@ -3270,8 +3268,8 @@ if __name__ == "__main__":
 
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)\nClick buttons below for more information:",
-                reply_markup=inline_kb,
+                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+                # reply_markup=inline_kb, # Do not send keyboard since autobanned
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -3340,8 +3338,11 @@ if __name__ == "__main__":
                     tasks = [task for task in tasks if task is not None]
 
                     # Ensure all tasks are coroutines or awaitables
-                    tasks = [task for task in tasks if asyncio.iscoroutine(task) or isinstance(task, asyncio.Future)]
-
+                    tasks = [
+                        task
+                        for task in tasks
+                        if asyncio.iscoroutine(task) or isinstance(task, asyncio.Future)
+                    ]
 
                     await asyncio.gather(*tasks)
 
@@ -3366,7 +3367,7 @@ if __name__ == "__main__":
                         disable_web_page_preview=True,
                         disable_notification=True,
                     )
-                    return  # stop actions for this message forwarded from channel/chat
+                    return  # stop actions for this message forwarded from channel/chat and do not record to DB
                 except BadRequest as e:
                     LOGGER.error(
                         "Error banning channel %s in chat %s: %s",
@@ -4621,9 +4622,7 @@ if __name__ == "__main__":
             susp_user_name = susp_user_name_dict
 
         # create unified message link
-        message_link = construct_message_link(
-            [susp_chat_id, susp_message_id, None]
-        )
+        message_link = construct_message_link([susp_chat_id, susp_message_id, None])
         # create lols check link
         lols_link = f"https://t.me/lolsbotcatcherbot?start={susp_user_id}"
 

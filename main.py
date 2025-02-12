@@ -3210,7 +3210,7 @@ if __name__ == "__main__":
             #     ),
             #     active_user_checks_dict[message.from_user.id],
             # )
-            if check_n_ban(message,"User was in active checks and sent a message!"):
+            if await check_n_ban(message,"User was in active checks and sent a message!"):
                 return
             else:
                 # Forward suspicious message to the ADMIN SUSPICIOUS

@@ -3210,29 +3210,32 @@ if __name__ == "__main__":
             #     ),
             #     active_user_checks_dict[message.from_user.id],
             # )
-            # Forward suspicious message to the ADMIN SUSPICIOUS
-            await BOT.forward_message(
-                ADMIN_GROUP_ID,
-                message.chat.id,
-                message.message_id,
-                message_thread_id=ADMIN_SUSPICIOUS,
-                disable_notification=True,
-            )
-            # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-            await BOT.send_message(
-                ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-                reply_markup=inline_kb,
-                parse_mode="HTML",
-                message_thread_id=ADMIN_SUSPICIOUS,
-            )
-            # Send warning to the Admin group with link to the message
-            # await BOT.send_message(
-            #     ADMIN_GROUP_ID,
-            #     f"WARNING! User {message.from_user.id} suspicious activity detected.",
-            #     reply_markup=inline_kb,
-            #     # message_thread_id=1,  # # main thread (#REPORTS)
-            # )
+            if check_n_ban(message,"User was in active checks and sent a message!"):
+                return
+            else:
+                # Forward suspicious message to the ADMIN SUSPICIOUS
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                    disable_notification=True,
+                )
+                # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+                    reply_markup=inline_kb,
+                    parse_mode="HTML",
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                )
+                # Send warning to the Admin group with link to the message
+                # await BOT.send_message(
+                #     ADMIN_GROUP_ID,
+                #     f"WARNING! User {message.from_user.id} suspicious activity detected.",
+                #     reply_markup=inline_kb,
+                #     # message_thread_id=1,  # # main thread (#REPORTS)
+                # )
         elif (  # TODO replace CHANNEL check with p2p network!!!
             message.from_user.id in banned_users_dict
             or (message.sender_chat and message.sender_chat.id in banned_users_dict)
@@ -3610,13 +3613,6 @@ if __name__ == "__main__":
                     message_link,
                 )
 
-                await BOT.send_message(
-                    ADMIN_GROUP_ID,
-                    f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
-                    message_thread_id=ADMIN_SUSPICIOUS,
-                    parse_mode="HTML",
-                )
-
                 the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 if await check_n_ban(message, the_reason):
 
@@ -3629,6 +3625,15 @@ if __name__ == "__main__":
                     #     print(stat)
 
                     return
+                else:
+                    # If lols check False - mark as suspicious and send to admin group TODO add inline_kb
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        parse_mode="HTML",
+                    )
+                    # TODO check further processing
 
             elif (
                 message.forward_from_chat

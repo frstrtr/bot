@@ -1326,6 +1326,7 @@ async def check_n_ban(message: types.Message, reason: str):
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+        # log username to the username thread
         if message.from_user.username:
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
@@ -3617,17 +3618,17 @@ if __name__ == "__main__":
                 )
 
                 the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
-                await check_n_ban(message, the_reason)
+                if await check_n_ban(message, the_reason):
 
-                # At the point where you want to print the traceback
-                # snapshot = tracemalloc.take_snapshot()
-                # top_stats = snapshot.statistics('lineno')
+                    # At the point where you want to print the traceback
+                    # snapshot = tracemalloc.take_snapshot()
+                    # top_stats = snapshot.statistics('lineno')
 
-                # print("[ Top 10 ]")
-                # for stat in top_stats[:10]:
-                #     print(stat)
+                    # print("[ Top 10 ]")
+                    # for stat in top_stats[:10]:
+                    #     print(stat)
 
-                return
+                    return
 
             elif (
                 message.forward_from_chat

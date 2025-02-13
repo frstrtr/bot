@@ -3046,7 +3046,8 @@ if __name__ == "__main__":
         content_types=ALLOWED_CONTENT_TYPES,
     )
     async def store_recent_messages(message: types.Message):
-        """Function to store recent messages in the database."""
+        """Function to store recent messages in the database.
+        And check senders for spam records."""
 
         # XXX check if message is Channel message
         if (
@@ -3123,7 +3124,6 @@ if __name__ == "__main__":
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()
-
         # Add buttons to the keyboard, each in a new row
         inline_kb.add(
             InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
@@ -3154,6 +3154,7 @@ if __name__ == "__main__":
                 callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
+
         # check if message is from user from active_user_checks_dict and banned_users_dict set
         if (
             message.from_user.id in active_user_checks_dict
@@ -3212,30 +3213,35 @@ if __name__ == "__main__":
             # )
             if await check_n_ban(message,"User was in active checks and sent a message!"):
                 return
-            else:
-                # Forward suspicious message to the ADMIN SUSPICIOUS
-                await BOT.forward_message(
-                    ADMIN_GROUP_ID,
-                    message.chat.id,
-                    message.message_id,
-                    message_thread_id=ADMIN_SUSPICIOUS,
-                    disable_notification=True,
-                )
-                # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-                await BOT.send_message(
-                    ADMIN_GROUP_ID,
-                    f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-                    reply_markup=inline_kb,
-                    parse_mode="HTML",
-                    message_thread_id=ADMIN_SUSPICIOUS,
-                )
-                # Send warning to the Admin group with link to the message
-                # await BOT.send_message(
-                #     ADMIN_GROUP_ID,
-                #     f"WARNING! User {message.from_user.id} suspicious activity detected.",
-                #     reply_markup=inline_kb,
-                #     # message_thread_id=1,  # # main thread (#REPORTS)
-                # )
+            # elif (
+            #     message.chat.id in CHANNEL_IDS
+            #     # SUSPICIOUS CONDITIONS goes here
+            #     and message.chat.id != ADMIN_GROUP_ID
+            #     and message.chat.id != TECHNOLOG_GROUP_ID
+            # ):
+            #     # Forward suspicious message to the ADMIN SUSPICIOUS
+            #     await BOT.forward_message(
+            #         ADMIN_GROUP_ID,
+            #         message.chat.id,
+            #         message.message_id,
+            #         message_thread_id=ADMIN_SUSPICIOUS,
+            #         disable_notification=True,
+            #     )
+            #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
+            #     await BOT.send_message(
+            #         ADMIN_GROUP_ID,
+            #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+            #         reply_markup=inline_kb,
+            #         parse_mode="HTML",
+            #         message_thread_id=ADMIN_SUSPICIOUS,
+            #     )
+            #     # Send warning to the Admin group with link to the message
+            #     await BOT.send_message(
+            #         ADMIN_GROUP_ID,
+            #         f"WARNING! User {message.from_user.id} suspicious activity detected.",
+            #         reply_markup=inline_kb,
+            #         # message_thread_id=1,  # # main thread (#REPORTS)
+            #     )
         elif (  # TODO replace CHANNEL check with p2p network!!!
             message.from_user.id in banned_users_dict
             or (message.sender_chat and message.sender_chat.id in banned_users_dict)
@@ -3426,6 +3432,8 @@ if __name__ == "__main__":
                 #     message.chat.id, message.from_id, revoke_messages=True
                 # )
                 return
+            
+        
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
@@ -3498,6 +3506,7 @@ if __name__ == "__main__":
                 # XXX await BOT.leave_chat(message.chat.id)
                 return
 
+            # Store message data to DB
             CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages 

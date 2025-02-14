@@ -806,15 +806,22 @@ async def handle_forwarded_reports_with_details(
     keyboard = InlineKeyboardMarkup()
     ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{report_id}")
     keyboard.add(ban_btn)
-
-    # Forward original message to the admin group
-    await BOT.forward_message(
-        ADMIN_GROUP_ID,
-        found_message_data[0],  # from_chat_id
-        found_message_data[1],  # message_id
-        message_thread_id=ADMIN_AUTOREPORTS,
-        disable_notification=True,
-    )
+    try:
+        # Forward original message to the admin group
+        await BOT.forward_message(
+            ADMIN_GROUP_ID,
+            found_message_data[0],  # from_chat_id
+            found_message_data[1],  # message_id
+            message_thread_id=ADMIN_AUTOREPORTS,
+            disable_notification=True,
+        )
+    except MessageToForwardNotFound:
+        if message:
+            await message.forward(ADMIN_GROUP_ID, ADMIN_AUTOREPORTS)
+        else:
+            LOGGER.warning(
+                "%s autoreported message already DELETED?", spammer_id
+            )
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     admin_group_banner_autoreport_message = await BOT.send_message(
         ADMIN_GROUP_ID,

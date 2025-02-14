@@ -40,12 +40,12 @@ import re
 from datetime import datetime
 from typing import Optional, Tuple
 
+from sqlite3 import Connection, Cursor
+
 import os
 import sys
 import pytz
 import emoji
-
-import sqlite3
 
 from aiogram import types
 
@@ -403,7 +403,7 @@ def has_spam_entities(spam_triggers, message: types.Message):
     return None
 
 
-def store_message_to_db(cursor, conn, message: types.message):
+def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message):
     """store message data to DB"""
     cursor.execute(
         """
@@ -430,5 +430,42 @@ def store_message_to_db(cursor, conn, message: types.message):
             None,
             None,
         ),
+    )
+    conn.commit()
+
+
+def db_init(cursor: Cursor, conn: Connection):
+    """DB init function"""
+
+    # If adding new column for the first time, uncomment below
+    # cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
+    # conn.commit()
+    # cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member BOOL")
+    # conn.commit()
+
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS recent_messages (
+        chat_id INTEGER NOT NULL,
+        chat_username TEXT,
+        message_id INTEGER NOT NULL,
+        forwarded_message_data TEXT,
+        user_id INTEGER NOT NULL,
+        user_name TEXT,
+        user_first_name TEXT,
+        user_last_name TEXT,
+        forward_date INTEGER,
+        forward_sender_name TEXT,
+        received_date INTEGER,
+        from_chat_title TEXT,
+        forwarded_from_id INTEGER,
+        forwarded_from_username TEXT,
+        forwarded_from_first_name TEXT,
+        forwarded_from_last_name TEXT,
+        new_chat_member BOOL,
+        left_chat_member BOOL,
+        PRIMARY KEY (chat_id, message_id)
+    )
+    """
     )
     conn.commit()

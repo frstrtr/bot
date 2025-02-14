@@ -64,6 +64,7 @@ from utils.utils import (
     load_predetermined_sentences,
     # get_spammer_details,  # Add this line
     store_message_to_db,
+    db_init,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -142,41 +143,10 @@ running_watchdogs = {}
 # Initialize the event
 shutdown_event = asyncio.Event()
 
-# If adding new column for the first time, uncomment below
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN new_chat_member BOOL")
-# conn.commit()
-# cursor.execute("ALTER TABLE recent_messages ADD COLUMN left_chat_member BOOL")
-# conn.commit()
-
 # Setting up SQLite Database
 CONN = sqlite3.connect("messages.db")
 CURSOR = CONN.cursor()
-CURSOR.execute(
-    """
-    CREATE TABLE IF NOT EXISTS recent_messages (
-        chat_id INTEGER NOT NULL,
-        chat_username TEXT,
-        message_id INTEGER NOT NULL,
-        forwarded_message_data TEXT,
-        user_id INTEGER NOT NULL,
-        user_name TEXT,
-        user_first_name TEXT,
-        user_last_name TEXT,
-        forward_date INTEGER,
-        forward_sender_name TEXT,
-        received_date INTEGER,
-        from_chat_title TEXT,
-        forwarded_from_id INTEGER,
-        forwarded_from_username TEXT,
-        forwarded_from_first_name TEXT,
-        forwarded_from_last_name TEXT,
-        new_chat_member BOOL,
-        left_chat_member BOOL,
-        PRIMARY KEY (chat_id, message_id)
-    )
-    """
-)
-CONN.commit()
+db_init(CURSOR, CONN)
 
 
 def get_spammer_details(

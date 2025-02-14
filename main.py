@@ -3187,31 +3187,31 @@ if __name__ == "__main__":
                 message, "User was in active checks and sent a message!"
             ):
                 return
-            elif (
-                message.chat.id in CHANNEL_IDS
-                # SUSPICIOUS CONDITIONS goes here
-                and message.chat.id != ADMIN_GROUP_ID
-                and message.chat.id != TECHNOLOG_GROUP_ID
-            ):
-                # Forward suspicious message to the ADMIN SUSPICIOUS
-                await BOT.forward_message(
-                    ADMIN_GROUP_ID,
-                    message.chat.id,
-                    message.message_id,
-                    message_thread_id=ADMIN_SUSPICIOUS,
-                    disable_notification=True,
-                )
-                # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-                await BOT.send_message(
-                    ADMIN_GROUP_ID,
-                    f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-                    reply_markup=inline_kb,
-                    parse_mode="HTML",
-                    message_thread_id=ADMIN_SUSPICIOUS,
-                )
-                # store message data to DB
-                store_message_to_db(CURSOR, CONN, message)
-                return
+            # elif (
+            #     message.chat.id in CHANNEL_IDS
+            #     # SUSPICIOUS CONDITIONS goes here
+            #     and message.chat.id != ADMIN_GROUP_ID
+            #     and message.chat.id != TECHNOLOG_GROUP_ID
+            # ):
+            #     # Forward suspicious message to the ADMIN SUSPICIOUS
+            #     await BOT.forward_message(
+            #         ADMIN_GROUP_ID,
+            #         message.chat.id,
+            #         message.message_id,
+            #         message_thread_id=ADMIN_SUSPICIOUS,
+            #         disable_notification=True,
+            #     )
+            #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
+            #     await BOT.send_message(
+            #         ADMIN_GROUP_ID,
+            #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+            #         reply_markup=inline_kb,
+            #         parse_mode="HTML",
+            #         message_thread_id=ADMIN_SUSPICIOUS,
+            #     )
+            #     # store message data to DB
+            #     store_message_to_db(CURSOR, CONN, message)
+            #     return
             #     # Send warning to the Admin group with link to the message
             #     await BOT.send_message(
             #         ADMIN_GROUP_ID,
@@ -3550,50 +3550,6 @@ if __name__ == "__main__":
                 if await check_n_ban(message, the_reason):
                     return
             elif (
-                user_is_between_3hours_and_1week_old
-            ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
-                time_passed = message.date - user_join_chat_date
-                human_readable_time = str(time_passed)
-                if message.chat.username:
-                    message_link = construct_message_link(
-                        [message.chat.id, message.message_id, message.chat.username]
-                    )
-                LOGGER.info(
-                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
-                    message.from_id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
-                    message.chat.title,
-                    human_readable_time,
-                    message_link,
-                )
-
-                the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
-                if await check_n_ban(message, the_reason):
-
-                    # At the point where you want to print the traceback
-                    # snapshot = tracemalloc.take_snapshot()
-                    # top_stats = snapshot.statistics('lineno')
-
-                    # print("[ Top 10 ]")
-                    # for stat in top_stats[:10]:
-                    #     print(stat)
-
-                    return
-                else:
-                    # If lols check False - mark as suspicious and send to admin group TODO add inline_kb
-                    await BOT.send_message(
-                        ADMIN_GROUP_ID,
-                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
-                        message_thread_id=ADMIN_SUSPICIOUS,
-                        parse_mode="HTML",
-                    )
-                    # TODO check further processing
-
-            elif (
                 message.forward_from_chat
                 and message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
             ):
@@ -3749,6 +3705,52 @@ if __name__ == "__main__":
                         ),
                         name=str(message.from_id),
                     )
+            elif (
+                user_is_between_3hours_and_1week_old
+                or message.from_user.id in active_user_checks_dict
+            ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
+                time_passed = message.date - user_join_chat_date
+                human_readable_time = str(time_passed)
+                if message.chat.username:
+                    message_link = construct_message_link(
+                        [message.chat.id, message.message_id, message.chat.username]
+                    )
+                LOGGER.info(
+                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
+                    message.from_id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
+                    message.chat.title,
+                    human_readable_time,
+                    message_link,
+                )
+
+                the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
+                if await check_n_ban(message, the_reason):
+
+                    # At the point where you want to print the traceback
+                    # snapshot = tracemalloc.take_snapshot()
+                    # top_stats = snapshot.statistics('lineno')
+
+                    # print("[ Top 10 ]")
+                    # for stat in top_stats[:10]:
+                    #     print(stat)
+
+                    return
+                else:
+                    # If lols check False - mark as suspicious and send to admin group TODO add inline_kb
+                    await BOT.send_message(
+                        ADMIN_GROUP_ID,
+                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        reply_markup=inline_kb,
+                        parse_mode="HTML",
+                    )
+                    return
+                    # TODO check further processing
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

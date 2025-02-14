@@ -45,6 +45,8 @@ import sys
 import pytz
 import emoji
 
+import sqlite3
+
 from aiogram import types
 
 
@@ -399,3 +401,34 @@ def has_spam_entities(spam_triggers, message: types.Message):
                 # Spam detected
                 return entity["type"]
     return None
+
+
+def store_message_to_db(cursor, conn, message: types.message):
+    """store message data to DB"""
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO recent_messages 
+        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            getattr(message.chat, "id", None),
+            getattr(message.chat, "username", ""),
+            getattr(message, "message_id", None),
+            getattr(message.from_user, "id", None),
+            getattr(message.from_user, "username", ""),
+            getattr(message.from_user, "first_name", ""),
+            getattr(message.from_user, "last_name", ""),
+            getattr(message, "forward_date", None),
+            getattr(message, "forward_sender_name", ""),
+            getattr(message, "date", None),
+            getattr(message.forward_from_chat, "title", None),
+            getattr(message.forward_from, "id", None),
+            getattr(message.forward_from, "username", ""),
+            getattr(message.forward_from, "first_name", ""),
+            getattr(message.forward_from, "last_name", ""),
+            None,
+            None,
+        ),
+    )
+    conn.commit()

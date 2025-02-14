@@ -62,6 +62,8 @@ from utils.utils import (
     get_channel_name_by_id,
     has_spam_entities,
     load_predetermined_sentences,
+    # get_spammer_details,  # Add this line
+    store_message_to_db,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -3211,30 +3213,35 @@ if __name__ == "__main__":
             #     ),
             #     active_user_checks_dict[message.from_user.id],
             # )
-            if await check_n_ban(message,"User was in active checks and sent a message!"):
+            if await check_n_ban(
+                message, "User was in active checks and sent a message!"
+            ):
                 return
-            # elif (
-            #     message.chat.id in CHANNEL_IDS
-            #     # SUSPICIOUS CONDITIONS goes here
-            #     and message.chat.id != ADMIN_GROUP_ID
-            #     and message.chat.id != TECHNOLOG_GROUP_ID
-            # ):
-            #     # Forward suspicious message to the ADMIN SUSPICIOUS
-            #     await BOT.forward_message(
-            #         ADMIN_GROUP_ID,
-            #         message.chat.id,
-            #         message.message_id,
-            #         message_thread_id=ADMIN_SUSPICIOUS,
-            #         disable_notification=True,
-            #     )
-            #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-            #     await BOT.send_message(
-            #         ADMIN_GROUP_ID,
-            #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-            #         reply_markup=inline_kb,
-            #         parse_mode="HTML",
-            #         message_thread_id=ADMIN_SUSPICIOUS,
-            #     )
+            elif (
+                message.chat.id in CHANNEL_IDS
+                # SUSPICIOUS CONDITIONS goes here
+                and message.chat.id != ADMIN_GROUP_ID
+                and message.chat.id != TECHNOLOG_GROUP_ID
+            ):
+                # Forward suspicious message to the ADMIN SUSPICIOUS
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                    disable_notification=True,
+                )
+                # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
+                await BOT.send_message(
+                    ADMIN_GROUP_ID,
+                    f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+                    reply_markup=inline_kb,
+                    parse_mode="HTML",
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                )
+                # store message data to DB
+                store_message_to_db(CURSOR, CONN, message)
+                return
             #     # Send warning to the Admin group with link to the message
             #     await BOT.send_message(
             #         ADMIN_GROUP_ID,
@@ -3432,8 +3439,7 @@ if __name__ == "__main__":
                 #     message.chat.id, message.from_id, revoke_messages=True
                 # )
                 return
-            
-        
+
         try:
             # Log the full message object for debugging
             # or/and forward the message to the technolog group
@@ -3507,34 +3513,7 @@ if __name__ == "__main__":
                 return
 
             # Store message data to DB
-            CURSOR.execute(
-                """
-                INSERT OR REPLACE INTO recent_messages 
-                (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    getattr(message.chat, "id", None),
-                    getattr(message.chat, "username", ""),
-                    getattr(message, "message_id", None),
-                    getattr(message.from_user, "id", None),
-                    getattr(message.from_user, "username", ""),
-                    getattr(message.from_user, "first_name", ""),
-                    getattr(message.from_user, "last_name", ""),
-                    getattr(message, "forward_date", None),
-                    getattr(message, "forward_sender_name", ""),
-                    getattr(message, "date", None),
-                    getattr(message.forward_from_chat, "title", None),
-                    getattr(message.forward_from, "id", None),
-                    getattr(message.forward_from, "username", ""),
-                    getattr(message.forward_from, "first_name", ""),
-                    getattr(message.forward_from, "last_name", ""),
-                    None,
-                    None,
-                ),
-            )
-            CONN.commit()
-            # logger.info(f"Stored recent message: {message}")
+            store_message_to_db(CURSOR, CONN, message)
 
             # search for the user join chat event date using user_id in the DB
             user_join_chat_date_str = CURSOR.execute(

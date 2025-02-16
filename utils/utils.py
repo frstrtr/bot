@@ -48,6 +48,10 @@ import pytz
 import emoji
 
 from aiogram import types
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 
 
 def initialize_logger(log_level="INFO"):
@@ -469,3 +473,37 @@ def db_init(cursor: Cursor, conn: Connection):
     """
     )
     conn.commit()
+
+
+def create_inline_keyboard(message_link, lols_link, message: types.Message):
+    """Create the inline keyboard"""
+    inline_kb = InlineKeyboardMarkup()
+    # Add buttons to the keyboard, each in a new row
+    inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+    inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
+    # Add callback data button to prevent further checks
+    inline_kb.add(
+        InlineKeyboardButton(
+            "🟢 Seems legit, STOP checks 🟢",
+            callback_data=f"stop_checks_{message.from_user.id}",
+        )
+    )
+    inline_kb.add(
+        InlineKeyboardButton(
+            "❌ Global BAN ❌",
+            callback_data=f"suspicious_globalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+        )
+    )
+    inline_kb.add(
+        InlineKeyboardButton(
+            "❌ BAN ❌",
+            callback_data=f"suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+        )
+    )
+    inline_kb.add(
+        InlineKeyboardButton(
+            "❌ Delete Message ❌",
+            callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+        )
+    )
+    return inline_kb

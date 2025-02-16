@@ -43,7 +43,11 @@ def is_forwarded_from_unknown_channel_message(
 
 def is_in_monitored_channel(message: types.Message) -> bool:
     """Check if the message is from one of the specified channels."""
-    return message.chat.id in CHANNEL_IDS
+    return (
+        message.chat.id in CHANNEL_IDS
+        and message.chat.id != ADMIN_GROUP_ID
+        and message.chat.id != TECHNOLOG_GROUP_ID
+    )
 
 
 def is_admin_user_message(message: types.Message) -> bool:

@@ -65,6 +65,7 @@ from utils.utils import (
     # get_spammer_details,  # Add this line
     store_message_to_db,
     db_init,
+    create_inline_keyboard,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -819,9 +820,7 @@ async def handle_forwarded_reports_with_details(
         if message:
             await message.forward(ADMIN_GROUP_ID, ADMIN_AUTOREPORTS)
         else:
-            LOGGER.warning(
-                "%s autoreported message already DELETED?", spammer_id
-            )
+            LOGGER.warning("%s autoreported message already DELETED?", spammer_id)
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
     admin_group_banner_autoreport_message = await BOT.send_message(
         ADMIN_GROUP_ID,
@@ -3028,7 +3027,7 @@ if __name__ == "__main__":
         """Function to store recent messages in the database.
         And check senders for spam records."""
 
-        # XXX check if message is Channel message
+        # check if message is Channel message and DELETE it
         if (
             message.sender_chat
             and message.sender_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
@@ -3074,13 +3073,15 @@ if __name__ == "__main__":
 
             # return  # XXX STOP processing and do not store message in the DB
 
+        # create unified message link
+        message_link = construct_message_link(
+            [message.chat.id, message.message_id, message.chat.username]
+        )
+
         # check first if sender is an admin in the channel or admin group and skip the message
         if await is_admin(message.from_user.id, message.chat.id) or await is_admin(
             message.from_user.id, ADMIN_GROUP_ID
         ):
-            message_link = construct_message_link(
-                [message.chat.id, message.message_id, message.chat.username]
-            )
             LOGGER.debug(
                 "\033[95m%s:@%s is admin, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
                 message.from_user.id,
@@ -3095,46 +3096,13 @@ if __name__ == "__main__":
             )
             return
 
-        # create unified message link
-        message_link = construct_message_link(
-            [message.chat.id, message.message_id, message.chat.username]
-        )
         lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
 
-        # Create the inline keyboard
-        inline_kb = InlineKeyboardMarkup()
-        # Add buttons to the keyboard, each in a new row
-        inline_kb.add(
-            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-        )
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
-        # Add callback data button to prevent further checks
-        inline_kb.add(
-            InlineKeyboardButton(
-                "🟢 Seems legit, STOP checks 🟢",
-                callback_data=f"stop_checks_{message.from_user.id}",
-            )
-        )
-        inline_kb.add(
-            InlineKeyboardButton(
-                "❌ Global BAN ❌",
-                callback_data=f"suspicious_globalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-            )
-        )
-        inline_kb.add(
-            InlineKeyboardButton(
-                "❌ BAN ❌",
-                callback_data=f"suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-            )
-        )
-        inline_kb.add(
-            InlineKeyboardButton(
-                "❌ Delete Message ❌",
-                callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-            )
-        )
+        inline_kb = create_inline_keyboard(message_link, lols_link, message)
 
-        # check if message is from user from active_user_checks_dict and banned_users_dict set
+        # check if message is from user from active_user_checks_dict
+        # and banned_users_dict set
+        # XXX is that possible?
         if (
             message.from_user.id in active_user_checks_dict
             and message.from_user.id in banned_users_dict
@@ -3464,30 +3432,6 @@ if __name__ == "__main__":
             #     f"Forwarded from chat type?: {message.forward_from_chat.type=='channel'}\n"
             # )
             # HACK remove afer sandboxing
-
-            # Check if the message is from chat in settings
-            if (
-                message.chat.id not in CHANNEL_IDS
-                and message.chat.id != ADMIN_GROUP_ID
-                and message.chat.id != TECHNOLOG_GROUP_ID
-            ):
-                # LOGGER.debug(
-                #     "message chat id: %s not in CHANNEL_IDS: %s ADMIN_GROUP_ID: %s TECHNOLOG_GROUP_ID: %s",
-                #     message.chat.id,
-                #     CHANNEL_IDS,
-                #     ADMIN_GROUP_ID,
-                #     TECHNOLOG_GROUP_ID,
-                # )
-
-                LOGGER.debug(
-                    "\033[93m%s is not in the allowed chat, skipping the message %s in the chat %s (%s) and leaving it...\033[0m",
-                    message.from_user.id,
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                )
-                # XXX await BOT.leave_chat(message.chat.id)
-                return
 
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
@@ -4227,7 +4171,22 @@ if __name__ == "__main__":
     async def log_all_unhandled_messages(message: types.Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
-            # Check if the message was sent in a chat with the bot and not directly to the bot
+            # Convert the Message object to a dictionary
+            message_dict = message.to_python()
+            full_formatted_message = json.dumps(
+                message_dict, indent=4, ensure_ascii=False
+            )  # Convert back to a JSON string with indentation and human-readable characters
+
+            # process unhandled messages
+            if len(full_formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+                formatted_message = (
+                    formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+                )
+            else:
+                formatted_message = full_formatted_message
+            # Check if the message was sent in a chat with the bot
+            # and not directly to the bot private chat
+            # skip bot private message logging to TECHNOLOG group
             if message.chat.type in ["group", "supergroup", "channel"]:
 
                 # logger.debug(f"Received UNHANDLED message object:\n{message}")
@@ -4242,39 +4201,27 @@ if __name__ == "__main__":
                     TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
                 )  # forward all unhandled messages to technolog group
 
-                # Convert the Message object to a dictionary
-                message_dict = message.to_python()
-                formatted_message = json.dumps(
-                    message_dict, indent=4, ensure_ascii=False
-                )  # Convert back to a JSON string with indentation and human-readable characters
-
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    formatted_message,
+                    message_thread_id=TECHNO_UNHANDLED,
+                )
                 # LOGGER.debug(
                 #     "\nReceived message object:\n %s\n",
                 #     formatted_message,
                 # )
-            elif message.text == "/start":  # /start bot command in PRIVATE message
+            elif (
+                # allow /start command only in private chat with bot
+                message.chat.type == "private"
+                and message.text == "/start"
+            ):
                 # /start easteregg
-                await BOT.send_message(
-                    message.chat.id,
+                await message.reply(
                     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
                 )
-                # await message.reply(
-                #     "Everything that follows is a result of what you see here.\n I'm sorry. My responses are limited. You must ask the right questions.",
-                # )
-
-            if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
-                formatted_message = (
-                    formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-                )
-
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                formatted_message,
-                message_thread_id=TECHNO_UNHANDLED,
-            )
 
             # LOGGER.debug("Received message %s", message)
-            LOGGER.debug("-----------DEBUG INFO-----------")
+            LOGGER.debug("-----------UNHANDLED MESSAGE INFO-----------")
             LOGGER.debug("From ID: %s", message.from_user.id)
             LOGGER.debug("From username: %s", message.from_user.username)
             LOGGER.debug("From first name: %s", message.from_user.first_name)
@@ -4282,24 +4229,20 @@ if __name__ == "__main__":
             LOGGER.debug("Message ID: %s", message.message_id)
             LOGGER.debug("Message from chat title: %s", message.chat.title)
             LOGGER.debug("Message Chat ID: %s", message.chat.id)
-            LOGGER.debug("-----------DEBUG INFO-----------")
+            LOGGER.debug("Message JSON:\n%s", full_formatted_message)
+            LOGGER.debug("-----------END OF UNHANDLED MESSAGE INFO-----------")
 
             user_id = message.from_user.id
-
             user_firstname = message.from_user.first_name
-
-            if message.from_user.last_name:
-                user_lastname = message.from_user.last_name
-            else:
-                user_lastname = ""
-
+            user_lastname = (
+                message.from_user.last_name if message.from_user.last_name else ""
+            )
             user_full_name = html.escape(user_firstname + user_lastname)
-            # user_full_name = f"{user_full_name} (<code>{user_id}</code>)"
-
-            if message.from_user.username:
-                user_name = message.from_user.username
-            else:
-                user_name = user_full_name
+            user_name = (
+                message.from_user.username
+                if message.from_user.username
+                else user_full_name
+            )
 
             bot_received_message = (
                 f" Message received in chat {message.chat.title} ({message.chat.id})\n"

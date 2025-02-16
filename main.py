@@ -1199,7 +1199,13 @@ async def check_n_ban(message: types.Message, reason: str):
     reason: str: The reason for the check.
     """
     lolscheck = await lols_cas_check(message.from_user.id)
-    if lolscheck is True:
+    # Temporarily check if channel already banned
+    channel_spam_check = (
+        message.forward_from_chat.id in banned_users_dict
+        if message.forward_from_chat
+        else False
+    )
+    if lolscheck is True or channel_spam_check:
         # send message to the admin group AUTOREPORT thread
         LOGGER.info(
             "%s in %s (%s):@%s message %s",

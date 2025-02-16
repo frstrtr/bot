@@ -3120,86 +3120,6 @@ if __name__ == "__main__":
                 message.chat.title,
                 message.chat.id,
             )
-
-        elif (
-            message.from_user.id in active_user_checks_dict
-        ):  # User not banned but suspicious
-            # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
-            if not isinstance(active_user_checks_dict.get(message.from_user.id), dict):
-                # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
-                active_user_checks_dict[message.from_user.id] = {
-                    "username": (
-                        "@" + message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    )
-                }
-
-            # Store the message link in the active_user_checks_dict
-            message_key = f"{message.chat.id}_{message.message_id}"
-            active_user_checks_dict[message.from_user.id][message_key] = message_link
-
-            # Create an inline keyboard with a link
-            LOGGER.warning(
-                "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
-                message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
-                message.message_id,
-                message.chat.title,
-                message.chat.id,
-                message_link,
-            )
-            # Log resulting dict
-            # LOGGER.debug(
-            #     "%s:@%s suspicious messages dict: %s",
-            #     message.from_user.id,
-            #     (
-            #         message.from_user.username
-            #         if message.from_user.username
-            #         else "!UNDEFINED!"
-            #     ),
-            #     active_user_checks_dict[message.from_user.id],
-            # )
-            if await check_n_ban(
-                message, "User was in active checks and sent a message!"
-            ):
-                return
-            # elif (
-            #     message.chat.id in CHANNEL_IDS
-            #     # SUSPICIOUS CONDITIONS goes here
-            #     and message.chat.id != ADMIN_GROUP_ID
-            #     and message.chat.id != TECHNOLOG_GROUP_ID
-            # ):
-            #     # Forward suspicious message to the ADMIN SUSPICIOUS
-            #     await BOT.forward_message(
-            #         ADMIN_GROUP_ID,
-            #         message.chat.id,
-            #         message.message_id,
-            #         message_thread_id=ADMIN_SUSPICIOUS,
-            #         disable_notification=True,
-            #     )
-            #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-            #     await BOT.send_message(
-            #         ADMIN_GROUP_ID,
-            #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-            #         reply_markup=inline_kb,
-            #         parse_mode="HTML",
-            #         message_thread_id=ADMIN_SUSPICIOUS,
-            #     )
-            #     # store message data to DB
-            #     store_message_to_db(CURSOR, CONN, message)
-            #     return
-            #     # Send warning to the Admin group with link to the message
-            #     await BOT.send_message(
-            #         ADMIN_GROUP_ID,
-            #         f"WARNING! User {message.from_user.id} suspicious activity detected.",
-            #         reply_markup=inline_kb,
-            #         # message_thread_id=1,  # # main thread (#REPORTS)
-            #     )
         elif (  # TODO replace CHANNEL check with p2p network!!!
             message.from_user.id in banned_users_dict
             or (message.sender_chat and message.sender_chat.id in banned_users_dict)
@@ -3345,7 +3265,7 @@ if __name__ == "__main__":
                     )
                     return  # stop processing further this message
             else:
-                # LATENCY squezzed spammer?
+                # LSS LATENCY squezzed spammer?
                 LOGGER.debug(
                     "\033[91m%s:@%s banned and message %s deleted in chat %s (%s) @%s #LSS\033[0m",
                     message.from_user.id,
@@ -3526,14 +3446,12 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     await submit_autoreport(message, the_reason)
-
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
                 the_reason = (
                     f"{message.from_id} message contains 5 or more spammy custom emojis"
                 )
-
                 if await check_n_ban(message, the_reason):
                     return
                 else:
@@ -3543,7 +3461,6 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     await submit_autoreport(message, the_reason)
-
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
@@ -3555,7 +3472,6 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     await submit_autoreport(message, the_reason)
-
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
@@ -3569,38 +3485,35 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     await submit_autoreport(message, the_reason)
-
-            elif not user_is_old:
-                # check if the message is sent less then 10 seconds after joining the chat
-                if user_is_10sec_old:
-                    # this is possibly a bot
-                    the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
-                    if await check_n_ban(message, the_reason):
-                        return
-                    else:
-                        LOGGER.info(
-                            "%s is possibly a bot typing histerically...",
-                            message.from_id,
-                        )
-                        await submit_autoreport(message, the_reason)
-                # check if the message is sent less then 1 hour after joining the chat
-                elif user_is_1hr_old and entity_spam_trigger:
-                    # this is possibly a spam
-                    the_reason = (
-                        f"{message.from_id} message sent less then 1 hour after joining the chat and have "
-                        + entity_spam_trigger
-                        + " inside"
+            # check if the message is sent less then 10 seconds after joining the chat
+            elif user_is_10sec_old:
+                # this is possibly a bot
+                the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
+                if await check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "%s is possibly a bot typing histerically...",
+                        message.from_id,
                     )
-                    if await check_n_ban(message, the_reason):
-                        return
-                    else:
-                        LOGGER.info(
-                            "%s possibly sent a spam with (%s) links or other entities in less than 1 hour after joining the chat",
-                            message.from_user.id,
-                            entity_spam_trigger,
-                        )
-                        await submit_autoreport(message, the_reason)
-
+                    await submit_autoreport(message, the_reason)
+            # check if the message is sent less then 1 hour after joining the chat
+            elif user_is_1hr_old and entity_spam_trigger:
+                # this is possibly a spam
+                the_reason = (
+                    f"{message.from_id} message sent less then 1 hour after joining the chat and have "
+                    + entity_spam_trigger
+                    + " inside"
+                )
+                if await check_n_ban(message, the_reason):
+                    return
+                else:
+                    LOGGER.info(
+                        "%s possibly sent a spam with (%s) links or other entities in less than 1 hour after joining the chat",
+                        message.from_user.id,
+                        entity_spam_trigger,
+                    )
+                    await submit_autoreport(message, the_reason)
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
                 the_reason = f"{message.from_id} message sent via inline bot"
@@ -3611,7 +3524,6 @@ if __name__ == "__main__":
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
                     await submit_autoreport(message, the_reason)
-
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
@@ -3663,9 +3575,89 @@ if __name__ == "__main__":
                         name=str(message.from_id),
                     )
             elif (
-                user_is_between_3hours_and_1week_old
-                or message.from_user.id in active_user_checks_dict
-            ):
+                message.from_user.id in active_user_checks_dict
+                or user_is_between_3hours_and_1week_old
+            ):  # User not banned but suspicious
+                # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
+                if not isinstance(
+                    active_user_checks_dict.get(message.from_user.id), dict
+                ):
+                    # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
+                    active_user_checks_dict[message.from_user.id] = {
+                        "username": (
+                            "@" + message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        )
+                    }
+
+                # Store the message link in the active_user_checks_dict
+                message_key = f"{message.chat.id}_{message.message_id}"
+                active_user_checks_dict[message.from_user.id][
+                    message_key
+                ] = message_link
+
+                # Create an inline keyboard with a link
+                LOGGER.warning(
+                    "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
+                    message.from_user.id,
+                    (
+                        message.from_user.username
+                        if message.from_user.username
+                        else "!UNDEFINED!"
+                    ),
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                    message_link,
+                )
+                # Log resulting dict
+                # LOGGER.debug(
+                #     "%s:@%s suspicious messages dict: %s",
+                #     message.from_user.id,
+                #     (
+                #         message.from_user.username
+                #         if message.from_user.username
+                #         else "!UNDEFINED!"
+                #     ),
+                #     active_user_checks_dict[message.from_user.id],
+                # )
+                # if await check_n_ban(
+                #     message, "User was in active checks and sent a message!"
+                # ):
+                #     return
+                # elif (
+                #     message.chat.id in CHANNEL_IDS
+                #     # SUSPICIOUS CONDITIONS goes here
+                #     and message.chat.id != ADMIN_GROUP_ID
+                #     and message.chat.id != TECHNOLOG_GROUP_ID
+                # ):
+                #     # Forward suspicious message to the ADMIN SUSPICIOUS
+                #     await BOT.forward_message(
+                #         ADMIN_GROUP_ID,
+                #         message.chat.id,
+                #         message.message_id,
+                #         message_thread_id=ADMIN_SUSPICIOUS,
+                #         disable_notification=True,
+                #     )
+                #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
+                #     await BOT.send_message(
+                #         ADMIN_GROUP_ID,
+                #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+                #         reply_markup=inline_kb,
+                #         parse_mode="HTML",
+                #         message_thread_id=ADMIN_SUSPICIOUS,
+                #     )
+                #     # store message data to DB
+                #     store_message_to_db(CURSOR, CONN, message)
+                #     return
+                #     # Send warning to the Admin group with link to the message
+                #     await BOT.send_message(
+                #         ADMIN_GROUP_ID,
+                #         f"WARNING! User {message.from_user.id} suspicious activity detected.",
+                #         reply_markup=inline_kb,
+                #         # message_thread_id=1,  # # main thread (#REPORTS)
+                #     )
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:
@@ -3684,7 +3676,6 @@ if __name__ == "__main__":
                     human_readable_time,
                     message_link,
                 )
-
                 the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                 if await check_n_ban(message, the_reason):
 
@@ -3698,7 +3689,7 @@ if __name__ == "__main__":
 
                     return
                 else:
-                    # If lols check False - mark as suspicious and send to admin group TODO add inline_kb
+                    # If lols check False - mark as suspicious and send to admin group
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
@@ -3707,7 +3698,6 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                     )
                     return
-                    # TODO check further processing
 
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

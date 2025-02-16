@@ -3115,7 +3115,7 @@ if __name__ == "__main__":
                 message.chat.id,
             )
 
-        if (
+        elif (
             message.from_user.id in active_user_checks_dict
         ):  # User not banned but suspicious
             # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
@@ -3436,9 +3436,9 @@ if __name__ == "__main__":
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
 
-            # search for the user join chat event date using user_id in the DB
+            # search for the latest user join chat event date using user_id in the DB
             user_join_chat_date_str = CURSOR.execute(
-                "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1",
+                "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1 ORDER BY received_date DESC LIMIT 1",
                 (message.from_user.id,),
             ).fetchone()
             # if there is no such data assume user joined the chat 3 years ago in seconds
@@ -3457,8 +3457,8 @@ if __name__ == "__main__":
                 user_join_chat_date_str, "%Y-%m-%d %H:%M:%S"
             )
 
-            # flag true if user joined the chat more than 3 days ago
-            user_is_old = (message.date - user_join_chat_date).total_seconds() > 259200
+            # flag true if user joined the chat more than 1 week ago
+            user_is_old = (message.date - user_join_chat_date).total_seconds() > 604805
             user_is_between_3hours_and_1week_old = (
                 10805  # 3 hours in seconds
                 <= (message.date - user_join_chat_date).total_seconds()
@@ -3659,7 +3659,7 @@ if __name__ == "__main__":
             elif (
                 user_is_between_3hours_and_1week_old
                 or message.from_user.id in active_user_checks_dict
-            ):  # TODO add admin action buttons, since this users are not in active_checks dict!!!  # do lols check if user less than 48hr old sending a message
+            ):
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:

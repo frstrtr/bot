@@ -692,6 +692,19 @@ async def handle_autoreports(
             )
 
     if not found_message_data:  # Last resort. Give up.
+        LOGGER.warning(
+            "%s:%s spammer data not found in DB. I giveup :(",
+            message.from_id,
+            (
+                message.from_user.username
+                if message.from_user.username
+                else (
+                    message.forward_from_chat.username
+                    if message.forward_from_chat.username
+                    else "@!UNDEFINED!"
+                )
+            ),
+        )
         return
 
     # LOGGER.debug(

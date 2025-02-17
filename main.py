@@ -318,7 +318,7 @@ async def submit_autoreport(message: types.Message, reason):
         ),
         froward_sender_chat_id=message.sender_chat.id if message.sender_chat else None,
     )
-    await handle_forwarded_reports_with_details(
+    await handle_autoreports(
         message,
         message.from_user.id,
         message.from_user.first_name,
@@ -619,7 +619,7 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
     return False
 
 
-async def handle_forwarded_reports_with_details(
+async def handle_autoreports(
     message: types.Message,
     spammer_id: int,
     spammer_first_name: str,
@@ -728,7 +728,7 @@ async def handle_forwarded_reports_with_details(
 
     CONN.commit()
 
-    message_link = construct_message_link(found_message_data)
+    message_link = f"https://t.me/c/{message.chat.id[:4] if message.chat.id < 0 else message.chat.id}/{message.message_id}"
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -4492,7 +4492,7 @@ if __name__ == "__main__":
             """,
             (
                 callback_query.message.chat.id,
-                callback_query.id, # XXX not a message ID!!!
+                callback_query.id,  # XXX not a message ID!!!
                 user_id_legit,
                 user_name,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

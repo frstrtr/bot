@@ -66,6 +66,7 @@ from utils.utils import (
     store_message_to_db,
     db_init,
     create_inline_keyboard,
+    check_user_legit,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -3142,7 +3143,7 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             LOGGER.warning(logger_text)
 
-            # Forwarding banned user message to ADMIN SUSPICIOUS
+            # Forwarding banned user message to ADMIN AUTOBAN
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
                 message.chat.id,
@@ -3385,11 +3386,11 @@ if __name__ == "__main__":
 
             # flag true if user joined the chat more than 1 week ago
             user_is_old = (message.date - user_join_chat_date).total_seconds() > 604805
-            user_is_between_3hours_and_1week_old = (
-                10805  # 3 hours in seconds
-                <= (message.date - user_join_chat_date).total_seconds()
-                < 604805  # 3 hours in seconds and 1 week in seconds
-            )
+            # user_is_between_3hours_and_1week_old = (
+            #     10805  # 3 hours in seconds
+            #     <= (message.date - user_join_chat_date).total_seconds()
+            #     < 604805  # 3 hours in seconds and 1 week in seconds
+            # )
             # user_is_1day_old = (
             #     message.date - user_join_chat_date
             # ).total_seconds() < 86400  # 1 days and 5 seconds
@@ -3399,6 +3400,10 @@ if __name__ == "__main__":
             user_is_10sec_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 10
+
+            # check if user flagged legit by setting
+            # new_chat_member and left_chat_member in the DB to 1
+            user_flagged_legit = check_user_legit(CURSOR, message.from_id)
 
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
@@ -3574,10 +3579,9 @@ if __name__ == "__main__":
                         ),
                         name=str(message.from_id),
                     )
-            elif (
-                message.from_user.id in active_user_checks_dict
-                or user_is_between_3hours_and_1week_old
-            ):  # User not banned but suspicious
+            elif message.from_user.id in active_user_checks_dict or not (
+                user_is_old or user_flagged_legit
+            ):
                 # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
                 if not isinstance(
                     active_user_checks_dict.get(message.from_user.id), dict
@@ -3690,12 +3694,19 @@ if __name__ == "__main__":
                     return
                 else:
                     # If lols check False - mark as suspicious and send to admin group
+                    await message.forward(
+                        ADMIN_GROUP_ID,
+                        ADMIN_SUSPICIOUS,
+                        disable_notification=True,
+                        protect_content=True,
+                    )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
                         f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
                         message_thread_id=ADMIN_SUSPICIOUS,
                         reply_markup=inline_kb,
                         parse_mode="HTML",
+                        disable_web_page_preview=True,
                     )
                     return
 
@@ -4468,10 +4479,28 @@ if __name__ == "__main__":
             for task in asyncio.all_tasks():
                 if task.get_name() == str(user_id_legit):
                     task.cancel()
-        else:
-            # user is not in active checks but joined less than 1 week ago
-            pass
-
+        # else:
+        # user is not in active checks but joined less than 1 week ago
+        # store new record in the DB that future checks are cancelled
+        # set new_chat_member and left_chat_member to 1
+        # to indicate that checks were cancelled
+        CURSOR.execute(
+            """
+            INSERT OR REPLACE INTO recent_messages
+            (chat_id, message_id, user_id, user_name, received_date, new_chat_member, left_chat_member)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                callback_query.message.chat.id,
+                callback_query.id, # XXX not a message ID!!!
+                user_id_legit,
+                user_name,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                1,  # new_chat_member
+                1,  # left_chat_member
+            ),
+        )
+        CONN.commit()
 
         # Log that user checks are cancelled by admin
         if len(active_user_checks_dict) > 3:

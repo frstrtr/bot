@@ -507,3 +507,19 @@ def create_inline_keyboard(message_link, lols_link, message: types.Message):
         )
     )
     return inline_kb
+
+
+def check_user_legit(cursor: Cursor, user_id: int) -> bool:
+    """Function to check if user is marked as legit
+    having new_chat_member and left_chat_member set to 1."""
+
+    cursor.execute(
+        """
+        SELECT 1 FROM recent_messages
+        WHERE user_id = ? AND new_chat_member = 1 AND left_chat_member = 1
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    result = cursor.fetchone()
+    return result is not None

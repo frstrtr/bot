@@ -3715,7 +3715,7 @@ if __name__ == "__main__":
                     )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Message Link: {message_link} Please check it out!",
+                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Please check it out!",
                         message_thread_id=ADMIN_SUSPICIOUS,
                         reply_markup=inline_kb,
                         parse_mode="HTML",

@@ -2047,9 +2047,8 @@ if __name__ == "__main__":
                 (
                     getattr(update.chat, "id", None),
                     getattr(update.chat, "username", ""),
-                    # XXX this is not MESSAGE.ID since UPDATE have no such property
-                    # combining CHAT.ID+FROM_USER.ID+UNIX_TIMESTAMP
-                    int(f"{str(getattr(update.chat, 'id', '')).replace('-100', '')}{int(getattr(update, 'date', datetime.now()).timestamp())}"),
+                    # XXX this is not MESSAGE.ID since UPDATE have no such property UNIX_TIMESTAMP
+                    int(f"{int(getattr(update, 'date', datetime.now()).timestamp())}"),
                     getattr(update.old_chat_member.user, "id", None),
                     getattr(update.old_chat_member.user, "username", ""),
                     getattr(update.old_chat_member.user, "first_name", ""),

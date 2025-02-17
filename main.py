@@ -256,7 +256,7 @@ def get_spammer_details(
     # Ensure result is not None before accessing its elements
     if result is None:
         LOGGER.error(
-            "\033[91mNo result found for the given query and parameters. GSD\033[0m"
+            "\033[91mNo result found for the given query and parameters. #GSD\033[0m"
         )
         return None
 
@@ -2047,9 +2047,9 @@ if __name__ == "__main__":
                 (
                     getattr(update.chat, "id", None),
                     getattr(update.chat, "username", ""),
-                    getattr(
-                        update, "date", None
-                    ),  # primary key to change to prevent overwriting DB
+                    # XXX this is not MESSAGE.ID since UPDATE have no such property
+                    # combining CHAT.ID+FROM_USER.ID+UNIX_TIMESTAMP
+                    int(f"{str(getattr(update.chat, 'id', '')).replace('-100', '')}{getattr(update.from_user, 'id', '')}{int(getattr(update, 'date', datetime.now()).timestamp())}"),
                     getattr(update.old_chat_member.user, "id", None),
                     getattr(update.old_chat_member.user, "username", ""),
                     getattr(update.old_chat_member.user, "first_name", ""),

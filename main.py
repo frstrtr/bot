@@ -741,7 +741,7 @@ async def handle_autoreports(
 
     CONN.commit()
 
-    message_link = f"https://t.me/c/{message.chat.id[:4] if message.chat.id < 0 else message.chat.id}/{message.message_id}"
+    message_link = f"https://t.me/c/{str(message.chat.id)[:4] if message.chat.id < 0 else str(message.chat.id)}/{str(message.message_id)}"
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -2519,7 +2519,7 @@ if __name__ == "__main__":
                 forwarded_report_state[report_id] = {
                     "original_forwarded_message": message,
                     "admin_group_banner_message": admin_group_banner_message,
-                    "action_banner_message": admin_action_banner_message,
+                    "action_banner_message": admin_action_banner_message,  # BUG if report sent by non-admin user - there is no admin action banner message
                     "report_chat_id": message.chat.id,
                 }
 

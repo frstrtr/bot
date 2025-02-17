@@ -3710,7 +3710,6 @@ if __name__ == "__main__":
                         ADMIN_GROUP_ID,
                         ADMIN_SUSPICIOUS,
                         disable_notification=True,
-                        protect_content=True,
                     )
                     await BOT.send_message(
                         ADMIN_GROUP_ID,

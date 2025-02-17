@@ -196,7 +196,7 @@ def get_spammer_details(
     base_query = """
         SELECT chat_id, message_id, chat_username, user_id, user_name, user_first_name, user_last_name, received_date
         FROM recent_messages
-        WHERE {condition}
+        WHERE {condition} AND new_chat_member IS NULL AND left_chat_member IS NULL
         ORDER BY received_date DESC
         LIMIT 1
     """

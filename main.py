@@ -3585,7 +3585,7 @@ if __name__ == "__main__":
                     # Initialize with the username if it exists, otherwise with "!UNDEFINED!"
                     active_user_checks_dict[message.from_user.id] = {
                         "username": (
-                            "@" + message.from_user.username
+                            message.from_user.username
                             if message.from_user.username
                             else "!UNDEFINED!"
                         )
@@ -4468,6 +4468,10 @@ if __name__ == "__main__":
             for task in asyncio.all_tasks():
                 if task.get_name() == str(user_id_legit):
                     task.cancel()
+        else:
+            # user is not in active checks but joined less than 1 week ago
+            pass
+
 
         # Log that user checks are cancelled by admin
         if len(active_user_checks_dict) > 3:

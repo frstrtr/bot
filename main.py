@@ -3058,6 +3058,21 @@ if __name__ == "__main__":
                     message.chat.id,
                     message.message_id,
                     message_thread_id=TECHNO_ORIGINALS,
+                    disable_notification=True,
+                )
+                message_link = construct_message_link(
+                    [
+                        message.chat.id,
+                        message.message_id,
+                        message.chat.username if message.chat.username else None,
+                    ]
+                )
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"From chat: {message.chat.title}\nMessage link: <a href='{message_link}'>Click here</a>",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_ORIGINALS,
+                    disable_notification=True,
                 )
             except BadRequest as e:
                 LOGGER.error("Channel message processing error: %s", e)

@@ -808,7 +808,7 @@ async def handle_autoreports(
     # construct lols check link button
     inline_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
-            "Check lols data",
+            "ℹ️ Check Spam Data ℹ️",
             url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
         )
     )
@@ -1034,7 +1034,7 @@ async def check_and_autoban(
     lols_url = f"https://t.me/lolsbotcatcherbot?start={user_id}"
 
     inline_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Check spammer profile", url=lols_url)
+        InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
     )
 
     if lols_spam is True:  # not Timeout exaclty
@@ -1302,7 +1302,7 @@ async def check_n_ban(message: types.Message, reason: str):
         # send the telefrag log message to the admin group
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
-                "Check lols data",
+                "ℹ️ Check Spam Data ℹ️",
                 url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
             )
         )
@@ -1930,7 +1930,7 @@ if __name__ == "__main__":
 
         lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("Check lols data", url=lols_url)
+            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
         )
 
         await BOT.send_message(
@@ -2384,7 +2384,7 @@ if __name__ == "__main__":
         # construct lols check link button
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
-                "Check lols data",
+                "ℹ️ Check Spam Data ℹ️",
                 url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
             )
         )
@@ -4416,7 +4416,9 @@ if __name__ == "__main__":
     @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user."""
-        *_, user_id_legit = callback_query.data.split("_")
+        *_, user_id_legit, orig_chat_id, orig_message_id = callback_query.data.split(
+            "_"
+        )
         user_id_legit = int(user_id_legit)
         button_pressed_by = callback_query.from_user.username
         admin_id = callback_query.from_user.id
@@ -4430,17 +4432,17 @@ if __name__ == "__main__":
             user_name = user_name_dict
 
         # # create unified message link
-        # message_link = construct_message_link(
-        #     [message.chat.id, message.message_id, message.chat.username]
-        # )
+        message_link = construct_message_link([orig_chat_id, orig_message_id, None])
         lols_link = f"https://t.me/lolsbotcatcherbot?start={user_id_legit}"
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()
 
         # # Add buttons to the keyboard, each in a new row
-        # inline_kb.add(InlineKeyboardButton("🔗View Original Message", url=message_link))
-        inline_kb.add(InlineKeyboardButton("ℹ️Check LOLS Data", url=lols_link))
+        inline_kb.add(
+            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+        )
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
@@ -4589,7 +4591,7 @@ if __name__ == "__main__":
         inline_kb.add(
             InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
         )
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         if comand == "globalban":
             inline_kb.add(

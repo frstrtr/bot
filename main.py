@@ -4416,10 +4416,18 @@ if __name__ == "__main__":
     @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user."""
-        *_, user_id_legit, orig_chat_id, orig_message_id = callback_query.data.split(
-            "_"
-        )
-        user_id_legit = int(user_id_legit)
+        try:
+            *_, user_id_legit, orig_chat_id, orig_message_id = (
+                callback_query.data.split("_")
+            )
+            user_id_legit = int(user_id_legit)
+            orig_chat_id = int(orig_chat_id)
+            orig_message_id = int(orig_message_id)
+        except ValueError as e:
+            LOGGER.error("%s Invalid callback data: %s", e, callback_query.data)
+            # await callback_query.answer("Invalid data format.")
+            return
+
         button_pressed_by = callback_query.from_user.username
         admin_id = callback_query.from_user.id
 

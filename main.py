@@ -3559,7 +3559,7 @@ if __name__ == "__main__":
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
-                the_reason = f"{message.from_id} message sent during the night"
+                the_reason = f"{message.from_id} message {message.message_id} in chat {message.chat.title} sent during the night"
                 # LOGGER.info(
                 #     "%s message sent during the night: %s", message.from_id, message
                 # )

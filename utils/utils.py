@@ -485,7 +485,7 @@ def create_inline_keyboard(message_link, lols_link, message: types.Message):
     inline_kb.add(
         InlineKeyboardButton(
             "🟢 Seems legit, STOP checks 🟢",
-            callback_data=f"stop_checks_{message.from_user.id}",
+            callback_data=f"stop_checks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
         )
     )
     inline_kb.add(

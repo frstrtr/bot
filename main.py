@@ -741,7 +741,7 @@ async def handle_autoreports(
 
     CONN.commit()
 
-    message_link = f"https://t.me/c/{str(message.chat.id)[:4] if message.chat.id < 0 else str(message.chat.id)}/{str(message.message_id)}"
+    message_link = f"https://t.me/c/{str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)}/{str(message.message_id)}"
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:

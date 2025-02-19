@@ -874,42 +874,56 @@ async def spam_check(user_id):
         lols = False
         cas = 0
         is_spammer = False
-        try:
-            async with session.get(
-                f"http://127.0.0.1:8081/check?user_id={user_id}"
-            ) as resp:
-                if resp.status == 200:
-                    try:
+
+        async def check_local():
+            try:
+                async with session.get(f"http://127.0.0.1:8081/check?user_id={user_id}") as resp:
+                    if resp.status == 200:
                         data = await resp.json()
-                        # p2p = data["p2p"]["ban_status"]
-                        is_spammer = data["is_spammer"]
-                    except KeyError:
-                        is_spammer = False
-            async with session.get(
-                f"https://api.lols.bot/account?id={user_id}"
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    lols = data["banned"]
-                    # LOGGER.debug("LOLS CAS checks:")
-                    # LOGGER.debug("LOLS data: %s", data)
-            async with session.get(
-                f"https://api.cas.chat/check?user_id={user_id}"
-            ) as resp:
-                if resp.status == 200:
-                    # LOGGER.debug("CAS data: %s", data)
-                    data = await resp.json()
-                    ok = data["ok"]
-                    if ok:
-                        cas = data["result"]["offenses"]
-                        # LOGGER.info("%s CAS offenses: %s", user_id, cas)
-                    else:
-                        cas = 0
-            if lols is True or is_spammer is True or int(cas) > 0:
+                        return data.get("is_spammer", False)
+            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                LOGGER.error("Local check error: %s", e)
+                return False
+
+        async def check_lols():
+            try:
+                async with session.get(f"https://api.lols.bot/account?id={user_id}") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data.get("banned", False)
+            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                LOGGER.error("LOLS check error: %s", e)
+                return False
+
+        async def check_cas():
+            try:
+                async with session.get(f"https://api.cas.chat/check?user_id={user_id}") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("ok", False):
+                            return data["result"].get("offenses", 0)
+            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                LOGGER.error("CAS check error: %s", e)
+                return 0
+
+        try:
+            results = await asyncio.gather(
+                check_local(),
+                check_lols(),
+                check_cas(),
+                return_exceptions=True
+            )
+
+            is_spammer = results[0]
+            lols = results[1]
+            cas = results[2]
+
+            if lols or is_spammer or cas > 0:
                 return True
             else:
                 return False
-        except asyncio.TimeoutError:
+        except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+            LOGGER.error("Unexpected error: %s", e)
             return None
 
 

@@ -916,7 +916,7 @@ async def spam_check(user_id):
 
             is_spammer = results[0]
             lols = results[1]
-            cas = results[2]
+            cas = results[2] if results[2] is not None else 0
 
             if lols or is_spammer or cas > 0:
                 return True

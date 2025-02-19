@@ -883,10 +883,8 @@ async def spam_check(user_id):
                         data = await resp.json()
                         # p2p = data["p2p"]["ban_status"]
                         is_spammer = data["is_spammer"]
-                        # LOGGER.debug("P2P SPAM checks:")
                     except KeyError:
                         is_spammer = False
-                        # LOGGER.debug("P2P SPAM checks: no data")
             async with session.get(
                 f"https://api.lols.bot/account?id={user_id}"
             ) as resp:

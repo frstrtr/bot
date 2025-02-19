@@ -493,7 +493,7 @@ async def load_and_start_checks():
 async def sequential_shutdown_tasks(_id, _uname):
     """Define the new coroutine that runs two async functions sequentially"""
     # First async function
-    lols_cas_result = await lols_cas_check(_id) is True
+    lols_cas_result = await spam_check(_id) is True
     # Second async function
     await check_and_autoban(
         f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
@@ -862,16 +862,30 @@ async def handle_autoreports(
     return
 
 
-async def lols_cas_check(user_id):
-    """Function to check if a user is in the lols/cas bot database.
+async def spam_check(user_id):
+    """Function to check if a user is in the lols/cas/p2p/db spam list.
     var: user_id: int: The ID of the user to check."""
     # Check if the user is in the lols bot database
     # https://api.lols.bot/account?id=
     # https://api.cas.chat/check?user_id=
+    # http://127.0.0.1:8081/check?user_id=
+    # TODO implement prime_radiant local DB check
     async with aiohttp.ClientSession() as session:
         lols = False
         cas = 0
+        p2p = False
         try:
+            async with session.get(
+                f"http://127.0.0.1:8081/check?user_id={user_id}"
+            ) as resp:
+                if resp.status == 200:
+                    try:
+                        data = await resp.json()
+                        p2p = data["p2p"]["ban_status"]
+                        # LOGGER.debug("P2P SPAM checks:")
+                    except KeyError:
+                        p2p = False
+                        # LOGGER.debug("P2P SPAM checks: no data")
             async with session.get(
                 f"https://api.lols.bot/account?id={user_id}"
             ) as resp:
@@ -892,7 +906,7 @@ async def lols_cas_check(user_id):
                         # LOGGER.info("%s CAS offenses: %s", user_id, cas)
                     else:
                         cas = 0
-            if lols is True or int(cas) > 0:
+            if lols is True or p2p is True or int(cas) > 0:
                 return True
             else:
                 return False
@@ -963,7 +977,7 @@ async def ban_user_from_all_chats(
     )
 
 
-async def lols_autoban(_id, user_name="!UNDEFINED!"):
+async def autoban(_id, user_name="!UNDEFINED!"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
 
@@ -1039,7 +1053,7 @@ async def check_and_autoban(
 
     if lols_spam is True:  # not Timeout exaclty
         if user_id not in banned_users_dict:
-            await lols_autoban(user_id, user_name)
+            await autoban(user_id, user_name)
             # banned_users_dict[user_id] = user_name
             action = "added to"
         else:
@@ -1212,7 +1226,7 @@ async def check_n_ban(message: types.Message, reason: str):
 
     reason: str: The reason for the check.
     """
-    lolscheck = await lols_cas_check(message.from_user.id)
+    lolscheck = await spam_check(message.from_user.id)
     # Temporarily check if channel already banned
     channel_spam_check = (
         message.forward_from_chat.id in banned_users_dict
@@ -1333,7 +1347,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 message_thread_id=TECHNO_NAMES,
             )
         # remove spammer from all groups
-        await lols_autoban(message.from_user.id, message.from_user.username)
+        await autoban(message.from_user.id, message.from_user.username)
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
             f"{message.from_id:<10} "
@@ -1455,7 +1469,7 @@ async def perform_checks(
                 return
 
             await asyncio.sleep(sleep_time)
-            lols_spam = await lols_cas_check(user_id)
+            lols_spam = await spam_check(user_id)
 
             # Get the color code based on the value of lols_spam
             color_code = color_map.get(
@@ -1887,7 +1901,7 @@ if __name__ == "__main__":
             update.old_chat_member.user.username or "!UNDEFINED!"
         )  # optional
 
-        lols_spam = await lols_cas_check(update.old_chat_member.user.id)
+        lols_spam = await spam_check(update.old_chat_member.user.id)
 
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
@@ -3155,7 +3169,7 @@ if __name__ == "__main__":
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
             )
-            or await lols_cas_check(
+            or await spam_check(
                 message.from_user.id
             )  # check if it is in spammer database
         ):
@@ -3202,7 +3216,7 @@ if __name__ == "__main__":
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict
                 or rogue_chan_id in banned_users_dict
-                or await lols_cas_check(message.from_user.id)
+                or await spam_check(message.from_user.id)
             ):
                 try:
                     # ban spammer in all chats
@@ -3340,53 +3354,6 @@ if __name__ == "__main__":
                 return
 
         try:
-            # Log the full message object for debugging
-            # or/and forward the message to the technolog group
-            # if (
-            #     message.chat.id == -100123456789 or message.chat.id == -100123456789
-            # ):  # XXX
-            #     # temporal horse fighting
-            #     await BOT.forward_message(
-            #         TECHNOLOG_GROUP_ID,
-            #         message.chat.id,
-            #         message.message_id,
-            #         message_thread_id=TECHNO_ORIGINALS,
-            #     )
-            #     LOGGER.info(
-            #         "Message ID: %s Forwarded from chat: %s",
-            #         message.message_id,
-            #         message.chat.title,
-            #     )
-            # # Convert the Message object to a dictionary
-            # message_dict = message.to_python()
-            # formatted_message = json.dumps(
-            #     message_dict, indent=4, ensure_ascii=False
-            # )  # Convert back to a JSON string with indentation and human-readable characters
-            # logger.debug(
-            #     "\nReceived message object:\n %s\n",
-            #     formatted_message,
-            # )
-            # if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
-            #     formatted_message = (
-            #         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-            #     )
-
-            # NOTE hash JSON to make signature
-            # await BOT.send_message(
-            #     TECHNOLOG_GROUP_ID,
-            #     formatted_message,
-            #     message_thread_id=TECHNO_ORIGINALS,
-            # )
-
-            # logger.debug(
-            #     # f"Bot?: {message.from_user.is_bot}\n"
-            #     # f"First Name?: {message.from_user.first_name}\n"
-            #     # f"Username?: {message.from_user.username}\n"
-            #     # f"Author signature?: {message.author_signature}\n"
-            #     f"Forwarded from chat type?: {message.forward_from_chat.type=='channel'}\n"
-            # )
-            # HACK remove afer sandboxing
-
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
 
@@ -3401,10 +3368,6 @@ if __name__ == "__main__":
                 if user_join_chat_date_str
                 else "2020-01-01 00:00:00"  # datetime(2020, 1, 1, 0, 0, 0)
             )
-            # LOGGER.info(
-            #     "USER JOINED: ",
-            #     user_join_chat_date_str,
-            # )
 
             # Convert the string to a datetime object
             user_join_chat_date = datetime.strptime(
@@ -3560,24 +3523,21 @@ if __name__ == "__main__":
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
                 the_reason = f"{message.from_id} message {message.message_id} in chat {message.chat.title} sent during the night"
-                # LOGGER.info(
-                #     "%s message sent during the night: %s", message.from_id, message
-                # )
-                # start the perform_checks coroutine
-                # get the admin group members
-                # admin_group_members = await fetch_admin_group_members()
-                # LOGGER.debug(
-                #     "%s Admin ids fetched successfully: %s",
-                #     message.from_id,
-                #     admin_group_members,
-                # )
                 if await check_n_ban(message, the_reason):
                     return
                 elif message.from_id not in active_user_checks_dict:
-                    # check if the user is not in the active_user_checks_dict already
-                    active_user_checks_dict[message.from_id] = (
-                        message.from_user.username
-                    )
+                    active_user_checks_dict[message.from_id] = {
+                        "username": (
+                            message.from_user.username
+                            if message.from_user.username
+                            else "!UNDEFINED!"
+                        )
+                    }
+
+                    # Store the message link in the active_user_checks_dict
+                    message_key = f"{message.chat.id}_{message.message_id}"
+                    active_user_checks_dict[message.from_id][message_key] = message_link
+
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
@@ -3606,7 +3566,16 @@ if __name__ == "__main__":
                         ),
                         name=str(message.from_id),
                     )
-            elif message.from_user.id in active_user_checks_dict or not (
+            # elif check_message_for_capital_letters(message):
+            #     the_reason = "Message contains 5+ spammy capital letters"
+            #     await take_heuristic_action(message, the_reason)
+
+            # elif check_message_for_emojis(message):
+            #     the_reason = "Message contains 5+ spammy regular emojis"
+            #     await take_heuristic_action(message, the_reason)
+
+            # FINALLY:
+            if message.from_user.id in active_user_checks_dict or not (
                 user_is_old or user_flagged_legit
             ):
                 # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
@@ -3642,53 +3611,6 @@ if __name__ == "__main__":
                     message.chat.id,
                     message_link,
                 )
-                # Log resulting dict
-                # LOGGER.debug(
-                #     "%s:@%s suspicious messages dict: %s",
-                #     message.from_user.id,
-                #     (
-                #         message.from_user.username
-                #         if message.from_user.username
-                #         else "!UNDEFINED!"
-                #     ),
-                #     active_user_checks_dict[message.from_user.id],
-                # )
-                # if await check_n_ban(
-                #     message, "User was in active checks and sent a message!"
-                # ):
-                #     return
-                # elif (
-                #     message.chat.id in CHANNEL_IDS
-                #     # SUSPICIOUS CONDITIONS goes here
-                #     and message.chat.id != ADMIN_GROUP_ID
-                #     and message.chat.id != TECHNOLOG_GROUP_ID
-                # ):
-                #     # Forward suspicious message to the ADMIN SUSPICIOUS
-                #     await BOT.forward_message(
-                #         ADMIN_GROUP_ID,
-                #         message.chat.id,
-                #         message.message_id,
-                #         message_thread_id=ADMIN_SUSPICIOUS,
-                #         disable_notification=True,
-                #     )
-                #     # Send a new message with the inline keyboard link to the ADMIN SUSPICIOUS
-                #     await BOT.send_message(
-                #         ADMIN_GROUP_ID,
-                #         f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
-                #         reply_markup=inline_kb,
-                #         parse_mode="HTML",
-                #         message_thread_id=ADMIN_SUSPICIOUS,
-                #     )
-                #     # store message data to DB
-                #     store_message_to_db(CURSOR, CONN, message)
-                #     return
-                #     # Send warning to the Admin group with link to the message
-                #     await BOT.send_message(
-                #         ADMIN_GROUP_ID,
-                #         f"WARNING! User {message.from_user.id} suspicious activity detected.",
-                #         reply_markup=inline_kb,
-                #         # message_thread_id=1,  # # main thread (#REPORTS)
-                #     )
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:
@@ -3735,14 +3657,6 @@ if __name__ == "__main__":
                         disable_web_page_preview=True,
                     )
                     return
-
-            # elif check_message_for_capital_letters(message):
-            #     the_reason = "Message contains 5+ spammy capital letters"
-            #     await take_heuristic_action(message, the_reason)
-
-            # elif check_message_for_emojis(message):
-            #     the_reason = "Message contains 5+ spammy regular emojis"
-            #     await take_heuristic_action(message, the_reason)
 
         # If other user/admin or bot deletes message earlier than this bot we got an error
         except MessageIdInvalid as e:

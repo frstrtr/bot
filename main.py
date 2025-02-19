@@ -873,7 +873,7 @@ async def spam_check(user_id):
     async with aiohttp.ClientSession() as session:
         lols = False
         cas = 0
-        p2p = False
+        is_spammer = False
         try:
             async with session.get(
                 f"http://127.0.0.1:8081/check?user_id={user_id}"
@@ -881,10 +881,11 @@ async def spam_check(user_id):
                 if resp.status == 200:
                     try:
                         data = await resp.json()
-                        p2p = data["p2p"]["ban_status"]
+                        # p2p = data["p2p"]["ban_status"]
+                        is_spammer = data["is_spammer"]
                         # LOGGER.debug("P2P SPAM checks:")
                     except KeyError:
-                        p2p = False
+                        is_spammer = False
                         # LOGGER.debug("P2P SPAM checks: no data")
             async with session.get(
                 f"https://api.lols.bot/account?id={user_id}"
@@ -906,7 +907,7 @@ async def spam_check(user_id):
                         # LOGGER.info("%s CAS offenses: %s", user_id, cas)
                     else:
                         cas = 0
-            if lols is True or p2p is True or int(cas) > 0:
+            if lols is True or is_spammer is True or int(cas) > 0:
                 return True
             else:
                 return False
@@ -3936,6 +3937,9 @@ if __name__ == "__main__":
                 raise ValueError("Invalid message link provided.")
 
             try:
+                await message.forward(
+                    TECHNOLOG_GROUP_ID,
+                )
                 await BOT.delete_message(chat_id=chat_id, message_id=message_id)
                 LOGGER.info(
                     "Message %d deleted from chat %s by admin request",

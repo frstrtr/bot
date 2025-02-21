@@ -1673,7 +1673,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     return task  # Return the task so the caller can manage it
 
 
-async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
+async def log_lists(msg_thread_id=TECHNO_ADMIN):
     """Function to log the banned users and active user checks lists.
     : params:: msg_thread_id : int Message Thread ID"""
 
@@ -1775,7 +1775,7 @@ async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
         await BOT.send_message(
-            ADMIN_GROUP_ID,
+            TECHNOLOG_GROUP_ID,
             f"Current user checks list: {len(active_user_checks_dict)}",
             message_thread_id=msg_thread_id,
             parse_mode="HTML",
@@ -1783,13 +1783,13 @@ async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
         # Send active user checks list in chunks
         for chunk in active_user_chunks:
             await BOT.send_message(
-                ADMIN_GROUP_ID,
+                TECHNOLOG_GROUP_ID,
                 f"Active user checks list:\n{chr(10).join(chunk)}",
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
         await BOT.send_message(
-            ADMIN_GROUP_ID,
+            TECHNOLOG_GROUP_ID,
             f"Current banned users list: {len(banned_users_dict)}",
             message_thread_id=msg_thread_id,
             parse_mode="HTML",
@@ -1797,7 +1797,7 @@ async def log_lists(msg_thread_id=ADMIN_AUTOBAN):
         # Send banned users list in chunks
         for chunk in banned_user_chunks:
             await BOT.send_message(
-                ADMIN_GROUP_ID,
+                TECHNOLOG_GROUP_ID,
                 f"Banned users list:\n{chr(10).join(chunk)}",
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",

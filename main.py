@@ -411,7 +411,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
         LOGGER.info(
             "%s  CHANNEL successfully banned where it was possible", rogue_chat_id
         )
-        banned_users_dict[rogue_chat_id] = "Rogue chat"
+        banned_users_dict[rogue_chat_id] = "!ROGUECHAT!"
         return True
 
 

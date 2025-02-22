@@ -883,9 +883,12 @@ async def spam_check(user_id):
                     if resp.status == 200:
                         data = await resp.json()
                         return data.get("is_spammer", False)
-            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-                LOGGER.warning("Local endpoint check error: %s", e)
-            return False
+            except aiohttp.ClientConnectorError as e:
+                LOGGER.warning("Local endpoint check error (ClientConnectorError): %s", e)
+                return False
+            except asyncio.TimeoutError as e:
+                LOGGER.warning("Local endpoint check error (TimeoutError): %s", e)
+                return False
 
         async def check_lols():
             try:
@@ -895,8 +898,11 @@ async def spam_check(user_id):
                     if resp.status == 200:
                         data = await resp.json()
                         return data.get("banned", False)
-            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-                LOGGER.warning("LOLS endpoint check error: %s", e)
+            except aiohttp.ClientConnectorError as e:
+                LOGGER.warning("LOLS endpoint check error (ClientConnectorError): %s", e)
+                return False
+            except asyncio.TimeoutError as e:
+                LOGGER.warning("LOLS endpoint check error (TimeoutError): %s", e)
                 return False
 
         async def check_cas():
@@ -908,8 +914,11 @@ async def spam_check(user_id):
                         data = await resp.json()
                         if data.get("ok", False):
                             return data["result"].get("offenses", 0)
-            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-                LOGGER.warning("CAS endpoint check error: %s", e)
+            except aiohttp.ClientConnectorError as e:
+                LOGGER.warning("CAS endpoint check error (ClientConnectorError): %s", e)
+                return 0
+            except asyncio.TimeoutError as e:
+                LOGGER.warning("CAS endpoint check error (TimeoutError): %s", e)
                 return 0
 
         try:

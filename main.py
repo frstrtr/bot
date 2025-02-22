@@ -127,6 +127,9 @@ args = parser.parse_args()
 # LOGGER init
 LOGGER = initialize_logger(args.log_level)
 
+# Log the chosen logging level
+LOGGER.info("Logging level set to: %s", args.log_level)
+
 tracemalloc.start()
 
 # List of predetermined sentences to check for

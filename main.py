@@ -118,7 +118,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--log-level",
     type=str,
-    default="DEBUG",
+    default="DEBUG",  # TODO for production
     choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     help="Set the logging level (default: INFO)",
 )
@@ -887,7 +887,9 @@ async def spam_check(user_id):
                         data = await resp.json()
                         return data.get("is_spammer", False)
             except aiohttp.ClientConnectorError as e:
-                LOGGER.warning("Local endpoint check error (ClientConnectorError): %s", e)
+                LOGGER.warning(
+                    "Local endpoint check error (ClientConnectorError): %s", e
+                )
                 return False
             except asyncio.TimeoutError as e:
                 LOGGER.warning("Local endpoint check error (TimeoutError): %s", e)
@@ -902,7 +904,9 @@ async def spam_check(user_id):
                         data = await resp.json()
                         return data.get("banned", False)
             except aiohttp.ClientConnectorError as e:
-                LOGGER.warning("LOLS endpoint check error (ClientConnectorError): %s", e)
+                LOGGER.warning(
+                    "LOLS endpoint check error (ClientConnectorError): %s", e
+                )
                 return False
             except asyncio.TimeoutError as e:
                 LOGGER.warning("LOLS endpoint check error (TimeoutError): %s", e)
@@ -2700,7 +2704,7 @@ if __name__ == "__main__":
             forwarded_report_state: dict = forwarded_reports_states.get(
                 report_id_to_ban
             )
-            original_forwarded_message: types.Message = forwarded_report_state[
+            original_spam_message: types.Message = forwarded_report_state[
                 "original_forwarded_message"
             ]
             CURSOR.execute(
@@ -2855,22 +2859,62 @@ if __name__ == "__main__":
             params = {"author_id": author_id}
             result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"Attempting to delete all messages from <code>{author_id}</code> (@{forwarded_message_data[4]})",
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                disable_notification=True,
+                message_thread_id=TECHNO_ORIGINALS,
+            )
             for channel_id, message_id, user_name in result:
+                # unpack user_name correctly XXX
+                user_name = user_name if user_name else "!UNDEFINED!"
                 retry_attempts = 3  # number of attempts to delete the message
+
+                # Attempt to delete the message with retry logic
                 for attempt in range(retry_attempts):
                     try:
-                        await BOT.delete_message(
-                            chat_id=channel_id, message_id=message_id
-                        )
-                        LOGGER.debug(
-                            "\033[91m%s:@%s message %s deleted from chat %s (%s).\033[0m",
-                            author_id,
-                            user_name,
-                            message_id,
-                            CHANNEL_DICT[channel_id],
-                            channel_id,
-                        )
-                        break  # break the loop if the message was deleted successfully
+                        try:
+                            await BOT.forward_message(
+                                TECHNOLOG_GROUP_ID,
+                                channel_id,
+                                message_id,
+                                disable_notification=True,
+                                message_thread_id=TECHNO_ORIGINALS,
+                            )
+                        except Exception as e:
+                            LOGGER.error(
+                                "%s:%s Failed to forward message %s in chat %s: %s",
+                                author_id,
+                                user_name,
+                                message_id,
+                                channel_id,
+                                e,
+                            )
+                        finally:
+                            try:
+                                await BOT.delete_message(
+                                    chat_id=channel_id, message_id=message_id
+                                )
+                                LOGGER.debug(
+                                    "\033[91m%s:@%s message %s deleted from chat %s (%s).\033[0m",
+                                    author_id,
+                                    user_name,
+                                    message_id,
+                                    CHANNEL_DICT[channel_id],
+                                    channel_id,
+                                )
+                                break  # break the loop if the message was deleted successfully
+                            except Exception as e:
+                                LOGGER.error(
+                                    "%s:@%s Failed to delete message %s in chat %s: %s",
+                                    author_id,
+                                    user_name,
+                                    message_id,
+                                    channel_id,
+                                    e,
+                                )
                     except RetryAfter as e:
                         wait_time = (
                             e.timeout
@@ -2879,14 +2923,19 @@ if __name__ == "__main__":
                             attempt < retry_attempts - 1
                         ):  # Don't wait after the last attempt
                             LOGGER.warning(
-                                "Rate limited. Waiting for %s seconds.", wait_time
+                                "%s:@%s Rate limited. Waiting for %s seconds.",
+                                author_id,
+                                user_name,
+                                wait_time,
                             )
                             time.sleep(wait_time)
                         else:
                             continue  # Move to the next message after the last attempt
                     except MessageToDeleteNotFound:
                         LOGGER.warning(
-                            "Message %s in chat %s (%s) not found for deletion.",
+                            "%s:@%s Message %s in chat %s (%s) not found for deletion.",
+                            author_id,
+                            user_name,
                             message_id,
                             CHANNEL_DICT[channel_id],
                             channel_id,
@@ -2894,7 +2943,7 @@ if __name__ == "__main__":
                         continue  # Move to the next message
                     except ChatAdminRequired as inner_e:
                         LOGGER.error(
-                            "Bot is not an admin in chat %s (%s). Error: %s",
+                            "\033[91mBot is not an admin in chat %s (%s). Error: %s\033[0m",
                             CHANNEL_DICT[channel_id],
                             channel_id,
                             inner_e,
@@ -2906,7 +2955,9 @@ if __name__ == "__main__":
                         continue  # Move to the next message
                     except MessageCantBeDeleted:
                         LOGGER.warning(
-                            "Message %s in chat %s (%s) can't be deleted. Too old message?",
+                            "%s:@%s Message %s in chat %s (%s) can't be deleted. Too old message?",
+                            author_id,
+                            user_name,
                             message_id,
                             CHANNEL_DICT[channel_id],
                             channel_id,
@@ -2950,7 +3001,9 @@ if __name__ == "__main__":
                     # )
                 except Exception as inner_e:
                     LOGGER.error(
-                        "Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        "%s:@%s Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        author_id,
+                        user_name,
                         CHANNEL_DICT[channel_id],
                         channel_id,
                         inner_e,
@@ -2968,11 +3021,11 @@ if __name__ == "__main__":
             )
             # Take actions to ban channels
             channel_id_to_ban = (
-                original_forwarded_message.forward_from_chat.id
-                if original_forwarded_message.forward_from_chat
+                original_spam_message.forward_from_chat.id
+                if original_spam_message.forward_from_chat
                 else (
-                    original_forwarded_message.sender_chat.id
-                    if original_forwarded_message.sender_chat
+                    original_spam_message.sender_chat.id
+                    if original_spam_message.sender_chat
                     else None
                 )
             )

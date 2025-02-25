@@ -2859,9 +2859,14 @@ if __name__ == "__main__":
             params = {"author_id": author_id}
             result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
+            spam_messages_count = len(result)
+            bot_info_message = (
+                f"Attempting to delete all messages({spam_messages_count}) from <code>{author_id}</code> "
+                f"(@{original_spam_message.from_user.username if original_spam_message.from_user.username else '!UNDEFINED!'}):"
+            )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Attempting to delete all messages from <code>{author_id}</code> (@{forwarded_message_data[4]})",
+                bot_info_message,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 disable_notification=True,
@@ -2875,6 +2880,26 @@ if __name__ == "__main__":
                 # Attempt to delete the message with retry logic
                 for attempt in range(retry_attempts):
                     try:
+                        try:
+                            message_link = construct_message_link(
+                                [channel_id, message_id, None]
+                            )
+                            bot_chatlink_message = f"Attempting to delete message {message_id} in chat {CHANNEL_DICT[channel_id]} ({channel_id})\n<a href='{message_link}'>{message_link}</a>"
+                            await BOT.send_message(
+                                TECHNOLOG_GROUP_ID,
+                                bot_chatlink_message,
+                                disable_web_page_preview=True,
+                                disable_notification=True,
+                                message_thread_id=TECHNO_ORIGINALS,
+                                parse_mode="HTML",
+                            )
+                        except asyncio.TimeoutError:
+                            LOGGER.error(
+                                "%s:@%s Timeout error while sending message to ORIGINALS",
+                                author_id,
+                                user_name,
+                            )
+                            continue
                         try:
                             await BOT.forward_message(
                                 TECHNOLOG_GROUP_ID,

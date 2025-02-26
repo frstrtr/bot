@@ -883,7 +883,7 @@ async def spam_check(user_id):
         async def check_local():
             try:
                 async with session.get(
-                    f"http://127.0.0.1:8081/check?user_id={user_id}", timeout=1
+                    f"http://127.0.0.1:8081/check?user_id={user_id}", timeout=10
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -900,7 +900,7 @@ async def spam_check(user_id):
         async def check_lols():
             try:
                 async with session.get(
-                    f"https://api.lols.bot/account?id={user_id}", timeout=1
+                    f"https://api.lols.bot/account?id={user_id}", timeout=10
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -917,7 +917,7 @@ async def spam_check(user_id):
         async def check_cas():
             try:
                 async with session.get(
-                    f"https://api.cas.chat/check?user_id={user_id}", timeout=1
+                    f"https://api.cas.chat/check?user_id={user_id}", timeout=10
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()

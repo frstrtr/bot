@@ -332,6 +332,7 @@ async def submit_autoreport(message: types.Message, reason):
         found_message_data,
         reason=reason,
     )
+    return True
 
 
 async def on_startup(_dp: Dispatcher):
@@ -1222,6 +1223,7 @@ async def check_and_autoban(
 
         # perform_checks(user_id, user_name)
         # TODO Add perform-checks coroutine!!!
+        # TODO check again if it is marked as SPAMMER already
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         # LOGGER.debug("event_record: %s", event_record)
@@ -1233,7 +1235,7 @@ async def check_and_autoban(
         )
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            f"User with ID: {user_id} is not now in the lols database but kicked/restricted by admin.\n"
+            f"User with ID: {user_id} is not now in the SPAM database but kicked/restricted by admin.\n"
             + inout_logmessage,
             message_thread_id=ADMIN_MANBAN,
             parse_mode="HTML",
@@ -3426,7 +3428,7 @@ if __name__ == "__main__":
                     await BOT.delete_message(message.chat.id, message.message_id)
                 except MessageToDeleteNotFound as e:
                     LOGGER.error(
-                        "\033[93m%s:@%s message %s to delete not found in chat %s (%s) @%s #LSS\033[0m:\n%s",
+                        "\033[93m%s:@%s message %s to delete not found in chat %s (%s) @%s #LSS\033[0m:\n\t\t\t%s",
                         message.from_user.id,
                         (
                             message.from_user.username
@@ -3499,6 +3501,9 @@ if __name__ == "__main__":
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
 
+            # initialize the autoreport_sent flag
+            autoreport_sent = False
+            # check if the user is in the banned list
             # XXX if user was in lols but before it was kicked it posted a message eventually
             # we can check it in runtime banned user list
             if message.from_user.id in banned_users_dict:
@@ -3522,17 +3527,21 @@ if __name__ == "__main__":
                 )
                 if await check_n_ban(message, the_reason):
                     return
+                else:
+                    await submit_autoreport(message, the_reason)
+                    return  # stop further actions for this message since user was banned before
             elif (
-                message.forward_from_chat
-                and message.forward_from_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
+                message.is_forward()
+                and message.forward_from_chat.id != message.chat.id  # not same chat
+                or message.forward_from.id != message.from_user.id  # not same user
             ):
                 # this is possibly a spam
-                the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel"
+                the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(
-                        "\033[93m%s:@%s possibly forwarded a spam from unknown channel in chat %s\033[0m",
+                        "\033[93m%s:@%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
                         message.from_user.id,
                         (
                             message.from_user.username
@@ -3541,7 +3550,8 @@ if __name__ == "__main__":
                         ),
                         message.chat.title,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
@@ -3556,7 +3566,8 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
@@ -3567,7 +3578,8 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
@@ -3580,7 +3592,8 @@ if __name__ == "__main__":
                         message.from_user.id,
                         message.chat.title,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             # check if the message is sent less then 10 seconds after joining the chat
             elif user_is_10sec_old:
                 # this is possibly a bot
@@ -3592,7 +3605,8 @@ if __name__ == "__main__":
                         "%s is possibly a bot typing histerically...",
                         message.from_id,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             # check if the message is sent less then 1 hour after joining the chat
             elif user_is_1hr_old and entity_spam_trigger:
                 # this is possibly a spam
@@ -3609,7 +3623,8 @@ if __name__ == "__main__":
                         message.from_user.id,
                         entity_spam_trigger,
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
                 the_reason = f"{message.from_id} message sent via inline bot"
@@ -3619,7 +3634,8 @@ if __name__ == "__main__":
                     LOGGER.info(
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
-                    await submit_autoreport(message, the_reason)
+                    if not autoreport_sent:
+                        await submit_autoreport(message, the_reason)
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
@@ -3667,6 +3683,8 @@ if __name__ == "__main__":
                         ),
                         name=str(message.from_id),
                     )
+                # if not autoreport_sent:
+                #         await submit_autoreport(message, the_reason)
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"
             #     await take_heuristic_action(message, the_reason)
@@ -3676,8 +3694,10 @@ if __name__ == "__main__":
             #     await take_heuristic_action(message, the_reason)
 
             # FINALLY:
-            if message.from_user.id in active_user_checks_dict or not (
-                user_is_old or user_flagged_legit
+            if (
+                not autoreport_sent
+                and message.from_user.id in active_user_checks_dict
+                or not (user_is_old or user_flagged_legit)
             ):
                 # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
                 if not isinstance(

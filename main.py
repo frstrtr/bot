@@ -3530,10 +3530,15 @@ if __name__ == "__main__":
                 else:
                     await submit_autoreport(message, the_reason)
                     return  # stop further actions for this message since user was banned before
-            elif (
-                message.is_forward()
-                and message.forward_from_chat.id != message.chat.id  # not same chat
-                or message.forward_from.id != message.from_user.id  # not same user
+            elif message.is_forward() and (
+                (
+                    message.forward_from_chat
+                    and message.forward_from_chat.id != message.chat.id
+                )
+                or (
+                    message.forward_from
+                    and message.forward_from.id != message.from_user.id
+                )
             ):
                 # this is possibly a spam
                 the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"

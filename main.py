@@ -3556,7 +3556,9 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis
@@ -3572,6 +3574,7 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
@@ -3584,6 +3587,7 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             elif check_message_for_capital_letters(
                 message
@@ -3598,6 +3602,7 @@ if __name__ == "__main__":
                         message.chat.title,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             # check if the message is sent less then 10 seconds after joining the chat
             elif user_is_10sec_old:
@@ -3611,6 +3616,7 @@ if __name__ == "__main__":
                         message.from_id,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             # check if the message is sent less then 1 hour after joining the chat
             elif user_is_1hr_old and entity_spam_trigger:
@@ -3629,6 +3635,7 @@ if __name__ == "__main__":
                         entity_spam_trigger,
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
@@ -3640,6 +3647,7 @@ if __name__ == "__main__":
                         "%s possibly sent a spam via inline bot", message.from_id
                     )
                     if not autoreport_sent:
+                        autoreport_sent = True
                         await submit_autoreport(message, the_reason)
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
@@ -3689,6 +3697,7 @@ if __name__ == "__main__":
                         name=str(message.from_id),
                     )
                 # if not autoreport_sent:
+                #         autoreport_sent = True
                 #         await submit_autoreport(message, the_reason)
             # elif check_message_for_capital_letters(message):
             #     the_reason = "Message contains 5+ spammy capital letters"

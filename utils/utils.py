@@ -1,12 +1,12 @@
 #! module utils
 """utils.py
-This module provides various utility functions for logging, message processing, 
+This module provides various utility functions for logging, message processing,
 and spam detection in a Telegram bot.
 Functions:
     construct_message_link(message_data_list: list) -> str:
         Construct a link to the original message (assuming it's a supergroup or channel).
     load_predetermined_sentences(txt_file: str):
-        Load predetermined sentences from a plain text file, normalize to lowercase, remove extra spaces and punctuation marks, 
+        Load predetermined sentences from a plain text file, normalize to lowercase, remove extra spaces and punctuation marks,
         check for duplicates, rewrite the file excluding duplicates if any, and log the results.
     get_latest_commit_info():
         Function to get the latest commit info.
@@ -17,7 +17,7 @@ Functions:
     get_inout_filename():
         Generate the filename for in/out events based on the current date.
     extract_status_change(chat_member_update: types.ChatMemberUpdated) -> Optional[Tuple[bool, bool]]:
-        Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member of the chat 
+        Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member of the chat
         and whether the 'new_chat_member' is a member of the chat.
     message_sent_during_night(message: types.Message):
         Function to check if the message was sent during the night.
@@ -31,7 +31,7 @@ Functions:
         Function to format the message one line for logging.
     extract_chat_id_and_message_id_from_link(message_link):
         Extract chat ID and message ID from a message link.
-        """
+"""
 
 
 import logging
@@ -44,6 +44,7 @@ from sqlite3 import Connection, Cursor
 
 import os
 import sys
+import aiohttp
 import pytz
 import emoji
 
@@ -523,3 +524,31 @@ def check_user_legit(cursor: Cursor, user_id: int) -> bool:
     )
     result = cursor.fetchone()
     return result is not None
+
+
+async def report_spam(spammer_id: int, logger) -> bool:
+    """Function to report spammer to local P2P spamcheck server"""
+    try:
+        # local P2P spamcheck server
+        url = f"http://localhost:8081/report_id?user_id={spammer_id}"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url) as response:
+                if response.status == 200:
+                    logger.info(
+                        f"{spammer_id} successfully reported spammer to local P2P spamcheck server."
+                    )
+                    return True
+                else:
+                    return False
+    except aiohttp.ServerTimeoutError as e:
+        logger.error(f"Server timeout error reporting spammer: {e}")
+        return False
+    except aiohttp.ClientError as e:
+        logger.error(f"Client error reporting spammer: {e}")
+        return False
+
+
+# def get_spam_report_link(spammer_id:int) -> str:
+#     """Function to get the spam report link"""
+#     # Replace with the actual URL of your local P2P spamcheck server
+#     url = f"http://localhost:5000/report_spam/{spammer_id}"

@@ -2137,7 +2137,7 @@ if __name__ == "__main__":
                 ).total_seconds()
 
                 if (
-                    time_diff <= 60
+                    time_diff <= 30
                     and last2_join_left_event[0][2] == 1
                     and last2_join_left_event[1][1] == 1
                 ):
@@ -2155,9 +2155,10 @@ if __name__ == "__main__":
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
+                    joinleft_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 1 minute or less. Telefragged...",
+                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 30 seconds or less. Telefragged at {joinleft_timestamp}...",
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,

@@ -68,6 +68,7 @@ from utils.utils import (
     db_init,
     create_inline_keyboard,
     check_user_legit,
+    report_spam,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -395,6 +396,7 @@ async def on_startup(_dp: Dispatcher):
 async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
     """ban chat sender chat for Rogue channels"""
     ban_rogue_chat_everywhere_error = None
+
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
@@ -410,6 +412,10 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
+
+    # report rogue chat to the p2p server
+    await report_spam(rogue_chat_id, LOGGER)
+
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
     else:
@@ -3080,7 +3086,7 @@ if __name__ == "__main__":
             if forwarded_message_data[4] not in [0, "0", None]:
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (2532)",
+                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (3088)",
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -3115,6 +3121,9 @@ if __name__ == "__main__":
         except MessageCantBeDeleted as e:
             LOGGER.error("Error in handle_ban function: %s", e)
             await callback_query.message.reply(f"Error in handle_ban function: {e}")
+
+        # report spam to the P2P spamcheck server
+        await report_spam(author_id, LOGGER)
 
     @DP.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
     async def reset_ban(callback_query: CallbackQuery):
@@ -3990,9 +3999,12 @@ if __name__ == "__main__":
                 parse_mode="HTML",
             )
 
-        except Exception as e:
+        except (sqlite3.Error, ValueError, TypeError) as e:
             LOGGER.error("Error in ban function: %s", e)
             await message.reply(f"Error: {e}")
+
+        # report spammer to P2P spam checker server
+        report_spam(author_id, LOGGER)
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
@@ -4752,6 +4764,8 @@ if __name__ == "__main__":
             except BadRequest as e:
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
+            # report spammer to the P2P spam check server
+            report_spam(susp_user_id, LOGGER)
         elif comand == "confirmban":
             # ban user in chat
             try:

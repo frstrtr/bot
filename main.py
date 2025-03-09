@@ -2772,7 +2772,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Author ID retrieved for original message: (<code>{author_id}</code>)",
+                f"Author ID (<code>{author_id}</code>) retrieved for original message.",
                 parse_mode="HTML",
             )
             if not author_id:
@@ -3893,10 +3893,11 @@ if __name__ == "__main__":
             )
 
             author_id = eval(forwarded_message_data)[3]
-            LOGGER.debug("Author ID retrieved for original message: %s", author_id)
+            LOGGER.debug("%s author ID retrieved for original message", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Author ID retrieved for original message: {author_id}",
+                f"Author ID (<code>{author_id}</code>) retrieved for original message.",
+                parse_mode="HTML",
             )
             if not author_id:
                 await message.reply(

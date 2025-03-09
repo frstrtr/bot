@@ -415,6 +415,13 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
 
     # report rogue chat to the p2p server
     await report_spam(rogue_chat_id, LOGGER)
+    await BOT.send_message(
+        TECHNOLOG_GROUP_ID,
+        f"{rogue_chat_id}:@!ROGUECHAT! reported to P2P spamcheck server.",
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+        message_thread_id=TECHNO_ADMIN,
+    )
 
     if ban_rogue_chat_everywhere_error:
         return ban_rogue_chat_everywhere_error
@@ -3128,6 +3135,13 @@ if __name__ == "__main__":
 
         # report spam to the P2P spamcheck server
         await report_spam(author_id, LOGGER)
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"{author_id}:@{user_name} reported to P2P spamcheck server.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            message_thread_id=TECHNO_ADMIN,
+        )
 
     @DP.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
     async def reset_ban(callback_query: CallbackQuery):
@@ -4038,6 +4052,13 @@ if __name__ == "__main__":
 
         # report spammer to P2P spam checker server
         report_spam(author_id, LOGGER)
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"{author_id}:@{user_name} reported to P2P spamcheck server.",  # XXX check user_name var
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            message_thread_id=TECHNO_ADMIN,
+        )
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
@@ -4799,6 +4820,13 @@ if __name__ == "__main__":
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
             report_spam(susp_user_id, LOGGER)
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"{susp_user_id}:@{susp_user_name} reported to P2P spamcheck server.",
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                message_thread_id=TECHNO_ADMIN,
+            )
         elif comand == "confirmban":
             # ban user in chat
             try:

@@ -69,6 +69,7 @@ from utils.utils import (
     create_inline_keyboard,
     check_user_legit,
     report_spam,
+    report_spam_from_message,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -3338,9 +3339,12 @@ if __name__ == "__main__":
             elif (
                 message.forward_from and message.forward_from.id in banned_users_dict
             ):  # forward_from.id BANNED
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM: {message.forward_from.id}:@{getattr(message.forward_from, 'username', None) or message.forward_from.first_name} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM USER: {message.forward_from.id}:@{getattr(message.forward_from, 'username', None) or message.forward_from.first_name} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             else:  # marked as a SPAM by P2P server
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+
+            # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
+            report_spam_from_message(message, LOGGER)
             LOGGER.warning(logger_text)
 
             # Forwarding banned user message to ADMIN AUTOBAN

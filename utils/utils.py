@@ -548,6 +548,31 @@ async def report_spam(spammer_id: int, logger) -> bool:
         return False
 
 
+async def report_spam_from_message(message: types.Message, logger):
+    """
+    Reports spam from various IDs found in a message.
+
+    Args:
+        message (types.Message): The message object.
+        logger: The logger object.
+    """
+    user_id = message.from_user.id if message.from_user else None
+    sender_chat_id = message.sender_chat.id if message.sender_chat else None
+    forward_from_id = message.forward_from.id if message.forward_from else None
+    forward_from_chat_id = (
+        message.forward_from_chat.id if message.forward_from_chat else None
+    )
+
+    if user_id:
+        await report_spam(user_id, logger)
+    if sender_chat_id:
+        await report_spam(sender_chat_id, logger)
+    if forward_from_id:
+        await report_spam(forward_from_id, logger)
+    if forward_from_chat_id:
+        await report_spam(forward_from_chat_id, logger)
+
+
 # def get_spam_report_link(spammer_id:int) -> str:
 #     """Function to get the spam report link"""
 #     # Replace with the actual URL of your local P2P spamcheck server

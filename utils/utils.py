@@ -53,8 +53,6 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-from main import TELEGRAM_CHANNEL_BOT_ID
-
 
 def initialize_logger(log_level="INFO"):
     """Initialize the logger."""
@@ -549,13 +547,14 @@ async def report_spam(spammer_id: int, logger) -> bool:
         return False
 
 
-async def report_spam_from_message(message: types.Message, logger):
+async def report_spam_from_message(message: types.Message, logger, userid_toexclude):
     """
     Reports spam from various IDs found in a message.
 
     Args:
         message (types.Message): The message object.
         logger: The logger object.
+        TELEGRAM_CHANNEL_BOT_ID: The ID of the telegram channel bot.
     """
     user_id = message.from_user.id if message.from_user else None
     sender_chat_id = message.sender_chat.id if message.sender_chat else None
@@ -565,7 +564,7 @@ async def report_spam_from_message(message: types.Message, logger):
     )
 
     if (
-        user_id and user_id != TELEGRAM_CHANNEL_BOT_ID
+        user_id and user_id != userid_toexclude
     ):  # prevent banning system TELEGRAM_CHANNEL_BOT_ID
         await report_spam(user_id, logger)
     if sender_chat_id:

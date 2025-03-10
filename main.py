@@ -434,6 +434,47 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
         return True
 
 
+async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
+    """Unban chat sender chat for Rogue channels"""
+    unban_rogue_chat_everywhere_error = None
+
+    for chat_id in chan_list:
+        try:
+            await BOT.unban_chat_sender_chat(chat_id, rogue_chat_id)
+            # LOGGER.debug("%s  CHANNEL successfully unbanned in %s", rogue_chat_id, chat_id)
+            await asyncio.sleep(1)  # pause 1 sec
+        except BadRequest as e:  # if user were Deleted Account while unbanning
+            # chat_name = get_channel_id_by_name(channel_dict, chat_id)
+            LOGGER.error(
+                "%s - error unbanning in chat (%s): %s. Deleted CHANNEL?",
+                rogue_chat_id,
+                chat_id,
+                e,
+            )
+            unban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
+            continue
+
+    # TODO: Remove rogue chat from the p2p server report list?
+    # await unreport_spam(rogue_chat_id, LOGGER)
+    # await BOT.send_message(
+    #     TECHNOLOG_GROUP_ID,
+    #     f"{rogue_chat_id}:@!ROGUECHAT! removed from P2P spamcheck server.",
+    #     parse_mode="HTML",
+    #     disable_web_page_preview=True,
+    #     message_thread_id=TECHNO_ADMIN,
+    # )
+
+    if unban_rogue_chat_everywhere_error:
+        return unban_rogue_chat_everywhere_error
+    else:
+        LOGGER.info(
+            "%s  CHANNEL successfully unbanned where it was possible", rogue_chat_id
+        )
+        if rogue_chat_id in banned_users_dict:
+            del banned_users_dict[rogue_chat_id]
+        return True
+
+
 async def load_banned_users():
     """Coroutine to load banned users from file"""
     banned_users_filename = "banned_users.txt"
@@ -4188,9 +4229,11 @@ if __name__ == "__main__":
             LOGGER.error("Error in delete_message: %s", e)
             await message.reply("An error occurred while trying to delete the message.")
 
-    @DP.message_handler(commands=["banchan"], chat_id=ADMIN_GROUP_ID)
-    async def ban_channel(message: types.Message):
-        """Function to ban channel by its id."""
+    @DP.message_handler(commands=["banchan", "unbanchan"], chat_id=ADMIN_GROUP_ID)
+    async def manage_channel(message: types.Message):
+        """Function to ban or unban a channel by its id."""
+        command = message.text.split()[0].lower()
+        action = "ban" if command == "/banchan" else "unban"
 
         try:
             command_args = message.text.split()
@@ -4218,19 +4261,20 @@ if __name__ == "__main__":
                 await message.reply(
                     "Invalid channel ID format. Please provide a valid channel ID."
                 )
-                return  # stop processing /banchan command
+                return  # stop processing command
 
-            if (
-                rogue_chan_id in banned_users_dict
-            ):  # check if channel already banned to prevent unneccessary actions
-                LOGGER.debug(
-                    "\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m",
-                    rogue_chan_id,
-                )
-                await message.reply(f"Channel {rogue_chan_id} already banned.")
-                return
+            if action == "ban":
+                if rogue_chan_id in banned_users_dict:
+                    LOGGER.debug(
+                        "\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m",
+                        rogue_chan_id,
+                    )
+                    await message.reply(f"Channel {rogue_chan_id} already banned.")
+                    return
 
-            LOGGER.debug("\033[93mRogue channel ID to ban: %s\033[0m", rogue_chan_id)
+            LOGGER.debug(
+                "\033[93mRogue channel ID to %s: %s\033[0m", action, rogue_chan_id
+            )
 
             # Admin_ID
             admin_id = message.from_user.id
@@ -4245,39 +4289,92 @@ if __name__ == "__main__":
                 else message.from_user.first_name
             )
 
-            # reply to the message # TODO confirm deletion
-            # await message.reply('Are you sure you want to delete the message?')
+            if action == "ban":
+                try:
+                    result = await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
+                    if result is True:
+                        LOGGER.info(
+                            "\033[91mChannel (%s) banned where it is possible.\033[0m",
+                            rogue_chan_id,
+                        )
+                        await message.reply(
+                            f"Channel {rogue_chan_id} banned where it is possible."
+                        )
+                        await BOT.send_message(
+                            TECHNOLOG_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                        )
+                        await BOT.send_message(
+                            ADMIN_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                            message_thread_id=ADMIN_MANBAN,
+                        )
+                    else:
+                        await message.reply(
+                            f"Banning channel {rogue_chan_id} generated error: {result}."
+                        )
+                except BadRequest as e:
+                    LOGGER.error(
+                        "Failed to ban channel %d. Error: %s", rogue_chan_id, e
+                    )
+            else:  # action == "unban"
+                try:
+                    result = unban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
+                    if result is True:
+                        LOGGER.info(
+                            "\033[91mChannel (%s) unbanned where it is possible.\033[0m",
+                            rogue_chan_id,
+                        )
+                        await message.reply(
+                            f"Channel {rogue_chan_id} unbanned where it is possible."
+                        )
+                        await BOT.send_message(
+                            TECHNOLOG_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                        )
+                        await BOT.send_message(
+                            ADMIN_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                            message_thread_id=ADMIN_MANBAN,
+                        )
+                    else:
+                        await message.reply(
+                            f"Unbanning channel {rogue_chan_id} generated error: {result}."
+                        )
 
-            if not rogue_chan_id:
-                raise ValueError("Invalid channel ID provided.")
-
-            try:
-                result = await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
-                if result is True:
-                    LOGGER.info(
-                        "\033[91mChannel (%s) banned where it is possible.\033[0m",
-                        rogue_chan_id,
+                    # Remove the channel from the banned_users_dict
+                    if rogue_chan_id in banned_users_dict:
+                        del banned_users_dict[rogue_chan_id]
+                        LOGGER.info(
+                            "\033[91mChannel (%s) unbanned.\033[0m",
+                            rogue_chan_id,
+                        )
+                        await message.reply(f"Channel {rogue_chan_id} unbanned.")
+                        await BOT.send_message(
+                            TECHNOLOG_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                        )
+                        await BOT.send_message(
+                            ADMIN_GROUP_ID,
+                            f"Channel <code>{rogue_chan_id}</code> unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            parse_mode="HTML",
+                            message_thread_id=ADMIN_MANBAN,
+                        )
+                    else:
+                        await message.reply(f"Channel {rogue_chan_id} was not banned.")
+                except Exception as e:
+                    LOGGER.error(
+                        "Failed to unban channel %d. Error: %s", rogue_chan_id, e
                     )
                     await message.reply(
-                        f"Channel {rogue_chan_id} banned where it is possible."
+                        f"Failed to unban channel {rogue_chan_id}. Error: {e}"
                     )
-                    await BOT.send_message(
-                        TECHNOLOG_GROUP_ID,
-                        f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
-                        parse_mode="HTML",
-                    )
-                    await BOT.send_message(
-                        ADMIN_GROUP_ID,
-                        f"Channel <code>{rogue_chan_id}</code> banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
-                        parse_mode="HTML",
-                        message_thread_id=ADMIN_MANBAN,
-                    )
-                else:
-                    await message.reply(
-                        f"Banning channel {rogue_chan_id} generated error: {result}."
-                    )
-            except BadRequest as e:
-                LOGGER.error("Failed to ban channel %d. Error: %s", rogue_chan_id, e)
+
         except ValueError as ve:
             await message.reply(str(ve))
             LOGGER.error("No channel ID provided!")

@@ -4203,10 +4203,22 @@ if __name__ == "__main__":
             if len(command_args) < 2:
                 raise ValueError("No channel ID provided.")
 
-            rogue_chan_id = command_args[1]
-            if not rogue_chan_id.startswith("-100"):
-                rogue_chan_id = f"-100{rogue_chan_id}"
-            rogue_chan_id = int(rogue_chan_id)
+            rogue_chan_id = command_args[1].strip()
+            if not rogue_chan_id.startswith("-100") or not rogue_chan_id[4:].isdigit():
+                raise ValueError(
+                    "Invalid channel ID format. Please provide a valid channel ID."
+                )
+            try:
+                rogue_chan_id = int(rogue_chan_id)
+            except ValueError:
+                LOGGER.error(
+                    "%s Invalid channel ID format. Please provide a valid channel ID.",
+                    rogue_chan_id,
+                )
+                await message.reply(
+                    "Invalid channel ID format. Please provide a valid channel ID."
+                )
+                return  # stop processing /banchan command
 
             if (
                 rogue_chan_id in banned_users_dict

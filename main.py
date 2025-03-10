@@ -4616,6 +4616,7 @@ if __name__ == "__main__":
             admin_id,
             button_pressed_by,
         )
+        await asyncio.sleep(0.1)  # Add a small delay
         await BOT.send_message(
             callback_query.message.chat.id,
             f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "

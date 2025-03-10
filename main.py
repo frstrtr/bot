@@ -81,6 +81,7 @@ from utils.utils_decorators import (
 
 from utils.utils_config import (
     CHANNEL_IDS,
+    TELEGRAM_CHANNEL_BOT_ID,
     ADMIN_AUTOREPORTS,
     # TECHNO_LOGGING,
     TECHNO_ADMIN,
@@ -3238,6 +3239,7 @@ if __name__ == "__main__":
             message.sender_chat
             and message.sender_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
             and message.sender_chat.id not in CHANNEL_IDS
+            # or message.from_user.id == TELEGRAM_CHANNEL_BOT_ID
         ):
             try:
                 await BOT.forward_message(

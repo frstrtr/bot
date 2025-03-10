@@ -53,6 +53,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from main import TELEGRAM_CHANNEL_BOT_ID
 
 
 def initialize_logger(log_level="INFO"):
@@ -563,7 +564,9 @@ async def report_spam_from_message(message: types.Message, logger):
         message.forward_from_chat.id if message.forward_from_chat else None
     )
 
-    if user_id:
+    if (
+        user_id and user_id != TELEGRAM_CHANNEL_BOT_ID
+    ):  # prevent banning system TELEGRAM_CHANNEL_BOT_ID
         await report_spam(user_id, logger)
     if sender_chat_id:
         await report_spam(sender_chat_id, logger)

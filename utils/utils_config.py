@@ -49,7 +49,7 @@ def load_config():
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNOLOG_GROUP, TECHNOLOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
-    global API_TOKEN
+    global API_TOKEN, TELEGRAM_CHANNEL_BOT_ID
 
     ALLOWED_CONTENT_TYPES = [
         types.ContentType.TEXT,
@@ -95,6 +95,8 @@ def load_config():
         TECHNO_INOUT = int(config_XML_root.find("techno_inout").text)
         TECHNO_NAMES = int(config_XML_root.find("techno_names").text)
         TECHNO_ADMIN = int(config_XML_root.find("techno_admin").text)
+
+        TELEGRAM_CHANNEL_BOT_ID = 136817688  # Telegram @Channel_bot ID
 
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
         CHANNEL_IDS = [

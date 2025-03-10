@@ -1860,12 +1860,15 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
         )
         # Send active user checks list in chunks
         for chunk in active_user_chunks:
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"Active user checks list:\n{chr(10).join(chunk)}",
-                message_thread_id=msg_thread_id,
-                parse_mode="HTML",
-            )
+            try:
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"Active user checks list:\n{chr(10).join(chunk)}",
+                    message_thread_id=msg_thread_id,
+                    parse_mode="HTML",
+                )
+            except BadRequest as e:
+                LOGGER.error("Error sending active user checks chunk: %s", e)
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
             f"Current banned users list: {len(banned_users_dict)}",
@@ -1874,12 +1877,15 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
         )
         # Send banned users list in chunks
         for chunk in banned_user_chunks:
-            await BOT.send_message(
-                TECHNOLOG_GROUP_ID,
-                f"Banned users list:\n{chr(10).join(chunk)}",
-                message_thread_id=msg_thread_id,
-                parse_mode="HTML",
-            )
+            try:
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"Banned users list:\n{chr(10).join(chunk)}",
+                    message_thread_id=msg_thread_id,
+                    parse_mode="HTML",
+                )
+            except BadRequest as e:
+                LOGGER.error("Error sending banned users chunk: %s", e)
     except BadRequest as e:
         LOGGER.error("Error sending active_user_checks_dict: %s", e)
 

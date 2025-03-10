@@ -81,7 +81,6 @@ from utils.utils_decorators import (
 
 from utils.utils_config import (
     CHANNEL_IDS,
-    TELEGRAM_CHANNEL_BOT_ID,
     ADMIN_AUTOREPORTS,
     # TECHNO_LOGGING,
     TECHNO_ADMIN,
@@ -113,6 +112,7 @@ from utils.utils_config import (
     ALLOWED_UPDATES,
     CHANNEL_DICT,
     ALLOWED_CONTENT_TYPES,
+    TELEGRAM_CHANNEL_BOT_ID,
 )
 
 # Parse command line arguments
@@ -3398,7 +3398,7 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
 
             # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
-            await report_spam_from_message(message, LOGGER)
+            await report_spam_from_message(message, LOGGER, TELEGRAM_CHANNEL_BOT_ID)
             LOGGER.warning(logger_text)
 
             # Forwarding banned user message to ADMIN AUTOBAN

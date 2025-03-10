@@ -4858,10 +4858,7 @@ if __name__ == "__main__":
             callback_answer = "User suspicious message were deleted.\nForward message to the bot to ban user everywhere!"
             # delete suspicious message
             try:
-                await BOT.delete_message(
-                    susp_chat_id,
-                    susp_message_id,
-                )
+                await BOT.delete_message(susp_chat_id, susp_message_id)
                 LOGGER.info(
                     "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
                     susp_user_id,

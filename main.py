@@ -3344,7 +3344,7 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
 
             # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
-            report_spam_from_message(message, LOGGER)
+            await report_spam_from_message(message, LOGGER)
             LOGGER.warning(logger_text)
 
             # Forwarding banned user message to ADMIN AUTOBAN
@@ -4055,7 +4055,7 @@ if __name__ == "__main__":
             await message.reply(f"Error: {e}")
 
         # report spammer to P2P spam checker server
-        report_spam(author_id, LOGGER)
+        await report_spam(author_id, LOGGER)
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
             f"{author_id}:@{user_name} reported to P2P spamcheck server.",  # XXX check user_name var
@@ -4823,7 +4823,7 @@ if __name__ == "__main__":
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
-            report_spam(susp_user_id, LOGGER)
+            await report_spam(susp_user_id, LOGGER)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"{susp_user_id}:@{susp_user_name} reported to P2P spamcheck server.",

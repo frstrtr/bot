@@ -4329,7 +4329,9 @@ if __name__ == "__main__":
                     )
             else:  # action == "unban"
                 try:
-                    result = unban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
+                    result = await unban_rogue_chat_everywhere(
+                        rogue_chan_id, CHANNEL_IDS
+                    )
                     if result is True:
                         LOGGER.info(
                             "\033[91mChannel (%s) unbanned where it is possible.\033[0m",

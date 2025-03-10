@@ -3220,8 +3220,13 @@ if __name__ == "__main__":
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
                 )
+            except MessageToForwardNotFound as e:
+                LOGGER.error("Channel message already deleted: %s", e)
+            except MessageCantBeForwarded as e:
+                LOGGER.error("Channel message can't be forwarded: %s", e)
             except BadRequest as e:
                 LOGGER.error("Channel message processing error: %s", e)
+                # return XXX do not stop processing
             try:
                 await BOT.delete_message(message.chat.id, message.message_id)
                 # Convert the Message object to a dictionary

@@ -3845,66 +3845,82 @@ if __name__ == "__main__":
                 active_user_checks_dict[message.from_user.id][
                     message_key
                 ] = message_link
-
-                # Create an inline keyboard with a link
-                LOGGER.warning(
-                    "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
-                    message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                    message_link,
-                )
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:
                     message_link = construct_message_link(
                         [message.chat.id, message.message_id, message.chat.username]
                     )
-                LOGGER.info(
-                    "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
-                    message.from_id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
-                    message.chat.title,
-                    human_readable_time,
-                    message_link,
-                )
-                the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
-                if await check_n_ban(message, the_reason):
+                if not user_flagged_legit:
+                    if message_sent_during_night(message):
+                        LOGGER.warning(
+                            "\033[47m\033[34m%s:@%s sent a message during the night, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
+                            message.from_user.id,
+                            (
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
+                            message.message_id,
+                            message.chat.title,
+                            message.chat.id,
+                            message_link,
+                        )
+                    else:
+                        LOGGER.warning(
+                            "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
+                            message.from_user.id,
+                            (
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
+                            message.message_id,
+                            message.chat.title,
+                            message.chat.id,
+                            message_link,
+                        )
+                        LOGGER.info(
+                            "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
+                            message.from_id,
+                            (
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
+                            message.chat.title,
+                            human_readable_time,
+                            message_link,
+                        )
+                    the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
+                    if await check_n_ban(message, the_reason):
 
-                    # At the point where you want to print the traceback
-                    # snapshot = tracemalloc.take_snapshot()
-                    # top_stats = snapshot.statistics('lineno')
+                        # At the point where you want to print the traceback
+                        # snapshot = tracemalloc.take_snapshot()
+                        # top_stats = snapshot.statistics('lineno')
 
-                    # print("[ Top 10 ]")
-                    # for stat in top_stats[:10]:
-                    #     print(stat)
+                        # print("[ Top 10 ]")
+                        # for stat in top_stats[:10]:
+                        #     print(stat)
 
-                    return
+                        return
+                    else:
+                        # If lols check False - mark as suspicious and send to admin group
+                        await message.forward(
+                            ADMIN_GROUP_ID,
+                            ADMIN_SUSPICIOUS,
+                            disable_notification=True,
+                        )
+                        await BOT.send_message(
+                            ADMIN_GROUP_ID,
+                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Please check it out!",
+                            message_thread_id=ADMIN_SUSPICIOUS,
+                            reply_markup=inline_kb,
+                            parse_mode="HTML",
+                            disable_web_page_preview=True,
+                        )
+                        return
                 else:
-                    # If lols check False - mark as suspicious and send to admin group
-                    await message.forward(
-                        ADMIN_GROUP_ID,
-                        ADMIN_SUSPICIOUS,
-                        disable_notification=True,
-                    )
-                    await BOT.send_message(
-                        ADMIN_GROUP_ID,
-                        f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Please check it out!",
-                        message_thread_id=ADMIN_SUSPICIOUS,
-                        reply_markup=inline_kb,
-                        parse_mode="HTML",
-                        disable_web_page_preview=True,
-                    )
                     return
 
         # If other user/admin or bot deletes message earlier than this bot we got an error

@@ -2024,7 +2024,7 @@ if __name__ == "__main__":
             else f'<a href="https://t.me/c/{str(update.chat.id)[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
         )
         # Get current date and time DD-MM-YY HH:MM
-        greet_timestamp = datetime.now().strftime("%d-%m-%y %H:%M")
+        greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Construct the log message
         inout_logmessage = (
             f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "

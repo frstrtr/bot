@@ -3240,7 +3240,7 @@ if __name__ == "__main__":
         """Function to store recent messages in the database.
         And check senders for spam records."""
 
-        # check if message is Channel message and DELETE it
+        # check if message is Channel message and DELETE it and stop processing
         if (
             message.sender_chat
             and message.sender_chat.id not in ALLOWED_FORWARD_CHANNEL_IDS
@@ -3305,7 +3305,7 @@ if __name__ == "__main__":
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Channel message already deleted! %s", e)
 
-            # return  # XXX STOP processing and do not store message in the DB
+            return  # XXX STOP processing and do not store message in the DB
 
         # create unified message link
         message_link = construct_message_link(
@@ -3328,7 +3328,7 @@ if __name__ == "__main__":
                 message.chat.title,
                 message_link,
             )
-            return
+            return  # XXX stop processing
 
         lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
 
@@ -3349,42 +3349,38 @@ if __name__ == "__main__":
                 message.chat.id,
             )
         elif (
-            message.from_user.id in banned_users_dict
-            or (message.sender_chat and message.sender_chat.id in banned_users_dict)
-            or (
-                message.forward_from_chat
-                and message.forward_from_chat.id in banned_users_dict
-            )
-            or (message.forward_from and message.forward_from.id in banned_users_dict)
-            or (
-                message.from_user.id
-                and await spam_check(message.from_user.id)
-                is True  # check if it is in spammer database
-            )
-            or (
-                message.sender_chat
-                and message.sender_chat.id
-                and await spam_check(message.sender_chat.id) is True
+            (
+                message.from_user.id in banned_users_dict
+                or await spam_check(message.from_user.id) is True
             )
             or (
                 message.forward_from_chat
-                and message.forward_from_chat.id
-                and await spam_check(message.forward_from_chat.id) is True
+                and (
+                    message.forward_from_chat.id in banned_users_dict
+                    or await spam_check(message.forward_from_chat.id) is True
+                )
             )
             or (
                 message.forward_from
-                and message.forward_from.id
-                and await spam_check(message.forward_from.id) is True
+                and (
+                    message.forward_from.id in banned_users_dict
+                    or await spam_check(message.forward_from.id) is True
+                )
             )
+            # or (message.from_user.id and await spam_check(message.from_user.id) is True)  # check if it is in spammer database
+            # or (message.sender_chat and message.sender_chat.id in banned_users_dict)
+            # or (message.sender_chat and message.sender_chat.id and await spam_check(message.sender_chat.id) is True)
+            # or (message.forward_from_chat and message.forward_from_chat.id and await spam_check(message.forward_from_chat.id) is True)
+            # or (message.forward_from and message.forward_from.id and await spam_check(message.forward_from.id) is True)
         ):
             if (
                 message.from_user and message.from_user.id in banned_users_dict
             ):  # user_id BANNED
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
-            elif (
-                message.sender_chat and message.sender_chat.id in banned_users_dict
-            ):  # sender_chat_id BANNED
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+            # elif (
+            #     message.sender_chat and message.sender_chat.id in banned_users_dict
+            # ):  # sender_chat_id BANNED
+            #     logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             elif (
                 message.forward_from_chat
                 and message.forward_from_chat.id in banned_users_dict
@@ -3395,13 +3391,9 @@ if __name__ == "__main__":
             ):  # forward_from.id BANNED
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM USER: {message.forward_from.id}:@{getattr(message.forward_from, 'username', None) or message.forward_from.first_name} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             else:  # marked as a SPAM by P2P server
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER by spam_check, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
 
-            # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
-            await report_spam_from_message(message, LOGGER, TELEGRAM_CHANNEL_BOT_ID)
-            LOGGER.warning(logger_text)
-
-            # Forwarding banned user message to ADMIN AUTOBAN
+            # Forward banned user message to ADMIN AUTOBAN
             await BOT.forward_message(
                 ADMIN_GROUP_ID,
                 message.chat.id,
@@ -3409,6 +3401,10 @@ if __name__ == "__main__":
                 ADMIN_AUTOBAN,
                 True,
             )
+
+            # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
+            await report_spam_from_message(message, LOGGER, TELEGRAM_CHANNEL_BOT_ID)
+            LOGGER.warning(logger_text)
 
             # delete message immidiately
             await BOT.delete_message(message.chat.id, message.message_id)
@@ -3422,13 +3418,15 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
             )
 
-            # check if message is forward from banned channel or posted as a banned channel XXX#1
+            # check if message is forward from banned channel XXX
             rogue_chan_id = (
-                message.sender_chat.id
-                if message.sender_chat
-                else (
-                    message.forward_from_chat.id if message.forward_from_chat else None
-                )
+                # message.sender_chat.id
+                # if message.sender_chat
+                # else (
+                message.forward_from_chat.id
+                if message.forward_from_chat
+                else None
+                # )
             )
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict

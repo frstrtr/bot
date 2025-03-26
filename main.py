@@ -4124,12 +4124,29 @@ if __name__ == "__main__":
 
         # report spammer to P2P spam checker server
         await report_spam(author_id, LOGGER)
+        user_name = (
+            forwarded_message_data[4]
+            if forwarded_message_data[4] not in [0, "0", None]
+            else "!UNDEFINED!"
+        )
+        lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+        lols_check_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="LOLS DATA",
+                        url=lols_url,
+                    )
+                ]
+            ]
+        )
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
             f"{author_id}:@{user_name} reported to P2P spamcheck server.",  # XXX check user_name var
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=TECHNO_ADMIN,
+            reply_markup=lols_check_kb,
         )
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)

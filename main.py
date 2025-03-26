@@ -5142,6 +5142,7 @@ if __name__ == "__main__":
         # empty banned_users_dict
         banned_users_dict.clear()
 
+    # TODO remove user watchdog if banned when suspicious message detected
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages

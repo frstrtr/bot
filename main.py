@@ -1286,7 +1286,7 @@ async def check_and_autoban(
         # user is not spammer but kicked or restricted by admin
         # TODO log admin name getting it from inout_logmessage
         admin_name = (
-            inout_logmessage.split("by ", 1)[-1].rstrip("\n")
+            inout_logmessage.split("by ", 1)[-1].split("\n", 1)[0]
             if "by " in inout_logmessage
             else "!UNDEFINED!"
         )

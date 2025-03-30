@@ -1709,6 +1709,23 @@ async def perform_checks(
 async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
     """Cancels a running watchdog task for a given user ID."""
     if user_id in running_watchdogs:
+        # Try to remove from active_checks dict and add to banned_users_dict
+        try:
+            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+        except KeyError:
+            LOGGER.warning(
+                "%s not found in active_user_checks_dict during cancel_named_watchdog.",
+                user_id,
+            )
+        if user_id in active_user_checks_dict:
+            del active_user_checks_dict[user_id]
+            LOGGER.info(
+                "\033[92m%s:@%s removed from active_user_checks_dict during cancel_named_watchdog:\033[0m\n\t\t\t%s",
+                user_id,
+                user_name,
+                active_user_checks_dict,
+            )
+        # Cancel the task and remove it from the dictionary
         task = running_watchdogs.pop(user_id)
         task.cancel()
         try:

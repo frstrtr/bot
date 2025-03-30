@@ -1608,27 +1608,28 @@ async def perform_checks(
                     user_name,
                 )
                 # cancel cycle and cancel task if it is available
-                if user_id in running_watchdogs:
-                    running_watchdogs[user_id].cancel()
-                try:
-                    await running_watchdogs[user_id]
-                except asyncio.CancelledError:
-                    LOGGER.info(
-                        "%s:@%s Watchdog disabled.(Cancelled)",
-                        user_id,
-                        user_name,
-                    )
-                    # stop cycle
-                    break
-                except KeyError as e:
-                    LOGGER.info(
-                        "%s:@%s Watchdog disabled.(%s)",
-                        user_id,
-                        user_name,
-                        e,
-                    )
-                    # stop cycle
-                    break
+                # if user_id in running_watchdogs:
+                #     running_watchdogs[user_id].cancel()
+                # try:
+                #     await running_watchdogs[user_id]
+                # except asyncio.CancelledError:
+                #     LOGGER.info(
+                #         "%s:@%s Watchdog disabled.(Cancelled)",
+                #         user_id,
+                #         user_name,
+                #     )
+                #     # stop cycle
+                #     break
+                # except KeyError as e:
+                #     LOGGER.info(
+                #         "%s:@%s Watchdog disabled.(%s)",
+                #         user_id,
+                #         user_name,
+                #         e,
+                #     )
+                #     # stop cycle
+                #     break
+                await cancel_named_watchdog(user_id, user_name)
                 # stop cycle
                 break
 
@@ -1703,6 +1704,39 @@ async def perform_checks(
                     user_name,
                     active_user_checks_dict,
                 )
+
+
+async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
+    """Cancels a running watchdog task for a given user ID."""
+    if user_id in running_watchdogs:
+        task = running_watchdogs.pop(user_id)
+        task.cancel()
+        try:
+            await task
+            LOGGER.info(
+                "%s:@%s Watchdog disabled.(Cancelled)",
+                user_id,
+                user_name,
+            )
+        except asyncio.CancelledError:
+            LOGGER.info(
+                "%s:@%s Watchdog cancellation confirmed.",
+                user_id,
+                user_name,
+            )
+        except Exception as e:
+            LOGGER.error(
+                "%s:@%s Error during watchdog cancellation: %s",
+                user_id,
+                user_name,
+                e,
+            )
+    else:
+        LOGGER.info(
+            "%s:@%s No running watchdog found to cancel.",
+            user_id,
+            user_name,
+        )
 
 
 async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
@@ -4994,6 +5028,10 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
                 message_thread_id=TECHNO_ADMIN,
             )
+            # TODO add cancel_watchdog() for designated cases
+            # cancel_named_watchdog()
+            await cancel_named_watchdog(susp_user_id)
+
         elif comand == "confirmban":
             # ban user in chat
             try:
@@ -5142,7 +5180,7 @@ if __name__ == "__main__":
         # empty banned_users_dict
         banned_users_dict.clear()
 
-    # TODO remove user watchdog if banned when suspicious message detected
+    # XXX remove user watchdog if banned when suspicious message detected
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
     # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages

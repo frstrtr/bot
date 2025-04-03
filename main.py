@@ -3386,12 +3386,13 @@ if __name__ == "__main__":
                 message.chat.title,
                 message_link,
             )
-            return  # XXX stop processing
+            return  # XXX stop processing and do not store message in the DB
 
         lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
 
         inline_kb = create_inline_keyboard(message_link, lols_link, message)
 
+        ### AUTOBAHN MESSAGE CHECKING ###
         # check if message is from user from active_user_checks_dict
         # and banned_users_dict set
         # XXX is that possible?
@@ -3425,11 +3426,6 @@ if __name__ == "__main__":
                     or await spam_check(message.forward_from.id) is True
                 )
             )
-            # or (message.from_user.id and await spam_check(message.from_user.id) is True)  # check if it is in spammer database
-            # or (message.sender_chat and message.sender_chat.id in banned_users_dict)
-            # or (message.sender_chat and message.sender_chat.id and await spam_check(message.sender_chat.id) is True)
-            # or (message.forward_from_chat and message.forward_from_chat.id and await spam_check(message.forward_from_chat.id) is True)
-            # or (message.forward_from and message.forward_from.id and await spam_check(message.forward_from.id) is True)
         ):
             if (
                 message.from_user and message.from_user.id in banned_users_dict
@@ -3626,6 +3622,8 @@ if __name__ == "__main__":
                 # )
                 return
 
+
+        ### STORE MESSAGES AND AUTOREPORT EM###
         try:
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
@@ -3728,6 +3726,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
 
             elif has_custom_emoji_spam(
                 message
@@ -3746,6 +3745,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
                 the_reason = f"{message.from_id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
@@ -3759,6 +3759,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
@@ -3774,6 +3775,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             # check if the message is sent less then 10 seconds after joining the chat
             elif user_is_10sec_old:
                 # this is possibly a bot
@@ -3788,6 +3790,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             # check if the message is sent less then 1 hour after joining the chat
             elif user_is_1hr_old and entity_spam_trigger:
                 # this is possibly a spam
@@ -3807,6 +3810,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
                 the_reason = f"{message.from_id} message sent via inline bot"
@@ -3819,6 +3823,7 @@ if __name__ == "__main__":
                     if not autoreport_sent:
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
+                        return  # stop further actions for this message since user was banned before
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
@@ -3878,6 +3883,7 @@ if __name__ == "__main__":
             #     await take_heuristic_action(message, the_reason)
 
             # FINALLY:
+            ### SUSPICIOUS MESSAGE CHECKING ###
             if (
                 not autoreport_sent
                 and message.from_user.id in active_user_checks_dict
@@ -5197,6 +5203,7 @@ if __name__ == "__main__":
         # empty banned_users_dict
         banned_users_dict.clear()
 
+    # FIXME double night message check in SRM
     # XXX remove user watchdog if banned when suspicious message detected
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport

@@ -3305,7 +3305,7 @@ if __name__ == "__main__":
             and message.sender_chat.id not in CHANNEL_IDS
             # or message.from_user.id == TELEGRAM_CHANNEL_BOT_ID
         ):
-            try: # Log messages in TECHNOLOG_GROUP_ID
+            try:  # Log messages in TECHNOLOG_GROUP_ID
                 await BOT.forward_message(
                     TECHNOLOG_GROUP_ID,
                     message.chat.id,
@@ -3334,7 +3334,7 @@ if __name__ == "__main__":
             except BadRequest as e:
                 LOGGER.error("Channel message processing error: %s", e)
                 # return XXX do not stop processing
-            try: # DELETE CHANNEL messages
+            try:  # DELETE CHANNEL messages
                 await BOT.delete_message(message.chat.id, message.message_id)
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
@@ -3623,7 +3623,6 @@ if __name__ == "__main__":
                 # )
                 return
 
-
         ### STORE MESSAGES AND AUTOREPORT EM###
         try:
             # Store message data to DB
@@ -3704,7 +3703,7 @@ if __name__ == "__main__":
             elif message.is_forward() and (
                 (
                     message.forward_from_chat
-                    and message.forward_from_chat.id != message.chat.id
+                    and message.forward_from_chat.id not in {message.chat.id, *ALLOWED_FORWARD_CHANNEL_IDS}
                 )
                 or (
                     message.forward_from

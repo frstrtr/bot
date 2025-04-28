@@ -3388,6 +3388,25 @@ if __name__ == "__main__":
             )
             return  # XXX stop processing and do not store message in the DB
 
+        # check if message is forward from allowed channels
+        if message.is_forward() and message.forward_from_chat.id not in {
+            message.chat.id,
+            *ALLOWED_FORWARD_CHANNEL_IDS,
+        }:
+            LOGGER.debug(
+                "\033[95m%s:@%s FORWARDED from allowed channel, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
+                message.from_user.id,
+                (
+                    message.from_user.username
+                    if message.from_user.username
+                    else "!UNDEFINED!"
+                ),
+                message.message_id,
+                message.chat.title,
+                message_link,
+            )
+            return
+
         lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
 
         inline_kb = create_inline_keyboard(message_link, lols_link, message)
@@ -3700,15 +3719,8 @@ if __name__ == "__main__":
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
-            elif message.is_forward() and (
-                (
-                    message.forward_from_chat
-                    and message.forward_from_chat.id not in {message.chat.id, *ALLOWED_FORWARD_CHANNEL_IDS}
-                )
-                or (
-                    message.forward_from
-                    and message.forward_from.id != message.from_user.id
-                )
+            elif (
+                message.is_forward() and message.forward_from.id != message.from_user.id
             ):
                 # this is possibly a spam
                 the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"

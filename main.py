@@ -3683,6 +3683,7 @@ if __name__ == "__main__":
 
             # check if user flagged legit by setting
             # new_chat_member and left_chat_member in the DB to 1
+            # to indicate that checks were cancelled
             user_flagged_legit = check_user_legit(CURSOR, message.from_id)
 
             # check if the message is a spam by checking the entities
@@ -3719,9 +3720,8 @@ if __name__ == "__main__":
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
-            elif (
-                message.is_forward() and message.forward_from.id != message.from_user.id
-            ):
+            # Check if the message is forwarded and ensure forward_from is not None
+            if message.is_forward() and message.forward_from and message.forward_from.id != message.from_user.id:
                 # this is possibly a spam
                 the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
                 if await check_n_ban(message, the_reason):
@@ -3741,7 +3741,6 @@ if __name__ == "__main__":
                         autoreport_sent = True
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
-
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis

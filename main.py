@@ -3389,7 +3389,7 @@ if __name__ == "__main__":
             return  # XXX stop processing and do not store message in the DB
 
         # check if message is forward from allowed channels
-        if message.is_forward() and message.forward_from_chat.id not in {
+        if message.is_forward() and message.forward_from_chat.id in {
             message.chat.id,
             *ALLOWED_FORWARD_CHANNEL_IDS,
         }:

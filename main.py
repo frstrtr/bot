@@ -3327,6 +3327,14 @@ if __name__ == "__main__":
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
                 )
+            except MessageIdInvalid as e:
+                LOGGER.error(
+                    "Message ID %s is invalid or the message was deleted in chat %s (%s): %s",
+                    message.message_id,
+                    message.chat.title,
+                    message.chat.id,
+                    e,
+                )
             except MessageToForwardNotFound as e:
                 LOGGER.error("Channel message already deleted: %s", e)
             except MessageCantBeForwarded as e:
@@ -3721,7 +3729,11 @@ if __name__ == "__main__":
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
             # Check if the message is forwarded and ensure forward_from is not None
-            if message.is_forward() and message.forward_from and message.forward_from.id != message.from_user.id:
+            if (
+                message.is_forward()
+                and message.forward_from
+                and message.forward_from.id != message.from_user.id
+            ):
                 # this is possibly a spam
                 the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
                 if await check_n_ban(message, the_reason):

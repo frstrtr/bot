@@ -581,7 +581,7 @@ async def on_shutdown(_dp):
         LOGGER.info(
             "%s:@%s shutdown check for spam...",
             _id,
-            _uname if _uname else "!UNDEFINED!'",
+            _uname["username"] if isinstance(_uname, dict) else (_uname if _uname else "!UNDEFINED!"),
         )
 
         # Create the task for the sequential coroutine without awaiting it immediately

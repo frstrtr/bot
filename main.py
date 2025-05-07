@@ -581,7 +581,11 @@ async def on_shutdown(_dp):
         LOGGER.info(
             "%s:@%s shutdown check for spam...",
             _id,
-            _uname["username"] if isinstance(_uname, dict) else (_uname if _uname else "!UNDEFINED!"),
+            (
+                _uname["username"]
+                if isinstance(_uname, dict)
+                else (_uname if _uname else "!UNDEFINED!")
+            ),
         )
 
         # Create the task for the sequential coroutine without awaiting it immediately
@@ -590,14 +594,30 @@ async def on_shutdown(_dp):
         )
         tasks.append(task)
 
+    # try:
     # Run all tasks concurrently
-    await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # TODO add messages deletion if spammer detected and have messages posted
+
+    # Process results and log any exceptions
+    for task, result in zip(tasks, results):
+        if isinstance(result, Exception):
+            LOGGER.error("Task %s failed with exception: %s", task.get_name(), result)
+        else:
+            LOGGER.info("Task %s completed successfully.", task.get_name())
+    # except Exception as e:
+    #     LOGGER.error("Unexpected error during shutdown tasks: %s", e)
 
     # save all unbanned checks to temp file to restart checks after bot restart
     # Check if active_user_checks_dict is not empty
     if active_user_checks_dict:
+        LOGGER.debug(
+            "Saving active user checks to file...\n%s", active_user_checks_dict
+        )
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
+                # TODO preserve messages to delete for next startup checks
                 if isinstance(_uname, dict) and "username" in _uname:
                     _uname = _uname["username"]
                 # LOGGER.debug(_uname)
@@ -609,6 +629,12 @@ async def on_shutdown(_dp):
 
     # save all banned users to temp file to preserve list after bot restart
     banned_users_filename = "banned_users.txt"
+
+    # debug
+    if banned_users_dict:
+        LOGGER.debug("Saving banned users to file...\n%s", banned_users_dict)
+    # end debug
+
     if os.path.exists(banned_users_filename) and banned_users_dict:
         with open(banned_users_filename, "a", encoding="utf-8") as file:
             for _id, _username in banned_users_dict.items():

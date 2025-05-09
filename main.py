@@ -628,7 +628,8 @@ async def on_shutdown(_dp):
     # Check if active_user_checks_dict is not empty
     if active_user_checks_dict:
         LOGGER.debug(
-            "Saving active user checks to file...\n%s", active_user_checks_dict
+            "Saving active user checks to file...\n\033[93m%s\033[0m",
+            active_user_checks_dict,
         )
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
@@ -647,17 +648,20 @@ async def on_shutdown(_dp):
 
     # debug
     if banned_users_dict:
-        LOGGER.debug("Saving banned users to file...\n%s", banned_users_dict)
+        LOGGER.debug(
+            "Saving banned users to file...\n\033[93m%s\033[0m",
+            banned_users_dict
+        )
     # end debug
 
     if os.path.exists(banned_users_filename) and banned_users_dict:
         with open(banned_users_filename, "a", encoding="utf-8") as file:
-            for _id, _username in banned_users_dict.items():
-                file.write(f"{_id}:{_username}\n")
+            for _id, _uname in banned_users_dict.items():
+                file.write(f"{_id}:{_uname}\n")
     elif banned_users_dict:
         with open(banned_users_filename, "w", encoding="utf-8") as file:
-            for _id, _username in banned_users_dict.items():
-                file.write(f"{_id}:{_username}\n")
+            for _id, _uname in banned_users_dict.items():
+                file.write(f"{_id}:{_uname}\n")
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()

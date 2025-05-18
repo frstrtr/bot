@@ -649,8 +649,7 @@ async def on_shutdown(_dp):
     # debug
     if banned_users_dict:
         LOGGER.debug(
-            "Saving banned users to file...\n\033[93m%s\033[0m",
-            banned_users_dict
+            "Saving banned users to file...\n\033[93m%s\033[0m", banned_users_dict
         )
     # end debug
 
@@ -3235,16 +3234,22 @@ if __name__ == "__main__":
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
 
+            lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+            lols_check_kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+            )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
                 f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
+                reply_markup=lols_check_kb,
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 parse_mode="HTML",
+                reply_markup=lols_check_kb,
             )
             if forwarded_message_data[4] not in [0, "0", None]:
                 await BOT.send_message(
@@ -3318,6 +3323,10 @@ if __name__ == "__main__":
             button_pressed_by,
         )
 
+        lols_url = f"https://t.me/lolsbotcatcherbot?start={report_id_to_ban}"
+        inline_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+        )
         await BOT.send_message(
             ADMIN_GROUP_ID,
             f"Button ACTION CANCELLED by @{button_pressed_by}: Report WAS NOT PROCESSED!!! "
@@ -3325,6 +3334,7 @@ if __name__ == "__main__":
             message_thread_id=callback_query.message.message_thread_id,
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=inline_kb,
         )
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
@@ -3333,6 +3343,7 @@ if __name__ == "__main__":
             f"Report them again if needed or use <code>/ban {report_id_to_ban}</code> command.",
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=inline_kb,
         )
 
     @DP.message_handler(
@@ -4247,9 +4258,16 @@ if __name__ == "__main__":
                 "\033[91m%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
             )
+
+            lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+            lols_check_kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+            )
+
             await message.reply(
                 f"Action taken: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
+                reply_markup=lols_check_kb,
             )
 
         except (sqlite3.Error, ValueError, TypeError) as e:

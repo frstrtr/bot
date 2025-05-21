@@ -485,25 +485,25 @@ def create_inline_keyboard(message_link, lols_link, message: types.Message):
     inline_kb.add(
         InlineKeyboardButton(
             "🟢 Seems legit, STOP checks 🟢",
-            callback_data=f"stop_checks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+            callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
         )
     )
     inline_kb.add(
         InlineKeyboardButton(
             "❌ Global BAN ❌",
-            callback_data=f"suspicious_globalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+            callback_data=f"suspiciousglobalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
         )
     )
     inline_kb.add(
         InlineKeyboardButton(
             "❌ BAN ❌",
-            callback_data=f"suspicious_ban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+            callback_data=f"suspiciousban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
         )
     )
     inline_kb.add(
         InlineKeyboardButton(
             "❌ Delete Message ❌",
-            callback_data=f"suspicious_delmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+            callback_data=f"suspiciousdelmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
         )
     )
     return inline_kb

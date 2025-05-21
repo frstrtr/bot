@@ -924,7 +924,10 @@ async def handle_autoreports(
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
-    ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{report_id}")
+    # MODIFIED: Pass spammer_id (user_id) and report_id, and rename callback prefix
+    ban_btn = InlineKeyboardButton(
+        "Ban", callback_data=f"confirmban_{spammer_id}_{report_id}"
+    )
     keyboard.add(ban_btn)
     try:
         # Forward original message to the admin group
@@ -2612,7 +2615,10 @@ if __name__ == "__main__":
 
         # Keyboard ban/cancel/confirm buttons
         keyboard = InlineKeyboardMarkup()
-        ban_btn = InlineKeyboardButton("Ban", callback_data=f"confirm_ban_{report_id}")
+        # MODIFIED: Pass user_id (spammer's ID) and report_id, and rename callback prefix
+        ban_btn = InlineKeyboardButton(
+            "Ban", callback_data=f"confirmban_{user_id}_{report_id}"
+        )
         keyboard.add(ban_btn)
 
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
@@ -2746,28 +2752,31 @@ if __name__ == "__main__":
                 "Error while sending the banner to the admin group. Please check the logs."
             )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("confirm_ban_"))
+    @DP.callback_query_handler(lambda c: c.data.startswith("confirmban_"))  # MODIFIED: Renamed callback prefix
     async def ask_confirmation(callback_query: CallbackQuery):
         """Function to ask for confirmation before banning the user."""
-        *_, report_id_to_ban_str = callback_query.data.split("_")
-        report_id_to_ban = int(report_id_to_ban_str)
+        # MODIFIED: Parse user_id and report_id
+        parts = callback_query.data.split("_")
+        spammer_user_id_str = parts[1]
+        report_id_to_ban_str = parts[2]
 
         # DEBUG:
         # logger.debug(f"Report {callback_query} confirmed for banning.")
 
         keyboard = InlineKeyboardMarkup(row_width=2)
+        # MODIFIED: Pass spammer_user_id_str and report_id_to_ban_str, and rename callback prefixes
         confirm_btn = InlineKeyboardButton(
-            "🟢 Confirm", callback_data=f"do_ban_{report_id_to_ban}"
+            "🟢 Confirm", callback_data=f"doban_{spammer_user_id_str}_{report_id_to_ban_str}"
         )
         cancel_btn = InlineKeyboardButton(
-            "🔴 Cancel", callback_data=f"reset_ban_{report_id_to_ban}"
+            "🔴 Cancel", callback_data=f"resetban_{spammer_user_id_str}_{report_id_to_ban_str}"
         )
 
         keyboard.add(confirm_btn, cancel_btn)
 
         # get report states
         forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
+        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban_str)
         if forwarded_reports_states is None:
             LOGGER.warning("No states recorded!")
             # reply message and remove buttons
@@ -2795,7 +2804,7 @@ if __name__ == "__main__":
         del forwarded_report_state["admin_group_banner_message"]
 
         # update states for the designated report_id_to_ban
-        forwarded_reports_states[report_id_to_ban] = forwarded_report_state
+        forwarded_reports_states[report_id_to_ban_str] = forwarded_report_state
 
         # update DP states storage
         DP["forwarded_reports_states"] = forwarded_reports_states
@@ -2847,7 +2856,7 @@ if __name__ == "__main__":
                 e,
             )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("do_ban_"))
+    @DP.callback_query_handler(lambda c: c.data.startswith("doban_"))  # MODIFIED: Renamed callback prefix
     async def handle_ban(callback_query: CallbackQuery):
         """Function to ban the user and delete all known to bot messages."""
 
@@ -2859,13 +2868,20 @@ if __name__ == "__main__":
         # get the message ID to ban and who pressed the button
         button_pressed_by = callback_query.from_user.username
         try:
-            *_, report_id_to_ban = callback_query.data.split("_")
-            report_id_to_ban = int(report_id_to_ban)
+            # MODIFIED: Parse user_id (author_id_from_callback_str) and report_id_to_ban_str
+            parts = callback_query.data.split("_")
+            author_id_from_callback_str = parts[1]  # This is the spammer's user_id
+            report_id_to_ban_str = parts[2]  # This is the original report_id (chat_id+message_id combo)
+
+            report_id_to_ban = int(report_id_to_ban_str)
+            # author_id_from_callback = int(author_id_from_callback_str) # Can be used for checks
+
             LOGGER.info(
-                "\033[95m%s:@%s requested to ban REPORT %s\033[0m",
+                "\033[95m%s:@%s requested to ban REPORT %s (Spammer ID from callback: %s)\033[0m",
                 callback_query.from_user.id,
                 button_pressed_by,
                 report_id_to_ban,
+                author_id_from_callback_str,
             )
             # get report states
             forwarded_reports_states: dict = DP.get("forwarded_reports_states")
@@ -2916,7 +2932,10 @@ if __name__ == "__main__":
             #     LOGGER.error("Index error: %s", e)
             #     await callback_query.message.reply("Error: Invalid data format in forwarded message.")
             #     return
-
+                        # MODIFIED: Use ast.literal_eval for safety
+            author_id = ast.literal_eval(forwarded_message_data)[3]
+            LOGGER.debug("%s author ID retrieved for original message", author_id)
+            
             LOGGER.debug(
                 "\033[93m%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s,\n\t\t\tForwarded message data: %s,\n\t\t\tOriginal message timestamp: %s\033[0m",
                 author_id,
@@ -3300,10 +3319,16 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_ADMIN,
         )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("reset_ban_"))
+    @DP.callback_query_handler(lambda c: c.data.startswith("resetban_"))  # MODIFIED: Renamed callback prefix
     async def reset_ban(callback_query: CallbackQuery):
         """Function to reset the ban button."""
-        *_, report_id_to_ban = callback_query.data.split("_")
+        # MODIFIED: Parse actual_user_id and original_report_id from callback data
+        parts = callback_query.data.split("_")
+        actual_user_id_str = parts[1]  # The spammer's actual user ID
+        original_report_id_str = parts[2]  # The original report_id (chat_id+message_id combo)
+
+        actual_user_id = int(actual_user_id_str)
+        # original_report_id = int(original_report_id_str) # For DB operations if needed, or logging
 
         # remove buttons from the admin group
         await BOT.edit_message_reply_markup(
@@ -3317,20 +3342,23 @@ if __name__ == "__main__":
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
 
         LOGGER.info(
-            "\033[95m%s Report %s button ACTION CANCELLED by @%s !!!\033[0m",
+            "\033[95m%s Report %s button ACTION CANCELLED by @%s !!! (User ID for LOLS: %s)\033[0m",
             admin_id,
-            report_id_to_ban,
+            original_report_id_str,  # Log the original report identifier
             button_pressed_by,
+            actual_user_id,
         )
 
-        lols_url = f"https://t.me/lolsbotcatcherbot?start={report_id_to_ban}"
+        # FIXED BUG: Use actual_user_id for the LOLS bot link
+        lols_url = f"https://t.me/lolsbotcatcherbot?start={actual_user_id}"
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
         )
         await BOT.send_message(
             ADMIN_GROUP_ID,
             f"Button ACTION CANCELLED by @{button_pressed_by}: Report WAS NOT PROCESSED!!! "
-            f"Report them again if needed or use <code>/ban {report_id_to_ban}</code> command.",
+            # Use original_report_id_str for the /ban command hint
+            f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
             message_thread_id=callback_query.message.message_thread_id,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -3340,7 +3368,8 @@ if __name__ == "__main__":
             TECHNOLOG_GROUP_ID,
             f"CANCEL button pressed by @{button_pressed_by}. "
             f"Button ACTION CANCELLED: Report WAS NOT PROCESSED. "
-            f"Report them again if needed or use <code>/ban {report_id_to_ban}</code> command.",
+            # Use original_report_id_str for the /ban command hint
+            f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
@@ -4123,7 +4152,8 @@ if __name__ == "__main__":
                 original_message_timestamp,
             )
 
-            author_id = eval(forwarded_message_data)[3]
+            # MODIFIED: Use ast.literal_eval for safety
+            author_id = ast.literal_eval(forwarded_message_data)[3]
             LOGGER.debug("%s author ID retrieved for original message", author_id)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
@@ -4862,12 +4892,11 @@ if __name__ == "__main__":
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user."""
         try:
-            *_, user_id_legit, orig_chat_id, orig_message_id = (
-                callback_query.data.split("_")
-            )
-            user_id_legit = int(user_id_legit)
-            orig_chat_id = int(orig_chat_id)
-            orig_message_id = int(orig_message_id)
+            # MODIFIED: Adjusted parsing for single-word prefix
+            _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
+            user_id_legit = int(user_id_legit_str)
+            orig_chat_id = int(orig_chat_id_str)
+            orig_message_id = int(orig_message_id_str)
         except ValueError as e:
             LOGGER.error("%s Invalid callback data: %s", e, callback_query.data)
             # await callback_query.answer("Invalid data format.")
@@ -4998,9 +5027,10 @@ if __name__ == "__main__":
         return
 
     @DP.callback_query_handler(
-        lambda c: c.data.startswith("suspicious_globalban_")
-        or c.data.startswith("suspicious_ban_")
-        or c.data.startswith("suspicious_delmsg_")
+        # MODIFIED: Renamed callback prefixes and adjusted lambda
+        lambda c: c.data.startswith("suspiciousglobalban_")
+        or c.data.startswith("suspiciousban_")
+        or c.data.startswith("suspiciousdelmsg_")
         or c.data.startswith("confirmdelmsg_")
         or c.data.startswith("canceldelmsg_")
         or c.data.startswith("confirmban_")
@@ -5010,12 +5040,44 @@ if __name__ == "__main__":
     )
     async def handle_suspicious_sender(callback_query: CallbackQuery):
         """Function to handle the suspicious sender."""
-        *_, comand, susp_chat_id, susp_message_id, susp_user_id = (
-            callback_query.data.split("_")
-        )
-        susp_user_id = int(susp_user_id)
-        susp_message_id = int(susp_message_id)
-        susp_chat_id = int(susp_chat_id)
+        # MODIFIED: Adjusted parsing for single-word prefixes and data extraction
+        data = callback_query.data
+        parts = data.split("_")
+
+        action_prefix = parts[0]
+        susp_chat_id_str = parts[1]
+        susp_message_id_str = parts[2]
+        susp_user_id_str = parts[3]
+
+        susp_user_id = int(susp_user_id_str)
+        susp_message_id = int(susp_message_id_str)
+        susp_chat_id = int(susp_chat_id_str)
+
+        # Determine 'comand' (action) based on the prefix
+        comand = ""
+        if action_prefix == "suspiciousglobalban":
+            comand = "globalban"
+        elif action_prefix == "suspiciousban":
+            comand = "ban"
+        elif action_prefix == "suspiciousdelmsg":
+            comand = "delmsg"
+        elif action_prefix == "confirmglobalban":
+            comand = "confirmglobalban"
+        elif action_prefix == "cancelglobalban":
+            comand = "cancelglobalban"
+        elif action_prefix == "confirmban":
+            comand = "confirmban"
+        elif action_prefix == "cancelban":
+            comand = "cancelban"
+        elif action_prefix == "confirmdelmsg":
+            comand = "confirmdelmsg"
+        elif action_prefix == "canceldelmsg":
+            comand = "canceldelmsg"
+        else:
+            LOGGER.error(f"Unknown prefix in handle_suspicious_sender: {action_prefix}")
+            await callback_query.answer("Internal error processing action.", show_alert=True)
+            return
+
         susp_chat_title = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
         admin_id = callback_query.from_user.id
         admin_username = (

@@ -914,7 +914,7 @@ async def handle_autoreports(
     inline_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
             "ℹ️ Check Spam Data ℹ️",
-            url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
+            url=f"https://t.me/oLolsBot?start={user_id}",
         )
     )
     # Send the banner to the technolog group
@@ -1182,7 +1182,7 @@ async def check_and_autoban(
     :param message_to_delete: tuple: chat_id, message_id: The message to delete.
     """
 
-    lols_url = f"https://t.me/lolsbotcatcherbot?start={user_id}"
+    lols_url = f"https://t.me/oLolsBot?start={user_id}"
 
     inline_kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
@@ -1462,7 +1462,7 @@ async def check_n_ban(message: types.Message, reason: str):
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
                 "ℹ️ Check Spam Data ℹ️",
-                url=f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}",
+                url=f"https://t.me/oLolsBot?start={message.from_user.id}",
             )
         )
         chat_link = (
@@ -2144,7 +2144,7 @@ if __name__ == "__main__":
             f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
-        lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
+        lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
         )
@@ -2318,7 +2318,7 @@ if __name__ == "__main__":
                     await ban_user_from_all_chats(
                         inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
                     )
-                    lols_url = f"https://t.me/lolsbotcatcherbot?start={inout_userid}"
+                    lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
@@ -2602,7 +2602,7 @@ if __name__ == "__main__":
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton(
                 "ℹ️ Check Spam Data ℹ️",
-                url=f"https://t.me/lolsbotcatcherbot?start={user_id}",
+                url=f"https://t.me/oLolsBot?start={user_id}",
             )
         )
         # Send the banner to the technolog group
@@ -2935,7 +2935,7 @@ if __name__ == "__main__":
                         # MODIFIED: Use ast.literal_eval for safety
             author_id = ast.literal_eval(forwarded_message_data)[3]
             LOGGER.debug("%s author ID retrieved for original message", author_id)
-            
+
             LOGGER.debug(
                 "\033[93m%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s,\n\t\t\tForwarded message data: %s,\n\t\t\tOriginal message timestamp: %s\033[0m",
                 author_id,
@@ -3253,7 +3253,7 @@ if __name__ == "__main__":
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
 
-            lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+            lols_url = f"https://t.me/oLolsBot?start={author_id}"
             lols_check_kb = InlineKeyboardMarkup().add(
                 InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
@@ -3350,7 +3350,7 @@ if __name__ == "__main__":
         )
 
         # FIXED BUG: Use actual_user_id for the LOLS bot link
-        lols_url = f"https://t.me/lolsbotcatcherbot?start={actual_user_id}"
+        lols_url = f"https://t.me/oLolsBot?start={actual_user_id}"
         inline_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
         )
@@ -3500,7 +3500,7 @@ if __name__ == "__main__":
             )
             return
 
-        lols_link = f"https://t.me/lolsbotcatcherbot?start={message.from_user.id}"
+        lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
 
         inline_kb = create_inline_keyboard(message_link, lols_link, message)
 
@@ -4289,7 +4289,7 @@ if __name__ == "__main__":
                 author_id,
             )
 
-            lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+            lols_url = f"https://t.me/oLolsBot?start={author_id}"
             lols_check_kb = InlineKeyboardMarkup().add(
                 InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
@@ -4311,7 +4311,7 @@ if __name__ == "__main__":
             if forwarded_message_data[4] not in [0, "0", None]
             else "!UNDEFINED!"
         )
-        lols_url = f"https://t.me/lolsbotcatcherbot?start={author_id}"
+        lols_url = f"https://t.me/oLolsBot?start={author_id}"
         lols_check_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -4915,7 +4915,7 @@ if __name__ == "__main__":
 
         # # create unified message link
         message_link = construct_message_link([orig_chat_id, orig_message_id, None])
-        lols_link = f"https://t.me/lolsbotcatcherbot?start={user_id_legit}"
+        lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()
@@ -5098,7 +5098,7 @@ if __name__ == "__main__":
         # create unified message link
         message_link = construct_message_link([susp_chat_id, susp_message_id, None])
         # create lols check link
-        lols_link = f"https://t.me/lolsbotcatcherbot?start={susp_user_id}"
+        lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()

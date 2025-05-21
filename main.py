@@ -2774,9 +2774,10 @@ if __name__ == "__main__":
 
         keyboard.add(confirm_btn, cancel_btn)
 
+        report_id_to_ban = int(report_id_to_ban_str)
         # get report states
         forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban_str)
+        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
         if forwarded_reports_states is None:
             LOGGER.warning("No states recorded!")
             # reply message and remove buttons
@@ -4657,6 +4658,128 @@ if __name__ == "__main__":
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 
+    @DP.callback_query_handler(lambda c: c.data.startswith("stopchecks_"))
+    async def stop_checks(callback_query: CallbackQuery):
+        """Function to stop checks for the user and mark them as legit."""
+        try:
+            _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
+            user_id_legit = int(user_id_legit_str)
+            orig_chat_id = int(orig_chat_id_str)
+            orig_message_id = int(orig_message_id_str)
+        except ValueError as e:
+            LOGGER.error(f"Invalid callback data for stop_checks: {callback_query.data}, Error: {e}")
+            await callback_query.answer("Invalid data format for stop_checks.", show_alert=True)
+            return
+
+        button_pressed_by = callback_query.from_user.username or "!NoAdminName!"
+        admin_id = callback_query.from_user.id
+
+        user_name_data = active_user_checks_dict.get(user_id_legit)
+        user_name = "!UNDEFINED!"
+        if isinstance(user_name_data, dict):
+            user_name = str(user_name_data.get("username", "!UNDEFINED!")).lstrip("@")
+        elif isinstance(user_name_data, str):
+            user_name = user_name_data.lstrip("@") if user_name_data != "None" else "!UNDEFINED!"
+        
+        message_link = construct_message_link([orig_chat_id, orig_message_id, None])
+        lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
+        
+        inline_kb = InlineKeyboardMarkup()
+        inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+
+        try:
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=inline_kb, 
+            )
+        except Exception as e_edit:
+            LOGGER.error(f"Error editing message markup in stop_checks for user {user_id_legit}: {e_edit}")
+
+        LOGGER.info(
+            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            user_id_legit, user_name, admin_id, button_pressed_by
+        )
+
+        common_message_text = (
+            f"Future checks for <code>{user_id_legit}</code> (@{user_name}) cancelled by @{button_pressed_by}. "
+            f"User marked as legitimate. To re-check, use <code>/check {user_id_legit}</code>."
+        )
+        try:
+            await BOT.send_message(
+                callback_query.message.chat.id,
+                common_message_text,
+                message_thread_id=callback_query.message.message_thread_id,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                common_message_text,
+                parse_mode="HTML",
+                message_thread_id=TECHNO_ADMIN,
+                disable_web_page_preview=True,
+            )
+        except Exception as e_send:
+            LOGGER.error(f"Error sending notification messages in stop_checks for user {user_id_legit}: {e_send}")
+
+        if user_id_legit in active_user_checks_dict:
+            del active_user_checks_dict[user_id_legit]
+            task_cancelled = False
+            for task in asyncio.all_tasks():
+                if task.get_name() == str(user_id_legit):
+                    task.cancel()
+                    task_cancelled = True
+                    LOGGER.info(f"Watchdog task for user {user_id_legit} (@{user_name}) cancelled by admin {admin_id}.")
+                    break
+            if not task_cancelled:
+                LOGGER.warning(f"Watchdog task for user {user_id_legit} (@{user_name}) not found for cancellation, though user was in active_user_checks_dict.")
+            
+            if len(active_user_checks_dict) > 3:
+                active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[-3:]
+                active_user_checks_dict_last3_str = ", ".join([f"{uid}: {str(uname.get('username', uname) if isinstance(uname, dict) else uname).lstrip('@')}" for uid, uname in active_user_checks_dict_last3_list])
+                LOGGER.info(
+                    "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
+                    user_id_legit, user_name, admin_id, button_pressed_by, active_user_checks_dict_last3_str, len(active_user_checks_dict)
+                )
+            else:
+                LOGGER.info(
+                    "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
+                    user_id_legit, user_name, admin_id, button_pressed_by, active_user_checks_dict
+                )
+        else:
+            LOGGER.info(
+                "%s:@%s was marked legit by %s(%s), but was not found in active_user_checks_dict. Checks might have already completed or been stopped.",
+                user_id_legit, user_name, button_pressed_by, admin_id
+            )
+
+        try:
+            CURSOR.execute(
+                """
+                INSERT OR REPLACE INTO recent_messages
+                (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, received_date, new_chat_member, left_chat_member)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    orig_chat_id,
+                    orig_message_id, 
+                    user_id_legit,
+                    user_name if user_name != "!UNDEFINED!" else None,
+                    None, 
+                    None, 
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    1,
+                    1,
+                ),
+            )
+            CONN.commit()
+            LOGGER.info(f"{user_id_legit} (@{user_name}) Recorded/Updated legitimization status in DB, linked to original context {orig_chat_id}/{orig_message_id}.")
+        except Exception as e_db:
+            LOGGER.error(f"{user_id_legit}: {e_db} Error updating DB in stop_checks")
+
+        await callback_query.answer("Checks stopped. User marked as legit.", show_alert=False)
+
     @DP.message_handler(
         is_valid_message,
         content_types=ALLOWED_CONTENT_TYPES,
@@ -4888,143 +5011,143 @@ if __name__ == "__main__":
         # Acknowledge the callback query
         await callback_query.answer()
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
-    async def stop_checks(callback_query: CallbackQuery):
-        """Function to stop checks for the user."""
-        try:
-            # MODIFIED: Adjusted parsing for single-word prefix
-            _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
-            user_id_legit = int(user_id_legit_str)
-            orig_chat_id = int(orig_chat_id_str)
-            orig_message_id = int(orig_message_id_str)
-        except ValueError as e:
-            LOGGER.error("%s Invalid callback data: %s", e, callback_query.data)
-            # await callback_query.answer("Invalid data format.")
-            return
+    # @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
+    # async def stop_checks(callback_query: CallbackQuery):
+    #     """Function to stop checks for the user."""
+    #     try:
+    #         # MODIFIED: Adjusted parsing for single-word prefix
+    #         _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
+    #         user_id_legit = int(user_id_legit_str)
+    #         orig_chat_id = int(orig_chat_id_str)
+    #         orig_message_id = int(orig_message_id_str)
+    #     except ValueError as e:
+    #         LOGGER.error("%s Invalid callback data: %s", e, callback_query.data)
+    #         # await callback_query.answer("Invalid data format.")
+    #         return
 
-        button_pressed_by = callback_query.from_user.username
-        admin_id = callback_query.from_user.id
+    #     button_pressed_by = callback_query.from_user.username
+    #     admin_id = callback_query.from_user.id
 
-        # Unpack user_name
-        user_name_dict = active_user_checks_dict.get(user_id_legit, "!UNDEFINED!")
-        # check if user_name_dict is a dict
-        if isinstance(user_name_dict, dict):
-            user_name = str(user_name_dict["username"]).lstrip("@")
-        else:
-            user_name = user_name_dict
+    #     # Unpack user_name
+    #     user_name_dict = active_user_checks_dict.get(user_id_legit, "!UNDEFINED!")
+    #     # check if user_name_dict is a dict
+    #     if isinstance(user_name_dict, dict):
+    #         user_name = str(user_name_dict["username"]).lstrip("@")
+    #     else:
+    #         user_name = user_name_dict
 
-        # # create unified message link
-        message_link = construct_message_link([orig_chat_id, orig_message_id, None])
-        lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
+    #     # # create unified message link
+    #     message_link = construct_message_link([orig_chat_id, orig_message_id, None])
+    #     lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
 
-        # Create the inline keyboard
-        inline_kb = InlineKeyboardMarkup()
+    #     # Create the inline keyboard
+    #     inline_kb = InlineKeyboardMarkup()
 
-        # # Add buttons to the keyboard, each in a new row
-        inline_kb.add(
-            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-        )
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+    #     # # Add buttons to the keyboard, each in a new row
+    #     inline_kb.add(
+    #         InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+    #     )
+    #     inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
-        # remove buttons from the admin group
-        await BOT.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            reply_markup=inline_kb,
-        )
+    #     # remove buttons from the admin group
+    #     await BOT.edit_message_reply_markup(
+    #         chat_id=callback_query.message.chat.id,
+    #         message_id=callback_query.message.message_id,
+    #         reply_markup=inline_kb,
+    #     )
 
-        # check if user already left active checks or button pressed after 3 hrs after report
-        if user_id_legit not in active_user_checks_dict:
-            LOGGER.error(
-                "%s:@%s legitimized by %s(%s) not found in active_user_checks_dict",
-                user_id_legit,
-                user_name,
-                button_pressed_by,
-                admin_id,
-            )
-            await callback_query.answer("User not found in active checks.")
-            return
+    #     # check if user already left active checks or button pressed after 3 hrs after report
+    #     if user_id_legit not in active_user_checks_dict:
+    #         LOGGER.error(
+    #             "%s:@%s legitimized by %s(%s) not found in active_user_checks_dict",
+    #             user_id_legit,
+    #             user_name,
+    #             button_pressed_by,
+    #             admin_id,
+    #         )
+    #         await callback_query.answer("User not found in active checks.")
+    #         return
 
-        LOGGER.info(
-            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
-            user_id_legit,
-            user_name,
-            admin_id,
-            button_pressed_by,
-        )
-        await asyncio.sleep(0.1)  # Add a small delay
-        await BOT.send_message(
-            callback_query.message.chat.id,
-            f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "
-            f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
-            message_thread_id=callback_query.message.message_thread_id,
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-        )
-        await BOT.send_message(
-            TECHNOLOG_GROUP_ID,
-            f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}. "
-            f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
-            parse_mode="HTML",
-            message_thread_id=TECHNO_ADMIN,
-            disable_web_page_preview=True,
-        )
-        # Removing user from active_user_checks dict and stop checks coroutines
-        if user_id_legit in active_user_checks_dict:
-            del active_user_checks_dict[user_id_legit]
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(user_id_legit):
-                    task.cancel()
-        # else:
-        # user is not in active checks but joined less than 1 week ago
-        # store new record in the DB that future checks are cancelled
-        # set new_chat_member and left_chat_member to 1
-        # to indicate that checks were cancelled
-        CURSOR.execute(
-            """
-            INSERT OR REPLACE INTO recent_messages
-            (chat_id, message_id, user_id, user_name, received_date, new_chat_member, left_chat_member)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                callback_query.message.chat.id,
-                callback_query.id,  # XXX not a message ID!!!
-                user_id_legit,
-                user_name,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                1,  # new_chat_member
-                1,  # left_chat_member
-            ),
-        )
-        CONN.commit()
+    #     LOGGER.info(
+    #         "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+    #         user_id_legit,
+    #         user_name,
+    #         admin_id,
+    #         button_pressed_by,
+    #     )
+    #     await asyncio.sleep(0.1)  # Add a small delay
+    #     await BOT.send_message(
+    #         callback_query.message.chat.id,
+    #         f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "
+    #         f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
+    #         message_thread_id=callback_query.message.message_thread_id,
+    #         parse_mode="HTML",
+    #         disable_web_page_preview=True,
+    #     )
+    #     await BOT.send_message(
+    #         TECHNOLOG_GROUP_ID,
+    #         f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}. "
+    #         f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
+    #         parse_mode="HTML",
+    #         message_thread_id=TECHNO_ADMIN,
+    #         disable_web_page_preview=True,
+    #     )
+    #     # Removing user from active_user_checks dict and stop checks coroutines
+    #     if user_id_legit in active_user_checks_dict:
+    #         del active_user_checks_dict[user_id_legit]
+    #         for task in asyncio.all_tasks():
+    #             if task.get_name() == str(user_id_legit):
+    #                 task.cancel()
+    #     # else:
+    #     # user is not in active checks but joined less than 1 week ago
+    #     # store new record in the DB that future checks are cancelled
+    #     # set new_chat_member and left_chat_member to 1
+    #     # to indicate that checks were cancelled
+    #     CURSOR.execute(
+    #         """
+    #         INSERT OR REPLACE INTO recent_messages
+    #         (chat_id, message_id, user_id, user_name, received_date, new_chat_member, left_chat_member)
+    #         VALUES (?, ?, ?, ?, ?, ?, ?)
+    #         """,
+    #         (
+    #             callback_query.message.chat.id,
+    #             callback_query.id,  # XXX not a message ID!!!
+    #             user_id_legit,
+    #             user_name,
+    #             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #             1,  # new_chat_member
+    #             1,  # left_chat_member
+    #         ),
+    #     )
+    #     CONN.commit()
 
-        # Log that user checks are cancelled by admin
-        if len(active_user_checks_dict) > 3:
-            active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[
-                -3:
-            ]
-            active_user_checks_dict_last3_str = ", ".join(
-                [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
-            )
-            LOGGER.info(
-                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
-                user_id_legit,
-                user_name,
-                admin_id,
-                button_pressed_by,
-                active_user_checks_dict_last3_str,  # Last 3 elements
-                len(active_user_checks_dict),  # Number of elements left
-            )
-        else:
-            LOGGER.info(
-                "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
-                user_id_legit,
-                user_name,
-                admin_id,
-                button_pressed_by,
-                active_user_checks_dict,
-            )
-        return
+    #     # Log that user checks are cancelled by admin
+    #     if len(active_user_checks_dict) > 3:
+    #         active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[
+    #             -3:
+    #         ]
+    #         active_user_checks_dict_last3_str = ", ".join(
+    #             [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
+    #         )
+    #         LOGGER.info(
+    #             "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
+    #             user_id_legit,
+    #             user_name,
+    #             admin_id,
+    #             button_pressed_by,
+    #             active_user_checks_dict_last3_str,  # Last 3 elements
+    #             len(active_user_checks_dict),  # Number of elements left
+    #         )
+    #     else:
+    #         LOGGER.info(
+    #             "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
+    #             user_id_legit,
+    #             user_name,
+    #             admin_id,
+    #             button_pressed_by,
+    #             active_user_checks_dict,
+    #         )
+    #     return
 
     @DP.callback_query_handler(
         # MODIFIED: Renamed callback prefixes and adjusted lambda

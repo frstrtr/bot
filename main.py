@@ -3268,14 +3268,14 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
@@ -4308,7 +4308,7 @@ if __name__ == "__main__":
             )
 
             await message.reply(
-                f"Action taken: User (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Action taken: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )

@@ -899,7 +899,7 @@ async def handle_autoreports(
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
-        f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+        f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
     )
 
     admin_ban_banner = (
@@ -907,7 +907,7 @@ async def handle_autoreports(
         f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
-        f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+        f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
     )
 
     # construct lols check link button
@@ -1194,7 +1194,7 @@ async def check_and_autoban(
             # banned_users_dict[user_id] = user_name
             action = "added to"
         else:
-            action = "is already added to"
+            action = "is already added to"чё
         # if len(banned_users_dict) > 3:  # prevent spamming the log
         #     last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         #     last_3_users_str = ", ".join(
@@ -2584,7 +2584,7 @@ if __name__ == "__main__":
             f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
-            f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+            f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
         )
         # LOGGER.debug("Report banner content:")
         # LOGGER.debug(log_info)
@@ -2595,7 +2595,7 @@ if __name__ == "__main__":
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
-            f"❌ <b>Use /ban {report_id}</b> to take action.\n"
+            f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
         )
 
         # construct lols check link button
@@ -2752,7 +2752,9 @@ if __name__ == "__main__":
                 "Error while sending the banner to the admin group. Please check the logs."
             )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("confirmban_"))  # MODIFIED: Renamed callback prefix
+    @DP.callback_query_handler(
+        lambda c: c.data.startswith("confirmban_")
+    )  # MODIFIED: Renamed callback prefix
     async def ask_confirmation(callback_query: CallbackQuery):
         """Function to ask for confirmation before banning the user."""
         # MODIFIED: Parse user_id and report_id
@@ -2766,10 +2768,12 @@ if __name__ == "__main__":
         keyboard = InlineKeyboardMarkup(row_width=2)
         # MODIFIED: Pass spammer_user_id_str and report_id_to_ban_str, and rename callback prefixes
         confirm_btn = InlineKeyboardButton(
-            "🟢 Confirm", callback_data=f"doban_{spammer_user_id_str}_{report_id_to_ban_str}"
+            "🟢 Confirm",
+            callback_data=f"doban_{spammer_user_id_str}_{report_id_to_ban_str}",
         )
         cancel_btn = InlineKeyboardButton(
-            "🔴 Cancel", callback_data=f"resetban_{spammer_user_id_str}_{report_id_to_ban_str}"
+            "🔴 Cancel",
+            callback_data=f"resetban_{spammer_user_id_str}_{report_id_to_ban_str}",
         )
 
         keyboard.add(confirm_btn, cancel_btn)
@@ -2857,7 +2861,9 @@ if __name__ == "__main__":
                 e,
             )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("doban_"))  # MODIFIED: Renamed callback prefix
+    @DP.callback_query_handler(
+        lambda c: c.data.startswith("doban_")
+    )  # MODIFIED: Renamed callback prefix
     async def handle_ban(callback_query: CallbackQuery):
         """Function to ban the user and delete all known to bot messages."""
 
@@ -2872,7 +2878,9 @@ if __name__ == "__main__":
             # MODIFIED: Parse user_id (author_id_from_callback_str) and report_id_to_ban_str
             parts = callback_query.data.split("_")
             author_id_from_callback_str = parts[1]  # This is the spammer's user_id
-            report_id_to_ban_str = parts[2]  # This is the original report_id (chat_id+message_id combo)
+            report_id_to_ban_str = parts[
+                2
+            ]  # This is the original report_id (chat_id+message_id combo)
 
             report_id_to_ban = int(report_id_to_ban_str)
             # author_id_from_callback = int(author_id_from_callback_str) # Can be used for checks
@@ -2933,7 +2941,7 @@ if __name__ == "__main__":
             #     LOGGER.error("Index error: %s", e)
             #     await callback_query.message.reply("Error: Invalid data format in forwarded message.")
             #     return
-                        # MODIFIED: Use ast.literal_eval for safety
+            # MODIFIED: Use ast.literal_eval for safety
             author_id = ast.literal_eval(forwarded_message_data)[3]
             LOGGER.debug("%s author ID retrieved for original message", author_id)
 
@@ -3320,13 +3328,17 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_ADMIN,
         )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("resetban_"))  # MODIFIED: Renamed callback prefix
+    @DP.callback_query_handler(
+        lambda c: c.data.startswith("resetban_")
+    )  # MODIFIED: Renamed callback prefix
     async def reset_ban(callback_query: CallbackQuery):
         """Function to reset the ban button."""
         # MODIFIED: Parse actual_user_id and original_report_id from callback data
         parts = callback_query.data.split("_")
         actual_user_id_str = parts[1]  # The spammer's actual user ID
-        original_report_id_str = parts[2]  # The original report_id (chat_id+message_id combo)
+        original_report_id_str = parts[
+            2
+        ]  # The original report_id (chat_id+message_id combo)
 
         actual_user_id = int(actual_user_id_str)
         # original_report_id = int(original_report_id_str) # For DB operations if needed, or logging
@@ -4662,13 +4674,19 @@ if __name__ == "__main__":
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user and mark them as legit."""
         try:
-            _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
+            _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = (
+                callback_query.data.split("_")
+            )
             user_id_legit = int(user_id_legit_str)
             orig_chat_id = int(orig_chat_id_str)
             orig_message_id = int(orig_message_id_str)
         except ValueError as e:
-            LOGGER.error(f"Invalid callback data for stop_checks: {callback_query.data}, Error: {e}")
-            await callback_query.answer("Invalid data format for stop_checks.", show_alert=True)
+            LOGGER.error(
+                f"Invalid callback data for stop_checks: {callback_query.data}, Error: {e}"
+            )
+            await callback_query.answer(
+                "Invalid data format for stop_checks.", show_alert=True
+            )
             return
 
         button_pressed_by = callback_query.from_user.username or "!NoAdminName!"
@@ -4679,27 +4697,38 @@ if __name__ == "__main__":
         if isinstance(user_name_data, dict):
             user_name = str(user_name_data.get("username", "!UNDEFINED!")).lstrip("@")
         elif isinstance(user_name_data, str):
-            user_name = user_name_data.lstrip("@") if user_name_data != "None" else "!UNDEFINED!"
-        
+            user_name = (
+                user_name_data.lstrip("@")
+                if user_name_data != "None"
+                else "!UNDEFINED!"
+            )
+
         message_link = construct_message_link([orig_chat_id, orig_message_id, None])
         lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
-        
+
         inline_kb = InlineKeyboardMarkup()
-        inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+        inline_kb.add(
+            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+        )
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=inline_kb, 
+                reply_markup=inline_kb,
             )
         except Exception as e_edit:
-            LOGGER.error(f"Error editing message markup in stop_checks for user {user_id_legit}: {e_edit}")
+            LOGGER.error(
+                f"Error editing message markup in stop_checks for user {user_id_legit}: {e_edit}"
+            )
 
         LOGGER.info(
             "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
-            user_id_legit, user_name, admin_id, button_pressed_by
+            user_id_legit,
+            user_name,
+            admin_id,
+            button_pressed_by,
         )
 
         common_message_text = (
@@ -4722,7 +4751,9 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
             )
         except Exception as e_send:
-            LOGGER.error(f"Error sending notification messages in stop_checks for user {user_id_legit}: {e_send}")
+            LOGGER.error(
+                f"Error sending notification messages in stop_checks for user {user_id_legit}: {e_send}"
+            )
 
         if user_id_legit in active_user_checks_dict:
             del active_user_checks_dict[user_id_legit]
@@ -4731,27 +4762,50 @@ if __name__ == "__main__":
                 if task.get_name() == str(user_id_legit):
                     task.cancel()
                     task_cancelled = True
-                    LOGGER.info(f"Watchdog task for user {user_id_legit} (@{user_name}) cancelled by admin {admin_id}.")
+                    LOGGER.info(
+                        f"Watchdog task for user {user_id_legit} (@{user_name}) cancelled by admin {admin_id}."
+                    )
                     break
             if not task_cancelled:
-                LOGGER.warning(f"Watchdog task for user {user_id_legit} (@{user_name}) not found for cancellation, though user was in active_user_checks_dict.")
-            
+                LOGGER.warning(
+                    f"Watchdog task for user {user_id_legit} (@{user_name}) not found for cancellation, though user was in active_user_checks_dict."
+                )
+
             if len(active_user_checks_dict) > 3:
-                active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[-3:]
-                active_user_checks_dict_last3_str = ", ".join([f"{uid}: {str(uname.get('username', uname) if isinstance(uname, dict) else uname).lstrip('@')}" for uid, uname in active_user_checks_dict_last3_list])
+                active_user_checks_dict_last3_list = list(
+                    active_user_checks_dict.items()
+                )[-3:]
+                active_user_checks_dict_last3_str = ", ".join(
+                    [
+                        f"{uid}: {str(uname.get('username', uname) if isinstance(uname, dict) else uname).lstrip('@')}"
+                        for uid, uname in active_user_checks_dict_last3_list
+                    ]
+                )
                 LOGGER.info(
                     "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
-                    user_id_legit, user_name, admin_id, button_pressed_by, active_user_checks_dict_last3_str, len(active_user_checks_dict)
+                    user_id_legit,
+                    user_name,
+                    admin_id,
+                    button_pressed_by,
+                    active_user_checks_dict_last3_str,
+                    len(active_user_checks_dict),
                 )
             else:
                 LOGGER.info(
                     "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
-                    user_id_legit, user_name, admin_id, button_pressed_by, active_user_checks_dict
+                    user_id_legit,
+                    user_name,
+                    admin_id,
+                    button_pressed_by,
+                    active_user_checks_dict,
                 )
         else:
             LOGGER.info(
                 "%s:@%s was marked legit by %s(%s), but was not found in active_user_checks_dict. Checks might have already completed or been stopped.",
-                user_id_legit, user_name, button_pressed_by, admin_id
+                user_id_legit,
+                user_name,
+                button_pressed_by,
+                admin_id,
             )
 
         try:
@@ -4763,22 +4817,26 @@ if __name__ == "__main__":
                 """,
                 (
                     orig_chat_id,
-                    orig_message_id, 
+                    orig_message_id,
                     user_id_legit,
                     user_name if user_name != "!UNDEFINED!" else None,
-                    None, 
-                    None, 
+                    None,
+                    None,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     1,
                     1,
                 ),
             )
             CONN.commit()
-            LOGGER.info(f"{user_id_legit} (@{user_name}) Recorded/Updated legitimization status in DB, linked to original context {orig_chat_id}/{orig_message_id}.")
+            LOGGER.info(
+                f"{user_id_legit} (@{user_name}) Recorded/Updated legitimization status in DB, linked to original context {orig_chat_id}/{orig_message_id}."
+            )
         except Exception as e_db:
             LOGGER.error(f"{user_id_legit}: {e_db} Error updating DB in stop_checks")
 
-        await callback_query.answer("Checks stopped. User marked as legit.", show_alert=False)
+        await callback_query.answer(
+            "Checks stopped. User marked as legit.", show_alert=False
+        )
 
     @DP.message_handler(
         is_valid_message,
@@ -5198,7 +5256,9 @@ if __name__ == "__main__":
             comand = "canceldelmsg"
         else:
             LOGGER.error(f"Unknown prefix in handle_suspicious_sender: {action_prefix}")
-            await callback_query.answer("Internal error processing action.", show_alert=True)
+            await callback_query.answer(
+                "Internal error processing action.", show_alert=True
+            )
             return
 
         susp_chat_title = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")

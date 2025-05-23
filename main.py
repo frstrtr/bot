@@ -3592,10 +3592,12 @@ if __name__ == "__main__":
             chat_title_safe = html.escape(message.chat.title)
             if message.chat.username:
                 chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{chat_title_safe} (@{message.chat.username})</a>"
-            elif str(message.chat.id).startswith("-100"): # For supergroups and channels
+            elif str(message.chat.id).startswith(
+                "-100"
+            ):  # For supergroups and channels
                 chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{chat_title_safe}</a>"
-            else: # Fallback for other chat types (e.g., basic groups, though less common for this bot's scope)
-                chat_link_html = f"{chat_title_safe}" # Just the title, as direct links can be unreliable
+            else:  # Fallback for other chat types (e.g., basic groups, though less common for this bot's scope)
+                chat_link_html = f"{chat_title_safe}"  # Just the title, as direct links can be unreliable
 
             admin_notification_text = (
                 f"Deleted message link:\n<code>{message_link}</code>\n"
@@ -4745,7 +4747,7 @@ if __name__ == "__main__":
         )
 
         common_message_text = (
-            f"Future checks for <code>{user_id_legit}</code> (@{user_name}) cancelled by @{button_pressed_by}. "
+            f"Future checks for <code>{user_id_legit}</code> (@{user_name}) cancelled by Admin @{button_pressed_by}. "
             f"User marked as legitimate. To re-check, use <code>/check {user_id_legit}</code>."
         )
         try:

@@ -3623,6 +3623,31 @@ if __name__ == "__main__":
                 else None
                 # )
             )
+            rogue_chan_username = (
+                getattr(message.sender_chat, "username", None)
+                if message.sender_chat
+                else (
+                    getattr(message.forward_from_chat, "username", None)
+                    if message.forward_from_chat
+                    else "!UNDEFINED!"
+                )
+            )
+            rogue_chan_name = (
+                message.sender_chat.title
+                if message.sender_chat
+                else (
+                    message.forward_from_chat.title
+                    if message.forward_from_chat
+                    else "!UNDEFINED!"
+                )
+            )
+            escaped_user_name = (
+                html.escape(
+                    message.from_user.first_name
+                ) + html.escape(message.from_user.last_name)
+                if message.from_user.last_name
+                else ""
+                )
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict
                 or rogue_chan_id in banned_users_dict
@@ -3631,9 +3656,9 @@ if __name__ == "__main__":
                 try:
                     # ban spammer in all chats
                     ban_member_task = await check_and_autoban(
-                        f"{message.from_user.id} CHANNELLED a SPAM message from ({rogue_chan_id})",
+                        f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} ({message.from_user.id}) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
                         message.from_user.id,
-                        f"{message.from_user.id} CHANNELLED a SPAM message from ({rogue_chan_id})",
+                        f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
                         (
                             message.from_user.username
                             if message.from_user.username

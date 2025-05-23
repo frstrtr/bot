@@ -3642,18 +3642,49 @@ if __name__ == "__main__":
                 )
             )
             escaped_user_name = (
-                html.escape(
-                    message.from_user.first_name
-                ) + html.escape(message.from_user.last_name)
+                html.escape(message.from_user.first_name)
+                + " "
+                + html.escape(message.from_user.last_name)
                 if message.from_user.last_name
                 else ""
-                )
+            )
             if rogue_chan_id and (
                 message.from_user.id in banned_users_dict
                 or rogue_chan_id in banned_users_dict
                 or await spam_check(message.from_user.id)
             ):
                 try:
+                    # Determine sender/forwarder details
+                    if message.sender_chat:
+                        sender_or_forwarder_title = message.sender_chat.title
+                        sender_or_forwarder_username = message.sender_chat.username
+                        sender_or_forwarder_id = message.sender_chat.id
+                    elif message.forward_from_chat:
+                        sender_or_forwarder_title = message.forward_from_chat.title
+                        sender_or_forwarder_username = (
+                            message.forward_from_chat.username
+                        )
+                        sender_or_forwarder_id = message.forward_from_chat.id
+                    else:
+                        sender_or_forwarder_title = "!NO sender/forwarder chat TITLE!"
+                        sender_or_forwarder_username = "!NONAME!"
+                        sender_or_forwarder_id = "!NO sender/forwarder chat ID!"
+
+                    # Determine the HTML link for the chat where the ban occurred
+                    escaped_chat_title_for_link = html.escape(
+                        message.chat.title, quote=True
+                    )
+                    escaped_chat_title_for_display = html.escape(
+                        message.chat.title
+                    )  # Used when no link is formed
+
+                    if message.chat.username:
+                        banned_in_chat_link_html = f'<a href="https://t.me/{message.chat.username}">{escaped_chat_title_for_link}</a>'
+                    elif str(message.chat.id).startswith("-100"):
+                        chat_id_suffix = str(message.chat.id)[4:]
+                        banned_in_chat_link_html = f'<a href="https://t.me/c/{chat_id_suffix}">{escaped_chat_title_for_link}</a>'
+                    else:
+                        banned_in_chat_link_html = escaped_chat_title_for_display
                     # ban spammer in all chats
                     ban_member_task = await check_and_autoban(
                         f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} ({message.from_user.id}) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
@@ -3711,11 +3742,17 @@ if __name__ == "__main__":
 
                     await asyncio.gather(*tasks)
 
+                    # admin_log_chan_data = (
+                    #     f"Channel <b>___{message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')}___</b> "
+                    #     f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
+                    #     f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>)"
+                    #     f"banned in chat {(f'<a href="https://t.me/{message.chat.username}">{html.escape(message.chat.title, quote=True)}</a>' if message.chat.username else (f'<a href="https://t.me/c/{str(message.chat.id)[4:]}">{html.escape(message.chat.title, quote=True)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
+                    # )
                     admin_log_chan_data = (
-                        f"Channel <b>___{message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')}___</b> "
-                        f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
-                        f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>)"
-                        f"banned in chat {(f'<a href="https://t.me/{message.chat.username}">{html.escape(message.chat.title)}</a>' if message.chat.username else (f'<a href="https://t.me/c/{str(message.chat.id)[4:]}">{html.escape(message.chat.title)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
+                        f"Channel <b>___{sender_or_forwarder_title}___</b> "
+                        f"@{sender_or_forwarder_username} "
+                        f"(<code>{sender_or_forwarder_id}</code>)"
+                        f"banned in chat {banned_in_chat_link_html} (<code>{message.chat.id}</code>)"
                     )
                     log_chan_data = (
                         f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "

@@ -3690,7 +3690,7 @@ if __name__ == "__main__":
                         f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "
                         f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>):"
                         f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
-                        f"banned in chat {message.chat.title} (<code>{message.chat.id}</code>)"
+                        f"banned in chat {(f'<a href=\"https://t.me/{message.chat.username}\">{html.escape(message.chat.title)}</a>' if message.chat.username else (f'<a href=\"https://t.me/c/{str(message.chat.id)[4:]}\">{html.escape(message.chat.title)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
                     )
                     log_chan_data = (
                         f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "

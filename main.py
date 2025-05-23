@@ -3268,7 +3268,7 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report <code>{report_id_to_ban}<code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
@@ -3687,10 +3687,10 @@ if __name__ == "__main__":
                     await asyncio.gather(*tasks)
 
                     admin_log_chan_data = (
-                        f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "
-                        f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>):"
+                        f"Channel <b>___{message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')}___</b> "
                         f"@{(message.sender_chat.username if message.sender_chat else (message.forward_from_chat.username if message.forward_from_chat else '!NONAME!'))} "
-                        f"banned in chat {(f'<a href=\"https://t.me/{message.chat.username}\">{html.escape(message.chat.title)}</a>' if message.chat.username else (f'<a href=\"https://t.me/c/{str(message.chat.id)[4:]}\">{html.escape(message.chat.title)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
+                        f"(<code>{message.sender_chat.id if message.sender_chat else (message.forward_from_chat.id if message.forward_from_chat else '!NO sender/forwarder chat ID!')}</code>)"
+                        f"banned in chat {(f'<a href="https://t.me/{message.chat.username}">{html.escape(message.chat.title)}</a>' if message.chat.username else (f'<a href="https://t.me/c/{str(message.chat.id)[4:]}">{html.escape(message.chat.title)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
                     )
                     log_chan_data = (
                         f"Channel {message.sender_chat.title if message.sender_chat else (message.forward_from_chat.title if message.forward_from_chat else '!NO sender/forwarder chat TITLE!')} "

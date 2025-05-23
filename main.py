@@ -3057,8 +3057,8 @@ if __name__ == "__main__":
             # delete them one by one
             spam_messages_count = len(result)
             bot_info_message = (
-                f"Attempting to delete all messages <b>({spam_messages_count})</b> from <code>{author_id}</code>\n"
-                f"reported by (@{original_spam_message.from_user.username if original_spam_message.from_user.username else '!UNDEFINED!'}):"
+                f"Attempting to delete all messages <b>({spam_messages_count})</b> from @{user_name} (<code>{author_id}</code>)\n"
+                f"action taken by (@{button_pressed_by if button_pressed_by else '!UNDEFINED!'}):"
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,

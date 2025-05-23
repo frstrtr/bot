@@ -1153,7 +1153,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     if user_name and user_name != "!UNDEFINED!":  # exclude noname users
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code>:@{user_name} (907)",
+            f"<code>{_id}</code> @{user_name} (1156)",
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1194,7 +1194,7 @@ async def check_and_autoban(
             # banned_users_dict[user_id] = user_name
             action = "added to"
         else:
-            action = "is already added to"чё
+            action = "is already added to"
         # if len(banned_users_dict) > 3:  # prevent spamming the log
         #     last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         #     last_3_users_str = ", ".join(
@@ -3268,14 +3268,14 @@ if __name__ == "__main__":
             )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}<code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
-                f"Report {report_id_to_ban} action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
@@ -3302,7 +3302,7 @@ if __name__ == "__main__":
                     active_user_checks_dict,
                 )
             LOGGER.info(
-                "\033[95m%s:@%s Report %s action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
+                "\033[95m%s:@%s Report <code>%s</code> action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
                 user_name,
                 report_id_to_ban,
@@ -3589,9 +3589,22 @@ if __name__ == "__main__":
             await BOT.delete_message(message.chat.id, message.message_id)
 
             # Send info to ADMIN_AUTOBAN
+            chat_title_safe = html.escape(message.chat.title)
+            if message.chat.username:
+                chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{chat_title_safe} (@{message.chat.username})</a>"
+            elif str(message.chat.id).startswith("-100"): # For supergroups and channels
+                chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{chat_title_safe}</a>"
+            else: # Fallback for other chat types (e.g., basic groups, though less common for this bot's scope)
+                chat_link_html = f"{chat_title_safe}" # Just the title, as direct links can be unreliable
+
+            admin_notification_text = (
+                f"Deleted message link:\n<code>{message_link}</code>\n"
+                f"Spammer: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
+                f"In chat: {chat_link_html} (<code>{message.chat.id}</code>)"
+            )
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                f"<code>{message_link}</code>\nby @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>)",
+                admin_notification_text,
                 # reply_markup=inline_kb, # Do not send keyboard since autobanned
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
@@ -5437,9 +5450,9 @@ if __name__ == "__main__":
 
         bot_reply_action_message = (
             f"{callback_answer}\n"
-            f"Suspicious user @{susp_user_name}:(<code>{susp_user_id}</code>) "
-            f"<a href='{message_link}'>Message:{message_link}</a>\n"
-            f"Action done by admin @{admin_username}"
+            f"Suspicious user @{susp_user_name} (<code>{susp_user_id}</code>) "
+            f"Message origin: <a href='{message_link}'>{message_link}</a>\n"
+            f"Action done by Admin @{admin_username}"
         )
 
         await BOT.send_message(

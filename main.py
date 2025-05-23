@@ -2325,7 +2325,7 @@ if __name__ == "__main__":
                     joinleft_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                     await BOT.send_message(
                         ADMIN_GROUP_ID,
-                        f"(<code>{inout_userid}</code>) @{inout_username} {escaped_inout_userfirstname} {escaped_inout_userlastname} joined and left {universal_chatlink} in 30 seconds or less. Telefragged at {joinleft_timestamp}...",
+                        f"{escaped_inout_userfirstname} {escaped_inout_userlastname} @{inout_username} (<code>{inout_userid}</code>) joined and left {universal_chatlink} in 30 seconds or less. Telefragged at {joinleft_timestamp}...",
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,

@@ -1345,8 +1345,7 @@ async def check_and_autoban(
         )
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            f"User with ID: {user_id} is not now in the SPAM database but kicked/restricted by admin.\n"
-            + inout_logmessage,
+            inout_logmessage,
             message_thread_id=ADMIN_MANBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,

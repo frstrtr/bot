@@ -1345,7 +1345,8 @@ async def check_and_autoban(
         )
         await BOT.send_message(
             ADMIN_GROUP_ID,
-            inout_logmessage,
+            f"User is not now in the SPAM database\nbut kicked/restricted by Admin or other BOT.\n"
+            + inout_logmessage,
             message_thread_id=ADMIN_MANBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -2131,8 +2132,8 @@ if __name__ == "__main__":
         greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Construct the log message
         inout_logmessage = (
-            f"{escaped_inout_userfirstname} {escaped_inout_userlastname}"
-            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>)\n"
+            f"{escaped_inout_userfirstname} {escaped_inout_userlastname} "
+            f"@{inout_username} (<code>{inout_userid}</code>)\n"
             f"{'❌ -->' if lols_spam is True else '🟢 -->' if lols_spam is False else '❓ '}"
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"

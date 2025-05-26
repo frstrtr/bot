@@ -4810,7 +4810,7 @@ if __name__ == "__main__":
         )
 
         common_message_text = (
-            f"Future checks for <code>{user_id_legit}</code> (@{user_name}) cancelled by Admin @{button_pressed_by}. "
+            f"Future checks for @{user_name} (<code>{user_id_legit}</code>) cancelled by Admin @{button_pressed_by}. "
             f"User marked as legitimate. To re-check, use <code>/check {user_id_legit}</code>."
         )
         try:

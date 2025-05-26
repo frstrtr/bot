@@ -3750,7 +3750,7 @@ if __name__ == "__main__":
                     # )
                     admin_log_chan_data = (
                         f"Channel <b>''{sender_or_forwarder_title}''</b> "
-                        f"@{sender_or_forwarder_username} "
+                        f"{html.escape(message.from_user.first_name)}{f' {html.escape(message.from_user.last_name)}' if message.from_user.last_name else ''} "
                         f"(<code>{sender_or_forwarder_id}</code>) "
                         f"banned in chat {banned_in_chat_link_html} (<code>{message.chat.id}</code>)"
                     )

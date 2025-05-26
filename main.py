@@ -3600,8 +3600,9 @@ if __name__ == "__main__":
                 chat_link_html = f"{chat_title_safe}"  # Just the title, as direct links can be unreliable
 
             admin_notification_text = (
-                f"Deleted message link:\n<code>{message_link}</code>\n"
-                f"Spammer: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
+                f"Deleted message: <code>{message_link}</code>\n"
+                f"{html.escape(message.from_user.first_name)}{f' {html.escape(message.from_user.last_name)}' if message.from_user.last_name else ''} "
+                f"@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
                 f"In chat: {chat_link_html} (<code>{message.chat.id}</code>)"
             )
             await BOT.send_message(

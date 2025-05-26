@@ -3056,9 +3056,10 @@ if __name__ == "__main__":
             result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
             spam_messages_count = len(result)
+            user_name = forwarded_message_data[4] or "!UNDEFINED!"
             bot_info_message = (
                 f"Attempting to delete all messages <b>({spam_messages_count})</b> from @{user_name} (<code>{author_id}</code>)\n"
-                f"action taken by (@{button_pressed_by if button_pressed_by else '!UNDEFINED!'}):"
+                f"action taken by @{button_pressed_by if button_pressed_by else '!UNDEFINED!'}):"
             )
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
@@ -4317,7 +4318,8 @@ if __name__ == "__main__":
                         revoke_messages=True,
                     )
                     LOGGER.debug(
-                        "User %s banned and their messages deleted from chat %s (%s).",
+                        "User (<code>%s</code>)> banned and their messages deleted from chat %s (%s).",
+                        # user_name,
                         author_id,
                         CHANNEL_DICT[chat_id],
                         chat_id,

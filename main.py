@@ -907,7 +907,7 @@ async def handle_autoreports(
         f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
-        f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
+        f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
     )
 
     # construct lols check link button
@@ -2584,7 +2584,7 @@ if __name__ == "__main__":
             f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
-            f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
+            f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
         )
         # LOGGER.debug("Report banner content:")
         # LOGGER.debug(log_info)
@@ -2595,7 +2595,7 @@ if __name__ == "__main__":
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
-            f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
+            f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
         )
 
         # construct lols check link button

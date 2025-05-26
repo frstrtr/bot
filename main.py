@@ -2089,7 +2089,7 @@ if __name__ == "__main__":
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
             # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
-            by_user = f"by {update.from_user.id}:@{by_username}: {by_userfirstname} {by_userlastname}\n"
+            by_user = f"by {by_userfirstname} {by_userlastname} @{by_username} (<code>{update.from_user.id}</code>)\n"
 
         inout_status = update.new_chat_member.status
 

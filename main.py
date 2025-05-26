@@ -2132,8 +2132,8 @@ if __name__ == "__main__":
         greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Construct the log message
         inout_logmessage = (
-            f"<a href='tg://resolve?domain={inout_username}'>@{inout_username}</a> (<code>{inout_userid}</code>): "
-            f"{escaped_inout_userfirstname} {escaped_inout_userlastname}\n"
+            f"{escaped_inout_userfirstname} {escaped_inout_userlastname}"
+            f"@{inout_username} (<code>{inout_userid}</code>)\n"
             f"{'❌ -->' if lols_spam is True else '🟢 -->' if lols_spam is False else '❓ '}"
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"

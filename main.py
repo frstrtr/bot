@@ -899,7 +899,7 @@ async def handle_autoreports(
         f"   └☠️ <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
-        f"❌ <b>Use /ban <code>{report_id}</code></b> to take action.\n"
+        f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
     )
 
     admin_ban_banner = (

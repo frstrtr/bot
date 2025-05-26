@@ -3997,7 +3997,7 @@ if __name__ == "__main__":
             elif user_is_1hr_old and entity_spam_trigger:
                 # this is possibly a spam
                 the_reason = (
-                    f"(<code>{message.from_id}</code>) message sent less then 1 hour after joining the chat and have "
+                    f"(<code>{message.from_id}</code>) sent message less then 1 hour after joining the chat and have "
                     + entity_spam_trigger
                     + " inside"
                 )

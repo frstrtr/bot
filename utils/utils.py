@@ -319,7 +319,7 @@ def format_spam_report(message: types.Message) -> str:
     return _reported_spam
 
 
-def extract_chat_id_and_message_id_from_link(message_link):
+def extract_chat_name_and_message_id_from_link(message_link):
     """Extract chat ID and message ID from a message link."""
     if not str(message_link).startswith("https://t.me/"):
         raise ValueError("Invalid message link format")

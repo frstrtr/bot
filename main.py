@@ -59,7 +59,7 @@ from utils.utils import (
     check_message_for_capital_letters,
     has_custom_emoji_spam,
     format_spam_report,
-    extract_chat_id_and_message_id_from_link,
+    extract_chat_name_and_message_id_from_link,
     get_channel_id_by_name,
     get_channel_name_by_id,
     has_spam_entities,
@@ -4492,36 +4492,83 @@ if __name__ == "__main__":
             # Admin_ID
             admin_id = message.from_user.id
             # Extract the chat ID and message ID from the message link
-            chat_id, message_id = extract_chat_id_and_message_id_from_link(message_link)
-            LOGGER.debug("Chat ID: %s, Message ID: %d", chat_id, message_id)
+            chat_username, message_id = extract_chat_name_and_message_id_from_link(message_link)
+            LOGGER.debug("Chat ID: %s, Message ID: %d", chat_username, message_id)
 
-            # reply to the message # TODO confirm deletion
-            # await message.reply('Are you sure you want to delete the message?')
-
-            if not chat_id or not message_id:
+            if not chat_username or not message_id:
                 raise ValueError("Invalid message link provided.")
+
+            # Fetch user details from the database before deleting the message
+            deleted_message_user_id = None
+            deleted_message_user_name = None
+            deleted_message_user_first_name = None
+            deleted_message_user_last_name = None
+            user_details_log_str = "user details not found in DB"
+
+            try:
+                CURSOR.execute(
+                    """
+                    SELECT user_id, user_name, user_first_name, user_last_name
+                    FROM recent_messages
+                    WHERE chat_username = ? AND message_id = ?
+                    ORDER BY received_date DESC
+                    LIMIT 1
+                    """,
+                    (chat_username, message_id),
+                )
+                result = CURSOR.fetchone()
+
+                if result:
+                    (
+                        deleted_message_user_id,
+                        deleted_message_user_name,
+                        deleted_message_user_first_name,
+                        deleted_message_user_last_name,
+                    ) = result
+                    user_details_log_str = (
+                        f"from user: {html.escape(deleted_message_user_first_name or '')} "
+                        f"{html.escape(deleted_message_user_last_name or '')} "
+                        f"@{deleted_message_user_name or '!NoName!'} "
+                        f"(<code>{deleted_message_user_id}</code>)"
+                    )
+                else:
+                    LOGGER.warning(
+                        "Could not retrieve user details for message %d in chat %s from the database.",
+                        message_id,
+                        chat_username,
+                    )
+            except sqlite3.Error as e_db:
+                LOGGER.error("Database error while fetching user details for deleted message: %s", e_db)
+                user_details_log_str = "DB error fetching user details"
+
 
             try:
                 await message.forward(
                     TECHNOLOG_GROUP_ID,
                 )
-                await BOT.delete_message(chat_id=chat_id, message_id=message_id)
+                await BOT.delete_message(chat_id=chat_username, message_id=message_id)
                 LOGGER.info(
-                    "Message %d deleted from chat %s by admin request",
+                    "%s Message %d deleted from chat %s by admin request. Original message %s",
+                    deleted_message_user_id,
                     message_id,
-                    chat_id,
+                    chat_username,
+                    user_details_log_str.replace('<code>','').replace('</code>','').replace('<b>','').replace('</b>','')
                 )
                 await message.reply(
-                    f"Message {message_id} deleted from chat {chat_id}."
+                    f"Message {message_id} deleted from chat {chat_username}.\n"
+                    f"Original message {user_details_log_str}",
+                    parse_mode="HTML"
                 )
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,
-                    f"{message_link} Message {message_id} deleted from chat {chat_id} by admin <code>{admin_id}</code> request.",
+                    f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
+                    f"Original message {user_details_log_str}",
                     parse_mode="HTML",
                 )
                 await BOT.send_message(
                     ADMIN_GROUP_ID,
-                    f"{message_link} Message {message_id} deleted from chat {chat_id} by admin <code>{admin_id}</code> request.",
+                    f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
+                    f"Original message {user_details_log_str}",
                     parse_mode="HTML",
                     message_thread_id=ADMIN_MANBAN,
                 )
@@ -4530,11 +4577,11 @@ if __name__ == "__main__":
                 LOGGER.error(
                     "Failed to delete message %d in chat %s. Error: %s",
                     message_id,
-                    chat_id,
+                    chat_username,
                     e,
                 )
                 await message.reply(
-                    f"Failed to delete message {message_id} in chat {chat_id}. Error: {e}"
+                    f"Failed to delete message {message_id} in chat {chat_username}. Error: {e}"
                 )
 
         except ValueError as ve:

@@ -1296,7 +1296,7 @@ async def check_and_autoban(
                 # Try to extract user_id from inout_logmessage
                 join_date_str = None
                 db_user_id = int(user_id)
-                # Query for join date/time from recent_messages table
+                # Query for join date/time from recent_messages table (join mark)
                 CURSOR.execute(
                     (
                         "SELECT received_date "
@@ -1313,10 +1313,23 @@ async def check_and_autoban(
                 if result and result[0]:
                     join_date_str = result[0]
                 else:
-                    # user join date/time not found in the database
-                    # and it is before chat creation date
-                    # so we will use a default join date/time
-                    join_date_str = "01-01-2022 00:00:00"
+                    # Try to fetch first message timestamp for user
+                    CURSOR.execute(
+                        (
+                            "SELECT received_date "
+                            "FROM recent_messages "
+                            "WHERE user_id=? "
+                            "ORDER BY received_date ASC "
+                            "LIMIT 1"
+                        ),
+                        (db_user_id,)
+                    )
+                    first_msg = CURSOR.fetchone()
+                    if first_msg and first_msg[0]:
+                        join_date_str = first_msg[0]
+                    else:
+                        # fallback to default
+                        join_date_str = "01-01-2022 00:00:00"
                 # Insert join date/time after clock emoji and before timestamp
                 if join_date_str:
                     # Find the clock emoji and timestamp

@@ -11,6 +11,7 @@ import html
 import tracemalloc  # for memory usage debugging
 import ast
 import aiocron
+import re
 import ast  # evaluate dictionaries safely
 
 import aiohttp
@@ -1290,11 +1291,55 @@ async def check_and_autoban(
             )
             await save_report_file("inout_", "cbm" + event_record)
         else:  # done by bot but not yet detected by lols_cas XXX
+            # fetch user join date and time from database if 🟢 is present
+            if "🟢" in inout_logmessage:
+                # Try to extract user_id from inout_logmessage
+                join_date_str = None
+                db_user_id = int(user_id)
+                # Query for join date/time from recent_messages table
+                CURSOR.execute(
+                    (
+                        "SELECT received_date "
+                        "FROM recent_messages "
+                        "WHERE user_id=? "
+                        "AND new_chat_member IS NOT NULL "
+                        "AND left_chat_member IS NULL "
+                        "ORDER BY received_date DESC "
+                        "LIMIT 1"
+                    ),
+                    (db_user_id,)
+                )
+                result = CURSOR.fetchone()
+                if result and result[0]:
+                    join_date_str = result[0]
+                else:
+                    # user join date/time not found in the database
+                    # and it is before chat creation date
+                    # so we will use a default join date/time
+                    join_date_str = "01-01-2022 00:00:00"
+                # Insert join date/time after clock emoji and before timestamp
+                if join_date_str:
+                    # Find the clock emoji and timestamp
+                    clock_idx = inout_logmessage.find("🕔")
+                    if clock_idx != -1:
+                        # Find the end of the clock emoji (should be right before timestamp)
+                        # Find the next non-space after clock emoji
+                        after_clock = inout_logmessage[clock_idx+1:]
+                        ts_match = re.search(r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock)
+                        if ts_match:
+                            ts_start = clock_idx + 1 + ts_match.start()
+                            # Insert join date/time before timestamp
+                            inout_logmessage = (
+                                inout_logmessage[:ts_start] + f" {join_date_str} --> " + inout_logmessage[ts_start:]
+                            )
+            # modify inout_logmessage (replace logic)
+            inout_logmessage = inout_logmessage.replace(
+                "member", "<i>member</i> --> <b>KICKED</b>", 1
+            ).replace("left", "<i>left</i> --> <b>KICKED</b>", 1)
+            # send message to the admin group
             await BOT.send_message(
                 ADMIN_GROUP_ID,
-                inout_logmessage.replace(
-                    "member", "<i>member</i> --> <b>KICKED</b>", 1
-                ).replace("left", "<i>left</i> --> <b>KICKED</b>", 1),
+                inout_logmessage,
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,

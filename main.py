@@ -406,20 +406,20 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
-            LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
+            # LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
             chat = await BOT.get_chat(rogue_chat_id)
             rogue_chat_name = chat.title
             rogue_chat_username = (
                 chat.username
             )  # May be None if the chat has no username
-            LOGGER.info(
-                "Banned %s @%s(<code><%s></code>) in chat %s",
-                rogue_chat_name,
-                rogue_chat_username,
-                rogue_chat_id,
-                chat_id,
-            )
+            # LOGGER.debug(
+            #     "Banned %s @%s(<code><%s></code>) in chat %s",
+            #     rogue_chat_name,
+            #     rogue_chat_username,
+            #     rogue_chat_id,
+            #     chat_id,
+            # )
         except BadRequest as e:  # if user were Deleted Account while banning
             # chat_name = get_channel_id_by_name(channel_dict, chat_id)
             LOGGER.error(
@@ -430,6 +430,24 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
+    try:
+        # send message to the Technolog group about the ban
+        await BOT.send_message(
+            TECHNOLOG_GROUP_ID,
+            f"{rogue_chat_name} @{rogue_chat_username}(<code><{rogue_chat_id}></code>) banned everywhere.",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            message_thread_id=TECHNO_ADMIN,
+        )
+    except Exception as e:
+        LOGGER.error(
+            "Error sending ban message to Technolog group: %s. Error: %s",
+            TECHNOLOG_GROUP_ID,
+            e,
+        )
+        # If sending the message fails, we still want to continue banning
+        # but log the error for further investigation
+        ban_rogue_chat_everywhere_error = str(e)
 
     # report rogue chat to the p2p server
     await report_spam(rogue_chat_id, LOGGER)

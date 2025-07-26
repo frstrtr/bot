@@ -4756,6 +4756,9 @@ if __name__ == "__main__":
                     LOGGER.error(
                         "Failed to ban channel %d. Error: %s", rogue_chan_id, e
                     )
+                    await message.reply(
+                        f"Failed to ban channel {rogue_chan_id}. Error: {e}"
+                    )
             else:  # action == "unban"
                 try:
                     result, rogue_chan_name, rogue_chan_username = (

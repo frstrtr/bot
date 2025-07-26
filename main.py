@@ -1314,6 +1314,7 @@ async def check_and_autoban(
                 result = CURSOR.fetchone()
                 if result and result[0]:
                     join_date_str = result[0]
+                    LOGGER.info("1/0 Join date found: %s", join_date_str)
                 else:
                     # Try to fetch first message timestamp for user
                     CURSOR.execute(
@@ -1329,6 +1330,7 @@ async def check_and_autoban(
                     first_msg = CURSOR.fetchone()
                     if first_msg and first_msg[0]:
                         join_date_str = first_msg[0]
+                        LOGGER.info("First message date found: %s", join_date_str)
                     else:
                         join_date_str = "01-01-2022 00:00:00"
                 # Format join_date_str to DD-MM-YYYY HH:MM:SS

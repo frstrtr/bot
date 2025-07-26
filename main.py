@@ -3816,9 +3816,10 @@ if __name__ == "__main__":
                     #     f"banned in chat {(f'<a href="https://t.me/{message.chat.username}">{html.escape(message.chat.title, quote=True)}</a>' if message.chat.username else (f'<a href="https://t.me/c/{str(message.chat.id)[4:]}">{html.escape(message.chat.title, quote=True)}</a>' if str(message.chat.id).startswith('-100') else html.escape(message.chat.title)))} (<code>{message.chat.id}</code>)"
                     # )
                     admin_log_chan_data = (
-                        f"Channel <b>''{sender_or_forwarder_title}''</b> "
-                        f"{html.escape(message.from_user.first_name)}{f' {html.escape(message.from_user.last_name)}' if message.from_user.last_name else ''} "
+                        f"Spam from channel <b>''{sender_or_forwarder_title}''</b> @{sender_or_forwarder_username} "
                         f"(<code>{sender_or_forwarder_id}</code>) "
+                        f"forwarded by {html.escape(message.from_user.first_name)}{f' {html.escape(message.from_user.last_name)}' if message.from_user.last_name else ''} "
+                        f"@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>) "
                         f"banned in chat {banned_in_chat_link_html} (<code>{message.chat.id}</code>)"
                     )
                     log_chan_data = (

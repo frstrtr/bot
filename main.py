@@ -1296,10 +1296,9 @@ async def check_and_autoban(
         else:  # done by bot but not yet detected by lols_cas XXX
             # fetch user join date and time from database if 🟢 is present
             if "🟢" in inout_logmessage:
-                # Try to extract user_id from inout_logmessage
                 join_date_str = None
                 db_user_id = int(user_id)
-                # Query for join date/time from recent_messages table (join mark)
+                # Query for first join date/time from recent_messages table (join mark)
                 CURSOR.execute(
                     (
                         "SELECT received_date "
@@ -1307,7 +1306,7 @@ async def check_and_autoban(
                         "WHERE user_id=? "
                         "AND new_chat_member IS NOT NULL "
                         "AND left_chat_member IS NULL "
-                        "ORDER BY received_date DESC "
+                        "ORDER BY received_date ASC "
                         "LIMIT 1"
                     ),
                     (db_user_id,),
@@ -1331,22 +1330,22 @@ async def check_and_autoban(
                     if first_msg and first_msg[0]:
                         join_date_str = first_msg[0]
                     else:
-                        # fallback to default
                         join_date_str = "01-01-2022 00:00:00"
+                # Format join_date_str to DD-MM-YYYY HH:MM:SS
+                try:
+                    join_date_str = datetime.strptime(join_date_str, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M:%S")
+                except Exception as e:
+                    LOGGER.error("Error formatting join date: %s", e)
                 # Insert join date/time after clock emoji and before timestamp
                 if join_date_str:
-                    # Find the clock emoji and timestamp
                     clock_idx = inout_logmessage.find("🕔")
                     if clock_idx != -1:
-                        # Find the end of the clock emoji (should be right before timestamp)
-                        # Find the next non-space after clock emoji
                         after_clock = inout_logmessage[clock_idx + 1 :]
                         ts_match = re.search(
                             r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock
                         )
                         if ts_match:
                             ts_start = clock_idx + 1 + ts_match.start()
-                            # Insert join date/time before timestamp
                             inout_logmessage = (
                                 inout_logmessage[:ts_start]
                                 + f" {join_date_str} --> "

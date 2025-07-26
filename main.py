@@ -1990,12 +1990,24 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
             os.rename(file, f"inout/{file}")
 
     try:
+        def extract_username(uname):
+            if isinstance(uname, dict):
+                # If dict has 'username' key, use it
+                if 'username' in uname:
+                    return f"@{uname['username']}"
+                # Otherwise, join all string values (ignore links/ids)
+                usernames = [str(v) for k, v in uname.items() if k == 'username' or (isinstance(v, str) and not v.startswith('http'))]
+                if usernames:
+                    return f"@{usernames[0]}"
+                # Fallback: show dict as string
+                return str(uname)
+            elif uname and uname != 'None':
+                return f"@{uname}"
+            else:
+                return "!UNDEFINED!"
+
         active_user_checks_list = [
-            (
-                f"<code>{user}</code>:{uname}"
-                if isinstance(uname, dict)
-                else f"<code>{user}</code>:@{uname}"
-            )  # if there were suspicious messages do not put @ in front of the dict
+            f"<code>{user}</code>:{extract_username(uname)}"
             for user, uname in active_user_checks_dict.items()
         ]
         banned_users_list = [

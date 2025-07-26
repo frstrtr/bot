@@ -1917,9 +1917,14 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     return task  # Return the task so the caller can manage it
 
 
-async def log_lists(msg_thread_id=TECHNO_ADMIN):
-    """Function to log the banned users and active user checks lists.
-    : params:: msg_thread_id : int Message Thread ID"""
+async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
+    """
+    Log the banned users and active user checks lists.
+
+    Args:
+        group (int): The group ID to send the log message to. Defaults to TECHNOLOG_GROUP_ID.
+        msg_thread_id (int): The message thread ID to send the log message to. Defaults to TECHNO_ADMIN.
+    """
 
     LOGGER.info(
         "\033[93m%s banned users list: %s\033[0m",
@@ -2019,7 +2024,7 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
         await BOT.send_message(
-            TECHNOLOG_GROUP_ID,
+            group,
             f"Current user checks list: {len(active_user_checks_dict)}",
             message_thread_id=msg_thread_id,
             parse_mode="HTML",
@@ -2028,7 +2033,7 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
         for chunk in active_user_chunks:
             try:
                 await BOT.send_message(
-                    TECHNOLOG_GROUP_ID,
+                    group,
                     f"Active user checks list:\n{chr(10).join(chunk)}",
                     message_thread_id=msg_thread_id,
                     parse_mode="HTML",
@@ -2036,7 +2041,7 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
             except BadRequest as e:
                 LOGGER.error("Error sending active user checks chunk: %s", e)
         await BOT.send_message(
-            TECHNOLOG_GROUP_ID,
+            group,
             f"Current banned users list: {len(banned_users_dict)}",
             message_thread_id=msg_thread_id,
             parse_mode="HTML",
@@ -2045,7 +2050,7 @@ async def log_lists(msg_thread_id=TECHNO_ADMIN):
         for chunk in banned_user_chunks:
             try:
                 await BOT.send_message(
-                    TECHNOLOG_GROUP_ID,
+                    group,
                     f"Banned users list:\n{chr(10).join(chunk)}",
                     message_thread_id=msg_thread_id,
                     parse_mode="HTML",
@@ -4806,7 +4811,7 @@ if __name__ == "__main__":
     @DP.message_handler(commands=["loglists"], chat_id=ADMIN_GROUP_ID)
     async def log_lists_handler(message: types.Message):
         """Function to log active checks and banned users dict."""
-        await log_lists(message.message_thread_id)
+        await log_lists(message.chat.id, message.message_thread_id)
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):

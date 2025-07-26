@@ -1956,7 +1956,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         active_user_checks_list = []
         for user, uname in active_user_checks_dict.items():
             active_user_checks_list.append(
-                f"<code>{user}</code>:{extract_username(uname)}"
+                f"<code>{user}</code>{extract_username(uname)}"
             )
             # If uname is a dict, extract URLs from it
             if isinstance(uname, dict):
@@ -1965,7 +1965,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         active_user_checks_list.append(v)
         # Create a list for banned users with user_id as key and user_name as value
         banned_users_list = [
-            f"<code>{user_id}</code>:@{extract_username(user_name)}"
+            f"<code>{user_id}</code>{extract_username(user_name)}"
             for user_id, user_name in banned_users_dict.items()
         ]
 

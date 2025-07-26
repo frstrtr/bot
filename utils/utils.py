@@ -612,21 +612,26 @@ def extract_username(uname):
         str: The extracted username in the format '@username' or '!UNDEFINED!' if not found.
     """
     
+    def find_username(d):
+        if isinstance(d, dict):
+            # Direct username key
+            username = d.get('username', None)
+            if username is not None and username != 'None' and username != '' and username != '!UNDEFINED!':
+                return username
+            # Search nested dicts
+            for v in d.values():
+                if isinstance(v, dict):
+                    nested = find_username(v)
+                    if nested is not None and nested != 'None' and nested != '' and nested != '!UNDEFINED!':
+                        return nested
+        return None
+
     if isinstance(uname, dict):
-        # If dict has 'username' key, use it
-        if 'username' in uname:
-            if uname['username'] is None or uname['username'] == 'None':
-                return "!UNDEFINED!"
-            return f"@{uname['username']}"
-        # Otherwise, join all string values (ignore links/ids)
-        usernames = [str(v) for k, v in uname.items() if k == 'username' or (isinstance(v, str) and not v.startswith('http'))]
-        if usernames:
-            if usernames[0] is None or usernames[0] == 'None':
-                return "!UNDEFINED!"
-            return f"@{usernames[0]}"
-        # Fallback: show dict as string
-        return str(uname)
-    elif uname and uname != 'None' and uname is not None:
-        return f"@{uname}"
+        username = find_username(uname)
+        if username is None:
+            return '!UNDEFINED!'
+        return f'@{username}'
+    elif uname is None or uname == 'None' or uname == '' or uname == '!UNDEFINED!':
+        return '!UNDEFINED!'
     else:
-        return "!UNDEFINED!"
+        return f'@{uname}'

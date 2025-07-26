@@ -402,17 +402,19 @@ async def on_startup(_dp: Dispatcher):
 async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
     """ban chat sender chat for Rogue channels"""
     ban_rogue_chat_everywhere_error = None
+    chat = await BOT.get_chat(rogue_chat_id)
+    rogue_chat_name = chat.title
+    rogue_chat_username = (
+        chat.username if chat.username else "!ROGUECHAT!"
+    )
 
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
             # LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
-            chat = await BOT.get_chat(rogue_chat_id)
-            rogue_chat_name = chat.title
-            rogue_chat_username = (
-                chat.username
-            )  # May be None if the chat has no username
+
+            # May be None if the chat has no username
             # LOGGER.debug(
             #     "Banned %s @%s(<code><%s></code>) in chat %s",
             #     rogue_chat_name,
@@ -430,7 +432,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             )
             ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
-        
+
     # report rogue chat to the p2p server
     await report_spam(rogue_chat_id, LOGGER)
     await BOT.send_message(

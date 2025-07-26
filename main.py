@@ -2041,6 +2041,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         header + chr(10).join(chunk),
                         message_thread_id=msg_thread_id,
                         parse_mode="HTML",
+                        disable_web_page_preview=True,
                     )
                 except BadRequest as e:
                     LOGGER.error("Error sending active user checks chunk: %s", e)
@@ -2050,7 +2051,6 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 "No active user checks at the moment.",
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",
-                disable_web_page_preview=True,
             )
 
         # Send banned users list

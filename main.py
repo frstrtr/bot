@@ -2027,19 +2027,18 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
-        # Send first chunk with the number of current user checks
+        # Send active user checks list
         if active_user_chunks:
-            active_user_chunks[0] = (
-                f"Active user checks list ({len(active_user_checks_dict)}):"
-                + active_user_chunks[0]
-                + "\n"
-            )
-            # Send active user checks list in chunks
-            for chunk in active_user_chunks:
+            for i, chunk in enumerate(active_user_chunks):
+                header = (
+                    f"Active user checks list ({len(active_user_checks_dict)}):\n"
+                    if i == 0
+                    else "Active user checks list (continued):\n"
+                )
                 try:
                     await BOT.send_message(
                         group,
-                        f"Active user checks list:\n{chr(10).join(chunk)}",
+                        header + chr(10).join(chunk),
                         message_thread_id=msg_thread_id,
                         parse_mode="HTML",
                     )
@@ -2053,18 +2052,19 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 parse_mode="HTML",
                 disable_web_page_preview=True,
             )
+
+        # Send banned users list
         if banned_user_chunks:
-            banned_user_chunks[0] = (
-                f"Banned users list ({len(banned_users_dict)}):"
-                + banned_user_chunks[0]
-                + "\n"
-            )
-            # Send banned users list in chunks
-            for chunk in banned_user_chunks:
+            for i, chunk in enumerate(banned_user_chunks):
+                header = (
+                    f"Banned users list ({len(banned_users_dict)}):\n"
+                    if i == 0
+                    else "Banned users list (continued):\n"
+                )
                 try:
                     await BOT.send_message(
                         group,
-                        f"Banned users list:\n{chr(10).join(chunk)}",
+                        header + chr(10).join(chunk),
                         message_thread_id=msg_thread_id,
                         parse_mode="HTML",
                         disable_web_page_preview=True,

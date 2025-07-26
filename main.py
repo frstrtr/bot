@@ -437,7 +437,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     await report_spam(rogue_chat_id, LOGGER)
     await BOT.send_message(
         TECHNOLOG_GROUP_ID,
-        f"{rogue_chat_name} @{rogue_chat_username}(<code><{rogue_chat_id}></code>) reported to P2P spamcheck server.",
+        f"Channel {rogue_chat_name} @{rogue_chat_username}(<code>{rogue_chat_id}</code>) reported to P2P spamcheck server.",
         parse_mode="HTML",
         disable_web_page_preview=True,
         message_thread_id=TECHNO_ADMIN,

@@ -2030,7 +2030,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         # Send first chunk with the number of current user checks
         if active_user_chunks:
             active_user_chunks[0] = (
-                [f"Active user checks list ({len(active_user_checks_dict)}):"]
+                f"Active user checks list ({len(active_user_checks_dict)}):"
                 + active_user_chunks[0]
                 + "\n"
             )
@@ -2055,7 +2055,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
             )
         if banned_user_chunks:
             banned_user_chunks[0] = (
-                [f"Banned users list ({len(banned_users_dict)}):"]
+                f"Banned users list ({len(banned_users_dict)}):"
                 + banned_user_chunks[0]
                 + "\n"
             )

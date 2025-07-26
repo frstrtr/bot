@@ -1307,7 +1307,7 @@ async def check_and_autoban(
                         "ORDER BY received_date DESC "
                         "LIMIT 1"
                     ),
-                    (db_user_id,)
+                    (db_user_id,),
                 )
                 result = CURSOR.fetchone()
                 if result and result[0]:
@@ -1322,7 +1322,7 @@ async def check_and_autoban(
                             "ORDER BY received_date ASC "
                             "LIMIT 1"
                         ),
-                        (db_user_id,)
+                        (db_user_id,),
                     )
                     first_msg = CURSOR.fetchone()
                     if first_msg and first_msg[0]:
@@ -1337,13 +1337,17 @@ async def check_and_autoban(
                     if clock_idx != -1:
                         # Find the end of the clock emoji (should be right before timestamp)
                         # Find the next non-space after clock emoji
-                        after_clock = inout_logmessage[clock_idx+1:]
-                        ts_match = re.search(r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock)
+                        after_clock = inout_logmessage[clock_idx + 1 :]
+                        ts_match = re.search(
+                            r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock
+                        )
                         if ts_match:
                             ts_start = clock_idx + 1 + ts_match.start()
                             # Insert join date/time before timestamp
                             inout_logmessage = (
-                                inout_logmessage[:ts_start] + f" {join_date_str} --> " + inout_logmessage[ts_start:]
+                                inout_logmessage[:ts_start]
+                                + f" {join_date_str} --> "
+                                + inout_logmessage[ts_start:]
                             )
             # modify inout_logmessage (replace logic)
             inout_logmessage = inout_logmessage.replace(
@@ -2023,11 +2027,13 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
-       # Send first chunk with the number of current user checks
+        # Send first chunk with the number of current user checks
         if active_user_chunks:
-            active_user_chunks[0] = [
-                f"Active user checks list ({len(active_user_checks_dict)}):"
-            ] + active_user_chunks[0]+"\n"
+            active_user_chunks[0] = (
+                [f"Active user checks list ({len(active_user_checks_dict)}):"]
+                + active_user_chunks[0]
+                + "\n"
+            )
             # Send active user checks list in chunks
             for chunk in active_user_chunks:
                 try:
@@ -2048,9 +2054,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 disable_web_page_preview=True,
             )
         if banned_user_chunks:
-            banned_user_chunks[0] = [
-                f"Banned users list ({len(banned_users_dict)}):"
-            ] + banned_user_chunks[0] + "\n"
+            banned_user_chunks[0] = (
+                [f"Banned users list ({len(banned_users_dict)}):"]
+                + banned_user_chunks[0]
+                + "\n"
+            )
             # Send banned users list in chunks
             for chunk in banned_user_chunks:
                 try:
@@ -4571,7 +4579,9 @@ if __name__ == "__main__":
             # Admin_ID
             admin_id = message.from_user.id
             # Extract the chat ID and message ID from the message link
-            chat_username, message_id = extract_chat_name_and_message_id_from_link(message_link)
+            chat_username, message_id = extract_chat_name_and_message_id_from_link(
+                message_link
+            )
             LOGGER.debug("Chat ID: %s, Message ID: %d", chat_username, message_id)
 
             if not chat_username or not message_id:
@@ -4617,9 +4627,11 @@ if __name__ == "__main__":
                         chat_username,
                     )
             except sqlite3.Error as e_db:
-                LOGGER.error("Database error while fetching user details for deleted message: %s", e_db)
+                LOGGER.error(
+                    "Database error while fetching user details for deleted message: %s",
+                    e_db,
+                )
                 user_details_log_str = "DB error fetching user details"
-
 
             try:
                 await message.forward(
@@ -4631,12 +4643,15 @@ if __name__ == "__main__":
                     deleted_message_user_id,
                     message_id,
                     chat_username,
-                    user_details_log_str.replace('<code>','').replace('</code>','').replace('<b>','').replace('</b>','')
+                    user_details_log_str.replace("<code>", "")
+                    .replace("</code>", "")
+                    .replace("<b>", "")
+                    .replace("</b>", ""),
                 )
                 await message.reply(
                     f"Message {message_id} deleted from chat {chat_username}.\n"
                     f"Original message {user_details_log_str}",
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
                 await BOT.send_message(
                     TECHNOLOG_GROUP_ID,

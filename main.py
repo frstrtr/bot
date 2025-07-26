@@ -1306,10 +1306,12 @@ async def check_and_autoban(
                     )
                     if ts_match:
                         ts_start = clock_idx + 1 + ts_match.start()
+                        join_ts = inout_logmessage[ts_start:ts_start+19]  # DD-MM-YYYY HH:MM:SS
+                        # Replace so order is JOIN_TIMESTAMP --> TODAY_TIMESTAMP
                         inout_logmessage = (
                             inout_logmessage[:ts_start]
-                            + f" --> {current_ts} "
-                            + inout_logmessage[ts_start:]
+                            + f" {join_ts} --> {current_ts} "
+                            + inout_logmessage[ts_start+19:]
                         )
             # modify inout_logmessage (replace logic)
             inout_logmessage = inout_logmessage.replace(

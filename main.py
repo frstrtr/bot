@@ -2023,40 +2023,53 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
-        await BOT.send_message(
-            group,
-            f"Current user checks list: {len(active_user_checks_dict)}",
-            message_thread_id=msg_thread_id,
-            parse_mode="HTML",
-        )
-        # Send active user checks list in chunks
-        for chunk in active_user_chunks:
-            try:
-                await BOT.send_message(
-                    group,
-                    f"Active user checks list:\n{chr(10).join(chunk)}",
-                    message_thread_id=msg_thread_id,
-                    parse_mode="HTML",
-                )
-            except BadRequest as e:
-                LOGGER.error("Error sending active user checks chunk: %s", e)
-        await BOT.send_message(
-            group,
-            f"Current banned users list: {len(banned_users_dict)}",
-            message_thread_id=msg_thread_id,
-            parse_mode="HTML",
-        )
-        # Send banned users list in chunks
-        for chunk in banned_user_chunks:
-            try:
-                await BOT.send_message(
-                    group,
-                    f"Banned users list:\n{chr(10).join(chunk)}",
-                    message_thread_id=msg_thread_id,
-                    parse_mode="HTML",
-                )
-            except BadRequest as e:
-                LOGGER.error("Error sending banned users chunk: %s", e)
+       # Send first chunk with the number of current user checks
+        if active_user_chunks:
+            active_user_chunks[0] = [
+                f"Active user checks list ({len(active_user_checks_dict)}):"
+            ] + active_user_chunks[0]+"\n"
+            # Send active user checks list in chunks
+            for chunk in active_user_chunks:
+                try:
+                    await BOT.send_message(
+                        group,
+                        f"Active user checks list:\n{chr(10).join(chunk)}",
+                        message_thread_id=msg_thread_id,
+                        parse_mode="HTML",
+                    )
+                except BadRequest as e:
+                    LOGGER.error("Error sending active user checks chunk: %s", e)
+        else:
+            await BOT.send_message(
+                group,
+                "No active user checks at the moment.",
+                message_thread_id=msg_thread_id,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+        if banned_user_chunks:
+            banned_user_chunks[0] = [
+                f"Banned users list ({len(banned_users_dict)}):"
+            ] + banned_user_chunks[0] + "\n"
+            # Send banned users list in chunks
+            for chunk in banned_user_chunks:
+                try:
+                    await BOT.send_message(
+                        group,
+                        f"Banned users list:\n{chr(10).join(chunk)}",
+                        message_thread_id=msg_thread_id,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+                except BadRequest as e:
+                    LOGGER.error("Error sending banned users chunk: %s", e)
+        else:
+            await BOT.send_message(
+                group,
+                "No banned users at the moment.",
+                message_thread_id=msg_thread_id,
+                parse_mode="HTML",
+            )
     except BadRequest as e:
         LOGGER.error("Error sending active_user_checks_dict: %s", e)
 

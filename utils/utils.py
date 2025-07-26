@@ -579,3 +579,50 @@ async def report_spam_from_message(message: types.Message, logger, userid_toexcl
 #     """Function to get the spam report link"""
 #     # Replace with the actual URL of your local P2P spamcheck server
 #     url = f"http://localhost:5000/report_spam/{spammer_id}"
+
+
+# Function to split lists into chunks
+def split_list(lst, max_length):
+    """Split a list into chunks that do not exceed max_length.
+    Args:
+        lst (list): The list to split.
+        max_length (int): The maximum length of each chunk.
+    Yields:
+        list: A chunk of the list."""
+    
+    chunk = []
+    current_length = 0
+    for item in lst:
+        item_length = len(item) + 1  # +1 for the space
+        if current_length + item_length > max_length:
+            yield chunk
+            chunk = []
+            current_length = 0
+        chunk.append(item)
+        current_length += item_length
+    if chunk:
+        yield chunk
+
+
+def extract_username(uname):
+    """Extract username from various formats.
+    Args:
+        uname (str or dict): The username to extract, can be a string or a dictionary.
+    Returns:
+        str: The extracted username in the format '@username' or '!UNDEFINED!' if not found.
+    """
+    
+    if isinstance(uname, dict):
+        # If dict has 'username' key, use it
+        if 'username' in uname:
+            return f"@{uname['username']}"
+        # Otherwise, join all string values (ignore links/ids)
+        usernames = [str(v) for k, v in uname.items() if k == 'username' or (isinstance(v, str) and not v.startswith('http'))]
+        if usernames:
+            return f"@{usernames[0]}"
+        # Fallback: show dict as string
+        return str(uname)
+    elif uname and uname != 'None':
+        return f"@{uname}"
+    else:
+        return "!UNDEFINED!"

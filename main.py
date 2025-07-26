@@ -72,6 +72,8 @@ from utils.utils import (
     check_user_legit,
     report_spam,
     report_spam_from_message,
+    split_list,
+    extract_username,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -1990,22 +1992,6 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
             os.rename(file, f"inout/{file}")
 
     try:
-        def extract_username(uname):
-            if isinstance(uname, dict):
-                # If dict has 'username' key, use it
-                if 'username' in uname:
-                    return f"@{uname['username']}"
-                # Otherwise, join all string values (ignore links/ids)
-                usernames = [str(v) for k, v in uname.items() if k == 'username' or (isinstance(v, str) and not v.startswith('http'))]
-                if usernames:
-                    return f"@{usernames[0]}"
-                # Fallback: show dict as string
-                return str(uname)
-            elif uname and uname != 'None':
-                return f"@{uname}"
-            else:
-                return "!UNDEFINED!"
-
         active_user_checks_list = [
             f"<code>{user}</code>:{extract_username(uname)}"
             for user, uname in active_user_checks_dict.items()
@@ -2014,21 +2000,6 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
             f"<code>{user_id}</code>:@{user_name}"
             for user_id, user_name in banned_users_dict.items()
         ]
-
-        # Function to split lists into chunks
-        def split_list(lst, max_length):
-            chunk = []
-            current_length = 0
-            for item in lst:
-                item_length = len(item) + 1  # +1 for the space
-                if current_length + item_length > max_length:
-                    yield chunk
-                    chunk = []
-                    current_length = 0
-                chunk.append(item)
-                current_length += item_length
-            if chunk:
-                yield chunk
 
         # Split lists into chunks
         max_message_length = (

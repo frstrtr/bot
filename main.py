@@ -490,10 +490,11 @@ async def load_banned_users():
 
     with open(banned_users_filename, "r", encoding="utf-8") as file:
         for line in file:
-            user_id, user_name = (
-                int(line.strip().split(":")[0]),
-                line.strip().split(":")[1],
+            user_id, user_name_repr = (
+                int(line.strip().split(":", 1)[0]),
+                line.strip().split(":", 1)[1],
             )
+            user_name = ast.literal_eval(user_name_repr)
             banned_users_dict[user_id] = user_name
         LOGGER.info(
             "\033[91mBanned users dict (%s) loaded from file: %s\033[0m",
@@ -659,11 +660,11 @@ async def on_shutdown(_dp):
     if os.path.exists(banned_users_filename) and banned_users_dict:
         with open(banned_users_filename, "a", encoding="utf-8") as file:
             for _id, _uname in banned_users_dict.items():
-                file.write(f"{_id}:{_uname}\n")
+                file.write(f"{_id}:{repr(_uname)}\n")
     elif banned_users_dict:
         with open(banned_users_filename, "w", encoding="utf-8") as file:
             for _id, _uname in banned_users_dict.items():
-                file.write(f"{_id}:{_uname}\n")
+                file.write(f"{_id}:{repr(_uname)}\n")
 
     # Signal that shutdown tasks are completed
     # shutdown_event.set()
@@ -1933,12 +1934,12 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
     """
 
     LOGGER.info(
-        "\033[93m%s banned users list: %s\033[0m",
+        "\033[93m%s banned users dict: %s\033[0m",
         len(banned_users_dict),
         banned_users_dict,
     )
     LOGGER.info(
-        "\033[93m%s Active user checks list: %s\033[0m",
+        "\033[93m%s Active user checks dict: %s\033[0m",
         len(active_user_checks_dict),
         active_user_checks_dict,
     )
@@ -2010,13 +2011,13 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         )
         banned_user_chunks = list(split_list(banned_users_list, max_message_length))
 
-        # Send active user checks list
+        # Send active user checks dict
         if active_user_chunks:
             for i, chunk in enumerate(active_user_chunks):
                 header = (
-                    f"Active user checks list ({len(active_user_checks_dict)}):\n"
+                    f"Active user checks dict ({len(active_user_checks_dict)}):\n"
                     if i == 0
-                    else "Active user checks list (continued):\n"
+                    else "Active user checks dict (continued):\n"
                 )
                 try:
                     await BOT.send_message(
@@ -2036,13 +2037,13 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 parse_mode="HTML",
             )
 
-        # Send banned users list
+        # Send banned users dict
         if banned_user_chunks:
             for i, chunk in enumerate(banned_user_chunks):
                 header = (
-                    f"Banned users list ({len(banned_users_dict)}):\n"
+                    f"Banned users dict ({len(banned_users_dict)}):\n"
                     if i == 0
-                    else "Banned users list (continued):\n"
+                    else "Banned users dict (continued):\n"
                 )
                 try:
                     await BOT.send_message(

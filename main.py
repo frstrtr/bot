@@ -406,8 +406,20 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
-            # LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
+            LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
+            chat = await BOT.get_chat(rogue_chat_id)
+            rogue_chat_name = chat.title
+            rogue_chat_username = (
+                chat.username
+            )  # May be None if the chat has no username
+            LOGGER.info(
+                "Banned %s @%s(<code><%s></code>) in chat %s",
+                rogue_chat_name,
+                rogue_chat_username,
+                rogue_chat_id,
+                chat_id,
+            )
         except BadRequest as e:  # if user were Deleted Account while banning
             # chat_name = get_channel_id_by_name(channel_dict, chat_id)
             LOGGER.error(
@@ -1306,12 +1318,14 @@ async def check_and_autoban(
                     )
                     if ts_match:
                         ts_start = clock_idx + 1 + ts_match.start()
-                        join_ts = inout_logmessage[ts_start:ts_start+19]  # DD-MM-YYYY HH:MM:SS
+                        join_ts = inout_logmessage[
+                            ts_start : ts_start + 19
+                        ]  # DD-MM-YYYY HH:MM:SS
                         # Replace so order is JOIN_TIMESTAMP --> TODAY_TIMESTAMP
                         inout_logmessage = (
                             inout_logmessage[:ts_start]
                             + f" {join_ts} --> {current_ts} "
-                            + inout_logmessage[ts_start+19:]
+                            + inout_logmessage[ts_start + 19 :]
                         )
             # modify inout_logmessage (replace logic)
             inout_logmessage = inout_logmessage.replace(

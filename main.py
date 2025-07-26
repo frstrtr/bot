@@ -1296,63 +1296,21 @@ async def check_and_autoban(
         else:  # done by bot but not yet detected by lols_cas XXX
             # fetch user join date and time from database if 🟢 is present
             if "🟢" in inout_logmessage:
-                join_date_str = None
-                db_user_id = int(user_id)
-                # Query for first join date/time from recent_messages table (join mark)
-                CURSOR.execute(
-                    (
-                        "SELECT received_date "
-                        "FROM recent_messages "
-                        "WHERE user_id=? "
-                        "AND new_chat_member IS NOT NULL "
-                        "AND left_chat_member IS NULL "
-                        "ORDER BY received_date ASC "
-                        "LIMIT 1"
-                    ),
-                    (db_user_id,),
-                )
-                result = CURSOR.fetchone()
-                if result and result[0]:
-                    join_date_str = result[0]
-                    LOGGER.info("1/0 Join date found: %s", join_date_str)
-                else:
-                    # Try to fetch first message timestamp for user
-                    CURSOR.execute(
-                        (
-                            "SELECT received_date "
-                            "FROM recent_messages "
-                            "WHERE user_id=? "
-                            "ORDER BY received_date ASC "
-                            "LIMIT 1"
-                        ),
-                        (db_user_id,),
+                # Insert current timestamp after clock emoji and before timestamp, no DB query needed
+                current_ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                clock_idx = inout_logmessage.find("🕔")
+                if clock_idx != -1:
+                    after_clock = inout_logmessage[clock_idx + 1 :]
+                    ts_match = re.search(
+                        r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock
                     )
-                    first_msg = CURSOR.fetchone()
-                    if first_msg and first_msg[0]:
-                        join_date_str = first_msg[0]
-                        LOGGER.info("First message date found: %s", join_date_str)
-                    else:
-                        join_date_str = "01-01-2022 00:00:00"
-                # Format join_date_str to DD-MM-YYYY HH:MM:SS
-                try:
-                    join_date_str = datetime.strptime(join_date_str, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M:%S")
-                except Exception as e:
-                    LOGGER.error("Error formatting join date: %s", e)
-                # Insert join date/time after clock emoji and before timestamp
-                if join_date_str:
-                    clock_idx = inout_logmessage.find("🕔")
-                    if clock_idx != -1:
-                        after_clock = inout_logmessage[clock_idx + 1 :]
-                        ts_match = re.search(
-                            r"\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}", after_clock
+                    if ts_match:
+                        ts_start = clock_idx + 1 + ts_match.start()
+                        inout_logmessage = (
+                            inout_logmessage[:ts_start]
+                            + f" --> {current_ts} "
+                            + inout_logmessage[ts_start:]
                         )
-                        if ts_match:
-                            ts_start = clock_idx + 1 + ts_match.start()
-                            inout_logmessage = (
-                                inout_logmessage[:ts_start]
-                                + f" {join_date_str} --> "
-                                + inout_logmessage[ts_start:]
-                            )
             # modify inout_logmessage (replace logic)
             inout_logmessage = inout_logmessage.replace(
                 "member", "<i>member</i> --> <b>KICKED</b>", 1

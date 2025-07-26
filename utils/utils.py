@@ -615,14 +615,18 @@ def extract_username(uname):
     if isinstance(uname, dict):
         # If dict has 'username' key, use it
         if 'username' in uname:
+            if uname['username'] is None or uname['username'] == 'None':
+                return "!UNDEFINED!"
             return f"@{uname['username']}"
         # Otherwise, join all string values (ignore links/ids)
         usernames = [str(v) for k, v in uname.items() if k == 'username' or (isinstance(v, str) and not v.startswith('http'))]
         if usernames:
+            if usernames[0] is None or usernames[0] == 'None':
+                return "!UNDEFINED!"
             return f"@{usernames[0]}"
         # Fallback: show dict as string
         return str(uname)
-    elif uname and uname != 'None':
+    elif uname and uname != 'None' and uname is not None:
         return f"@{uname}"
     else:
         return "!UNDEFINED!"

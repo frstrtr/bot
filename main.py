@@ -2374,7 +2374,7 @@ if __name__ == "__main__":
                     and last2_join_left_event[1][1] == 1
                 ):
                     LOGGER.debug(
-                        "%s:@%s joined and left %s in 1 minute or less",
+                        "%s:@%s joined and left %s in 30 seconds or less",
                         inout_userid,
                         inout_username,
                         inout_chattitle,

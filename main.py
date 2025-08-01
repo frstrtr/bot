@@ -2210,9 +2210,9 @@ if __name__ == "__main__":
         )
 
         lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-        )
+        inline_kb = InlineKeyboardMarkup()
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
+        inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{inout_userid}"))
 
         await BOT.send_message(
             TECHNOLOG_GROUP,
@@ -3453,6 +3453,182 @@ if __name__ == "__main__":
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("banuser_"))
+    async def ask_ban_confirmation(callback_query: CallbackQuery):
+        """Function to ask for confirmation before banning the user from all chats."""
+        # Parse user_id from callback data
+        parts = callback_query.data.split("_")
+        user_id_str = parts[1]
+        user_id = int(user_id_str)
+
+        # Get user info for display
+        try:
+            user_info = await BOT.get_chat(user_id)
+            username = user_info.username or "!UNDEFINED!"
+            first_name = user_info.first_name or ""
+            last_name = user_info.last_name or ""
+            display_name = f"{first_name} {last_name}".strip() or username
+        except:
+            username = "!UNDEFINED!"
+            display_name = "Unknown User"
+
+        keyboard = InlineKeyboardMarkup(row_width=2)
+        confirm_btn = InlineKeyboardButton(
+            "✅ Yes, Ban", callback_data=f"confirmbanuser_{user_id_str}"
+        )
+        cancel_btn = InlineKeyboardButton(
+            "❌ No, Cancel", callback_data=f"cancelbanuser_{user_id_str}"
+        )
+        keyboard.add(confirm_btn, cancel_btn)
+
+        # Edit the message to show confirmation
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            reply_markup=keyboard,
+        )
+
+        # Send confirmation message
+        await callback_query.answer(
+            f"Confirm ban for {display_name} (@{username})?", show_alert=True
+        )
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("confirmbanuser_"))
+    async def handle_user_ban(callback_query: CallbackQuery):
+        """Function to ban the user from all chats."""
+        # Parse user_id from callback data
+        parts = callback_query.data.split("_")
+        user_id_str = parts[1]
+        user_id = int(user_id_str)
+        
+        button_pressed_by = callback_query.from_user.username or "!UNDEFINED!"
+        admin_id = callback_query.from_user.id
+
+        # Remove buttons
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+        )
+
+        try:
+            # Get user info
+            try:
+                user_info = await BOT.get_chat(user_id)
+                username = user_info.username or "!UNDEFINED!"
+                first_name = user_info.first_name or ""
+                last_name = user_info.last_name or ""
+            except:
+                username = "!UNDEFINED!"
+                first_name = "Unknown"
+                last_name = "User"
+
+            # Remove from active checks if present
+            if user_id in active_user_checks_dict:
+                banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+                LOGGER.info(
+                    "%s:@%s removed from active_user_checks_dict during manual ban",
+                    user_id, username
+                )
+
+            # Ban user from all chats
+            await ban_user_from_all_chats(user_id, username, CHANNEL_IDS, CHANNEL_DICT)
+            
+            # Add to banned users dict
+            banned_users_dict[user_id] = username
+
+            # Create event record
+            event_record = (
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                f"{user_id:<10} "
+                f"❌  @{username} {first_name} {last_name}            "
+                f" member          --> kicked          in "
+                f"ALL_CHATS                          by @{button_pressed_by}\n"
+            )
+            await save_report_file("inout_", "mbn" + event_record)
+
+            # Report to spam servers
+            await report_spam(user_id, LOGGER)
+
+            # Create response message
+            lols_url = f"https://t.me/oLolsBot?start={user_id}"
+            lols_check_kb = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+            )
+
+            ban_message = (
+                f"Manual ban completed by @{button_pressed_by}:\n"
+                f"User @{username} ({first_name} {last_name}) <code>{user_id}</code> "
+                f"banned from all monitored chats and reported to spam servers."
+            )
+
+            # Send to technolog group
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                ban_message,
+                parse_mode="HTML",
+                reply_markup=lols_check_kb,
+                message_thread_id=TECHNO_ADMIN,
+            )
+
+            # Send to admin group
+            await BOT.send_message(
+                ADMIN_GROUP_ID,
+                ban_message,
+                parse_mode="HTML",
+                reply_markup=lols_check_kb,
+                message_thread_id=ADMIN_MANBAN,
+            )
+
+            # Log username if available
+            if username and username != "!UNDEFINED!":
+                await BOT.send_message(
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{user_id}</code>:@{username} (manual)",
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
+
+            LOGGER.info(
+                "\033[91m%s:@%s manually banned from all chats by @%s\033[0m",
+                user_id, username, button_pressed_by
+            )
+
+            await callback_query.answer("User banned successfully!", show_alert=True)
+
+        except Exception as e:
+            error_msg = f"Error banning user {user_id}: {str(e)}"
+            LOGGER.error(error_msg)
+            await callback_query.answer(f"Error: {str(e)}", show_alert=True)
+            
+            await BOT.send_message(
+                TECHNOLOG_GROUP_ID,
+                f"❌ {error_msg}",
+                parse_mode="HTML",
+                message_thread_id=TECHNO_ADMIN,
+            )
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("cancelbanuser_"))
+    async def cancel_user_ban(callback_query: CallbackQuery):
+        """Function to cancel the ban and restore original buttons."""
+        # Parse user_id from callback data
+        parts = callback_query.data.split("_")
+        user_id_str = parts[1]
+        user_id = int(user_id_str)
+
+        # Restore original buttons
+        lols_url = f"https://t.me/oLolsBot?start={user_id}"
+        inline_kb = InlineKeyboardMarkup()
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
+        inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{user_id_str}"))
+
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            reply_markup=inline_kb,
+        )
+
+        await callback_query.answer("Ban cancelled.", show_alert=False)
 
     @DP.message_handler(
         is_in_monitored_channel,

@@ -525,7 +525,7 @@ def check_user_legit(cursor: Cursor, user_id: int) -> bool:
     return result is not None
 
 
-async def report_spam(spammer_id: int, logger) -> bool:
+async def report_spam_2p2p(spammer_id: int, logger) -> bool:
     """Function to report spammer to local P2P spamcheck server"""
     try:
         # local P2P spamcheck server
@@ -566,13 +566,13 @@ async def report_spam_from_message(message: types.Message, logger, userid_toexcl
     if (
         user_id and user_id != userid_toexclude
     ):  # prevent banning system TELEGRAM_CHANNEL_BOT_ID
-        await report_spam(user_id, logger)
+        await report_spam_2p2p(user_id, logger)
     if sender_chat_id:
-        await report_spam(sender_chat_id, logger)
+        await report_spam_2p2p(sender_chat_id, logger)
     if forward_from_id:
-        await report_spam(forward_from_id, logger)
+        await report_spam_2p2p(forward_from_id, logger)
     if forward_from_chat_id:
-        await report_spam(forward_from_chat_id, logger)
+        await report_spam_2p2p(forward_from_chat_id, logger)
 
 
 # def get_spam_report_link(spammer_id:int) -> str:

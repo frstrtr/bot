@@ -70,7 +70,7 @@ from utils.utils import (
     db_init,
     create_inline_keyboard,
     check_user_legit,
-    report_spam,
+    report_spam_2p2p,
     report_spam_from_message,
     split_list,
     extract_username,
@@ -432,7 +432,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
             continue
 
     # report rogue chat to the p2p server
-    await report_spam(rogue_chat_id, LOGGER)
+    await report_spam_2p2p(rogue_chat_id, LOGGER)
     await BOT.send_message(
         TECHNOLOG_GROUP_ID,
         f"Channel {rogue_chat_name} @{rogue_chat_username}(<code>{rogue_chat_id}</code>) reported to P2P spamcheck server.",
@@ -3385,7 +3385,7 @@ if __name__ == "__main__":
             await callback_query.message.reply(f"Error in handle_ban function: {e}")
 
         # report spam to the P2P spamcheck server
-        await report_spam(author_id, LOGGER)
+        await report_spam_2p2p(author_id, LOGGER)
         await BOT.send_message(
             TECHNOLOG_GROUP_ID,
             f"{author_id}:@{user_name} reported to P2P spamcheck server.",
@@ -3490,12 +3490,12 @@ if __name__ == "__main__":
         )
 
         # Send confirmation message
-        await callback_query.answer(
-            f"Confirm ban for {display_name} (@{username})?", show_alert=True
-        )
+        # await callback_query.answer(
+        #     f"Confirm ban for {display_name} (@{username})?", show_alert=True
+        # )
 
     @DP.callback_query_handler(lambda c: c.data.startswith("confirmbanuser_"))
-    async def handle_user_ban(callback_query: CallbackQuery):
+    async def handle_user_inout_ban(callback_query: CallbackQuery):
         """Function to ban the user from all chats."""
         # Parse user_id from callback data
         parts = callback_query.data.split("_")
@@ -3505,10 +3505,17 @@ if __name__ == "__main__":
         button_pressed_by = callback_query.from_user.username or "!UNDEFINED!"
         admin_id = callback_query.from_user.id
 
+        # Create response message
+        lols_url = f"https://t.me/oLolsBot?start={user_id}"
+        lols_check_kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+        )
+
         # Remove buttons
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
+            reply_markup=lols_check_kb,
         )
 
         try:
@@ -3548,13 +3555,7 @@ if __name__ == "__main__":
             await save_report_file("inout_", "mbn" + event_record)
 
             # Report to spam servers
-            await report_spam(user_id, LOGGER)
-
-            # Create response message
-            lols_url = f"https://t.me/oLolsBot?start={user_id}"
-            lols_check_kb = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-            )
+            await report_spam_2p2p(user_id, LOGGER)
 
             ban_message = (
                 f"Manual ban completed by @{button_pressed_by}:\n"
@@ -3594,7 +3595,7 @@ if __name__ == "__main__":
                 user_id, username, button_pressed_by
             )
 
-            await callback_query.answer("User banned successfully!", show_alert=True)
+            # await callback_query.answer("User banned successfully!", show_alert=True)
 
         except Exception as e:
             error_msg = f"Error banning user {user_id}: {str(e)}"
@@ -4640,7 +4641,7 @@ if __name__ == "__main__":
             await message.reply(f"Error: {e}")
 
         # report spammer to P2P spam checker server
-        await report_spam(author_id, LOGGER)
+        await report_spam_2p2p(author_id, LOGGER)
         user_name = (
             forwarded_message_data[4]
             if forwarded_message_data[4] not in [0, "0", None]
@@ -5761,7 +5762,7 @@ if __name__ == "__main__":
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
-            await report_spam(susp_user_id, LOGGER)
+            await report_spam_2p2p(susp_user_id, LOGGER)
             await BOT.send_message(
                 TECHNOLOG_GROUP_ID,
                 f"{susp_user_id}:@{susp_user_name} reported to P2P spamcheck server.",

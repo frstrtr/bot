@@ -2212,7 +2212,10 @@ if __name__ == "__main__":
         lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
-        inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{inout_userid}"))
+        
+        # Add buttons for the user actions only if the user is not a spammer
+        if lols_spam is not True:
+            inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{inout_userid}"))
 
         await BOT.send_message(
             TECHNOLOG_GROUP,

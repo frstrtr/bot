@@ -3515,7 +3515,7 @@ if __name__ == "__main__":
         )
         api_url = f"https://api.lols.bot/account?id={user_id}"
         lols_check_and_banned_kb.add(
-            InlineKeyboardButton("💀💀💀 B.A.N.N.E.D 💀💀💀", url=api_url)
+            InlineKeyboardButton("💀💀💀 B.A.N.N.E.D. 💀💀💀", url=api_url)
         )
 
         # Remove buttons

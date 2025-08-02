@@ -2212,7 +2212,7 @@ if __name__ == "__main__":
         lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
         inline_kb = InlineKeyboardMarkup()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
-        
+
         # Add buttons for the user actions only if the user is not a spammer
         if lols_spam is not True:
             inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{inout_userid}"))
@@ -3510,15 +3510,19 @@ if __name__ == "__main__":
 
         # Create response message
         lols_url = f"https://t.me/oLolsBot?start={user_id}"
-        lols_check_kb = InlineKeyboardMarkup().add(
+        lols_check_and_banned_kb = InlineKeyboardMarkup().add(
             InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
+        )
+        api_url = f"https://api.lols.bot/account?id={user_id}"
+        lols_check_and_banned_kb.add(
+            InlineKeyboardButton("💀💀💀 B.A.N.N.E.D 💀💀💀", url=api_url)
         )
 
         # Remove buttons
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=lols_check_kb,
+            reply_markup=lols_check_and_banned_kb,
         )
 
         try:
@@ -3571,7 +3575,7 @@ if __name__ == "__main__":
                 TECHNOLOG_GROUP_ID,
                 ban_message,
                 parse_mode="HTML",
-                reply_markup=lols_check_kb,
+                reply_markup=lols_check_and_banned_kb,
                 message_thread_id=TECHNO_ADMIN,
             )
 
@@ -3580,7 +3584,7 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 ban_message,
                 parse_mode="HTML",
-                reply_markup=lols_check_kb,
+                reply_markup=lols_check_and_banned_kb,
                 message_thread_id=ADMIN_MANBAN,
             )
 

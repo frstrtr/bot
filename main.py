@@ -3580,13 +3580,13 @@ if __name__ == "__main__":
             )
 
             # Send to admin group
-            await BOT.send_message(
-                ADMIN_GROUP_ID,
-                ban_message,
-                parse_mode="HTML",
-                reply_markup=lols_check_and_banned_kb,
-                message_thread_id=ADMIN_MANBAN,
-            )
+            # await BOT.send_message(
+            #     ADMIN_GROUP_ID,
+            #     ban_message,
+            #     parse_mode="HTML",
+            #     reply_markup=lols_check_and_banned_kb,
+            #     message_thread_id=ADMIN_MANBAN,
+            # )
 
             # Log username if available
             if username and username != "!UNDEFINED!":

@@ -42,6 +42,7 @@ from aiogram.utils.exceptions import (
     MessageToForwardNotFound,
     MessageIdInvalid,
     ChatAdminRequired,
+    Unauthorized,
     # BotKicked,
 )
 
@@ -399,12 +400,24 @@ async def on_startup(_dp: Dispatcher):
     asyncio.create_task(load_and_start_checks())
 
 
-async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
+async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tuple[bool, str, str]:
     """ban chat sender chat for Rogue channels"""
     ban_rogue_chat_everywhere_error = None
-    chat = await BOT.get_chat(rogue_chat_id)
-    rogue_chat_name = chat.title if chat.title else "!ROGUECHAT!"
-    rogue_chat_username = chat.username if chat.username else "!@ROGUECHAT!"
+    
+    # Try to get chat information, handle case where bot is not a member
+    try:
+        chat = await BOT.get_chat(rogue_chat_id)
+        rogue_chat_name = chat.title if chat.title else "!ROGUECHAT!"
+        rogue_chat_username = chat.username if chat.username else "!@ROGUECHAT!"
+    except (Unauthorized, BadRequest) as e:
+        # Bot is not a member of the channel or channel doesn't exist
+        LOGGER.warning(
+            "Cannot get chat info for rogue channel %s: %s. Using default names.",
+            rogue_chat_id,
+            str(e)
+        )
+        rogue_chat_name = "!ROGUECHAT!"
+        rogue_chat_username = "!@ROGUECHAT!"
 
     for chat_id in chan_list:
         try:
@@ -442,7 +455,14 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
     )
 
     if ban_rogue_chat_everywhere_error:
-        return ban_rogue_chat_everywhere_error
+        LOGGER.error(
+            "Failed to ban rogue channel %s @%s(%s): %s",
+            rogue_chat_name,
+            rogue_chat_username,
+            rogue_chat_id,
+            ban_rogue_chat_everywhere_error
+        )
+        return False, rogue_chat_name, rogue_chat_username
     else:
         LOGGER.info(
             "%s @%s(%s)  CHANNEL successfully banned where it was possible",
@@ -457,9 +477,21 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool
 async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
     """Unban chat sender chat for Rogue channels"""
     unban_rogue_chat_everywhere_error = None
-    chat = await BOT.get_chat(rogue_chat_id)
-    rogue_chat_name = chat.title if chat.title else "!ROGUECHAT!"
-    rogue_chat_username = chat.username if chat.username else "!@ROGUECHAT!"
+    
+    # Try to get chat information, handle case where bot is not a member
+    try:
+        chat = await BOT.get_chat(rogue_chat_id)
+        rogue_chat_name = chat.title if chat.title else "!ROGUECHAT!"
+        rogue_chat_username = chat.username if chat.username else "!@ROGUECHAT!"
+    except (Unauthorized, BadRequest) as e:
+        # Bot is not a member of the channel or channel doesn't exist
+        LOGGER.warning(
+            "Cannot get chat info for rogue channel %s during unban: %s. Using default names.",
+            rogue_chat_id,
+            str(e)
+        )
+        rogue_chat_name = "!ROGUECHAT!"
+        rogue_chat_username = "!@ROGUECHAT!"
 
     for chat_id in chan_list:
         try:

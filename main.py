@@ -984,7 +984,10 @@ async def handle_autoreports(
     # AUTOREPORT ALWAYS IN ADMIN_GROUP_ID so there is no ADMIN action banner message
 
     forwarded_report_state = DP.get("forwarded_reports_states")
-    forwarded_report_state[report_id] = {}
+    if forwarded_report_state is None:
+        forwarded_report_state = {}
+        DP["forwarded_reports_states"] = forwarded_report_state
+    
     # Add the new state to the forwarded_reports_states dictionary
     forwarded_report_state[report_id] = {
         "original_forwarded_message": message,
@@ -2723,7 +2726,10 @@ if __name__ == "__main__":
 
                 # Store the admin action banner message data XXX
                 forwarded_report_state = DP.get("forwarded_reports_states")
-                forwarded_report_state[report_id] = {}
+                if forwarded_report_state is None:
+                    forwarded_report_state = {}
+                    DP["forwarded_reports_states"] = forwarded_report_state
+                
                 # Add the new state to the forwarded_reports_states dictionary
                 forwarded_report_state[report_id] = {
                     "original_forwarded_message": message,
@@ -2801,7 +2807,10 @@ if __name__ == "__main__":
                 #     return admin_group_banner_message
                 # XXX we need to lock
                 forwarded_report_state = DP.get("forwarded_reports_states")
-                forwarded_report_state[report_id] = {}
+                if forwarded_report_state is None:
+                    forwarded_report_state = {}
+                    DP["forwarded_reports_states"] = forwarded_report_state
+                
                 # Add the new state to the forwarded_reports_states dictionary
                 forwarded_report_state[report_id] = {
                     "original_forwarded_message": message,
@@ -2849,11 +2858,17 @@ if __name__ == "__main__":
         report_id_to_ban = int(report_id_to_ban_str)
         # get report states
         forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
         if forwarded_reports_states is None:
-            LOGGER.warning("No states recorded!")
+            LOGGER.warning("No forwarded_reports_states recorded!")
             # reply message and remove buttons
             return
+        
+        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
+        if forwarded_report_state is None:
+            LOGGER.warning("No forwarded_report_state found for report_id: %s", report_id_to_ban)
+            # reply message and remove buttons
+            return
+        
         # """                forwarded_report_state[report_id] = {
         #             "original_forwarded_message": message,
         #             "admin_group_banner_message": admin_group_banner_message,
@@ -2876,8 +2891,8 @@ if __name__ == "__main__":
         del forwarded_report_state["action_banner_message"]
         del forwarded_report_state["admin_group_banner_message"]
 
-        # update states for the designated report_id_to_ban
-        forwarded_reports_states[report_id_to_ban_str] = forwarded_report_state
+        # update states for the designated report_id_to_ban (use integer key like everywhere else)
+        forwarded_reports_states[report_id_to_ban] = forwarded_report_state
 
         # update DP states storage
         DP["forwarded_reports_states"] = forwarded_reports_states
@@ -2962,9 +2977,19 @@ if __name__ == "__main__":
             )
             # get report states
             forwarded_reports_states: dict = DP.get("forwarded_reports_states")
+            if forwarded_reports_states is None:
+                LOGGER.warning("No forwarded_reports_states recorded in handle_ban!")
+                await callback_query.message.reply("Error: Report states not found.")
+                return
+                
             forwarded_report_state: dict = forwarded_reports_states.get(
                 report_id_to_ban
             )
+            if forwarded_report_state is None:
+                LOGGER.warning("No forwarded_report_state found for report_id: %s in handle_ban", report_id_to_ban)
+                await callback_query.message.reply("Error: Report state not found.")
+                return
+                
             original_spam_message: types.Message = forwarded_report_state[
                 "original_forwarded_message"
             ]

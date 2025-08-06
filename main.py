@@ -417,7 +417,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tupl
             str(e)
         )
         rogue_chat_name = "!ROGUECHAT!"
-        rogue_chat_username = "!@ROGUECHAT!"
+        rogue_chat_username = "!ROGUECHAT!"
 
     for chat_id in chan_list:
         try:

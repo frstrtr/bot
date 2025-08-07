@@ -1,3 +1,5 @@
+"""Yet Another Telegram Bot for Spammers Detection and Reporting"""
+
 from datetime import timedelta
 from datetime import datetime
 import argparse
@@ -9,10 +11,10 @@ import json
 import time
 import html
 import tracemalloc  # for memory usage debugging
-import ast
-import aiocron
 import re
 import ast  # evaluate dictionaries safely
+
+import aiocron
 
 import aiohttp
 from aiogram import Dispatcher, types
@@ -3050,8 +3052,8 @@ if __name__ == "__main__":
             #            ChatID        MsgID    ChatUsername        UserID     UserName    User1  User2   MessageForwardDate
             # Result: (-1001753683146, 3255, 'exampleChatUsername', 66666666, 'userUser', 'нелл', None, '2025-01-05 02:35:53')
 
-            # XXXfixed find safe solution to get the author_id from the forwarded_message_data
-            author_id = eval(forwarded_message_data)[3]
+            # XXX fixed find safe solution to get the author_id from the forwarded_message_data
+            # author_id = eval(forwarded_message_data)[3]
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
 
             # Check if forwarded_message_data is not empty and is a list
@@ -3067,8 +3069,13 @@ if __name__ == "__main__":
             #     await callback_query.message.reply("Error: Invalid data format in forwarded message.")
             #     return
             # MODIFIED: Use ast.literal_eval for safety
-            author_id = ast.literal_eval(forwarded_message_data)[3]
-            LOGGER.debug("%s author ID retrieved for original message", author_id)
+            try:
+                author_id = ast.literal_eval(forwarded_message_data)[3]
+                LOGGER.debug("%s author ID retrieved for original message", author_id)
+            except (ValueError, SyntaxError, IndexError) as e:
+                LOGGER.error("Failed to parse forwarded_message_data: %s", e)
+                await callback_query.message.reply("Error: Invalid message data format.")
+                return
 
             LOGGER.debug(
                 "\033[93m%s Message timestamp: %-10s, Original chat ID: %s, Original report ID: %s,\n\t\t\tForwarded message data: %s,\n\t\t\tOriginal message timestamp: %s\033[0m",

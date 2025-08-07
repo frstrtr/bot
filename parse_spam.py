@@ -1,6 +1,6 @@
 import re
 
-def find_mentions_and_links(file_path):
+def find_mentions_and_links(_file_path):
     """
     Find all @username mentions and t.me/ links in a .txt file.
 
@@ -10,7 +10,7 @@ def find_mentions_and_links(file_path):
     Returns:
         dict: A dictionary with two keys 'mentions' and 'links', each containing a list of found items.
     """
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(_file_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
     # Regular expression to find @username mentions

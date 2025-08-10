@@ -1,5 +1,16 @@
 """Yet Another Telegram Bot for Spammers Detection and Reporting"""
 
+# Force process timezone to Indian/Mauritius as early as possible
+import os as _os
+
+_os.environ.setdefault("TZ", "Indian/Mauritius")
+try:
+    import time as _time
+
+    _time.tzset()  # Ensure the process picks up TZ on Unix
+except Exception:
+    pass
+
 from datetime import timedelta
 from datetime import datetime
 import argparse
@@ -15,6 +26,7 @@ import re
 import ast  # evaluate dictionaries safely
 
 import aiocron
+from zoneinfo import ZoneInfo
 
 import aiohttp
 from aiogram import Dispatcher, types
@@ -77,6 +89,13 @@ from utils.utils import (
     report_spam_from_message,
     split_list,
     extract_username,
+    make_lols_kb,
+    build_lols_url,
+    safe_get_chat_name_username,
+    get_forwarded_states,
+    set_forwarded_state,
+    get_forwarded_state,
+    safe_send_message,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -366,8 +385,12 @@ async def on_startup(_dp: Dispatcher):
     # await BOT.leave_chat(-1001876523135) # @lalaland_classy
 
     # start message to the Technolog group
-    await BOT.send_message(
-        TECHNOLOG_GROUP_ID, bot_start_message, message_thread_id=TECHNO_RESTART
+    await safe_send_message(
+        BOT,
+        TECHNOLOG_GROUP_ID,
+        bot_start_message,
+        LOGGER,
+        message_thread_id=TECHNO_RESTART,
     )
 
     # List of user IDs to check for Deleted Accounts
@@ -402,10 +425,12 @@ async def on_startup(_dp: Dispatcher):
     asyncio.create_task(load_and_start_checks())
 
 
-async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tuple[bool, str, str]:
+async def ban_rogue_chat_everywhere(
+    rogue_chat_id: int, chan_list: list
+) -> tuple[bool, str, str]:
     """ban chat sender chat for Rogue channels"""
     ban_rogue_chat_everywhere_error = None
-    
+
     # Try to get chat information, handle case where bot is not a member
     try:
         chat = await BOT.get_chat(rogue_chat_id)
@@ -416,7 +441,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tupl
         LOGGER.warning(
             "Cannot get chat info for rogue channel %s: %s. Using default names.",
             rogue_chat_id,
-            str(e)
+            str(e),
         )
         rogue_chat_name = "!ROGUECHAT!"
         rogue_chat_username = "!ROGUECHAT!"
@@ -448,9 +473,11 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tupl
 
     # report rogue chat to the p2p server
     await report_spam_2p2p(rogue_chat_id, LOGGER)
-    await BOT.send_message(
+    await safe_send_message(
+        BOT,
         TECHNOLOG_GROUP_ID,
         f"Channel {rogue_chat_name} @{rogue_chat_username}(<code>{rogue_chat_id}</code>) reported to P2P spamcheck server.",
+        LOGGER,
         parse_mode="HTML",
         disable_web_page_preview=True,
         message_thread_id=TECHNO_ADMIN,
@@ -462,7 +489,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tupl
             rogue_chat_name,
             rogue_chat_username,
             rogue_chat_id,
-            ban_rogue_chat_everywhere_error
+            ban_rogue_chat_everywhere_error,
         )
         return False, rogue_chat_name, rogue_chat_username
     else:
@@ -479,7 +506,7 @@ async def ban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tupl
 async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
     """Unban chat sender chat for Rogue channels"""
     unban_rogue_chat_everywhere_error = None
-    
+
     # Try to get chat information, handle case where bot is not a member
     try:
         chat = await BOT.get_chat(rogue_chat_id)
@@ -490,7 +517,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
         LOGGER.warning(
             "Cannot get chat info for rogue channel %s during unban: %s. Using default names.",
             rogue_chat_id,
-            str(e)
+            str(e),
         )
         rogue_chat_name = "!ROGUECHAT!"
         rogue_chat_username = "!@ROGUECHAT!"
@@ -515,13 +542,6 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
 
     # TODO: Remove rogue chat from the p2p server report list?
     # await unreport_spam(rogue_chat_id, LOGGER)
-    # await BOT.send_message(
-    #     TECHNOLOG_GROUP_ID,
-    #     f"{rogue_chat_id}:@!ROGUECHAT! removed from P2P spamcheck server.",
-    #     parse_mode="HTML",
-    #     disable_web_page_preview=True,
-    #     message_thread_id=TECHNO_ADMIN,
-    # )
 
     if unban_rogue_chat_everywhere_error:
         return unban_rogue_chat_everywhere_error
@@ -694,11 +714,11 @@ async def on_shutdown(_dp):
         )
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
-                # XXX preserve messages to delete for next startup checks
-                # if isinstance(_uname, dict) and "username" in _uname:
-                #     _uname = _uname["username"]
-                # LOGGER.debug(_uname)
-                file.write(f"{_id}:{_uname}\n")
+                # Persist dicts as repr for round-trip; loader already supports dict/string
+                if isinstance(_uname, dict):
+                    file.write(f"{_id}:{repr(_uname)}\n")
+                else:
+                    file.write(f"{_id}:{_uname}\n")
     else:
         # clear the file if no active checks
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
@@ -743,7 +763,8 @@ async def on_shutdown(_dp):
     # number of the messages with spam not detected and deleted by admins
     # number of active user checks forwarded to the next session
 
-    await BOT.send_message(
+    await safe_send_message(
+        BOT,
         TECHNOLOG_GROUP,
         (
             "Runtime session shutdown stats:\n"
@@ -751,6 +772,7 @@ async def on_shutdown(_dp):
             f"Current active user checks: {len(active_user_checks_dict)}\n"
             f"Spammers detected: {len(banned_users_dict)}\n"
         ),
+        LOGGER,
         message_thread_id=TECHNO_RESTART,
     )
     LOGGER.info(
@@ -797,8 +819,8 @@ async def handle_autoreports(
 ):
     """Function to handle forwarded messages with provided user details."""
 
-    reported_spam = "ADM" + format_spam_report(message)[3:]
     # store spam text and caption to the daily_spam file
+    reported_spam = "ADM" + format_spam_report(message)[3:]
     await save_report_file("daily_spam_", reported_spam)
 
     # LOGGER.debug(f"Received forwarded message for the investigation: {message}")
@@ -822,8 +844,10 @@ async def handle_autoreports(
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-    await BOT.send_message(TECHNOLOG_GROUP_ID, message_as_json)
-    await BOT.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
+    await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
+    await safe_send_message(
+        BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
+    )
 
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
@@ -972,15 +996,15 @@ async def handle_autoreports(
     )
 
     # construct lols check link button
-    inline_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            "ℹ️ Check Spam Data ℹ️",
-            url=f"https://t.me/oLolsBot?start={user_id}",
-        )
-    )
+    inline_kb = make_lols_kb(user_id)
     # Send the banner to the technolog group
-    await BOT.send_message(
-        TECHNOLOG_GROUP_ID, log_info, parse_mode="HTML", reply_markup=inline_kb
+    await safe_send_message(
+        BOT,
+        TECHNOLOG_GROUP_ID,
+        log_info,
+        LOGGER,
+        parse_mode="HTML",
+        reply_markup=inline_kb,
     )
 
     # Keyboard ban/cancel/confirm buttons
@@ -1005,9 +1029,11 @@ async def handle_autoreports(
         else:
             LOGGER.warning("%s autoreported message already DELETED?", spammer_id)
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
-    admin_group_banner_autoreport_message = await BOT.send_message(
+    admin_group_banner_autoreport_message = await safe_send_message(
+        BOT,
         ADMIN_GROUP_ID,
         admin_ban_banner,
+        LOGGER,
         reply_markup=keyboard,
         parse_mode="HTML",
         message_thread_id=ADMIN_AUTOREPORTS,
@@ -1017,19 +1043,16 @@ async def handle_autoreports(
     # Store the admin action banner message data
     # AUTOREPORT ALWAYS IN ADMIN_GROUP_ID so there is no ADMIN action banner message
 
-    forwarded_report_state = DP.get("forwarded_reports_states")
-    if forwarded_report_state is None:
-        forwarded_report_state = {}
-        DP["forwarded_reports_states"] = forwarded_report_state
-    
-    # Add the new state to the forwarded_reports_states dictionary
-    forwarded_report_state[report_id] = {
-        "original_forwarded_message": message,
-        "admin_group_banner_message": admin_group_banner_autoreport_message,
-        "action_banner_message": None,  # AUTOREPORT have no ADMIN ACTION
-        "report_chat_id": message.chat.id,
-    }
-    DP["forwarded_reports_states"] = forwarded_report_state
+    set_forwarded_state(
+        DP,
+        report_id,
+        {
+            "original_forwarded_message": message,
+            "admin_group_banner_message": admin_group_banner_autoreport_message,
+            "action_banner_message": None,  # AUTOREPORT have no ADMIN ACTION
+            "report_chat_id": message.chat.id,
+        },
+    )
 
     return
 
@@ -1215,9 +1238,11 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             len(banned_users_dict),  # Number of elements left
         )
     if user_name and user_name != "!UNDEFINED!":  # exclude noname users
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP_ID,
             f"<code>{_id}</code> @{user_name} (1156)",
+            LOGGER,
             parse_mode="HTML",
             message_thread_id=TECHNO_NAMES,
         )
@@ -1246,11 +1271,7 @@ async def check_and_autoban(
     :param message_to_delete: tuple: chat_id, message_id: The message to delete.
     """
 
-    lols_url = f"https://t.me/oLolsBot?start={user_id}"
-
-    inline_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-    )
+    inline_kb = make_lols_kb(user_id)
 
     if lols_spam is True:  # not Timeout exaclty
         if user_id not in banned_users_dict:
@@ -1311,11 +1332,13 @@ async def check_and_autoban(
                 )
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace("kicked", "<b>KICKED BY ADMIN</b>", 1).replace(
                     "restricted", "<b>RESTRICTED BY ADMIN</b>", 1
                 ),
+                LOGGER,
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -1328,7 +1351,8 @@ async def check_and_autoban(
             await save_report_file("inout_", "cbk" + event_record)
         elif "manual check requested" in inout_logmessage:
             # XXX it was /check id command
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 ADMIN_GROUP_ID,
                 inout_logmessage.replace(
                     "manual check requested,",
@@ -1336,15 +1360,18 @@ async def check_and_autoban(
                     1,
                 )
                 + " please check for the other spammer messages!",
+                LOGGER,
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
             if user_name and user_name != "!UNDEFINED!":
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"<code>{user_id}</code>:@{user_name} (990)",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1380,18 +1407,22 @@ async def check_and_autoban(
                 "member", "<i>member</i> --> <b>KICKED</b>", 1
             ).replace("left", "<i>left</i> --> <b>KICKED</b>", 1)
             # send message to the admin group
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 ADMIN_GROUP_ID,
                 inout_logmessage,
+                LOGGER,
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
             if user_name and user_name != "!UNDEFINED!":
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"<code>{user_id}</code>:@{user_name} (1013)",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -1434,19 +1465,23 @@ async def check_and_autoban(
             user_name,
             admin_name,
         )
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             ADMIN_GROUP_ID,
             f"User is not now in the SPAM database\nbut kicked/restricted by Admin or other BOT.\n"
             + inout_logmessage,
+            LOGGER,
             message_thread_id=ADMIN_MANBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
         if user_name and user_name != "!UNDEFINED!":
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"<code>{user_id}</code>:@{user_name} (1054)",
+                LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1550,12 +1585,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 e,
             )
         # send the telefrag log message to the admin group
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton(
-                "ℹ️ Check Spam Data ℹ️",
-                url=f"https://t.me/oLolsBot?start={message.from_user.id}",
-            )
-        )
+        inline_kb = make_lols_kb(message.from_user.id)
         chat_link = (
             f"https://t.me/{message.chat.username}"
             if message.chat.username
@@ -1566,9 +1596,11 @@ async def check_n_ban(message: types.Message, reason: str):
             if message.chat.username
             else message.chat.title
         )
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             ADMIN_GROUP_ID,
             f"Alert! 🚨 User @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>) has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}...",
+            LOGGER,
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -1576,9 +1608,11 @@ async def check_n_ban(message: types.Message, reason: str):
         )
         # log username to the username thread
         if message.from_user.username:
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1191)",
+                LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
             )
@@ -1727,11 +1761,80 @@ async def perform_checks(
             # XXX what if there is more than one message link?
             if user_id in active_user_checks_dict:
                 if isinstance(active_user_checks_dict[user_id], dict):
+                    # Detect post-join profile changes (name/username/photo)
+                    _entry = active_user_checks_dict[user_id]
+                    baseline = _entry.get("baseline") if isinstance(_entry, dict) else None
+                    already_notified = _entry.get("notified_profile_change") if isinstance(_entry, dict) else False
+                    if baseline and not already_notified:
+                        _chat_info = baseline.get("chat", {}) if isinstance(baseline, dict) else {}
+                        _chat_id = _chat_info.get("id")
+
+                        # Start from baseline and override with live data if available
+                        cur_first = baseline.get("first_name", "")
+                        cur_last = baseline.get("last_name", "")
+                        cur_username = baseline.get("username", "")
+                        cur_photo_count = baseline.get("photo_count", 0)
+
+                        try:
+                            _member = await BOT.get_chat_member(_chat_id, user_id)
+                            _user = getattr(_member, "user", None) or _member
+                            cur_first = getattr(_user, "first_name", "") or ""
+                            cur_last = getattr(_user, "last_name", "") or ""
+                            cur_username = getattr(_user, "username", "") or ""
+                        except Exception as _e:
+                            LOGGER.debug("%s:@%s unable to fetch chat member for profile-change check: %s", user_id, user_name, _e)
+
+                        try:
+                            _photos = await BOT.get_user_profile_photos(user_id, limit=1)
+                            cur_photo_count = getattr(_photos, "total_count", 0) if _photos else cur_photo_count
+                        except Exception as _e:
+                            LOGGER.debug("%s:@%s unable to fetch photo count during checks: %s", user_id, user_name, _e)
+
+                        changed = []
+                        if cur_first != baseline.get("first_name", ""):
+                            changed.append("first name")
+                        if cur_last != baseline.get("last_name", ""):
+                            changed.append("last name")
+                        if cur_username != baseline.get("username", ""):
+                            changed.append("username")
+                        if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
+                            changed.append("profile photo")
+
+                        if changed:
+                            chat_username = _chat_info.get("username")
+                            chat_title = _chat_info.get("title") or ""
+                            universal_chatlink = (
+                                f"<a href=\"https://t.me/{chat_username}\">{html.escape(chat_title)}</a>"
+                                if chat_username
+                                else f"<a href=\"https://t.me/c/{str(_chat_id)[4:] if str(_chat_id).startswith('-100') else _chat_id}\">{html.escape(chat_title)}</a>"
+                            )
+                            change_list = ", ".join(changed)
+                            _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                            kb = make_lols_kb(user_id)
+                            _report_id = int(datetime.now().timestamp())
+                            kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{user_id}_{_report_id}"))
+                            await safe_send_message(
+                                BOT,
+                                ADMIN_GROUP_ID,
+                                (
+                                    f"Suspicious activity detected after joining {universal_chatlink}.\n"
+                                    f"User @{cur_username or '!UNDEFINED!'} (<code>{user_id}</code>) changed: <b>{change_list}</b> at {_ts}."
+                                ),
+                                LOGGER,
+                                message_thread_id=ADMIN_SUSPICIOUS,
+                                parse_mode="HTML",
+                                disable_web_page_preview=True,
+                                reply_markup=kb,
+                            )
+                            # Prevent duplicate notifications for this user during this watch period
+                            active_user_checks_dict[user_id]["notified_profile_change"] = True
+
                     suspicious_messages = {
                         k: v
                         for k, v in active_user_checks_dict[user_id].items()
-                        if k
-                        != "username"  # unpack message links only, leave username record
+                        if isinstance(k, str)
+                        and "_" in k
+                        and k not in ("username", "baseline", "notified_profile_change")
                     }
                     if suspicious_messages:
                         chat_id, message_id = next(iter(suspicious_messages)).split("_")
@@ -1745,28 +1848,6 @@ async def perform_checks(
                     user_id,
                     user_name,
                 )
-                # cancel cycle and cancel task if it is available
-                # if user_id in running_watchdogs:
-                #     running_watchdogs[user_id].cancel()
-                # try:
-                #     await running_watchdogs[user_id]
-                # except asyncio.CancelledError:
-                #     LOGGER.info(
-                #         "%s:@%s Watchdog disabled.(Cancelled)",
-                #         user_id,
-                #         user_name,
-                #     )
-                #     # stop cycle
-                #     break
-                # except KeyError as e:
-                #     LOGGER.info(
-                #         "%s:@%s Watchdog disabled.(%s)",
-                #         user_id,
-                #         user_name,
-                #         e,
-                #     )
-                #     # stop cycle
-                #     break
                 await cancel_named_watchdog(user_id, user_name)
                 # stop cycle
                 break
@@ -1814,10 +1895,11 @@ async def perform_checks(
         if (
             user_id in active_user_checks_dict
         ):  # avoid case when manually banned by admin same time
-            # banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
-            del active_user_checks_dict[
-                user_id
-            ]  # remove user from active checks dict as LEGIT
+            # remove user from active checks dict as LEGIT / cleanup baseline
+            try:
+                del active_user_checks_dict[user_id]
+            except Exception:
+                active_user_checks_dict.pop(user_id, None)
             if len(active_user_checks_dict) > 3:
                 active_user_checks_dict_last3_list = list(
                     active_user_checks_dict.items()
@@ -1902,19 +1984,15 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     :param user_id: The user ID to use as the key in the running_watchdogs dictionary
 
     """
-    if user_id in running_watchdogs:
+    existing_task = running_watchdogs.get(user_id)
+    if existing_task:
         LOGGER.info(
             "\033[93m%s:@%s Watchdog is already set. Cancelling and restarting existing task.\033[0m",
             user_id,
             user_name,
         )
-        # return  # Do nothing; a watchdog is already active.
-        await running_watchdogs[
-            user_id
-        ]  # Await the existing task to prevent RuntimeWarning: coroutine was never awaited
-        return
-
-    # Create the task and store it in the running_watchdogs dictionary
+    
+    # Always create and register the new task immediately (non-blocking restart)
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
@@ -1923,26 +2001,38 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
         user_name,
     )  # Include user_name
 
-    # # Remove the task from the dictionary when it completes
-    # def task_done_callback(t: asyncio.Task):
-    #     running_watchdogs.pop(user_id, None)
-    #     if t.exception():
-    #         LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
+    # Remove the task from the dictionary when it completes (only if it's still the current one)
+    def _task_done(t: asyncio.Task, _uid=user_id):
+        try:
+            if running_watchdogs.get(_uid) is t:
+                running_watchdogs.pop(_uid, None)
+        finally:
+            if t.cancelled():
+                LOGGER.info("%s Task was cancelled.", _uid)
+            else:
+                exc = t.exception()
+                if exc:
+                    LOGGER.error("%s Task raised an exception: %s", _uid, exc)
 
-    # task.add_done_callback(task_done_callback)
-    task.add_done_callback(
-        lambda t: (
-            LOGGER.error("%s Task raised an exception: %s", user_id, t.exception())
-            if t.exception()
-            else None
-        )
-    )
+    task.add_done_callback(_task_done)
 
-    # Await the newly created task
-    # await task  # Wait for check_and_autoban to finish before continuing
+    # If there was an existing task, cancel it and await in background
+    if existing_task:
+        try:
+            existing_task.cancel()
+        except Exception:
+            pass
 
-    # No need to return anything here as the function now awaits the task
-    # return await task  # Await the new task
+        async def _await_cancel(_t: asyncio.Task, _uid=user_id, _uname=user_name):
+            try:
+                await _t
+                LOGGER.info("%s:@%s Previous watchdog cancelled.", _uid, _uname)
+            except asyncio.CancelledError:
+                LOGGER.info("%s:@%s Previous watchdog cancellation confirmed.", _uid, _uname)
+            except Exception as e:
+                LOGGER.error("%s:@%s Error while cancelling previous watchdog: %s", _uid, _uname, e)
+
+        asyncio.create_task(_await_cancel(existing_task), name=f"cancel:{user_id}")
 
     return task  # Return the task so the caller can manage it
 
@@ -2019,9 +2109,10 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         # Create a list for active user checks with user_id as key and username as value
         active_user_checks_list = []
         for user, uname in active_user_checks_dict.items():
-            active_user_checks_list.append(
-                f"<code>{user}</code>:{extract_username(uname)}"
+            _disp = (
+                uname.get("username", "!UNDEFINED!") if isinstance(uname, dict) else extract_username(uname)
             )
+            active_user_checks_list.append(f"<code>{user}</code>:{_disp}")
             # If uname is a dict, extract URLs from it
             if isinstance(uname, dict):
                 for k, v in uname.items():
@@ -2051,9 +2142,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                     else "Active user checks dict (continued):\n"
                 )
                 try:
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         group,
                         header + chr(10).join(chunk),
+                        LOGGER,
                         message_thread_id=msg_thread_id,
                         parse_mode="HTML",
                         disable_web_page_preview=True,
@@ -2061,9 +2154,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 except BadRequest as e:
                     LOGGER.error("Error sending active user checks chunk: %s", e)
         else:
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 group,
                 "No active user checks at the moment.",
+                LOGGER,
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
@@ -2077,9 +2172,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                     else "Banned users dict (continued):\n"
                 )
                 try:
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         group,
                         header + chr(10).join(chunk),
+                        LOGGER,
                         message_thread_id=msg_thread_id,
                         parse_mode="HTML",
                         disable_web_page_preview=True,
@@ -2087,9 +2184,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 except BadRequest as e:
                     LOGGER.error("Error sending banned users chunk: %s", e)
         else:
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 group,
                 "No banned users at the moment.",
+                LOGGER,
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
@@ -2246,17 +2345,21 @@ if __name__ == "__main__":
             f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, <a href='https://t.me/@id{inout_userid}'>IOS (Apple)</a>\n"
         )
 
-        lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
-        inline_kb = InlineKeyboardMarkup()
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
+        inline_kb = make_lols_kb(inout_userid)
 
         # Add buttons for the user actions only if the user is not a spammer
         if lols_spam is not True:
-            inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{inout_userid}"))
+            inline_kb.add(
+                InlineKeyboardButton(
+                    "🚫 Ban User", callback_data=f"banuser_{inout_userid}"
+                )
+            )
 
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP,
             inout_logmessage,
+            LOGGER,
             message_thread_id=TECHNO_INOUT,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -2332,10 +2435,34 @@ if __name__ == "__main__":
             )
             # Check if the user ID is already being processed
             if inout_userid not in active_user_checks_dict:
-                # Add the user ID to the active set
-                active_user_checks_dict[inout_userid] = (
-                    update.old_chat_member.user.username
-                )
+                # Only capture baseline on join (is_member True) to compare later on leave
+                if 'is_member' in locals() and is_member:
+                    try:
+                        photos = await BOT.get_user_profile_photos(inout_userid, limit=1)
+                        _photo_count = getattr(photos, "total_count", 0) if photos else 0
+                    except Exception as _e:
+                        _photo_count = 0
+                        LOGGER.debug(
+                            "%s:@%s unable to fetch initial photo count: %s",
+                            inout_userid,
+                            inout_username,
+                            _e,
+                        )
+
+                    active_user_checks_dict[inout_userid] = {
+                        "username": update.old_chat_member.user.username,
+                        "baseline": {
+                            "first_name": update.old_chat_member.user.first_name or "",
+                            "last_name": update.old_chat_member.user.last_name or "",
+                            "username": update.old_chat_member.user.username or "",
+                            "photo_count": _photo_count,
+                            "chat": {
+                                "id": update.chat.id,
+                                "username": getattr(update.chat, "username", None),
+                                "title": getattr(update.chat, "title", "") or "",
+                            },
+                        },
+                    }
                 # create task with user_id as name
                 asyncio.create_task(
                     perform_checks(
@@ -2391,6 +2518,62 @@ if __name__ == "__main__":
         # checking if user joins and leave chat in 1 minute or less
         if inout_status == ChatMemberStatus.LEFT:
             try:  # check if left less than 1 min after join
+                # First, compare against baseline captured at join, if available
+                _entry = active_user_checks_dict.get(inout_userid)
+                _baseline = _entry.get("baseline") if isinstance(_entry, dict) else None
+                _already_notified = _entry.get("notified_profile_change") if isinstance(_entry, dict) else False
+                if _baseline and not _already_notified:
+                    # For leave events, Telegram provides the current user data in update.old_chat_member.user
+                    _u = update.old_chat_member.user
+                    cur_first = getattr(_u, "first_name", "") or ""
+                    cur_last = getattr(_u, "last_name", "") or ""
+                    cur_username = getattr(_u, "username", "") or ""
+                    try:
+                        _p = await BOT.get_user_profile_photos(inout_userid, limit=1)
+                        cur_photo_count = getattr(_p, "total_count", 0) if _p else _baseline.get("photo_count", 0)
+                    except Exception as _e:
+                        cur_photo_count = _baseline.get("photo_count", 0)
+                        LOGGER.debug("%s:@%s unable to fetch photo count on leave: %s", inout_userid, inout_username, _e)
+
+                    _changed = []
+                    if cur_first != _baseline.get("first_name", ""):
+                        _changed.append("first name")
+                    if cur_last != _baseline.get("last_name", ""):
+                        _changed.append("last name")
+                    if cur_username != _baseline.get("username", ""):
+                        _changed.append("username")
+                    if _baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
+                        _changed.append("profile photo")
+
+                    if _changed:
+                        _chat_info = _baseline.get("chat", {})
+                        _cid = _chat_info.get("id", update.chat.id)
+                        _cuser = _chat_info.get("username") or getattr(update.chat, "username", None)
+                        _ctitle = _chat_info.get("title") or getattr(update.chat, "title", "") or ""
+                        _link = (
+                            f"<a href=\"https://t.me/{_cuser}\">{html.escape(_ctitle)}</a>"
+                            if _cuser
+                            else f"<a href=\"https://t.me/c/{str(_cid)[4:] if str(_cid).startswith('-100') else _cid}\">{html.escape(_ctitle)}</a>"
+                        )
+                        _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                        _kb = make_lols_kb(inout_userid)
+                        _rid = int(datetime.now().timestamp())
+                        _kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{inout_userid}_{_rid}"))
+                        await safe_send_message(
+                            BOT,
+                            ADMIN_GROUP_ID,
+                            (
+                                f"Suspicious activity detected between join and leave in {_link}.\n"
+                                f"User @{cur_username or '!UNDEFINED!'} (<code>{inout_userid}</code>) changed: <b>{', '.join(_changed)}</b> before leaving at {_ts}."
+                            ),
+                            LOGGER,
+                            message_thread_id=ADMIN_SUSPICIOUS,
+                            parse_mode="HTML",
+                            disable_web_page_preview=True,
+                            reply_markup=_kb,
+                        )
+                        active_user_checks_dict[inout_userid]["notified_profile_change"] = True
+
                 last2_join_left_event = CURSOR.execute(
                     """
                     SELECT received_date, new_chat_member, left_chat_member
@@ -2423,14 +2606,16 @@ if __name__ == "__main__":
                     await ban_user_from_all_chats(
                         inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
                     )
-                    lols_url = f"https://t.me/oLolsBot?start={inout_userid}"
+                    lols_url = build_lols_url(inout_userid)
                     inline_kb = InlineKeyboardMarkup().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
                     joinleft_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         ADMIN_GROUP_ID,
                         f"{escaped_inout_userfirstname} {escaped_inout_userlastname} @{inout_username} (<code>{inout_userid}</code>) joined and left {universal_chatlink} in 30 seconds or less. Telefragged at {joinleft_timestamp}...",
+                        LOGGER,
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
                         reply_markup=inline_kb,
@@ -2439,9 +2624,11 @@ if __name__ == "__main__":
                     if (
                         update.old_chat_member.user.username
                     ):  # post username if the user have it
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             TECHNOLOG_GROUP_ID,
                             f"<code>{inout_userid}</code>:@{update.old_chat_member.user.username} (1790)",
+                            LOGGER,
                             parse_mode="HTML",
                             message_thread_id=TECHNO_NAMES,
                         )
@@ -2451,6 +2638,23 @@ if __name__ == "__main__":
                     inout_userid,
                     inout_username,
                 )
+
+            # Always cleanup the baseline/watch entry when the user leaves
+            if inout_userid in active_user_checks_dict:
+                try:
+                    del active_user_checks_dict[inout_userid]
+                    LOGGER.debug(
+                        "%s:@%s removed baseline/watch entry on leave",
+                        inout_userid,
+                        inout_username,
+                    )
+                except Exception as _e:
+                    LOGGER.debug(
+                        "%s:@%s failed to remove baseline/watch entry on leave: %s",
+                        inout_userid,
+                        inout_username,
+                        _e,
+                    )
 
     @DP.message_handler(
         is_forwarded_from_unknown_channel_message,
@@ -2477,8 +2681,10 @@ if __name__ == "__main__":
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
             message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-        await BOT.send_message(TECHNOLOG_GROUP_ID, message_as_json)
-        await BOT.send_message(TECHNOLOG_GROUP_ID, "Please investigate this message.")
+        await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
+        await safe_send_message(
+            BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
+        )
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         spammer_id, spammer_first_name, spammer_last_name = extract_spammer_info(
@@ -2704,16 +2910,13 @@ if __name__ == "__main__":
         )
 
         # construct lols check link button
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton(
-                "ℹ️ Check Spam Data ℹ️",
-                url=f"https://t.me/oLolsBot?start={user_id}",
-            )
-        )
+        inline_kb = make_lols_kb(user_id)
         # Send the banner to the technolog group
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP_ID,
             technolog_info,
+            LOGGER,
             parse_mode="HTML",
             reply_markup=inline_kb,
         )
@@ -2740,9 +2943,11 @@ if __name__ == "__main__":
                     disable_notification=True,
                 )
                 # Send report banner to the admin group
-                admin_group_banner_message = await BOT.send_message(
+                admin_group_banner_message = await safe_send_message(
+                    BOT,
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
+                    LOGGER,
                     reply_markup=keyboard,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
@@ -2758,21 +2963,17 @@ if __name__ == "__main__":
                     reply_markup=keyboard,
                 )
 
-                # Store the admin action banner message data XXX
-                forwarded_report_state = DP.get("forwarded_reports_states")
-                if forwarded_report_state is None:
-                    forwarded_report_state = {}
-                    DP["forwarded_reports_states"] = forwarded_report_state
-                
-                # Add the new state to the forwarded_reports_states dictionary
-                forwarded_report_state[report_id] = {
-                    "original_forwarded_message": message,
-                    "admin_group_banner_message": admin_group_banner_message,
-                    "action_banner_message": admin_action_banner_message,
-                    "report_chat_id": message.chat.id,
-                }
-
-                DP["forwarded_reports_states"] = forwarded_report_state
+                # Store the admin action banner message data
+                set_forwarded_state(
+                    DP,
+                    report_id,
+                    {
+                        "original_forwarded_message": message,
+                        "admin_group_banner_message": admin_group_banner_message,
+                        "action_banner_message": admin_action_banner_message,
+                        "report_chat_id": message.chat.id,
+                    },
+                )
 
                 # Construct link to the published banner and send it to the reporter
                 private_chat_id = int(
@@ -2792,9 +2993,11 @@ if __name__ == "__main__":
                     message.message_id,
                     message_thread_id=ADMIN_AUTOREPORTS,
                 )
-                admin_group_banner_message = await BOT.send_message(
+                admin_group_banner_message = await safe_send_message(
+                    BOT,
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
+                    LOGGER,
                     reply_markup=keyboard,
                     parse_mode="HTML",
                     message_thread_id=ADMIN_AUTOREPORTS,
@@ -2840,20 +3043,16 @@ if __name__ == "__main__":
 
                 #     return admin_group_banner_message
                 # XXX we need to lock
-                forwarded_report_state = DP.get("forwarded_reports_states")
-                if forwarded_report_state is None:
-                    forwarded_report_state = {}
-                    DP["forwarded_reports_states"] = forwarded_report_state
-                
-                # Add the new state to the forwarded_reports_states dictionary
-                forwarded_report_state[report_id] = {
-                    "original_forwarded_message": message,
-                    "admin_group_banner_message": admin_group_banner_message,
-                    "action_banner_message": admin_action_banner_message,  # BUG if report sent by non-admin user - there is no admin action banner message
-                    "report_chat_id": message.chat.id,
-                }
-
-                DP["forwarded_reports_states"] = forwarded_report_state
+                set_forwarded_state(
+                    DP,
+                    report_id,
+                    {
+                        "original_forwarded_message": message,
+                        "admin_group_banner_message": admin_group_banner_message,
+                        "action_banner_message": admin_action_banner_message,  # BUG if report sent by non-admin user - there is no admin action banner message
+                        "report_chat_id": message.chat.id,
+                    },
+                )
 
                 return admin_group_banner_message
 
@@ -2896,13 +3095,15 @@ if __name__ == "__main__":
             LOGGER.warning("No forwarded_reports_states recorded!")
             # reply message and remove buttons
             return
-        
+
         forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
         if forwarded_report_state is None:
-            LOGGER.warning("No forwarded_report_state found for report_id: %s", report_id_to_ban)
+            LOGGER.warning(
+                "No forwarded_report_state found for report_id: %s", report_id_to_ban
+            )
             # reply message and remove buttons
             return
-        
+
         # """                forwarded_report_state[report_id] = {
         #             "original_forwarded_message": message,
         #             "admin_group_banner_message": admin_group_banner_message,
@@ -3015,15 +3216,18 @@ if __name__ == "__main__":
                 LOGGER.warning("No forwarded_reports_states recorded in handle_ban!")
                 await callback_query.message.reply("Error: Report states not found.")
                 return
-                
+
             forwarded_report_state: dict = forwarded_reports_states.get(
                 report_id_to_ban
             )
             if forwarded_report_state is None:
-                LOGGER.warning("No forwarded_report_state found for report_id: %s in handle_ban", report_id_to_ban)
+                LOGGER.warning(
+                    "No forwarded_report_state found for report_id: %s in handle_ban",
+                    report_id_to_ban,
+                )
                 await callback_query.message.reply("Error: Report state not found.")
                 return
-                
+
             original_spam_message: types.Message = forwarded_report_state[
                 "original_forwarded_message"
             ]
@@ -3074,7 +3278,9 @@ if __name__ == "__main__":
                 LOGGER.debug("%s author ID retrieved for original message", author_id)
             except (ValueError, SyntaxError, IndexError) as e:
                 LOGGER.error("Failed to parse forwarded_message_data: %s", e)
-                await callback_query.message.reply("Error: Invalid message data format.")
+                await callback_query.message.reply(
+                    "Error: Invalid message data format."
+                )
                 return
 
             LOGGER.debug(
@@ -3088,9 +3294,11 @@ if __name__ == "__main__":
                 forwarded_message_data,
                 original_message_timestamp,
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"Author ID (<code>{author_id}</code>) retrieved for original message.",
+                LOGGER,
                 parse_mode="HTML",
             )
             if not author_id:
@@ -3193,9 +3401,11 @@ if __name__ == "__main__":
                 f"Attempting to delete all messages <b>({spam_messages_count})</b> from @{user_name} (<code>{author_id}</code>)\n"
                 f"action taken by @{button_pressed_by if button_pressed_by else '!UNDEFINED!'}):"
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 bot_info_message,
+                LOGGER,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 disable_notification=True,
@@ -3213,9 +3423,11 @@ if __name__ == "__main__":
                         f"in chat <a href='{chat_link}'>{CHANNEL_DICT[channel_id]}</a> (<code>{channel_id}</code>)\n"
                         f"<a href='{message_link}'>{message_link}</a>"
                     )
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         TECHNOLOG_GROUP_ID,
                         bot_chatlink_message,
+                        LOGGER,
                         disable_web_page_preview=True,
                         disable_notification=True,
                         message_thread_id=TECHNO_ORIGINALS,
@@ -3300,9 +3512,11 @@ if __name__ == "__main__":
                             channel_id,
                             inner_e,
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             TECHNOLOG_GROUP_ID,
                             f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
+                            LOGGER,
                         )
                         break  # Cancel current attempt
                     except MessageCantBeDeleted:
@@ -3360,9 +3574,11 @@ if __name__ == "__main__":
                         channel_id,
                         inner_e,
                     )
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         TECHNOLOG_GROUP_ID,
                         f"Failed to ban and delete messages in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
+                        LOGGER,
                     )
             # unpack user_name correctly XXX
             user_name = result[0][2] if result else "!UNDEFINED!"
@@ -3395,27 +3611,30 @@ if __name__ == "__main__":
             # TODO add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
 
-            lols_url = f"https://t.me/oLolsBot?start={author_id}"
-            lols_check_kb = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-            )
-            await BOT.send_message(
+            lols_check_kb = make_lols_kb(author_id)
+            await safe_send_message(
+                BOT,
                 ADMIN_GROUP_ID,
                 f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                LOGGER,
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                LOGGER,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
             if forwarded_message_data[4] not in [0, "0", None]:
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"<code>{author_id}</code>:@{forwarded_message_data[4]} (3088)",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
@@ -3453,9 +3672,12 @@ if __name__ == "__main__":
 
         # report spam to the P2P spamcheck server
         await report_spam_2p2p(author_id, LOGGER)
-        await BOT.send_message(
+
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP_ID,
             f"{author_id}:@{user_name} reported to P2P spamcheck server.",
+            LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=TECHNO_ADMIN,
@@ -3496,26 +3718,25 @@ if __name__ == "__main__":
         )
 
         # FIXED BUG: Use actual_user_id for the LOLS bot link
-        lols_url = f"https://t.me/oLolsBot?start={actual_user_id}"
-        inline_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-        )
-        await BOT.send_message(
+        inline_kb = make_lols_kb(actual_user_id)
+        await safe_send_message(
+            BOT,
             ADMIN_GROUP_ID,
             f"Button ACTION CANCELLED by @{button_pressed_by}: Report WAS NOT PROCESSED!!! "
-            # Use original_report_id_str for the /ban command hint
             f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
+            LOGGER,
             message_thread_id=callback_query.message.message_thread_id,
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP_ID,
             f"CANCEL button pressed by @{button_pressed_by}. "
             f"Button ACTION CANCELLED: Report WAS NOT PROCESSED. "
-            # Use original_report_id_str for the /ban command hint
             f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
+            LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
@@ -3568,15 +3789,12 @@ if __name__ == "__main__":
         parts = callback_query.data.split("_")
         user_id_str = parts[1]
         user_id = int(user_id_str)
-        
+
         button_pressed_by = callback_query.from_user.username or "!UNDEFINED!"
         admin_id = callback_query.from_user.id
 
         # Create response message
-        lols_url = f"https://t.me/oLolsBot?start={user_id}"
-        lols_check_and_banned_kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
-        )
+        lols_check_and_banned_kb = make_lols_kb(user_id)
         api_url = f"https://api.lols.bot/account?id={user_id}"
         lols_check_and_banned_kb.add(
             InlineKeyboardButton("💀💀💀 B.A.N.N.E.D. 💀💀💀", url=api_url)
@@ -3606,12 +3824,13 @@ if __name__ == "__main__":
                 banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
                 LOGGER.info(
                     "%s:@%s removed from active_user_checks_dict during manual ban",
-                    user_id, username
+                    user_id,
+                    username,
                 )
 
             # Ban user from all chats
             await ban_user_from_all_chats(user_id, username, CHANNEL_IDS, CHANNEL_DICT)
-            
+
             # Add to banned users dict
             banned_users_dict[user_id] = username
 
@@ -3635,35 +3854,43 @@ if __name__ == "__main__":
             )
 
             # Send to technolog group
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 ban_message,
+                LOGGER,
                 parse_mode="HTML",
                 reply_markup=lols_check_and_banned_kb,
                 message_thread_id=TECHNO_ADMIN,
             )
 
             # Send to admin group
-            # await BOT.send_message(
-            #     ADMIN_GROUP_ID,
-            #     ban_message,
-            #     parse_mode="HTML",
-            #     reply_markup=lols_check_and_banned_kb,
-            #     message_thread_id=ADMIN_MANBAN,
-            # )
+            await safe_send_message(
+                BOT,
+                ADMIN_GROUP_ID,
+                ban_message,
+                LOGGER,
+                parse_mode="HTML",
+                reply_markup=lols_check_and_banned_kb,
+                message_thread_id=ADMIN_MANBAN,
+            )
 
             # Log username if available
             if username and username != "!UNDEFINED!":
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"<code>{user_id}</code>:@{username} (manual)",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
 
             LOGGER.info(
                 "\033[91m%s:@%s manually banned from all chats by @%s\033[0m",
-                user_id, username, button_pressed_by
+                user_id,
+                username,
+                button_pressed_by,
             )
 
             # await callback_query.answer("User banned successfully!", show_alert=True)
@@ -3672,10 +3899,12 @@ if __name__ == "__main__":
             error_msg = f"Error banning user {user_id}: {str(e)}"
             LOGGER.error(error_msg)
             await callback_query.answer(f"Error: {str(e)}", show_alert=True)
-            
-            await BOT.send_message(
+
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"❌ {error_msg}",
+                LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_ADMIN,
             )
@@ -3692,7 +3921,9 @@ if __name__ == "__main__":
         lols_url = f"https://t.me/oLolsBot?start={user_id}"
         inline_kb = InlineKeyboardMarkup()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
-        inline_kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{user_id_str}"))
+        inline_kb.add(
+            InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{user_id_str}")
+        )
 
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
@@ -3732,9 +3963,11 @@ if __name__ == "__main__":
                         message.chat.username if message.chat.username else None,
                     ]
                 )
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"From chat: {message.chat.title}\nMessage link: <a href='{message_link}'>Click here</a>",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
@@ -3770,13 +4003,15 @@ if __name__ == "__main__":
                     "\nReceived CHANNEL message object:\n %s\n",
                     formatted_message,
                 )
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     (
                         formatted_message_tlgrm
                         if formatted_message_tlgrm
                         else formatted_message
                     ),
+                    LOGGER,
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )
@@ -3891,8 +4126,8 @@ if __name__ == "__main__":
                 ADMIN_GROUP_ID,
                 message.chat.id,
                 message.message_id,
-                ADMIN_AUTOBAN,
-                True,
+                message_thread_id=ADMIN_AUTOBAN,
+                disable_notification=True,
             )
 
             # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
@@ -3919,10 +4154,11 @@ if __name__ == "__main__":
                 f"@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
                 f"In chat: {chat_link_html} (<code>{message.chat.id}</code>)"
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 ADMIN_GROUP_ID,
                 admin_notification_text,
-                # reply_markup=inline_kb, # Do not send keyboard since autobanned
+                LOGGER,
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -4077,9 +4313,11 @@ if __name__ == "__main__":
                         f"banned in chat {message.chat.title} ({message.chat.id})"
                     )
                     LOGGER.info(log_chan_data)
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         ADMIN_GROUP_ID,
                         admin_log_chan_data,
+                        LOGGER,
                         parse_mode="HTML",
                         message_thread_id=ADMIN_AUTOBAN,
                         disable_web_page_preview=True,
@@ -4489,9 +4727,11 @@ if __name__ == "__main__":
                             ADMIN_SUSPICIOUS,
                             disable_notification=True,
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             ADMIN_GROUP_ID,
                             f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Please check it out!",
+                            LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             reply_markup=inline_kb,
                             parse_mode="HTML",
@@ -4535,9 +4775,11 @@ if __name__ == "__main__":
                 report_msg_id,
                 result,
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"Database query result for forwarded_message_data {report_msg_id}: {result}",
+                LOGGER,
             )
 
             if not result:
@@ -4561,9 +4803,11 @@ if __name__ == "__main__":
             # MODIFIED: Use ast.literal_eval for safety
             author_id = ast.literal_eval(forwarded_message_data)[3]
             LOGGER.debug("%s author ID retrieved for original message", author_id)
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"Author ID (<code>{author_id}</code>) retrieved for original message.",
+                LOGGER,
                 parse_mode="HTML",
             )
             if not author_id:
@@ -4638,10 +4882,12 @@ if __name__ == "__main__":
                         CHANNEL_DICT[chat_id],
                         chat_id,
                     )
-                    # await BOT.send_message(
-                    #     TECHNOLOG_GROUP_ID,
-                    #     f"User {author_id} banned and their messages deleted from chat {channels_dict[chat_id]} ({chat_id}).",
-                    # )
+                    await safe_send_message(
+                        BOT,
+                        TECHNOLOG_GROUP_ID,
+                        f"User {author_id} banned and their messages deleted from chat {CHANNEL_DICT[chat_id]} ({chat_id}).",
+                        LOGGER,
+                    )
                 except Exception as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
@@ -4649,9 +4895,11 @@ if __name__ == "__main__":
                         chat_id,
                         inner_e,
                     )
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         TECHNOLOG_GROUP_ID,
                         f"Failed to ban and delete messages in chat {CHANNEL_DICT[chat_id]} ({chat_id}). Error: {inner_e}",
+                        LOGGER,
                     )
             # select all messages from the user in the chat
             # and this is not records about join or leave
@@ -4687,10 +4935,12 @@ if __name__ == "__main__":
                         chat_id,
                         inner_e,
                     )
-                    # await BOT.send_message(
-                    #     TECHNOLOG_GROUP_ID,
-                    #     f"Failed to delete message {message_id} in chat {channels_dict[chat_id]} ({chat_id}). Error: {inner_e}",
-                    # )
+                    await safe_send_message(
+                        BOT,
+                        TECHNOLOG_GROUP_ID,
+                        f"Failed to delete message {message_id} in chat {CHANNEL_DICT[chat_id]} ({chat_id}). Error: {inner_e}",
+                        LOGGER,
+                    )
             LOGGER.debug(
                 "\033[91m%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
@@ -4718,20 +4968,12 @@ if __name__ == "__main__":
             if forwarded_message_data[4] not in [0, "0", None]
             else "!UNDEFINED!"
         )
-        lols_url = f"https://t.me/oLolsBot?start={author_id}"
-        lols_check_kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="LOLS DATA",
-                        url=lols_url,
-                    )
-                ]
-            ]
-        )
-        await BOT.send_message(
+        lols_check_kb = make_lols_kb(author_id)
+        await safe_send_message(
+            BOT,
             TECHNOLOG_GROUP_ID,
-            f"{author_id}:@{user_name} reported to P2P spamcheck server.",  # XXX check user_name var
+            f"{author_id}:@{user_name} reported to P2P spamcheck server.",
+            LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=TECHNO_ADMIN,
@@ -4762,8 +5004,12 @@ if __name__ == "__main__":
             )
 
             if user_id in active_user_checks_dict:
+                _val = active_user_checks_dict.get(user_id)
+                _disp = (
+                    _val.get("username", "!UNDEFINED!") if isinstance(_val, dict) else (_val or "!UNDEFINED!")
+                )
                 await message.reply(
-                    f"User <code>{active_user_checks_dict[user_id]}</code> is already being checked.",
+                    f"User <code>{_disp}</code> is already being checked.",
                     parse_mode="HTML",
                 )
                 return
@@ -4880,16 +5126,20 @@ if __name__ == "__main__":
                     f"Original message {user_details_log_str}",
                     parse_mode="HTML",
                 )
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
                     f"Original message {user_details_log_str}",
+                    LOGGER,
                     parse_mode="HTML",
                 )
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     ADMIN_GROUP_ID,
                     f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
                     f"Original message {user_details_log_str}",
+                    LOGGER,
                     parse_mode="HTML",
                     message_thread_id=ADMIN_MANBAN,
                 )
@@ -4986,14 +5236,18 @@ if __name__ == "__main__":
                         await message.reply(
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned where it is possible."
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             TECHNOLOG_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             ADMIN_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                             message_thread_id=ADMIN_MANBAN,
                         )
@@ -5023,14 +5277,17 @@ if __name__ == "__main__":
                         await message.reply(
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned where it is possible."
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             TECHNOLOG_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
                             ADMIN_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                             message_thread_id=ADMIN_MANBAN,
                         )
@@ -5046,15 +5303,21 @@ if __name__ == "__main__":
                             "\033[91mChannel (%s) unbanned.\033[0m",
                             rogue_chan_id,
                         )
-                        await message.reply(f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned.")
-                        await BOT.send_message(
+                        await message.reply(
+                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned."
+                        )
+                        await safe_send_message(
+                            BOT,
                             TECHNOLOG_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                         )
-                        await BOT.send_message(
+                        await safe_send_message(
+                            BOT,
                             ADMIN_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                            LOGGER,
                             parse_mode="HTML",
                             message_thread_id=ADMIN_MANBAN,
                         )
@@ -5193,16 +5456,20 @@ if __name__ == "__main__":
             f"User marked as legitimate. To re-check, use <code>/check {user_id_legit}</code>."
         )
         try:
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 callback_query.message.chat.id,
                 common_message_text,
+                LOGGER,
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
             )
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 common_message_text,
+                LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_ADMIN,
                 disable_web_page_preview=True,
@@ -5323,18 +5590,16 @@ if __name__ == "__main__":
                 # logger.debug(f"Received UNHANDLED message object:\n{message}")
 
                 # Send unhandled message to the technolog group
-                # await BOT.send_message(
-                #     TECHNOLOG_GROUP_ID,
-                #     f"Received UNHANDLED message object:\n{message}",
-                #     message_thread_id=TECHNO_UNHANDLED,
-                # )
+                # Intentionally not sending the raw object text; we forward the message instead
                 await message.forward(
                     TECHNOLOG_GROUP_ID, message_thread_id=TECHNO_UNHANDLED
                 )  # forward all unhandled messages to technolog group
 
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     TECHNOLOG_GROUP_ID,
                     formatted_message,
+                    LOGGER,
                     message_thread_id=TECHNO_UNHANDLED,
                 )
                 # LOGGER.debug(
@@ -5410,9 +5675,11 @@ if __name__ == "__main__":
             # _reply_message = f"Received message from {message.from_user.first_name}:\n{bot_received_message}\n"
 
             # Send the message with the inline keyboard
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 ADMIN_USER_ID,
                 _reply_message,
+                LOGGER,
                 reply_markup=inline_kb,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
@@ -5440,9 +5707,11 @@ if __name__ == "__main__":
         original_message_chat_id, original_message_chat_reply_id, response_text
     ):
         """Simulate an admin reply with the given response text."""
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             original_message_chat_id,
             response_text,
+            LOGGER,
             reply_to_message_id=original_message_chat_reply_id,
         )
 
@@ -5508,9 +5777,11 @@ if __name__ == "__main__":
                 )
 
                 # Reply with the predetermined sentence
-                await BOT.send_message(
+                await safe_send_message(
+                    BOT,
                     callback_query.message.chat.id,
                     "Replied to " + original_message_user_name + ": " + response_text,
+                    LOGGER,
                 )
 
                 # Edit the original message to remove the buttons
@@ -5525,144 +5796,6 @@ if __name__ == "__main__":
 
         # Acknowledge the callback query
         await callback_query.answer()
-
-    # @DP.callback_query_handler(lambda c: c.data.startswith("stop_checks_"))
-    # async def stop_checks(callback_query: CallbackQuery):
-    #     """Function to stop checks for the user."""
-    #     try:
-    #         # MODIFIED: Adjusted parsing for single-word prefix
-    #         _prefix, user_id_legit_str, orig_chat_id_str, orig_message_id_str = callback_query.data.split("_")
-    #         user_id_legit = int(user_id_legit_str)
-    #         orig_chat_id = int(orig_chat_id_str)
-    #         orig_message_id = int(orig_message_id_str)
-    #     except ValueError as e:
-    #         LOGGER.error("%s Invalid callback data: %s", e, callback_query.data)
-    #         # await callback_query.answer("Invalid data format.")
-    #         return
-
-    #     button_pressed_by = callback_query.from_user.username
-    #     admin_id = callback_query.from_user.id
-
-    #     # Unpack user_name
-    #     user_name_dict = active_user_checks_dict.get(user_id_legit, "!UNDEFINED!")
-    #     # check if user_name_dict is a dict
-    #     if isinstance(user_name_dict, dict):
-    #         user_name = str(user_name_dict["username"]).lstrip("@")
-    #     else:
-    #         user_name = user_name_dict
-
-    #     # # create unified message link
-    #     message_link = construct_message_link([orig_chat_id, orig_message_id, None])
-    #     lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
-
-    #     # Create the inline keyboard
-    #     inline_kb = InlineKeyboardMarkup()
-
-    #     # # Add buttons to the keyboard, each in a new row
-    #     inline_kb.add(
-    #         InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-    #     )
-    #     inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
-
-    #     # remove buttons from the admin group
-    #     await BOT.edit_message_reply_markup(
-    #         chat_id=callback_query.message.chat.id,
-    #         message_id=callback_query.message.message_id,
-    #         reply_markup=inline_kb,
-    #     )
-
-    #     # check if user already left active checks or button pressed after 3 hrs after report
-    #     if user_id_legit not in active_user_checks_dict:
-    #         LOGGER.error(
-    #             "%s:@%s legitimized by %s(%s) not found in active_user_checks_dict",
-    #             user_id_legit,
-    #             user_name,
-    #             button_pressed_by,
-    #             admin_id,
-    #         )
-    #         await callback_query.answer("User not found in active checks.")
-    #         return
-
-    #     LOGGER.info(
-    #         "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
-    #         user_id_legit,
-    #         user_name,
-    #         admin_id,
-    #         button_pressed_by,
-    #     )
-    #     await asyncio.sleep(0.1)  # Add a small delay
-    #     await BOT.send_message(
-    #         callback_query.message.chat.id,
-    #         f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}!!! "
-    #         f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
-    #         message_thread_id=callback_query.message.message_thread_id,
-    #         parse_mode="HTML",
-    #         disable_web_page_preview=True,
-    #     )
-    #     await BOT.send_message(
-    #         TECHNOLOG_GROUP_ID,
-    #         f"Future checks for <code>{user_id_legit}</code> cancelled by @{button_pressed_by}. "
-    #         f"Start checks them again if needed or use <code>/check {user_id_legit}</code> command.",
-    #         parse_mode="HTML",
-    #         message_thread_id=TECHNO_ADMIN,
-    #         disable_web_page_preview=True,
-    #     )
-    #     # Removing user from active_user_checks dict and stop checks coroutines
-    #     if user_id_legit in active_user_checks_dict:
-    #         del active_user_checks_dict[user_id_legit]
-    #         for task in asyncio.all_tasks():
-    #             if task.get_name() == str(user_id_legit):
-    #                 task.cancel()
-    #     # else:
-    #     # user is not in active checks but joined less than 1 week ago
-    #     # store new record in the DB that future checks are cancelled
-    #     # set new_chat_member and left_chat_member to 1
-    #     # to indicate that checks were cancelled
-    #     CURSOR.execute(
-    #         """
-    #         INSERT OR REPLACE INTO recent_messages
-    #         (chat_id, message_id, user_id, user_name, received_date, new_chat_member, left_chat_member)
-    #         VALUES (?, ?, ?, ?, ?, ?, ?)
-    #         """,
-    #         (
-    #             callback_query.message.chat.id,
-    #             callback_query.id,  # XXX not a message ID!!!
-    #             user_id_legit,
-    #             user_name,
-    #             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #             1,  # new_chat_member
-    #             1,  # left_chat_member
-    #         ),
-    #     )
-    #     CONN.commit()
-
-    #     # Log that user checks are cancelled by admin
-    #     if len(active_user_checks_dict) > 3:
-    #         active_user_checks_dict_last3_list = list(active_user_checks_dict.items())[
-    #             -3:
-    #         ]
-    #         active_user_checks_dict_last3_str = ", ".join(
-    #             [f"{uid}: {uname}" for uid, uname in active_user_checks_dict_last3_list]
-    #         )
-    #         LOGGER.info(
-    #             "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
-    #             user_id_legit,
-    #             user_name,
-    #             admin_id,
-    #             button_pressed_by,
-    #             active_user_checks_dict_last3_str,  # Last 3 elements
-    #             len(active_user_checks_dict),  # Number of elements left
-    #         )
-    #     else:
-    #         LOGGER.info(
-    #             "\033[95m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
-    #             user_id_legit,
-    #             user_name,
-    #             admin_id,
-    #             button_pressed_by,
-    #             active_user_checks_dict,
-    #         )
-    #     return
 
     @DP.callback_query_handler(
         # MODIFIED: Renamed callback prefixes and adjusted lambda
@@ -5834,9 +5967,11 @@ if __name__ == "__main__":
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
             await report_spam_2p2p(susp_user_id, LOGGER)
-            await BOT.send_message(
+            await safe_send_message(
+                BOT,
                 TECHNOLOG_GROUP_ID,
                 f"{susp_user_id}:@{susp_user_name} reported to P2P spamcheck server.",
+                LOGGER,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
                 message_thread_id=TECHNO_ADMIN,
@@ -5899,9 +6034,11 @@ if __name__ == "__main__":
             f"Action done by Admin @{admin_username}"
         )
 
-        await BOT.send_message(
+        await safe_send_message(
+            BOT,
             callback_query.message.chat.id,
             bot_reply_action_message,
+            LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=callback_query.message.message_thread_id,
@@ -5931,14 +6068,18 @@ if __name__ == "__main__":
                 # Forward the admin's reply to the original sender
                 _message_text = message.text
                 if message.text.startswith("/") or message.text.startswith("\\"):
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         original_message_chat_id,
                         _message_text[1:],
+                        LOGGER,
                     )
                 else:
-                    await BOT.send_message(
+                    await safe_send_message(
+                        BOT,
                         original_message_chat_id,
                         _message_text,
+                        LOGGER,
                         reply_to_message_id=original_message_chat_reply_id,
                     )
 
@@ -5979,14 +6120,16 @@ if __name__ == "__main__":
             )
         except MessageCantBeDeleted as e:
             LOGGER.error("Message can't be deleted: %s", e)
-            await BOT.send_message(
-                chat_id=message.chat.id,
-                text="Sorry, I can't delete this message.",
+            await safe_send_message(
+                BOT,
+                message.chat.id,
+                "Sorry, I can't delete this message.",
+                LOGGER,
                 reply_to_message_id=message.message_id,
             )
 
     # scheduler to run the log_lists function daily at 04:00
-    @aiocron.crontab("0 4 * * *")
+    @aiocron.crontab("0 4 * * *", tz=ZoneInfo("Indian/Mauritius"))
     async def scheduled_log():
         """Function to schedule the log_lists function to run daily at 00:00."""
         await log_lists()

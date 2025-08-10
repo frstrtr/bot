@@ -35,6 +35,7 @@ Functions:
 
 
 import logging
+import asyncio
 import subprocess
 import re
 from datetime import datetime
@@ -53,6 +54,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from aiogram.utils.exceptions import Unauthorized, BadRequest, RetryAfter
 
 def initialize_logger(log_level="INFO"):
     """Initialize the logger."""
@@ -107,6 +109,113 @@ def construct_message_link(message_data_list: list) -> str:
         message_link = f"https://t.me/c/{chat_id}/{message_id}"
 
     return message_link
+
+
+# ---------------------- Small reusable helpers ----------------------
+def build_lols_url(user_id: int) -> str:
+    """Return LOLS bot deep link for a given user id."""
+    return f"https://t.me/oLolsBot?start={user_id}"
+
+
+def make_lols_kb(user_id: int) -> InlineKeyboardMarkup:
+    """Create a one-button keyboard with the LOLS check link.
+
+    Button text must remain exactly as used elsewhere to preserve UX.
+    """
+    lols_url = build_lols_url(user_id)
+    inline_kb = InlineKeyboardMarkup()
+    inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
+    return inline_kb
+
+
+async def safe_get_chat_name_username(bot, chat_id: int, logger=None):
+    """Safely fetch chat title and username; return fallbacks on errors.
+
+    Returns tuple: (title_or_default, username_or_default)
+    """
+    try:
+        chat = await bot.get_chat(chat_id)
+        title = getattr(chat, "title", None) or "!ROGUECHAT!"
+        username = getattr(chat, "username", None) or "!@ROGUECHAT!"
+        return title, username
+    except (Unauthorized, BadRequest) as e:
+        if logger:
+            logger.warning(
+                "Cannot get chat info for chat %s: %s. Using defaults.", chat_id, str(e)
+            )
+        return "!ROGUECHAT!", "!@ROGUECHAT!"
+
+
+def get_forwarded_states(dp) -> dict:
+    """Ensure and return dispatcher-level forwarded_reports_states dict."""
+    states = dp.get("forwarded_reports_states")
+    if states is None:
+        states = {}
+        dp["forwarded_reports_states"] = states
+    return states
+
+
+def set_forwarded_state(dp, report_id: int, state: dict):
+    """Set/replace state for a report id in forwarded_reports_states."""
+    states = get_forwarded_states(dp)
+    states[report_id] = state
+    dp["forwarded_reports_states"] = states
+
+
+def get_forwarded_state(dp, report_id: int):
+    """Get state for report id from forwarded_reports_states or None."""
+    states = dp.get("forwarded_reports_states")
+    if not states:
+        return None
+    return states.get(report_id)
+
+
+async def safe_send_message(
+    bot,
+    chat_id: int,
+    text: str,
+    logger=None,
+    retries: int = 2,
+    retry_backoff: float = 1.2,
+    **kwargs,
+):
+    """Safely call bot.send_message with simple RetryAfter handling.
+
+    - Retries on aiogram RetryAfter using server-provided timeout.
+    - Logs warnings/errors if a logger is provided.
+    - Returns the Message on success, or None on final failure.
+    """
+    attempt = 0
+    while True:
+        try:
+            return await bot.send_message(chat_id, text, **kwargs)
+        except RetryAfter as e:
+            wait = getattr(e, "timeout", 1) or 1
+            if attempt < retries:
+                if logger:
+                    logger.warning(
+                        "Rate limited on send_message to %s, retrying in %ss (attempt %s/%s)",
+                        chat_id,
+                        wait,
+                        attempt + 1,
+                        retries,
+                    )
+                await asyncio.sleep(wait * (retry_backoff ** attempt))
+                attempt += 1
+                continue
+            else:
+                if logger:
+                    logger.error("Failed to send_message to %s after retries: %s", chat_id, e)
+                return None
+        except BadRequest as e:
+            # Common harmless case when editing text with no changes; for send we still surface it
+            if logger:
+                logger.error("BadRequest sending message to %s: %s", chat_id, e)
+            return None
+        except Exception as e:
+            if logger:
+                logger.error("Unexpected error sending message to %s: %s", chat_id, e)
+            return None
 
 
 def load_predetermined_sentences(txt_file: str, logger):

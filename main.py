@@ -3987,8 +3987,7 @@ if __name__ == "__main__":
             except BadRequest as e:
                 LOGGER.error("Channel message processing error: %s", e)
                 # return XXX do not stop processing
-            try:  # DELETE CHANNEL messages
-                await BOT.delete_message(message.chat.id, message.message_id)
+            try:
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
                 formatted_message = json.dumps(
@@ -4015,6 +4014,8 @@ if __name__ == "__main__":
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )
+                # DELETE CHANNEL messages
+                await BOT.delete_message(message.chat.id, message.message_id)
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Channel message already deleted! %s", e)
 
@@ -4065,6 +4066,91 @@ if __name__ == "__main__":
         lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
 
         inline_kb = create_inline_keyboard(message_link, lols_link, message)
+
+        # If user is under active checks and changed profile, immediately forward to ADMIN_SUSPICIOUS with buttons
+        try:
+            _uid = message.from_user.id
+            _entry = active_user_checks_dict.get(_uid)
+            if isinstance(_entry, dict):
+                _baseline = _entry.get("baseline")
+                _already_notified = _entry.get("notified_profile_change", False)
+                if _baseline and not _already_notified:
+                    old_first = _baseline.get("first_name", "")
+                    old_last = _baseline.get("last_name", "")
+                    old_usern = _baseline.get("username", "")
+                    old_pcnt = _baseline.get("photo_count", 0)
+
+                    new_first = getattr(message.from_user, "first_name", "") or ""
+                    new_last = getattr(message.from_user, "last_name", "") or ""
+                    new_usern = getattr(message.from_user, "username", "") or ""
+                    new_pcnt = old_pcnt
+                    # Try to detect uploaded photo (0 -> >0)
+                    try:
+                        _p = await BOT.get_user_profile_photos(_uid, limit=1)
+                        new_pcnt = getattr(_p, "total_count", 0) if _p else old_pcnt
+                    except Exception as _e:
+                        LOGGER.debug("%s:@%s unable to fetch photo count on message: %s", _uid, new_usern or "!UNDEFINED!", _e)
+
+                    changed = []
+                    diffs = []
+                    if new_first != old_first:
+                        changed.append("first name")
+                        diffs.append(f"first name: '{html.escape(old_first)}' -> '{html.escape(new_first)}'")
+                    if new_last != old_last:
+                        changed.append("last name")
+                        diffs.append(f"last name: '{html.escape(old_last)}' -> '{html.escape(new_last)}'")
+                    if new_usern != old_usern:
+                        changed.append("username")
+                        diffs.append(f"username: @{old_usern or '!UNDEFINED!'} -> @{new_usern or '!UNDEFINED!'}")
+                    if old_pcnt == 0 and new_pcnt > 0:
+                        changed.append("profile photo")
+                        diffs.append("profile photo: none -> set")
+
+                    if changed:
+                        # Forward the triggering message
+                        try:
+                            await message.forward(
+                                ADMIN_GROUP_ID,
+                                ADMIN_SUSPICIOUS,
+                                disable_notification=True,
+                            )
+                        except Exception as _e:
+                            LOGGER.debug("%s:@%s forward to admin/suspicious failed: %s", _uid, new_usern or "!UNDEFINED!", _e)
+
+                        kb = make_lols_kb(_uid)
+                        _report_id = int(datetime.now().timestamp())
+                        kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{_uid}_{_report_id}"))
+
+                        _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                        chat_title_safe = html.escape(message.chat.title)
+                        chat_link_html = (
+                            f"<a href='https://t.me/{message.chat.username}'>{chat_title_safe}</a>"
+                            if message.chat.username
+                            else (
+                                f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{chat_title_safe}</a>"
+                                if str(message.chat.id).startswith("-100")
+                                else chat_title_safe
+                            )
+                        )
+
+                        await safe_send_message(
+                            BOT,
+                            ADMIN_GROUP_ID,
+                            (
+                                "Suspicious profile change detected while under watch.\n"
+                                f"User @{new_usern or '!UNDEFINED!'} (<code>{_uid}</code>) in {chat_link_html}\n"
+                                f"Changed: <b>{', '.join(changed)}</b> at {_ts}.\n"
+                                + ("Details: " + "; ".join(diffs) if diffs else "")
+                            ),
+                            LOGGER,
+                            message_thread_id=ADMIN_SUSPICIOUS,
+                            parse_mode="HTML",
+                            disable_web_page_preview=True,
+                            reply_markup=kb,
+                        )
+                        active_user_checks_dict[_uid]["notified_profile_change"] = True
+        except Exception as _e:
+            LOGGER.debug("Immediate profile-change check failed: %s", _e)
 
         ### AUTOBAHN MESSAGE CHECKING ###
         # check if message is from user from active_user_checks_dict

@@ -929,7 +929,7 @@ class ModernTelegramBot:
                 
             # Create message and spam check links
             message_link = f"https://t.me/c/{str(susp_chat_id)[4:]}/{susp_message_id}"
-            lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
+            lols_link = self.build_lols_url(susp_user_id)
             
             # Create inline keyboard with links
             kb = InlineKeyboardBuilder()
@@ -979,14 +979,7 @@ class ModernTelegramBot:
                     callback_answer = "User banned globally and message deleted!"
                     
                     # Report to P2P spam server
-                    if AIOHTTP_AVAILABLE:
-                        try:
-                            async with aiohttp.ClientSession() as session:
-                                await session.post(f"{self.settings.LOCAL_SPAM_API_URL}/report", json={"user_id": susp_user_id})
-                        except Exception as e:
-                            self.logger.error(f"Failed to report to P2P server: {e}")
-                    else:
-                        self.logger.warning("aiohttp not available, skipping P2P report")
+                    await self.report_spam_2p2p(susp_user_id)
                         
                     # Cancel user checks
                     if susp_user_id in self.active_user_checks_dict:
@@ -1093,8 +1086,8 @@ class ModernTelegramBot:
             kb.row(InlineKeyboardButton(text="🔗 View Original Message", url=message_link))
             
             # Spam check link
-            lols_link = f"https://t.me/oLolsBot?start={user_id}"
-            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data", url=lols_link))
+            lols_link = self.build_lols_url(user_id)
+            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
             
             # Action buttons
             kb.row(
@@ -1121,20 +1114,121 @@ class ModernTelegramBot:
             self.logger.error(f"Failed to send suspicious message report: {e}")
     
     async def spam_check(self, user_id: int) -> bool:
-        """Check user against external spam databases (LoLs, CAS, etc.)."""
+        """Check user against external spam databases (LoLs, CAS, local P2P)."""
         try:
-            # This would implement the actual external API checks from the original bot
-            # For now, return False (not spam) as a placeholder
             self.logger.debug(f"Checking user {user_id} against spam databases")
             
-            # TODO: Implement actual LoLs API check
-            # TODO: Implement actual CAS API check  
-            # TODO: Implement local database check
+            if not AIOHTTP_AVAILABLE:
+                self.logger.warning("aiohttp not available, spam check disabled")
+                return False
             
-            return False
+            async with aiohttp.ClientSession() as session:
+                lols = False
+                cas = 0
+                is_spammer = False
+
+                async def check_local():
+                    """Check local P2P spam server."""
+                    try:
+                        async with session.get(
+                            f"{self.settings.LOCAL_SPAM_API_URL}/check?user_id={user_id}",
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                return data.get("is_spammer", False)
+                    except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                        self.logger.warning(f"Local endpoint check error: {e}")
+                        return False
+
+                async def check_lols():
+                    """Check LoLs bot spam database."""
+                    try:
+                        async with session.get(
+                            f"{self.settings.LOLS_API_URL}/account?id={user_id}",
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                return data.get("banned", False)
+                    except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                        self.logger.warning(f"LOLS endpoint check error: {e}")
+                        return False
+
+                async def check_cas():
+                    """Check CAS (Combot Anti-Spam) database."""
+                    try:
+                        async with session.get(
+                            f"{self.settings.CAS_API_URL}/check?user_id={user_id}",
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                if data.get("ok", False):
+                                    return data["result"].get("offenses", 0)
+                    except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                        self.logger.warning(f"CAS endpoint check error: {e}")
+                        return 0
+
+                # Run all checks concurrently
+                try:
+                    results = await asyncio.gather(
+                        check_local(), check_lols(), check_cas(), return_exceptions=True
+                    )
+
+                    is_spammer = results[0] if not isinstance(results[0], Exception) else False
+                    lols = results[1] if not isinstance(results[1], Exception) else False
+                    cas = results[2] if not isinstance(results[2], Exception) else 0
+
+                    # User is spam if any service reports them
+                    is_spam = lols or is_spammer or cas > 0
+                    
+                    if is_spam:
+                        self.logger.info(f"User {user_id} detected as spam: LoLs={lols}, Local={is_spammer}, CAS={cas}")
+                    
+                    return is_spam
+                    
+                except Exception as e:
+                    self.logger.error(f"Unexpected error in spam checks: {e}")
+                    return False
+                    
         except Exception as e:
             self.logger.error(f"Error in spam_check for user {user_id}: {e}")
             return False
+    
+    async def report_spam_2p2p(self, spammer_id: int) -> bool:
+        """Report spammer to local P2P spamcheck server."""
+        try:
+            if not AIOHTTP_AVAILABLE:
+                self.logger.warning("aiohttp not available, cannot report to P2P server")
+                return False
+                
+            url = f"{self.settings.LOCAL_SPAM_API_URL}/report_id?user_id={spammer_id}"
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        self.logger.info(f"{spammer_id} successfully reported to local P2P spamcheck server")
+                        return True
+                    else:
+                        self.logger.warning(f"Failed to report {spammer_id} to P2P server: HTTP {response.status}")
+                        return False
+        except (aiohttp.ServerTimeoutError, aiohttp.ClientError) as e:
+            self.logger.error(f"Error reporting spammer {spammer_id} to P2P server: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error reporting spammer {spammer_id}: {e}")
+            return False
+    
+    def build_lols_url(self, user_id: int) -> str:
+        """Return LOLS bot deep link for a given user id."""
+        return f"https://t.me/oLolsBot?start={user_id}"
+    
+    def make_lols_kb(self, user_id: int) -> InlineKeyboardMarkup:
+        """Create a one-button keyboard with the LOLS check link."""
+        lols_url = self.build_lols_url(user_id)
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
+        return kb.as_markup()
     
     async def check_and_autoban(self, user_id: int, reason: str = "Automated ban", **kwargs) -> bool:
         """Check user and automatically ban if conditions are met."""

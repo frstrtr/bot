@@ -1,24 +1,45 @@
-*
-.xml
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+venv_*/
+.venv/
+
+# Environment files
+.env
+
+# Bot specific
 *.log
 *.db
-test.py
-.vscode/settings.json
-*.json
+config.xml
+groups.xml
+*_old.xml
+banned_users.txt
+active_user_checks.txt
+daily_spam*.txt
+inout*.txt
+message_*.json
+sender_chat.json
+*_error.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup folders
+backup_*/
+
+# Old files
 *.old
 
-# Exclude spam_dict.txt from being ignored
+# Include important files
 !spam_dict.txt
-!p2spm.py
-!parse_spam.py
-!server/
-!server/main.py
-!server/api.py
-!server/config.py
-!server/database.py
-!server/p2p.py
-!server/p2spm.py
-!server/websocket.py
-!utils/
-!utils/*
-!utils/utils.py
+!.env.example

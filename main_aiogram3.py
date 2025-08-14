@@ -191,6 +191,9 @@ class ModernTelegramBot:
         self.active_user_checks_dict = {}
         self.banned_users_dict = {}
         
+        # Unhandled messages mapping (admin replies system)
+        self.unhandled_messages = {}  # XXX: Should be moved to DB for persistence
+        
         # Admin configuration
         self.admin_group_id = getattr(self.settings, 'ADMIN_GROUP_ID', None)
         self.technolog_group_id = getattr(self.settings, 'TECHNOLOG_GROUP_ID', None)
@@ -308,6 +311,16 @@ class ModernTelegramBot:
         @self.dp.message(lambda message: self._is_in_monitored_channel(message))
         async def store_recent_messages(message: Message):
             await self._handle_monitored_message(message)
+        
+        # Admin reply handler (must be before catch-all)
+        @self.dp.message(lambda message: self._is_admin_user_message(message))
+        async def handle_admin_reply(message: Message):
+            await self._handle_admin_reply(message)
+        
+        # Catch-all handler for unhandled messages (must be last)
+        @self.dp.message(lambda message: self._is_valid_message(message))
+        async def log_all_unhandled_messages(message: Message):
+            await self._handle_unhandled_message(message)
         
         # Chat member updates
         @self.dp.chat_member()
@@ -1003,6 +1016,32 @@ class ModernTelegramBot:
         monitored_channels = getattr(self.settings, 'CHANNEL_IDS', [])
         return message.chat.id in monitored_channels
     
+    def _is_valid_message(self, message: Message) -> bool:
+        """Check if message is valid for unhandled message processing."""
+        if not message.chat or not message.from_user:
+            return False
+        
+        # Exclude admin groups, technolog group, admin user, and managed channels
+        excluded_ids = [
+            self.admin_group_id,
+            self.technolog_group_id, 
+            self.ADMIN_USER_ID
+        ] + getattr(self.settings, 'CHANNEL_IDS', [])
+        
+        return (
+            message.chat.id not in excluded_ids and
+            not message.forward_origin and  # Not forwarded
+            not message.from_user.is_bot     # Not from bot
+        )
+    
+    def _is_admin_user_message(self, message: Message) -> bool:
+        """Check if message is from admin user and not forwarded."""
+        return (
+            message.from_user and
+            message.from_user.id == self.ADMIN_USER_ID and
+            not message.forward_origin
+        )
+    
     async def _handle_forwarded_message(self, message: Message):
         """Handle forwarded spam reports."""
         try:
@@ -1079,6 +1118,107 @@ class ModernTelegramBot:
             
         except Exception as e:
             self.logger.error(f"Error handling monitored message: {e}")
+    
+    async def _handle_unhandled_message(self, message: Message):
+        """Handle unhandled messages by forwarding to admin."""
+        try:
+            # Convert message to JSON for technolog group
+            import json
+            message_dict = message.model_dump() if hasattr(message, 'model_dump') else message.dict()
+            formatted_message = json.dumps(message_dict, indent=4, ensure_ascii=False)
+            
+            # Truncate if too long
+            if len(formatted_message) > self.MAX_TELEGRAM_MESSAGE_LENGTH - 3:
+                formatted_message = formatted_message[:self.MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+            
+            # Only process group/supergroup/channel messages, not private chats
+            if message.chat.type in ["group", "supergroup", "channel"]:
+                # Forward to technolog group
+                if self.technolog_group_id:
+                    try:
+                        await self.bot.forward_message(
+                            chat_id=self.technolog_group_id,
+                            from_chat_id=message.chat.id,
+                            message_id=message.message_id
+                        )
+                        
+                        # Send formatted message details
+                        await self.bot.send_message(
+                            chat_id=self.technolog_group_id,
+                            text=formatted_message
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to forward to technolog group: {e}")
+                
+                # Forward directly to admin user and store mapping
+                if self.ADMIN_USER_ID:
+                    try:
+                        admin_message = await self.bot.forward_message(
+                            chat_id=self.ADMIN_USER_ID,
+                            from_chat_id=message.chat.id,
+                            message_id=message.message_id
+                        )
+                        
+                        # Store mapping for admin replies
+                        self.unhandled_messages[admin_message.message_id] = [
+                            message.chat.id,
+                            message.message_id,
+                            message.from_user.first_name or "Unknown"
+                        ]
+                        
+                        self.logger.info(f"Forwarded unhandled message from {message.from_user.id} to admin")
+                        
+                    except Exception as e:
+                        self.logger.error(f"Failed to forward to admin user: {e}")
+            
+            elif message.chat.type == "private" and message.text == "/start":
+                # Easter egg for /start command in private chat
+                await message.reply(
+                    "Everything that follows is a result of what you see here.\n"
+                    "I'm sorry. My responses are limited. You must ask the right questions."
+                )
+            
+        except Exception as e:
+            self.logger.error(f"Error handling unhandled message: {e}")
+    
+    async def _handle_admin_reply(self, message: Message):
+        """Handle admin replies to unhandled messages."""
+        try:
+            # Check if this is a reply to an unhandled message
+            if (message.reply_to_message and 
+                message.reply_to_message.message_id in self.unhandled_messages):
+                
+                # Get original message info
+                original_chat_id, original_message_id, original_sender_name = \
+                    self.unhandled_messages[message.reply_to_message.message_id]
+                
+                # Prepare reply text
+                reply_text = message.text
+                if reply_text and (reply_text.startswith("/") or reply_text.startswith("\\")):
+                    # Remove command prefix
+                    reply_text = reply_text[1:]
+                
+                # Send reply back to original user
+                try:
+                    if reply_text:
+                        await self.bot.send_message(
+                            chat_id=original_chat_id,
+                            text=reply_text,
+                            reply_to_message_id=original_message_id
+                        )
+                        
+                        self.logger.info(f"Admin replied to message from {original_sender_name}")
+                        
+                    # Optionally remove mapping after reply
+                    # del self.unhandled_messages[message.reply_to_message.message_id]
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to send admin reply: {e}")
+                    await message.reply(f"Failed to send reply: {e}")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling admin reply: {e}")
+            await message.reply(f"Error processing reply: {e}")
     
     async def _handle_error(self, event: ErrorEvent):
         """Handle errors in aiogram 3.x style."""

@@ -11,6 +11,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# Add aiocron for scheduled tasks
+try:
+    import aiocron
+    from zoneinfo import ZoneInfo
+    AIOCRON_AVAILABLE = True
+except ImportError:
+    print("⚠️  aiocron not available, scheduled tasks disabled")
+    AIOCRON_AVAILABLE = False
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -222,6 +231,9 @@ class ModernTelegramBot:
         # Setup middleware and handlers
         self._setup_middleware()
         self._register_handlers()
+        
+        # Setup scheduled tasks
+        self.setup_scheduled_tasks()
     
     def _setup_middleware(self):
         """Setup middleware stack for aiogram 3.x."""
@@ -287,6 +299,16 @@ class ModernTelegramBot:
         async def cmd_unbanchan(message: Message):
             await self._handle_unbanchan_command(message)
         
+        # Message handlers for content processing
+        @self.dp.message(lambda message: self._is_forwarded_from_unknown_channel(message))
+        async def handle_forwarded_reports(message: Message):
+            await self._handle_forwarded_message(message)
+        
+        # Monitor messages in tracked channels  
+        @self.dp.message(lambda message: self._is_in_monitored_channel(message))
+        async def store_recent_messages(message: Message):
+            await self._handle_monitored_message(message)
+        
         # Chat member updates
         @self.dp.chat_member()
         async def chat_member_update(update: ChatMemberUpdated):
@@ -301,6 +323,23 @@ class ModernTelegramBot:
         @self.dp.callback_query()
         async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             await self._handle_callback_query(callback_query, state)
+        
+        # Specific callback handlers for advanced functionality
+        @self.dp.callback_query(lambda c: c.data.startswith("banuser_"))
+        async def ask_ban_confirmation(callback_query: CallbackQuery):
+            await self._handle_banuser_callback(callback_query)
+        
+        @self.dp.callback_query(lambda c: c.data.startswith("confirmbanuser_"))
+        async def confirm_ban_user(callback_query: CallbackQuery):
+            await self._handle_confirmban_callback(callback_query)
+        
+        @self.dp.callback_query(lambda c: c.data.startswith("cancelbanuser_"))
+        async def cancel_ban_user(callback_query: CallbackQuery):
+            await self._handle_cancelban_callback(callback_query)
+        
+        @self.dp.callback_query(lambda c: c.data.startswith("stopchecks_"))
+        async def stop_user_checks(callback_query: CallbackQuery):
+            await self._handle_stopchecks_callback(callback_query)
         
         # Error handling
         @self.dp.error()
@@ -711,6 +750,335 @@ class ModernTelegramBot:
     def _is_admin(self, user_id: int) -> bool:
         """Check if user is admin."""
         return user_id == self.ADMIN_USER_ID
+    
+    async def _handle_banuser_callback(self, callback_query: CallbackQuery):
+        """Handle banuser_* callbacks - ask for ban confirmation."""
+        try:
+            parts = callback_query.data.split("_")
+            user_id = int(parts[1])
+            
+            # Get user info for display
+            try:
+                user_info = await self.bot.get_chat(user_id)
+                username = user_info.username or "!UNDEFINED!"
+                first_name = user_info.first_name or ""
+                last_name = user_info.last_name or ""
+                display_name = f"{first_name} {last_name}".strip() or username
+            except:
+                username = "!UNDEFINED!"
+                display_name = "Unknown User"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ Yes, Ban", callback_data=f"confirmbanuser_{user_id}"),
+                    InlineKeyboardButton(text="❌ No, Cancel", callback_data=f"cancelbanuser_{user_id}")
+                ]
+            ])
+            
+            await callback_query.message.edit_reply_markup(reply_markup=keyboard)
+            await callback_query.answer(f"Confirm ban for {display_name}?")
+            
+        except Exception as e:
+            self.logger.error(f"Error in banuser callback: {e}")
+            await callback_query.answer("Error processing ban request")
+    
+    async def _handle_confirmban_callback(self, callback_query: CallbackQuery):
+        """Handle confirmbanuser_* callbacks - execute the ban."""
+        try:
+            parts = callback_query.data.split("_")
+            user_id = int(parts[1])
+            
+            # Use ban service to ban the user
+            if self.ban_service:
+                ban_result = await self.ban_service.ban_user(
+                    user_id=user_id,
+                    reason="Manual ban by admin",
+                    admin_id=callback_query.from_user.id
+                )
+                
+                if ban_result.success:
+                    # Update banned users dict
+                    self.banned_users_dict[user_id] = f"BANNED_BY_ADMIN_{callback_query.from_user.id}"
+                    
+                    # Remove keyboard and show ban confirmation
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="💀💀💀 B.A.N.N.E.D. 💀💀💀", url=f"https://api.lols.bot/account?id={user_id}")]
+                    ])
+                    
+                    await callback_query.message.edit_reply_markup(reply_markup=keyboard)
+                    await callback_query.answer("✅ User banned successfully!")
+                    
+                    self.logger.info(f"User {user_id} banned by admin {callback_query.from_user.id}")
+                else:
+                    await callback_query.answer(f"❌ Ban failed: {ban_result.error_message}")
+            else:
+                await callback_query.answer("❌ Ban service not available")
+                
+        except Exception as e:
+            self.logger.error(f"Error in confirmban callback: {e}")
+            await callback_query.answer("Error executing ban")
+    
+    async def _handle_cancelban_callback(self, callback_query: CallbackQuery):
+        """Handle cancelbanuser_* callbacks - cancel the ban."""
+        try:
+            # Remove keyboard
+            await callback_query.message.edit_reply_markup(reply_markup=None)
+            await callback_query.answer("❌ Ban cancelled")
+            
+        except Exception as e:
+            self.logger.error(f"Error in cancelban callback: {e}")
+            await callback_query.answer("Error cancelling ban")
+    
+    async def _handle_stopchecks_callback(self, callback_query: CallbackQuery):
+        """Handle stopchecks_* callbacks - stop user monitoring."""
+        try:
+            parts = callback_query.data.split("_")
+            user_id = int(parts[1])
+            
+            # Remove user from active checks
+            if user_id in self.active_user_checks_dict:
+                user_data = self.active_user_checks_dict[user_id]
+                del self.active_user_checks_dict[user_id]
+                
+                display_name = user_data.get("username", "!UNDEFINED!") if isinstance(user_data, dict) else (user_data or "!UNDEFINED!")
+                
+                # Remove keyboard
+                await callback_query.message.edit_reply_markup(reply_markup=None)
+                await callback_query.answer(f"✅ Stopped monitoring {display_name}")
+                
+                self.logger.info(f"Stopped monitoring user {user_id} by admin {callback_query.from_user.id}")
+            else:
+                await callback_query.answer("User not being monitored")
+                
+        except Exception as e:
+            self.logger.error(f"Error in stopchecks callback: {e}")
+            await callback_query.answer("Error stopping checks")
+    
+    async def spam_check(self, user_id: int) -> bool:
+        """Check user against external spam databases (LoLs, CAS, etc.)."""
+        try:
+            # This would implement the actual external API checks from the original bot
+            # For now, return False (not spam) as a placeholder
+            self.logger.debug(f"Checking user {user_id} against spam databases")
+            
+            # TODO: Implement actual LoLs API check
+            # TODO: Implement actual CAS API check  
+            # TODO: Implement local database check
+            
+            return False
+        except Exception as e:
+            self.logger.error(f"Error in spam_check for user {user_id}: {e}")
+            return False
+    
+    async def check_and_autoban(self, user_id: int, reason: str = "Automated ban", **kwargs) -> bool:
+        """Check user and automatically ban if conditions are met."""
+        try:
+            # Check if user is in banned list
+            if user_id in self.banned_users_dict:
+                self.logger.debug(f"User {user_id} already banned")
+                return True
+            
+            # Perform spam check
+            is_spam = await self.spam_check(user_id)
+            
+            if is_spam:
+                # Auto-ban the user
+                if self.ban_service:
+                    ban_result = await self.ban_service.ban_user(
+                        user_id=user_id,
+                        reason=reason,
+                        admin_id=0  # System auto-ban
+                    )
+                    
+                    if ban_result.success:
+                        self.banned_users_dict[user_id] = f"AUTO_BAN_{reason}"
+                        self.logger.info(f"Auto-banned user {user_id}: {reason}")
+                        return True
+                    else:
+                        self.logger.error(f"Failed to auto-ban user {user_id}: {ban_result.error_message}")
+                        return False
+            
+            return False
+        except Exception as e:
+            self.logger.error(f"Error in check_and_autoban for user {user_id}: {e}")
+            return False
+    
+    async def perform_checks(self, user_id: int, user_name: str = "!UNDEFINED!", event_record: str = "", inout_logmessage: str = ""):
+        """Perform 3-hour monitoring checks on a user."""
+        try:
+            self.logger.info(f"Starting 3-hour monitoring for user {user_id}")
+            
+            # Add user to active checks if not already there
+            if user_id not in self.active_user_checks_dict:
+                self.active_user_checks_dict[user_id] = {
+                    "username": user_name,
+                    "start_time": asyncio.get_event_loop().time(),
+                    "event_record": event_record
+                }
+            
+            # Wait for 3 hours (or shorter for testing)
+            monitoring_duration = 3 * 60 * 60  # 3 hours in seconds
+            await asyncio.sleep(monitoring_duration)
+            
+            # After 3 hours, perform final check
+            if user_id in self.active_user_checks_dict:
+                final_check = await self.check_and_autoban(user_id, "3hr monitoring completed")
+                
+                if not final_check:
+                    # User is clean, remove from monitoring
+                    del self.active_user_checks_dict[user_id]
+                    self.logger.info(f"User {user_id} monitoring completed - user is clean")
+                else:
+                    self.logger.info(f"User {user_id} monitoring completed - user was banned")
+            
+        except asyncio.CancelledError:
+            self.logger.info(f"Monitoring cancelled for user {user_id}")
+            if user_id in self.active_user_checks_dict:
+                del self.active_user_checks_dict[user_id]
+        except Exception as e:
+            self.logger.error(f"Error in perform_checks for user {user_id}: {e}")
+            if user_id in self.active_user_checks_dict:
+                del self.active_user_checks_dict[user_id]
+    
+    async def log_lists(self):
+        """Log active checks and banned users, then clean up daily data."""
+        try:
+            self.logger.info(f"Daily log: {len(self.banned_users_dict)} banned users, {len(self.active_user_checks_dict)} active checks")
+            
+            # Save data to files
+            from datetime import datetime, timedelta
+            import os
+            
+            today = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
+            
+            # Ensure directories exist
+            os.makedirs("inout", exist_ok=True)
+            os.makedirs("daily_spam", exist_ok=True)
+            
+            # Save banned users to file
+            filename = f"inout/banned_users_{today}.txt"
+            with open(filename, "w", encoding="utf-8") as f:
+                for user_id, user_name in self.banned_users_dict.items():
+                    f.write(f"{user_id}: {user_name}\n")
+            
+            # Clear banned users dict for new day
+            self.banned_users_dict.clear()
+            
+            self.logger.info(f"Daily cleanup completed, banned users saved to {filename}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in log_lists: {e}")
+    
+    def setup_scheduled_tasks(self):
+        """Setup daily scheduled tasks."""
+        if AIOCRON_AVAILABLE:
+            # Schedule daily log cleanup at 4 AM Mauritius time
+            @aiocron.crontab("0 4 * * *", tz=ZoneInfo("Indian/Mauritius"))
+            async def scheduled_log():
+                await self.log_lists()
+            
+            self.logger.info("✅ Scheduled tasks setup completed")
+        else:
+            self.logger.warning("⚠️  Scheduled tasks disabled - aiocron not available")
+    
+    def _is_forwarded_from_unknown_channel(self, message: Message) -> bool:
+        """Check if message is forwarded from an unknown channel."""
+        if not message.forward_origin:
+            return False
+        
+        # Check if it's forwarded from a channel
+        if hasattr(message.forward_origin, 'chat') and message.forward_origin.chat:
+            channel_id = message.forward_origin.chat.id
+            # Check if channel is not in allowed forward channels
+            allowed_channels = getattr(self.settings, 'ALLOWED_FORWARD_CHANNELS', [])
+            return channel_id not in allowed_channels
+        
+        return False
+    
+    def _is_in_monitored_channel(self, message: Message) -> bool:
+        """Check if message is in a monitored channel."""
+        if not message.chat:
+            return False
+        
+        monitored_channels = getattr(self.settings, 'CHANNEL_IDS', [])
+        return message.chat.id in monitored_channels
+    
+    async def _handle_forwarded_message(self, message: Message):
+        """Handle forwarded spam reports."""
+        try:
+            # Thank the user for the report
+            await message.answer("Thank you for the report. We will investigate it.")
+            
+            # Forward to admin group if configured
+            if self.technolog_group_id:
+                try:
+                    await self.bot.forward_message(
+                        chat_id=self.technolog_group_id,
+                        from_chat_id=message.chat.id,
+                        message_id=message.message_id
+                    )
+                    
+                    # Send investigation notice
+                    await self.bot.send_message(
+                        chat_id=self.technolog_group_id,
+                        text="Please investigate this forwarded message."
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to forward message to admin group: {e}")
+            
+            self.logger.info(f"Processed forwarded spam report from user {message.from_user.id}")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling forwarded message: {e}")
+    
+    async def _handle_monitored_message(self, message: Message):
+        """Handle messages in monitored channels."""
+        try:
+            # Store message if database is available
+            if self.database_manager:
+                await self.database_manager.store_message(
+                    message_id=message.message_id,
+                    chat_id=message.chat.id,
+                    user_id=message.from_user.id if message.from_user else 0,
+                    text=message.text or message.caption or "",
+                    timestamp=message.date
+                )
+            
+            # Check for spam if user is provided
+            if message.from_user and not message.from_user.is_bot:
+                user_id = message.from_user.id
+                
+                # Check if user is already banned
+                if user_id in self.banned_users_dict:
+                    try:
+                        await message.delete()
+                        self.logger.info(f"Deleted message from banned user {user_id}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to delete message from banned user: {e}")
+                    return
+                
+                # Perform spam analysis
+                if self.spam_service:
+                    spam_result = await self.spam_service.analyze_message(message)
+                    
+                    if spam_result.is_spam:
+                        # Auto-ban or start monitoring based on confidence
+                        if spam_result.confidence > 0.8:
+                            await self.check_and_autoban(user_id, f"High spam confidence: {spam_result.confidence}")
+                        else:
+                            # Start monitoring if not already being monitored
+                            if user_id not in self.active_user_checks_dict:
+                                asyncio.create_task(
+                                    self.perform_checks(
+                                        user_id=user_id,
+                                        user_name=message.from_user.username or "!UNDEFINED!",
+                                        event_record=f"Suspicious message detected: {spam_result.spam_type}"
+                                    ),
+                                    name=f"monitor_{user_id}"
+                                )
+            
+        except Exception as e:
+            self.logger.error(f"Error handling monitored message: {e}")
     
     async def _handle_error(self, event: ErrorEvent):
         """Handle errors in aiogram 3.x style."""

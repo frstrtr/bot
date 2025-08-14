@@ -20,6 +20,14 @@ except ImportError:
     print("⚠️  aiocron not available, scheduled tasks disabled")
     AIOCRON_AVAILABLE = False
 
+# HTTP client for external APIs
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    print("⚠️  aiohttp not available, some features disabled")
+    AIOHTTP_AVAILABLE = False
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -41,6 +49,7 @@ try:
         Update,
         ErrorEvent
     )
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
     AIOGRAM_3_AVAILABLE = True
 except ImportError as e:
@@ -353,6 +362,10 @@ class ModernTelegramBot:
         @self.dp.callback_query(lambda c: c.data.startswith("stopchecks_"))
         async def stop_user_checks(callback_query: CallbackQuery):
             await self._handle_stopchecks_callback(callback_query)
+        
+        @self.dp.callback_query(lambda c: c.data.startswith(("suspiciousglobalban_", "suspiciousban_", "suspiciousdelmsg_", "confirmdelmsg_", "canceldelmsg_", "confirmban_", "cancelban_", "confirmglobalban_", "cancelglobalban_")))
+        async def handle_suspicious_callback(callback_query: CallbackQuery):
+            await self._handle_suspicious_sender(callback_query)
         
         # Error handling
         @self.dp.error()
@@ -867,6 +880,246 @@ class ModernTelegramBot:
             self.logger.error(f"Error in stopchecks callback: {e}")
             await callback_query.answer("Error stopping checks")
     
+    async def _handle_suspicious_sender(self, callback_query: CallbackQuery):
+        """Handle suspicious sender callback actions with confirmation flow."""
+        try:
+            data = callback_query.data
+            parts = data.split("_")
+            
+            if len(parts) < 4:
+                self.logger.error(f"Invalid callback data format: {data}")
+                await callback_query.answer("Invalid action data.", show_alert=True)
+                return
+                
+            action_prefix = parts[0]
+            susp_chat_id = int(parts[1])
+            susp_message_id = int(parts[2])
+            susp_user_id = int(parts[3])
+            
+            # Determine action based on prefix
+            action_map = {
+                "suspiciousglobalban": "globalban",
+                "suspiciousban": "ban", 
+                "suspiciousdelmsg": "delmsg",
+                "confirmglobalban": "confirmglobalban",
+                "cancelglobalban": "cancelglobalban",
+                "confirmban": "confirmban",
+                "cancelban": "cancelban",
+                "confirmdelmsg": "confirmdelmsg",
+                "canceldelmsg": "canceldelmsg"
+            }
+            
+            action = action_map.get(action_prefix)
+            if not action:
+                self.logger.error(f"Unknown action prefix: {action_prefix}")
+                await callback_query.answer("Unknown action.", show_alert=True)
+                return
+                
+            # Get user and chat info
+            susp_chat_title = self.settings.CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
+            admin_id = callback_query.from_user.id
+            admin_username = callback_query.from_user.username or "!NoName!"
+            
+            # Get user info from active checks
+            user_info = self.active_user_checks_dict.get(susp_user_id, "!UNDEFINED!")
+            if isinstance(user_info, dict):
+                susp_user_name = str(user_info.get("username", "")).lstrip("@")
+            else:
+                susp_user_name = str(user_info)
+                
+            # Create message and spam check links
+            message_link = f"https://t.me/c/{str(susp_chat_id)[4:]}/{susp_message_id}"
+            lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
+            
+            # Create inline keyboard with links
+            kb = InlineKeyboardBuilder()
+            kb.row(InlineKeyboardButton(text="🔗 View Original Message 🔗", url=message_link))
+            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            
+            callback_answer = None
+            
+            # Handle confirmation flow actions
+            if action in ["globalban", "ban", "delmsg"]:
+                # Add confirmation buttons
+                if action == "globalban":
+                    kb.row(
+                        InlineKeyboardButton(text="Confirm global ban", callback_data=f"confirmglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}"),
+                        InlineKeyboardButton(text="Cancel global ban", callback_data=f"cancelglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}")
+                    )
+                elif action == "ban":
+                    kb.row(
+                        InlineKeyboardButton(text="Confirm ban", callback_data=f"confirmban_{susp_chat_id}_{susp_message_id}_{susp_user_id}"),
+                        InlineKeyboardButton(text="Cancel ban", callback_data=f"cancelban_{susp_chat_id}_{susp_message_id}_{susp_user_id}")
+                    )
+                elif action == "delmsg":
+                    kb.row(
+                        InlineKeyboardButton(text="Confirm delmsg", callback_data=f"confirmdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}"),
+                        InlineKeyboardButton(text="Cancel delmsg", callback_data=f"canceldelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}")
+                    )
+                    
+                # Update message with confirmation buttons
+                await callback_query.message.edit_reply_markup(reply_markup=kb.as_markup())
+                await callback_query.answer()
+                return
+                
+            # Handle actual actions
+            elif action == "confirmglobalban":
+                try:
+                    # Delete message if not synthetic
+                    if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                        await self.bot.delete_message(susp_chat_id, susp_message_id)
+                    else:
+                        self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id}")
+                        
+                    # Global ban user
+                    if self.ban_service:
+                        await self.ban_service.ban_user_globally(susp_user_id, susp_user_name, f"Suspicious activity - Admin decision by @{admin_username}")
+                    
+                    self.logger.info(f"{susp_user_id}:@{susp_user_name} SUSPICIOUS banned globally by admin @{admin_username}({admin_id})")
+                    callback_answer = "User banned globally and message deleted!"
+                    
+                    # Report to P2P spam server
+                    if AIOHTTP_AVAILABLE:
+                        try:
+                            async with aiohttp.ClientSession() as session:
+                                await session.post(f"{self.settings.LOCAL_SPAM_API_URL}/report", json={"user_id": susp_user_id})
+                        except Exception as e:
+                            self.logger.error(f"Failed to report to P2P server: {e}")
+                    else:
+                        self.logger.warning("aiohttp not available, skipping P2P report")
+                        
+                    # Cancel user checks
+                    if susp_user_id in self.active_user_checks_dict:
+                        del self.active_user_checks_dict[susp_user_id]
+                        
+                except Exception as e:
+                    self.logger.error(f"Global ban failed: {e}")
+                    callback_answer = "Failed to ban user globally."
+                    
+            elif action == "confirmban":
+                try:
+                    # Delete message if not synthetic 
+                    if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                        await self.bot.delete_message(susp_chat_id, susp_message_id)
+                    else:
+                        self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id}")
+                        
+                    # Ban user in specific chat
+                    await self.bot.ban_chat_member(chat_id=susp_chat_id, user_id=susp_user_id, revoke_messages=True)
+                    
+                    self.logger.info(f"{susp_user_id}:@{susp_user_name} SUSPICIOUS banned in chat {susp_chat_title} ({susp_chat_id}) by admin @{admin_username}({admin_id})")
+                    callback_answer = "User banned in ONE chat and message deleted.\nForward message to bot to ban everywhere!"
+                    
+                except Exception as e:
+                    self.logger.error(f"Ban failed: {e}")
+                    callback_answer = "Failed to ban user."
+                    
+            elif action == "confirmdelmsg":
+                try:
+                    # Delete message if not synthetic
+                    if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                        await self.bot.delete_message(susp_chat_id, susp_message_id)
+                        self.logger.info(f"{susp_user_id}:@{susp_user_name} SUSPICIOUS message {susp_message_id} deleted from chat ({susp_chat_id})")
+                        callback_answer = "Suspicious message deleted.\nForward message to bot to ban user everywhere!"
+                    else:
+                        self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id} (delmsg)")
+                        callback_answer = "Message was synthetic, no action taken."
+                        
+                except Exception as e:
+                    self.logger.error(f"Delete message failed: {e}")
+                    callback_answer = "Failed to delete message."
+                    
+            elif action in ["canceldelmsg", "cancelban", "cancelglobalban"]:
+                self.logger.info(f"Action {action} cancelled by admin @{admin_username}({admin_id})")
+                callback_answer = "Action cancelled."
+                
+            # Remove buttons and show final state
+            await callback_query.message.edit_reply_markup(reply_markup=kb.as_markup())
+            
+            # Send callback response
+            await callback_query.answer(callback_answer or "Action completed.", show_alert=True)
+            
+            # Send detailed response message
+            response_msg = (
+                f"{callback_answer}\n"
+                f"Suspicious user @{susp_user_name} (<code>{susp_user_id}</code>)\n"
+                f"Message origin: <a href='{message_link}'>{message_link}</a>\n"
+                f"Action by Admin @{admin_username}"
+            )
+            
+            await callback_query.message.answer(
+                response_msg,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error in suspicious sender handler: {e}")
+            await callback_query.answer("Error processing action.", show_alert=True)
+    
+    async def _send_suspicious_message_report(self, message: Message, spam_result):
+        """Send suspicious message report to ADMIN_SUSPICIOUS with action buttons."""
+        try:
+            if not self.admin_group_id:
+                self.logger.warning("No admin group configured for suspicious reports")
+                return
+                
+            user_id = message.from_user.id
+            username = message.from_user.username or "!UNDEFINED!"
+            chat_id = message.chat.id
+            chat_title = message.chat.title or "!UNKNOWN!"
+            message_id = message.message_id
+            
+            # Generate report ID
+            import time
+            report_id = int(time.time())
+            
+            # Create message text
+            report_text = (
+                f"🚨 <b>Suspicious Activity Detected</b>\n\n"
+                f"👤 User: @{username} (<code>{user_id}</code>)\n"
+                f"💬 Chat: {chat_title} (<code>{chat_id}</code>)\n"
+                f"📊 Spam Type: {spam_result.spam_type}\n"
+                f"🎯 Confidence: {spam_result.confidence:.2f}\n"
+                f"📝 Message: {message.text[:200] if message.text else 'No text'}{'...' if message.text and len(message.text) > 200 else ''}\n\n"
+                f"🔗 Original message in chat"
+            )
+            
+            # Create action buttons
+            kb = InlineKeyboardBuilder()
+            
+            # Message link
+            message_link = f"https://t.me/c/{str(chat_id)[4:]}/{message_id}"
+            kb.row(InlineKeyboardButton(text="🔗 View Original Message", url=message_link))
+            
+            # Spam check link
+            lols_link = f"https://t.me/oLolsBot?start={user_id}"
+            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data", url=lols_link))
+            
+            # Action buttons
+            kb.row(
+                InlineKeyboardButton(text="🚫 Ban User", callback_data=f"suspiciousban_{chat_id}_{report_id}_{user_id}"),
+                InlineKeyboardButton(text="🌐 Global Ban", callback_data=f"suspiciousglobalban_{chat_id}_{report_id}_{user_id}")
+            )
+            kb.row(
+                InlineKeyboardButton(text="🗑️ Delete Message", callback_data=f"suspiciousdelmsg_{chat_id}_{report_id}_{user_id}")
+            )
+            
+            # Send to admin group with suspicious thread
+            await self.bot.send_message(
+                chat_id=self.admin_group_id,
+                text=report_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=kb.as_markup(),
+                message_thread_id=self.settings.ADMIN_SUSPICIOUS,
+                disable_web_page_preview=True
+            )
+            
+            self.logger.info(f"Sent suspicious message report for user {user_id} to admin")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send suspicious message report: {e}")
+    
     async def spam_check(self, user_id: int) -> bool:
         """Check user against external spam databases (LoLs, CAS, etc.)."""
         try:
@@ -1105,6 +1358,9 @@ class ModernTelegramBot:
                         if spam_result.confidence > 0.8:
                             await self.check_and_autoban(user_id, f"High spam confidence: {spam_result.confidence}")
                         else:
+                            # Send suspicious message to admin with action buttons
+                            await self._send_suspicious_message_report(message, spam_result)
+                            
                             # Start monitoring if not already being monitored
                             if user_id not in self.active_user_checks_dict:
                                 asyncio.create_task(
@@ -1271,6 +1527,10 @@ class ModernTelegramBot:
     
     async def start_webhook(self, webhook_url: str, port: int = 8000):
         """Start the bot with webhook."""
+        if not AIOHTTP_AVAILABLE:
+            self.logger.error("aiohttp not available, cannot start webhook")
+            return
+            
         from aiohttp import web
         
         async with self.lifespan():

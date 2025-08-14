@@ -105,6 +105,66 @@ from utils.utils_decorators import (
     is_valid_message,
 )
 
+# -----------------------------------------------------------------------------
+# Helper: unified profile change logging
+# -----------------------------------------------------------------------------
+async def log_profile_change(
+    user_id: int,
+    username: str | None,
+    context: str,
+    chat_id: int | None,
+    chat_title: str | None,
+    changed: list[str],
+    old_values: dict,
+    new_values: dict,
+    photo_changed: bool,
+):
+    """Log a profile change event using the existing in/out style format.
+
+    Creates a line similar to greet_chat_members event_record, prefixed with 'pc'.
+    Also appends to the inout_ log file so operators have a single chronological stream.
+    """
+    try:
+        ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        uid_fmt = f"{user_id:<10}"
+        uname = username or '!UNDEFINED!'
+        chat_repr = f"{chat_title or ''}({chat_id})" if chat_id else str(chat_id)
+        # Build compact diffs old->new for changed fields
+        diff_parts = []
+        mapping = {
+            'first name': ('first_name', 'First'),
+            'last name': ('last_name', 'Last'),
+            'username': ('username', 'User'),
+            'profile photo': ('photo_count', 'Photo'),
+        }
+        for field in changed:
+            key, label = mapping.get(field, (field, field))
+            o = old_values.get(key)
+            n = new_values.get(key)
+            if key == 'username':
+                o = ('@' + o) if o else '@!UNDEFINED!'
+                n = ('@' + n) if n else '@!UNDEFINED!'
+            diff_parts.append(f"{label}='{o}'→'{n}'")
+        photo_marker = ' P' if photo_changed else ''
+        record = f"{ts}: {uid_fmt} PC[{context}{photo_marker}] @{uname:<20} in {chat_repr:<40} changes: {', '.join(diff_parts)}\n"
+        await save_report_file('inout_', 'pc' + record)
+        LOGGER.info(record.rstrip())
+    except Exception as _e:  # silent failure should not break main flow
+        LOGGER.debug('Failed to log profile change: %s', _e)
+
+
+def make_profile_dict(first_name: str | None, last_name: str | None, username: str | None, photo_count: int | None) -> dict:
+    """Return a normalized profile snapshot dict used for logging diffs.
+
+    Ensures keys are consistent and missing values default to simple primitives.
+    """
+    return {
+        'first_name': first_name or '',
+        'last_name': last_name or '',
+        'username': username or '',
+        'photo_count': photo_count or 0,
+    }
+
 from utils.utils_config import (
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
@@ -1010,8 +1070,9 @@ async def handle_autoreports(
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
     # MODIFIED: Pass spammer_id (user_id) and report_id, and rename callback prefix
+    # Show only initial Ban action (two-step confirmation via suspiciousban_)
     ban_btn = InlineKeyboardButton(
-        "Ban", callback_data=f"confirmban_{spammer_id}_{report_id}"
+        "Ban", callback_data=f"suspiciousban_{message.chat.id}_{report_id}_{spammer_id}"
     )
     keyboard.add(ban_btn)
     try:
@@ -1808,25 +1869,105 @@ async def perform_checks(
                                 if chat_username
                                 else f"<a href=\"https://t.me/c/{str(_chat_id)[4:] if str(_chat_id).startswith('-100') else _chat_id}\">{html.escape(chat_title)}</a>"
                             )
-                            change_list = ", ".join(changed)
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
                             _report_id = int(datetime.now().timestamp())
-                            kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{user_id}_{_report_id}"))
+                            # First-step action buttons (confirmation shown after click)
+                            kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{baseline.get('chat', {}).get('id')}_{_report_id}_{user_id}"))
+                            _chat_id_for_gban = baseline.get('chat', {}).get('id')
+                            kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{_chat_id_for_gban}_{_report_id}_{user_id}"))
+
+                            def _fmt(old, new, label, username=False):
+                                if username:
+                                    old_disp = ("@" + old) if old else "@!UNDEFINED!"
+                                    new_disp = ("@" + new) if new else "@!UNDEFINED!"
+                                else:
+                                    old_disp = html.escape(old) if old else ""
+                                    new_disp = html.escape(new) if new else ""
+                                if old != new:
+                                    return f"{label}: {old_disp or '∅'} ➜ <b>{new_disp or '∅'}</b>"
+                                return f"{label}: {new_disp or '∅'}"
+
+                            field_lines = [
+                                _fmt(baseline.get("first_name", ""), cur_first, "First name"),
+                                _fmt(baseline.get("last_name", ""), cur_last, "Last name"),
+                                _fmt(baseline.get("username", ""), cur_username, "Username", username=True),
+                                f"User ID: <code>{user_id}</code>",
+                            ]
+                            if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
+                                field_lines.append("Profile photo: none ➜ <b>set</b>")
+
+                            profile_links = (
+                                f"🔗 <b>Profile links:</b>\n"
+                                f"   ├ <a href='tg://user?id={user_id}'>id based profile link</a>\n"
+                                f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>"
+                            )
+                            # Compute elapsed time since join if we have a joined_at
+                            joined_at_raw = baseline.get("joined_at")
+                            elapsed_line = ""
+                            if joined_at_raw:
+                                try:
+                                    joined_dt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                    delta = datetime.now() - joined_dt
+                                    # human friendly formatting
+                                    days = delta.days
+                                    hours, rem = divmod(delta.seconds, 3600)
+                                    minutes, seconds = divmod(rem, 60)
+                                    parts = []
+                                    if days:
+                                        parts.append(f"{days}d")
+                                    if hours:
+                                        parts.append(f"{hours}h")
+                                    if minutes and not days:
+                                        parts.append(f"{minutes}m")
+                                    if seconds and not days and not hours:
+                                        parts.append(f"{seconds}s")
+                                    human_elapsed = " ".join(parts) or f"{seconds}s"
+                                    elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {human_elapsed})"
+                                except Exception:
+                                    elapsed_line = f"\nJoined at: {joined_at_raw}"
+
+                            message_text = (
+                                f"Suspicious profile change detected after joining {universal_chatlink}.\n"
+                                + "\n".join(field_lines)
+                                + f"\nChanges: <b>{', '.join(changed)}</b> at {_ts}."
+                                + elapsed_line
+                                + "\n"
+                                + profile_links
+                            )
+
                             await safe_send_message(
                                 BOT,
                                 ADMIN_GROUP_ID,
-                                (
-                                    f"Suspicious activity detected after joining {universal_chatlink}.\n"
-                                    f"User @{cur_username or '!UNDEFINED!'} (<code>{user_id}</code>) changed: <b>{change_list}</b> at {_ts}."
-                                ),
+                                message_text,
                                 LOGGER,
                                 message_thread_id=ADMIN_SUSPICIOUS,
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
                                 reply_markup=kb,
                             )
-                            # Prevent duplicate notifications for this user during this watch period
+                            # Log periodic profile change
+                            await log_profile_change(
+                                user_id=user_id,
+                                username=cur_username,
+                                context='periodic',
+                                chat_id=_chat_id,
+                                chat_title=chat_title,
+                                changed=changed,
+                                old_values=make_profile_dict(
+                                    baseline.get('first_name',''),
+                                    baseline.get('last_name',''),
+                                    baseline.get('username',''),
+                                    baseline.get('photo_count',0),
+                                ),
+                                new_values=make_profile_dict(
+                                    cur_first,
+                                    cur_last,
+                                    cur_username,
+                                    cur_photo_count,
+                                ),
+                                photo_changed=('profile photo' in changed),
+                            )
                             active_user_checks_dict[user_id]["notified_profile_change"] = True
 
                     suspicious_messages = {
@@ -2456,6 +2597,8 @@ if __name__ == "__main__":
                             "last_name": update.old_chat_member.user.last_name or "",
                             "username": update.old_chat_member.user.username or "",
                             "photo_count": _photo_count,
+                            # Store join timestamp (server local time) to compute elapsed durations later
+                            "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "chat": {
                                 "id": update.chat.id,
                                 "username": getattr(update.chat, "username", None),
@@ -2558,19 +2701,70 @@ if __name__ == "__main__":
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         _kb = make_lols_kb(inout_userid)
                         _rid = int(datetime.now().timestamp())
-                        _kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{inout_userid}_{_rid}"))
+                        # Local ban (chat-level) confirmation
+                        # Step 1 buttons only (confirmation after click)
+                        _kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{update.chat.id}_{_rid}_{inout_userid}"))
+                        _kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{update.chat.id}_{_rid}_{inout_userid}"))
+                        # Elapsed time since join if available
+                        joined_at_raw = _baseline.get("joined_at")
+                        elapsed_line = ""
+                        if joined_at_raw:
+                            try:
+                                _jdt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                _delta = datetime.now() - _jdt
+                                _days = _delta.days
+                                _hours, _rem = divmod(_delta.seconds, 3600)
+                                _minutes, _seconds = divmod(_rem, 60)
+                                _parts = []
+                                if _days:
+                                    _parts.append(f"{_days}d")
+                                if _hours:
+                                    _parts.append(f"{_hours}h")
+                                if _minutes and not _days:
+                                    _parts.append(f"{_minutes}m")
+                                if _seconds and not _days and not _hours:
+                                    _parts.append(f"{_seconds}s")
+                                _human_elapsed = " ".join(_parts) or f"{_seconds}s"
+                                elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {_human_elapsed})"
+                            except Exception:
+                                elapsed_line = f"\nJoined at: {joined_at_raw}"
+
+                        _leave_msg = (
+                            f"Suspicious activity detected between join and leave in {_link}.\n"
+                            f"User @{cur_username or '!UNDEFINED!'} (<code>{inout_userid}</code>) changed: <b>{', '.join(_changed)}</b> before leaving at {_ts}."
+                            + elapsed_line
+                        )
                         await safe_send_message(
                             BOT,
                             ADMIN_GROUP_ID,
-                            (
-                                f"Suspicious activity detected between join and leave in {_link}.\n"
-                                f"User @{cur_username or '!UNDEFINED!'} (<code>{inout_userid}</code>) changed: <b>{', '.join(_changed)}</b> before leaving at {_ts}."
-                            ),
+                            _leave_msg,
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             parse_mode="HTML",
                             disable_web_page_preview=True,
                             reply_markup=_kb,
+                        )
+                        # Log profile change on leave
+                        await log_profile_change(
+                            user_id=inout_userid,
+                            username=cur_username,
+                            context='leave',
+                            chat_id=_cid,
+                            chat_title=_ctitle,
+                            changed=_changed,
+                            old_values=make_profile_dict(
+                                _baseline.get('first_name',''),
+                                _baseline.get('last_name',''),
+                                _baseline.get('username',''),
+                                _baseline.get('photo_count',0),
+                            ),
+                            new_values=make_profile_dict(
+                                cur_first,
+                                cur_last,
+                                cur_username,
+                                cur_photo_count,
+                            ),
+                            photo_changed=('profile photo' in _changed),
                         )
                         active_user_checks_dict[inout_userid]["notified_profile_change"] = True
 
@@ -2925,7 +3119,8 @@ if __name__ == "__main__":
         keyboard = InlineKeyboardMarkup()
         # MODIFIED: Pass user_id (spammer's ID) and report_id, and rename callback prefix
         ban_btn = InlineKeyboardButton(
-            "Ban", callback_data=f"confirmban_{user_id}_{report_id}"
+            # First-step ban button (confirmation appears after click)
+            "Ban", callback_data=f"suspiciousban_{message.chat.id}_{report_id}_{user_id}"
         )
         keyboard.add(ban_btn)
 
@@ -3089,48 +3284,34 @@ if __name__ == "__main__":
         keyboard.add(confirm_btn, cancel_btn)
 
         report_id_to_ban = int(report_id_to_ban_str)
-        # get report states
-        forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-        if forwarded_reports_states is None:
-            LOGGER.warning("No forwarded_reports_states recorded!")
-            # reply message and remove buttons
-            return
-
-        forwarded_report_state: dict = forwarded_reports_states.get(report_id_to_ban)
-        if forwarded_report_state is None:
-            LOGGER.warning(
-                "No forwarded_report_state found for report_id: %s", report_id_to_ban
+        # Try to get report states (might not exist for ad-hoc ban buttons e.g. profile change alerts)
+        forwarded_reports_states: dict | None = DP.get("forwarded_reports_states")
+        admin_group_banner_message = None
+        action_banner_message = None
+        if forwarded_reports_states:
+            forwarded_report_state = forwarded_reports_states.get(report_id_to_ban)
+            if forwarded_report_state:
+                admin_group_banner_message = forwarded_report_state.get("admin_group_banner_message")
+                action_banner_message = forwarded_report_state.get("action_banner_message")
+                # prune stored buttons so we don't try to edit twice later
+                if "action_banner_message" in forwarded_report_state:
+                    del forwarded_report_state["action_banner_message"]
+                if "admin_group_banner_message" in forwarded_report_state:
+                    del forwarded_report_state["admin_group_banner_message"]
+                forwarded_reports_states[report_id_to_ban] = forwarded_report_state
+                DP["forwarded_reports_states"] = forwarded_reports_states
+            else:
+                LOGGER.debug(
+                    "Ad-hoc ban confirmation (no stored report state) for user %s report_id %s",
+                    spammer_user_id_str,
+                    report_id_to_ban_str,
+                )
+        else:
+            LOGGER.debug(
+                "Ad-hoc ban confirmation (no forwarded_reports_states dict) for user %s report_id %s",
+                spammer_user_id_str,
+                report_id_to_ban_str,
             )
-            # reply message and remove buttons
-            return
-
-        # """                forwarded_report_state[report_id] = {
-        #             "original_forwarded_message": message,
-        #             "admin_group_banner_message": admin_group_banner_message,
-        #             "action_banner_message": admin_action_banner_message,
-        #             "report_chat_id": message.chat.id,"""
-        # unpack states for the report_id to ban
-        # original_forwarded_message: types.Message = forwarded_report_state[
-        #     "original_forwarded_message"
-        # ]
-        admin_group_banner_message: types.Message = forwarded_report_state[
-            "admin_group_banner_message"
-        ]
-        action_banner_message: types.Message = forwarded_report_state[
-            "action_banner_message"
-        ]
-        # report_chat_id: int = forwarded_report_state["report_chat_id"]
-        # check received states for None
-
-        # clear admin and personal banner states for this report
-        del forwarded_report_state["action_banner_message"]
-        del forwarded_report_state["admin_group_banner_message"]
-
-        # update states for the designated report_id_to_ban (use integer key like everywhere else)
-        forwarded_reports_states[report_id_to_ban] = forwarded_report_state
-
-        # update DP states storage
-        DP["forwarded_reports_states"] = forwarded_reports_states
 
         # Edit messages to remove buttons or messages
         # check where the callback_query was pressed
@@ -3143,26 +3324,28 @@ if __name__ == "__main__":
             )
 
             if admin_group_banner_message:
-                if (
-                    callback_query.message.chat.id == ADMIN_GROUP_ID
-                    and action_banner_message  # Action done in Admin group and reported by admin
-                ):
-                    await BOT.edit_message_reply_markup(
-                        chat_id=action_banner_message.chat.id,
-                        message_id=action_banner_message.message_id,
-                    )
-                elif (
-                    callback_query.message.chat.id == ADMIN_GROUP_ID
-                    and action_banner_message is None
-                ):
-                    return  # Action done in Admin group and this is AUTOREPORT or report from non-admin user do nothing
-                else:  # report was actioned in the personal chat
-                    # remove admin group banner buttons
-                    await BOT.edit_message_reply_markup(
-                        chat_id=ADMIN_GROUP_ID,
-                        message_id=admin_group_banner_message.message_id,
-                    )
-                    return
+                try:
+                    if (
+                        callback_query.message.chat.id == ADMIN_GROUP_ID
+                        and action_banner_message  # Action done in Admin group and reported by admin
+                    ):
+                        await BOT.edit_message_reply_markup(
+                            chat_id=action_banner_message.chat.id,
+                            message_id=action_banner_message.message_id,
+                        )
+                    elif (
+                        callback_query.message.chat.id == ADMIN_GROUP_ID
+                        and action_banner_message is None
+                    ):
+                        # AUTOREPORT or no personal banner: nothing else to edit
+                        pass
+                    else:  # report was actioned in the personal chat
+                        await BOT.edit_message_reply_markup(
+                            chat_id=ADMIN_GROUP_ID,
+                            message_id=admin_group_banner_message.message_id,
+                        )
+                except Exception as _e:
+                    LOGGER.debug("Editing related banners during confirmation failed: %s", _e)
 
         # FIXME exceptions type
         except KeyError as e:
@@ -3211,26 +3394,37 @@ if __name__ == "__main__":
                 author_id_from_callback_str,
             )
             # get report states
-            forwarded_reports_states: dict = DP.get("forwarded_reports_states")
-            if forwarded_reports_states is None:
-                LOGGER.warning("No forwarded_reports_states recorded in handle_ban!")
-                await callback_query.message.reply("Error: Report states not found.")
-                return
-
-            forwarded_report_state: dict = forwarded_reports_states.get(
-                report_id_to_ban
+            forwarded_reports_states: dict | None = DP.get("forwarded_reports_states")
+            forwarded_report_state = (
+                forwarded_reports_states.get(report_id_to_ban)
+                if forwarded_reports_states
+                else None
             )
-            if forwarded_report_state is None:
-                LOGGER.warning(
-                    "No forwarded_report_state found for report_id: %s in handle_ban",
-                    report_id_to_ban,
+
+            if not forwarded_report_state:
+                # Ad-hoc ban (e.g., profile change alert) – perform minimal ban logic
+                author_id = int(author_id_from_callback_str)
+                await ban_user_from_all_chats(author_id, None, CHANNEL_IDS, CHANNEL_DICT)
+                banned_users_dict[author_id] = "!UNDEFINED!"
+                # cancel watchdog if running
+                for task in asyncio.all_tasks():
+                    if task.get_name() == str(author_id):
+                        task.cancel()
+                lols_check_kb = make_lols_kb(author_id)
+                await safe_send_message(
+                    BOT,
+                    ADMIN_GROUP_ID,
+                    f"Ad-hoc ban executed by @{button_pressed_by}: User (<code>{author_id}</code>) banned across monitored chats.",
+                    LOGGER,
+                    parse_mode="HTML",
+                    reply_markup=lols_check_kb,
+                    message_thread_id=callback_query.message.message_thread_id,
                 )
-                await callback_query.message.reply("Error: Report state not found.")
                 return
 
-            original_spam_message: types.Message = forwarded_report_state[
+            original_spam_message: types.Message = forwarded_report_state.get(
                 "original_forwarded_message"
-            ]
+            )
             CURSOR.execute(
                 "SELECT chat_id, message_id, forwarded_message_data, received_date FROM recent_messages WHERE message_id = ?",
                 (report_id_to_ban,),
@@ -4119,7 +4313,8 @@ if __name__ == "__main__":
 
                         kb = make_lols_kb(_uid)
                         _report_id = int(datetime.now().timestamp())
-                        kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"confirmban_{_uid}_{_report_id}"))
+                        kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{message.chat.id}_{_report_id}_{_uid}"))
+                        kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{message.chat.id}_{_report_id}_{_uid}"))
 
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         chat_title_safe = html.escape(message.chat.title)
@@ -4133,20 +4328,97 @@ if __name__ == "__main__":
                             )
                         )
 
+                        # Build unified diff-style lines
+                        def _fmt(old, new, label, username=False):
+                            if username:
+                                old_disp = ("@" + old) if old else "@!UNDEFINED!"
+                                new_disp = ("@" + new) if new else "@!UNDEFINED!"
+                            else:
+                                old_disp = html.escape(old) if old else ""
+                                new_disp = html.escape(new) if new else ""
+                            if old != new:
+                                return f"{label}: {old_disp or '∅'} ➜ <b>{new_disp or '∅'}</b>"
+                            return f"{label}: {new_disp or '∅'}"
+
+                        field_lines = [
+                            _fmt(old_first, new_first, "First name"),
+                            _fmt(old_last, new_last, "Last name"),
+                            _fmt(old_usern, new_usern, "Username", username=True),
+                            f"User ID: <code>{_uid}</code>",
+                        ]
+                        if old_pcnt == 0 and new_pcnt > 0:
+                            field_lines.append("Profile photo: none ➜ <b>set</b>")
+
+                        profile_links = (
+                            f"🔗 <b>Profile links:</b>\n"
+                            f"   ├ <a href='tg://user?id={_uid}'>id based profile link</a>\n"
+                            f"   └ <a href='tg://openmessage?user_id={_uid}'>Android</a>, <a href='https://t.me/@id{_uid}'>IOS (Apple)</a>"
+                        )
+                        # Elapsed time since join
+                        joined_at_raw = _baseline.get("joined_at") if isinstance(_baseline, dict) else None
+                        elapsed_line = ""
+                        if joined_at_raw:
+                            try:
+                                _jdt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                _delta = datetime.now() - _jdt
+                                _days = _delta.days
+                                _hours, _rem = divmod(_delta.seconds, 3600)
+                                _minutes, _seconds = divmod(_rem, 60)
+                                _parts = []
+                                if _days:
+                                    _parts.append(f"{_days}d")
+                                if _hours:
+                                    _parts.append(f"{_hours}h")
+                                if _minutes and not _days:
+                                    _parts.append(f"{_minutes}m")
+                                if _seconds and not _days and not _hours:
+                                    _parts.append(f"{_seconds}s")
+                                _human_elapsed = " ".join(_parts) or f"{_seconds}s"
+                                elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {_human_elapsed})"
+                            except Exception:
+                                elapsed_line = f"\nJoined at: {joined_at_raw}"
+
+                        message_text = (
+                            "Suspicious profile change detected while under watch.\n"
+                            f"In chat: {chat_link_html}\n"
+                            + "\n".join(field_lines)
+                            + f"\nChanges: <b>{', '.join(changed)}</b> at {_ts}."
+                            + elapsed_line
+                            + "\n"
+                            + profile_links
+                        )
+
                         await safe_send_message(
                             BOT,
                             ADMIN_GROUP_ID,
-                            (
-                                "Suspicious profile change detected while under watch.\n"
-                                f"User @{new_usern or '!UNDEFINED!'} (<code>{_uid}</code>) in {chat_link_html}\n"
-                                f"Changed: <b>{', '.join(changed)}</b> at {_ts}.\n"
-                                + ("Details: " + "; ".join(diffs) if diffs else "")
-                            ),
+                            message_text,
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             parse_mode="HTML",
                             disable_web_page_preview=True,
                             reply_markup=kb,
+                        )
+                        # Log immediate profile change
+                        await log_profile_change(
+                            user_id=_uid,
+                            username=new_usern,
+                            context='immediate',
+                            chat_id=message.chat.id,
+                            chat_title=getattr(message.chat,'title',None),
+                            changed=changed,
+                            old_values=make_profile_dict(
+                                old_first,
+                                old_last,
+                                old_usern,
+                                old_pcnt,
+                            ),
+                            new_values=make_profile_dict(
+                                new_first,
+                                new_last,
+                                new_usern,
+                                new_pcnt,
+                            ),
+                            photo_changed=('profile photo' in changed),
                         )
                         active_user_checks_dict[_uid]["notified_profile_change"] = True
         except Exception as _e:
@@ -6033,12 +6305,33 @@ if __name__ == "__main__":
         if comand == "confirmglobalban":
             # ban user in all chats
             try:
-                await BOT.delete_message(susp_chat_id, susp_message_id)
+                # Guard: skip deletion if message_id looks synthetic (epoch seconds or constructed report id)
+                # Heuristic: if length >= 13 (milliseconds-like) or > 4_000_000_000 treat as synthetic
+                if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                    await BOT.delete_message(susp_chat_id, susp_message_id)
+                else:
+                    LOGGER.debug(
+                        "Skip delete_message for synthetic suspicious message_id=%s chat_id=%s",
+                        susp_message_id,
+                        susp_chat_id,
+                    )
                 await ban_user_from_all_chats(
                     susp_user_id,
                     susp_user_name,
                     CHANNEL_IDS,
                     CHANNEL_DICT,
+                )
+                # Log admin global ban action
+                await log_profile_change(
+                    user_id=susp_user_id,
+                    username=susp_user_name,
+                    context='admin-globalban',
+                    chat_id=susp_chat_id,
+                    chat_title=susp_chat_title,
+                    changed=['GLOBAL BAN'],
+                    old_values={},
+                    new_values={},
+                    photo_changed=False,
                 )
                 LOGGER.info(
                     "%s:@%s SUSPICIOUS banned globally by admin @%s(%s)",
@@ -6069,11 +6362,29 @@ if __name__ == "__main__":
         elif comand == "confirmban":
             # ban user in chat
             try:
-                await BOT.delete_message(susp_chat_id, susp_message_id)
+                if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                    await BOT.delete_message(susp_chat_id, susp_message_id)
+                else:
+                    LOGGER.debug(
+                        "Skip delete_message for synthetic suspicious message_id=%s chat_id=%s",
+                        susp_message_id,
+                        susp_chat_id,
+                    )
                 await BOT.ban_chat_member(
                     chat_id=susp_chat_id,
                     user_id=susp_user_id,
                     revoke_messages=True,
+                )
+                await log_profile_change(
+                    user_id=susp_user_id,
+                    username=susp_user_name,
+                    context='admin-ban',
+                    chat_id=susp_chat_id,
+                    chat_title=susp_chat_title,
+                    changed=['BAN'],
+                    old_values={},
+                    new_values={},
+                    photo_changed=False,
                 )
                 LOGGER.info(
                     "%s:@%s SUSPICIOUS banned in chat %s (%s) by admin @%s(%s)",
@@ -6092,13 +6403,31 @@ if __name__ == "__main__":
             callback_answer = "User suspicious message were deleted.\nForward message to the bot to ban user everywhere!"
             # delete suspicious message
             try:
-                await BOT.delete_message(susp_chat_id, susp_message_id)
+                if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                    await BOT.delete_message(susp_chat_id, susp_message_id)
+                else:
+                    LOGGER.debug(
+                        "Skip delete_message for synthetic suspicious message_id=%s chat_id=%s (delmsg)",
+                        susp_message_id,
+                        susp_chat_id,
+                    )
                 LOGGER.info(
                     "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
                     susp_user_id,
                     susp_user_name,
                     susp_message_id,
                     susp_chat_id,
+                )
+                await log_profile_change(
+                    user_id=susp_user_id,
+                    username=susp_user_name,
+                    context='admin-delmsg',
+                    chat_id=susp_chat_id,
+                    chat_title=susp_chat_title,
+                    changed=['DELMSG'],
+                    old_values={},
+                    new_values={},
+                    photo_changed=False,
                 )
             except MessageToDeleteNotFound as e:
                 LOGGER.error("Suspicious message to delete not found: %s", e)

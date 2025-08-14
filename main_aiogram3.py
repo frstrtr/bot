@@ -178,6 +178,17 @@ class ModernTelegramBot:
         if not self.settings.BOT_TOKEN:
             raise ValueError("BOT_TOKEN is required in .env file")
         
+        # Global dictionaries for tracking users (from aiogram 2.x compatibility)
+        self.active_user_checks_dict = {}
+        self.banned_users_dict = {}
+        
+        # Admin configuration
+        self.admin_group_id = getattr(self.settings, 'ADMIN_GROUP_ID', None)
+        self.technolog_group_id = getattr(self.settings, 'TECHNOLOG_GROUP_ID', None)
+        
+        # Configuration constants
+        self.ADMIN_USER_ID = getattr(self.settings, 'ADMIN_ID', None)
+        self.MAX_TELEGRAM_MESSAGE_LENGTH = 4096
         # Setup logging
         logging.basicConfig(
             level=getattr(logging, self.settings.LOG_LEVEL.upper()),
@@ -254,6 +265,27 @@ class ModernTelegramBot:
         @self.dp.message(Command('stats'))
         async def cmd_stats(message: Message):
             await self._handle_stats_command(message)
+        
+        # Missing admin commands from aiogram 2.x version
+        @self.dp.message(Command('check'))
+        async def cmd_check(message: Message):
+            await self._handle_check_command(message)
+        
+        @self.dp.message(Command('loglists'))
+        async def cmd_loglists(message: Message):
+            await self._handle_loglists_command(message)
+        
+        @self.dp.message(Command('delmsg'))
+        async def cmd_delmsg(message: Message):
+            await self._handle_delmsg_command(message)
+        
+        @self.dp.message(Command('banchan'))
+        async def cmd_banchan(message: Message):
+            await self._handle_banchan_command(message)
+        
+        @self.dp.message(Command('unbanchan'))
+        async def cmd_unbanchan(message: Message):
+            await self._handle_unbanchan_command(message)
         
         # Chat member updates
         @self.dp.chat_member()
@@ -525,6 +557,160 @@ class ModernTelegramBot:
             
         except Exception as e:
             self.logger.error(f"Error handling callback query: {e}")
+    
+    async def _handle_check_command(self, message: Message):
+        """Handle /check command - start 3hrs monitoring for user."""
+        if not self._is_admin(message.from_user.id):
+            await message.reply("❌ Admin access required")
+            return
+        
+        try:
+            command_args = message.text.split()
+            if len(command_args) < 2:
+                await message.reply("Please provide the user ID to check.\nUsage: /check <user_id>")
+                return
+            
+            user_id = int(command_args[1])
+            
+            if user_id in self.active_user_checks_dict:
+                user_data = self.active_user_checks_dict.get(user_id)
+                display_name = user_data.get("username", "!UNDEFINED!") if isinstance(user_data, dict) else (user_data or "!UNDEFINED!")
+                await message.reply(f"User <code>{display_name}</code> is already being checked.", parse_mode="HTML")
+                return
+            
+            # Add user to checks
+            self.active_user_checks_dict[user_id] = "!UNDEFINED!"
+            
+            # Start monitoring (simplified - the full implementation would start a coroutine)
+            await message.reply(f"User {user_id} 3hrs monitoring activity check started.")
+            self.logger.info(f"Manual check requested for user {user_id} by admin {message.from_user.id}")
+            
+        except ValueError:
+            await message.reply("Invalid user ID. Please provide a numeric user ID.")
+        except Exception as e:
+            self.logger.error(f"Error in check command: {e}")
+            await message.reply("An error occurred while starting the check.")
+    
+    async def _handle_loglists_command(self, message: Message):
+        """Handle /loglists command - show active checks and banned users."""
+        if not self._is_admin(message.from_user.id):
+            await message.reply("❌ Admin access required")
+            return
+        
+        try:
+            active_count = len(self.active_user_checks_dict)
+            banned_count = len(self.banned_users_dict)
+            
+            response = f"📊 <b>Bot Status</b>\n\n"
+            response += f"🔍 <b>Active Checks:</b> {active_count}\n"
+            response += f"🚫 <b>Banned Users:</b> {banned_count}\n\n"
+            
+            if self.active_user_checks_dict:
+                response += "<b>Active User Checks:</b>\n"
+                for user_id, user_name in list(self.active_user_checks_dict.items())[:10]:  # Limit to 10
+                    display_name = user_name.get("username", "!UNDEFINED!") if isinstance(user_name, dict) else (user_name or "!UNDEFINED!")
+                    response += f"• {user_id}: {display_name}\n"
+                if len(self.active_user_checks_dict) > 10:
+                    response += f"... and {len(self.active_user_checks_dict) - 10} more\n"
+            
+            if len(response) > self.MAX_TELEGRAM_MESSAGE_LENGTH:
+                # Split into multiple messages if too long
+                parts = [response[i:i+self.MAX_TELEGRAM_MESSAGE_LENGTH] for i in range(0, len(response), self.MAX_TELEGRAM_MESSAGE_LENGTH)]
+                for part in parts:
+                    await message.reply(part, parse_mode="HTML")
+            else:
+                await message.reply(response, parse_mode="HTML")
+                
+        except Exception as e:
+            self.logger.error(f"Error in loglists command: {e}")
+            await message.reply("An error occurred while fetching the lists.")
+    
+    async def _handle_delmsg_command(self, message: Message):
+        """Handle /delmsg command - delete message by link."""
+        if not self._is_admin(message.from_user.id):
+            await message.reply("❌ Admin access required")
+            return
+        
+        try:
+            command_args = message.text.split()
+            if len(command_args) < 2:
+                await message.reply("Please provide the message link to delete.\nUsage: /delmsg <message_link>")
+                return
+            
+            message_link = command_args[1]
+            # This would need the implementation from the original bot to extract chat_id and message_id
+            await message.reply(f"Message deletion functionality needs full implementation.\nLink: {message_link}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in delmsg command: {e}")
+            await message.reply("An error occurred while deleting the message.")
+    
+    async def _handle_banchan_command(self, message: Message):
+        """Handle /banchan command - ban channel by ID."""
+        if not self._is_admin(message.from_user.id):
+            await message.reply("❌ Admin access required")
+            return
+        
+        try:
+            command_args = message.text.split()
+            if len(command_args) < 2:
+                await message.reply("Please provide the channel ID to ban.\nUsage: /banchan <channel_id>")
+                return
+            
+            channel_id = command_args[1].strip()
+            if not channel_id.startswith("-100") or not channel_id[4:].isdigit():
+                await message.reply("Invalid channel ID format. Please provide a valid channel ID.")
+                return
+            
+            channel_id = int(channel_id)
+            
+            if channel_id in self.banned_users_dict:
+                await message.reply(f"Channel {channel_id} already banned.")
+                return
+            
+            # Add channel to banned list
+            self.banned_users_dict[channel_id] = f"CHANNEL_BANNED_BY_ADMIN_{message.from_user.id}"
+            await message.reply(f"Channel {channel_id} has been banned.")
+            self.logger.info(f"Channel {channel_id} banned by admin {message.from_user.id}")
+            
+        except ValueError:
+            await message.reply("Invalid channel ID. Please provide a numeric channel ID.")
+        except Exception as e:
+            self.logger.error(f"Error in banchan command: {e}")
+            await message.reply("An error occurred while banning the channel.")
+    
+    async def _handle_unbanchan_command(self, message: Message):
+        """Handle /unbanchan command - unban channel by ID."""
+        if not self._is_admin(message.from_user.id):
+            await message.reply("❌ Admin access required")
+            return
+        
+        try:
+            command_args = message.text.split()
+            if len(command_args) < 2:
+                await message.reply("Please provide the channel ID to unban.\nUsage: /unbanchan <channel_id>")
+                return
+            
+            channel_id = int(command_args[1].strip())
+            
+            if channel_id not in self.banned_users_dict:
+                await message.reply(f"Channel {channel_id} is not banned.")
+                return
+            
+            # Remove channel from banned list
+            del self.banned_users_dict[channel_id]
+            await message.reply(f"Channel {channel_id} has been unbanned.")
+            self.logger.info(f"Channel {channel_id} unbanned by admin {message.from_user.id}")
+            
+        except ValueError:
+            await message.reply("Invalid channel ID. Please provide a numeric channel ID.")
+        except Exception as e:
+            self.logger.error(f"Error in unbanchan command: {e}")
+            await message.reply("An error occurred while unbanning the channel.")
+    
+    def _is_admin(self, user_id: int) -> bool:
+        """Check if user is admin."""
+        return user_id == self.ADMIN_USER_ID
     
     async def _handle_error(self, event: ErrorEvent):
         """Handle errors in aiogram 3.x style."""

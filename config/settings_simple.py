@@ -49,6 +49,10 @@ class Settings:
         self.TECHNO_ORIGINALS = int(env_vars.get('TECHNO_ORIGINALS', os.getenv('TECHNO_ORIGINALS', '0')))
         self.TECHNO_UNHANDLED = int(env_vars.get('TECHNO_UNHANDLED', os.getenv('TECHNO_UNHANDLED', '0')))
         
+        # Admin users (support both ADMIN_ID and ADMIN_USER_IDS for compatibility)
+        admin_id_str = env_vars.get('ADMIN_ID', env_vars.get('ADMIN_USER_IDS', os.getenv('ADMIN_ID', os.getenv('ADMIN_USER_IDS', '0'))))
+        self.ADMIN_ID = int(admin_id_str.split(',')[0]) if admin_id_str else 0
+        
         # Admin users
         admin_users_str = env_vars.get('ADMIN_USER_IDS', os.getenv('ADMIN_USER_IDS', ''))
         self.ADMIN_USER_IDS = self._parse_int_list(admin_users_str)

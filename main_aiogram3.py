@@ -199,6 +199,7 @@ class ModernTelegramBot:
         # Global dictionaries for tracking users (from aiogram 2.x compatibility)
         self.active_user_checks_dict = {}
         self.banned_users_dict = {}
+        self.running_watchdogs = {}  # Track running monitoring tasks
         
         # Unhandled messages mapping (admin replies system)
         self.unhandled_messages = {}  # XXX: Should be moved to DB for persistence
@@ -478,7 +479,7 @@ class ModernTelegramBot:
         try:
             args = message.text.split()[1:] if message.text else []
             if not args:
-                await message.answer("❌ Usage: /unban &lt;user_id&gt;")
+                await message.answer("❌ Usage: /unban <user_id>")
                 return
             
             try:
@@ -487,23 +488,36 @@ class ModernTelegramBot:
                 await message.answer("❌ Invalid user ID.")
                 return
             
-            if self.ban_service:
-                result = await self.ban_service.unban_user(
-                    bot=self.bot,
-                    user_id=user_id,
-                    chat_id=message.chat.id,
-                    unbanned_by=message.from_user.id
-                )
-                
-                if result.success:
-                    await message.answer(f"✅ User {user_id} has been unbanned.")
-                else:
-                    await message.answer(f"❌ Failed to unban user: {result.error_message}")
-            else:
-                await message.answer("❌ Ban service not available.")
+            # Remove from banned and checks dicts
+            if user_id in self.active_user_checks_dict:
+                del self.active_user_checks_dict[user_id]
+            if user_id in self.banned_users_dict:
+                del self.banned_users_dict[user_id]
+            
+            # Cancel any running watchdog for this user
+            await self.cancel_named_watchdog(f"monitor_{user_id}")
+            
+            # Unban from all channels
+            unban_count = 0
+            for channel_name in self.settings.CHANNEL_NAMES:
+                channel_id = self.get_channel_id_by_name(channel_name)
+                if channel_id:
+                    try:
+                        await self.bot.unban_chat_member(
+                            chat_id=channel_id, 
+                            user_id=user_id, 
+                            only_if_banned=True
+                        )
+                        unban_count += 1
+                        self.logger.info(f"Unbanned user {user_id} in channel {channel_name} (ID: {channel_id})")
+                    except Exception as e:
+                        self.logger.error(f"Failed to unban user {user_id} in channel {channel_name}: {e}")
+            
+            await message.answer(f"✅ User {user_id} has been unbanned from {unban_count} channels and removed from monitoring.")
                 
         except Exception as e:
             self.logger.error(f"Error in unban command: {e}")
+            await message.answer("❌ An error occurred while trying to unban the user.")
             await message.answer("❌ An error occurred while processing the unban command.")
     
     async def _handle_stats_command(self, message: Message):
@@ -972,8 +986,7 @@ class ModernTelegramBot:
                         self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id}")
                         
                     # Global ban user
-                    if self.ban_service:
-                        await self.ban_service.ban_user_globally(susp_user_id, susp_user_name, f"Suspicious activity - Admin decision by @{admin_username}")
+                    await self.ban_user_from_all_chats(susp_user_id, susp_user_name, f"Suspicious activity - Admin decision by @{admin_username}")
                     
                     self.logger.info(f"{susp_user_id}:@{susp_user_name} SUSPICIOUS banned globally by admin @{admin_username}({admin_id})")
                     callback_answer = "User banned globally and message deleted!"
@@ -1230,69 +1243,442 @@ class ModernTelegramBot:
         kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
         return kb.as_markup()
     
-    async def check_and_autoban(self, user_id: int, reason: str = "Automated ban", **kwargs) -> bool:
-        """Check user and automatically ban if conditions are met."""
+    async def ban_user_from_all_chats(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Spam detected") -> bool:
+        """Ban a user from all specified chats and log the results."""
         try:
-            # Check if user is in banned list
+            channel_ids = getattr(self.settings, 'CHANNEL_IDS', [])
+            if not channel_ids:
+                self.logger.warning("No channels configured for global ban")
+                return False
+                
+            ban_count = 0
+            for chat_id in channel_ids:
+                try:
+                    await self.bot.ban_chat_member(chat_id, user_id, revoke_messages=True)
+                    ban_count += 1
+                    self.logger.debug(f"Successfully banned user {user_id} in chat {chat_id}")
+                except Exception as e:
+                    chat_name = self.settings.CHANNEL_DICT.get(chat_id, "!UNKNOWN!")
+                    self.logger.error(f"Error banning user {user_id} in chat {chat_name} ({chat_id}): {e}")
+                    await asyncio.sleep(1)  # Rate limiting
+                    continue
+
+            if ban_count > 0:
+                self.logger.info(f"🚫 {user_id}:@{user_name} banned from {ban_count}/{len(channel_ids)} chats - {reason}")
+                return True
+            else:
+                self.logger.error(f"Failed to ban {user_id} from any chats")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error in ban_user_from_all_chats for user {user_id}: {e}")
+            return False
+    
+    async def cancel_named_watchdog(self, user_id: int, user_name: str = "!UNDEFINED!") -> bool:
+        """Cancel a running watchdog task for a given user ID."""
+        try:
+            if user_id in self.running_watchdogs:
+                # Move user from active checks to banned users
+                if user_id in self.active_user_checks_dict:
+                    user_data = self.active_user_checks_dict.pop(user_id, None)
+                    self.banned_users_dict[user_id] = user_data
+                    self.logger.info(f"✅ {user_id}:@{user_name} removed from active checks during watchdog cancellation")
+                
+                # Cancel the task
+                task = self.running_watchdogs.pop(user_id)
+                task.cancel()
+                
+                try:
+                    await task
+                    self.logger.info(f"🛑 {user_id}:@{user_name} Watchdog disabled (Cancelled)")
+                except asyncio.CancelledError:
+                    self.logger.info(f"🛑 {user_id}:@{user_name} Watchdog cancellation confirmed")
+                except Exception as e:
+                    self.logger.error(f"Error during watchdog cancellation for {user_id}: {e}")
+                
+                return True
+            else:
+                self.logger.info(f"ℹ️  {user_id}:@{user_name} No running watchdog found to cancel")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error cancelling watchdog for user {user_id}: {e}")
+            return False
+    
+    async def create_named_watchdog(self, coro, user_id: int, user_name: str = "!UNDEFINED!") -> bool:
+        """Create or restart a watchdog task for user monitoring."""
+        try:
+            # Check if task already exists
+            existing_task = self.running_watchdogs.get(user_id)
+            if existing_task:
+                self.logger.info(f"⚠️  {user_id}:@{user_name} Watchdog already exists. Restarting...")
+                existing_task.cancel()
+                try:
+                    await existing_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Create new task
+            task = asyncio.create_task(coro, name=f"watchdog_{user_id}")
+            self.running_watchdogs[user_id] = task
+            
+            self.logger.info(f"🐕 {user_id}:@{user_name} Watchdog assigned")
+            
+            # Set up cleanup callback
+            def _task_done(t: asyncio.Task, _uid=user_id):
+                try:
+                    if self.running_watchdogs.get(_uid) is t:
+                        self.running_watchdogs.pop(_uid, None)
+                finally:
+                    if t.cancelled():
+                        self.logger.info(f"🛑 {_uid} Watchdog task was cancelled")
+                    else:
+                        exc = t.exception()
+                        if exc:
+                            self.logger.error(f"❌ {_uid} Watchdog task raised exception: {exc}")
+            
+            task.add_done_callback(_task_done)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error creating watchdog for user {user_id}: {e}")
+            return False
+    
+    async def autoban(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Automated spam detection") -> bool:
+        """Function to automatically ban a user from all chats."""
+        try:
+            # Check if already banned
             if user_id in self.banned_users_dict:
                 self.logger.debug(f"User {user_id} already banned")
                 return True
             
-            # Perform spam check
+            # Perform spam check first
             is_spam = await self.spam_check(user_id)
+            if not is_spam:
+                self.logger.info(f"User {user_id} passed spam check, not banning")
+                return False
             
-            if is_spam:
-                # Auto-ban the user
-                if self.ban_service:
-                    ban_result = await self.ban_service.ban_user(
-                        user_id=user_id,
-                        reason=reason,
-                        admin_id=0  # System auto-ban
-                    )
-                    
-                    if ban_result.success:
-                        self.banned_users_dict[user_id] = f"AUTO_BAN_{reason}"
-                        self.logger.info(f"Auto-banned user {user_id}: {reason}")
-                        return True
-                    else:
-                        self.logger.error(f"Failed to auto-ban user {user_id}: {ban_result.error_message}")
-                        return False
+            # Ban from all chats
+            ban_success = await self.ban_user_from_all_chats(user_id, user_name, reason)
             
+            if ban_success:
+                # Add to banned users
+                self.banned_users_dict[user_id] = {
+                    "username": user_name,
+                    "reason": reason,
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+                
+                # Remove from active checks
+                if user_id in self.active_user_checks_dict:
+                    del self.active_user_checks_dict[user_id]
+                
+                # Cancel watchdog if running
+                await self.cancel_named_watchdog(user_id, user_name)
+                
+                # Report to P2P
+                await self.report_spam_2p2p(user_id)
+                
+                self.logger.info(f"🔨 {user_id}:@{user_name} AUTO-BANNED: {reason}")
+                return True
+            else:
+                self.logger.error(f"Failed to autoban user {user_id}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error in autoban for user {user_id}: {e}")
             return False
+    
+    async def save_report_file(self, file_type: str, data: str) -> bool:
+        """Create or append to daily report files."""
+        try:
+            from datetime import datetime
+            import os
+            
+            # Get today's date
+            today = datetime.now().strftime("%d-%m-%Y")
+            filename = f"{file_type}{today}.txt"
+            
+            # Ensure directory exists
+            if file_type.startswith("daily_spam_"):
+                os.makedirs("daily_spam", exist_ok=True)
+                filename = f"daily_spam/{filename}"
+            elif file_type.startswith("inout_"):
+                os.makedirs("inout", exist_ok=True)
+                filename = f"inout/{filename}"
+            
+            # Write data to file
+            with open(filename, "a", encoding="utf-8") as f:
+                f.write(data + "\n")
+            
+            self.logger.debug(f"Saved report data to {filename}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error saving report file: {e}")
+            return False
+    
+    async def log_profile_change(self, user_id: int, username: str, context: str, chat_id: int, chat_title: str, 
+                                changed: list, old_values: dict, new_values: dict, photo_changed: bool = False) -> None:
+        """Log profile changes for audit trail."""
+        try:
+            from datetime import datetime
+            
+            # Create timestamp
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Format user ID
+            uid_fmt = f"{user_id:>12}"
+            
+            # Format username
+            uname = username.lstrip("@") if username else "!UNDEFINED!"
+            
+            # Format chat representation
+            chat_repr = f"{chat_title}({chat_id})" if chat_title else f"({chat_id})"
+            
+            # Build change details
+            diff_parts = []
+            mapping = {
+                'first_name': ('first_name', 'FirstName'),
+                'last_name': ('last_name', 'LastName'),
+                'username': ('username', 'Username'),
+                'photo_count': ('photo_count', 'PhotoCount')
+            }
+            
+            for field in changed:
+                key, label = mapping.get(field, (field, field))
+                o = old_values.get(key, '')
+                n = new_values.get(key, '')
+                if key == 'username':
+                    o = ('@' + o) if o else '@!UNDEFINED!'
+                    n = ('@' + n) if n else '@!UNDEFINED!'
+                diff_parts.append(f"{label}='{o}'→'{n}'")
+            
+            photo_marker = ' P' if photo_changed else ''
+            record = f"{ts}: {uid_fmt} PC[{context}{photo_marker}] @{uname:<20} in {chat_repr:<40} changes: {', '.join(diff_parts)}\n"
+            
+            # Save to inout file
+            await self.save_report_file('inout_', 'pc' + record.rstrip())
+            self.logger.info(record.rstrip())
+            
+        except Exception as e:
+            self.logger.debug(f'Failed to log profile change: {e}')
+    
+    def make_profile_dict(self, first_name: str = None, last_name: str = None, username: str = None, photo_count: int = None) -> dict:
+        """Return a normalized profile snapshot dict used for logging diffs."""
+        return {
+            'first_name': first_name or '',
+            'last_name': last_name or '',
+            'username': username or '',
+            'photo_count': photo_count or 0,
+        }
+    
+    async def check_and_autoban(self, user_id: int, reason: str = "Automated ban", **kwargs) -> bool:
+        """Check user and automatically ban if conditions are met."""
+        try:
+            # Use the new autoban function which includes spam checking
+            return await self.autoban(user_id, kwargs.get('user_name', '!UNDEFINED!'), reason)
+            
         except Exception as e:
             self.logger.error(f"Error in check_and_autoban for user {user_id}: {e}")
             return False
     
-    async def perform_checks(self, user_id: int, user_name: str = "!UNDEFINED!", event_record: str = "", inout_logmessage: str = ""):
-        """Perform 3-hour monitoring checks on a user."""
+    async def submit_autoreport(self, report_chat: int, from_id: int, report_user_id: int, 
+                               content: str, reason: str = None) -> bool:
+        """Submit and log an autoreport."""
         try:
-            self.logger.info(f"Starting 3-hour monitoring for user {user_id}")
+            from datetime import datetime
+            
+            # Log the autoreport
+            timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            reason_str = f" ({reason})" if reason else ""
+            ar_line = f"{timestamp} AutoReport{reason_str}: Chat={report_chat}, Reporter={from_id}, Target={report_user_id}, Content='{content}'"
+            
+            # Save to inout file
+            await self.save_report_file('inout_', ar_line)
+            self.logger.info(f"AutoReport{reason_str}: Reporter {from_id} → Target {report_user_id} in chat {report_chat}")
+            
+            # Process the content if it contains forwarded message investigation
+            if "INVESTIGATE" in content.upper():
+                await self.handle_autoreports(content, report_chat, from_id, report_user_id)
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error submitting autoreport: {e}")
+            return False
+    
+    async def handle_autoreports(self, content: str, chat_id: int, reporter_id: int, target_id: int) -> None:
+        """Handle investigation of forwarded messages in autoreports."""
+        try:
+            # Look for patterns like "INVESTIGATE FORWARD FROM @username" or similar
+            if "FORWARD" in content.upper() and "FROM" in content.upper():
+                # Extract potential username or channel info
+                import re
+                patterns = [
+                    r'FROM\s+@(\w+)',
+                    r'FROM\s+(\w+)',
+                    r'CHANNEL\s+@(\w+)',
+                    r'USER\s+@(\w+)'
+                ]
+                
+                found_entities = []
+                for pattern in patterns:
+                    matches = re.findall(pattern, content.upper())
+                    found_entities.extend(matches)
+                
+                if found_entities:
+                    entities_str = ", ".join(found_entities)
+                    investigation_log = f"Investigation: Forward trace for user {target_id} → entities: {entities_str}"
+                    await self.save_report_file('inout_', investigation_log)
+                    self.logger.info(investigation_log)
+                
+                # If this looks like a spam forward, trigger additional checks
+                spam_keywords = ["SPAM", "SCAM", "FLOOD", "ADVERTISING"]
+                if any(keyword in content.upper() for keyword in spam_keywords):
+                    await self.autoban(target_id, "Forwarded spam content investigation")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling autoreport investigation: {e}")
+    
+    async def load_banned_users(self) -> None:
+        """Load banned users from file."""
+        try:
+            import os
+            import ast
+            
+            banned_users_filename = "banned_users.txt"
+            
+            if not os.path.exists(banned_users_filename):
+                self.logger.error(f"File not found: {banned_users_filename}")
+                return
+            
+            with open(banned_users_filename, "r", encoding="utf-8") as file:
+                for line in file:
+                    if line.strip():
+                        parts = line.strip().split(":", 1)
+                        if len(parts) == 2:
+                            user_id = int(parts[0])
+                            user_name_repr = parts[1]
+                            try:
+                                user_name = ast.literal_eval(user_name_repr)
+                            except (ValueError, SyntaxError):
+                                user_name = user_name_repr
+                            self.banned_users_dict[user_id] = user_name
+            
+            self.logger.info(f"Banned users dict ({len(self.banned_users_dict)}) loaded from file")
+            
+        except Exception as e:
+            self.logger.error(f"Error loading banned users: {e}")
+    
+    async def load_active_user_checks(self) -> None:
+        """Load active user checks from file and start monitoring."""
+        try:
+            import os
+            import ast
+            
+            active_checks_filename = "active_user_checks.txt"
+            
+            if not os.path.exists(active_checks_filename):
+                self.logger.error(f"File not found: {active_checks_filename}")
+                return
+            
+            with open(active_checks_filename, "r", encoding="utf-8") as file:
+                for line in file:
+                    if line.strip():
+                        parts = line.strip().split(":", 1)
+                        if len(parts) == 2:
+                            user_id = int(parts[0])
+                            user_name = parts[1]
+                            
+                            # Try to parse as dict if it looks like one
+                            try:
+                                if user_name.startswith("{") and user_name.endswith("}"):
+                                    user_name = ast.literal_eval(user_name)
+                            except (ValueError, SyntaxError):
+                                pass
+                            
+                            self.active_user_checks_dict[user_id] = user_name
+                            
+                            # Extract username for logging
+                            if isinstance(user_name, dict):
+                                username = user_name.get("username", "!UNDEFINED!")
+                            else:
+                                username = user_name if user_name != "None" else "!UNDEFINED!"
+                            
+                            # Start monitoring with 1 second delay between tasks
+                            from datetime import datetime
+                            event_message = (
+                                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                                f"{user_id} ❌ \t\t\tbanned everywhere during initial checks on_startup"
+                            )
+                            
+                            # Start the check in watchdog system
+                            asyncio.create_task(
+                                self.perform_checks(
+                                    user_id=user_id,
+                                    user_name=username,
+                                    event_record=event_message,
+                                    inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event"
+                                )
+                            )
+                            
+                            self.logger.info(f"{user_id}:@{username} loaded from file & 3hr monitoring started...")
+                            await asyncio.sleep(1)  # 1-second interval between task creations
+            
+            self.logger.info(f"Active users checks dict ({len(self.active_user_checks_dict)}) loaded from file")
+            
+        except Exception as e:
+            self.logger.error(f"Error loading active user checks: {e}")
+    
+    async def load_and_start_checks(self) -> None:
+        """Load all data files and start monitoring."""
+        try:
+            self.logger.info("Loading banned users and active checks...")
+            await self.load_banned_users()
+            await self.load_active_user_checks()
+            self.logger.info("All data loaded and monitoring started")
+            
+        except Exception as e:
+            self.logger.error(f"Error in load_and_start_checks: {e}")
+    
+    async def perform_checks(self, user_id: int, user_name: str = "!UNDEFINED!", event_record: str = "", inout_logmessage: str = ""):
+        """Perform 3-hour monitoring checks on a user with watchdog system."""
+        try:
+            self.logger.info(f"🔍 Starting 3-hour monitoring for user {user_id}:@{user_name}")
             
             # Add user to active checks if not already there
             if user_id not in self.active_user_checks_dict:
                 self.active_user_checks_dict[user_id] = {
                     "username": user_name,
                     "start_time": asyncio.get_event_loop().time(),
-                    "event_record": event_record
+                    "event_record": event_record,
+                    "inout_logmessage": inout_logmessage
                 }
             
-            # Wait for 3 hours (or shorter for testing)
-            monitoring_duration = 3 * 60 * 60  # 3 hours in seconds
-            await asyncio.sleep(monitoring_duration)
-            
-            # After 3 hours, perform final check
-            if user_id in self.active_user_checks_dict:
-                final_check = await self.check_and_autoban(user_id, "3hr monitoring completed")
+            # Create monitoring coroutine
+            async def monitoring_coro():
+                # Wait for 3 hours (or shorter for testing)
+                monitoring_duration = 3 * 60 * 60  # 3 hours in seconds
+                await asyncio.sleep(monitoring_duration)
                 
-                if not final_check:
-                    # User is clean, remove from monitoring
-                    del self.active_user_checks_dict[user_id]
-                    self.logger.info(f"User {user_id} monitoring completed - user is clean")
-                else:
-                    self.logger.info(f"User {user_id} monitoring completed - user was banned")
+                # After 3 hours, perform final check
+                if user_id in self.active_user_checks_dict:
+                    final_check = await self.autoban(user_id, f"3hr monitoring completed - {event_record}")
+                    
+                    if not final_check:
+                        # User is clean, remove from monitoring
+                        if user_id in self.active_user_checks_dict:
+                            del self.active_user_checks_dict[user_id]
+                        self.logger.info(f"✅ User {user_id}:@{user_name} monitoring completed - user is clean")
+                    else:
+                        self.logger.info(f"🔨 User {user_id}:@{user_name} monitoring completed - user was banned")
+            
+            # Create watchdog for this monitoring task
+            await self.create_named_watchdog(monitoring_coro(), user_id, user_name)
             
         except asyncio.CancelledError:
-            self.logger.info(f"Monitoring cancelled for user {user_id}")
+            self.logger.info(f"🛑 Monitoring cancelled for user {user_id}:@{user_name}")
             if user_id in self.active_user_checks_dict:
                 del self.active_user_checks_dict[user_id]
         except Exception as e:
@@ -1457,13 +1843,14 @@ class ModernTelegramBot:
                             
                             # Start monitoring if not already being monitored
                             if user_id not in self.active_user_checks_dict:
-                                asyncio.create_task(
+                                await self.create_named_watchdog(
                                     self.perform_checks(
                                         user_id=user_id,
                                         user_name=message.from_user.username or "!UNDEFINED!",
                                         event_record=f"Suspicious message detected: {spam_result.spam_type}"
                                     ),
-                                    name=f"monitor_{user_id}"
+                                    user_id,
+                                    message.from_user.username or "!UNDEFINED!"
                                 )
             
         except Exception as e:
@@ -1658,6 +2045,9 @@ async def main():
     """Main entry point."""
     try:
         bot = ModernTelegramBot()
+        
+        # Load data files and start monitoring
+        await bot.load_and_start_checks()
         
         # Check if webhook URL is configured
         webhook_url = getattr(bot.settings, 'WEBHOOK_URL', None)

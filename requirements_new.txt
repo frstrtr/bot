@@ -1,0 +1,14 @@
+# Requires Python 3.11+
+aiogram==3.15.0
+aiohttp==3.10.5
+aiofiles==24.1.0
+pydantic==2.9.2
+asyncpg==0.30.0  # if using PostgreSQL instead of SQLite
+aiocron==1.8.0
+emoji==2.14.0
+requests==2.32.3
+# For development
+black==24.8.0
+mypy==1.11.2
+pytest==8.3.3
+pytest-asyncio==0.24.0

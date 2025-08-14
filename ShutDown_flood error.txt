@@ -1,0 +1,26 @@
+Traceback (most recent call last):
+  File "/home/user0/bot/main.py", line 5151, in <module>
+    executor.start_polling(
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/utils/executor.py", line 45, in start_polling
+    executor.start_polling(
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/utils/executor.py", line 328, in start_polling
+    loop.run_until_complete(self._shutdown_polling())
+  File "/usr/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/utils/executor.py", line 381, in _shutdown_polling
+    await callback(self.dispatcher)
+  File "/home/user0/bot/main.py", line 594, in on_shutdown
+    await asyncio.gather(*tasks)
+  File "/home/user0/bot/main.py", line 559, in sequential_shutdown_tasks
+    await check_and_autoban(
+  File "/home/user0/bot/main.py", line 1257, in check_and_autoban
+    await BOT.send_message(
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/bot/bot.py", line 346, in send_message
+    result = await self.request(api.Methods.SEND_MESSAGE, payload)
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/bot/base.py", line 236, in request
+    return await api.make_request(await self.get_session(), self.server, self.__token, method, data, files,
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/bot/api.py", line 140, in make_request
+    return check_result(method, response.content_type, response.status, await response.text())
+  File "/home/user0/.local/lib/python3.10/site-packages/aiogram/bot/api.py", line 111, in check_result
+    raise exceptions.RetryAfter(parameters.retry_after)
+aiogram.utils.exceptions.RetryAfter: Flood control exceeded. Retry in 5 seconds.

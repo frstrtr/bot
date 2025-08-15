@@ -289,6 +289,16 @@ class DatabaseManager:
             cursor = await conn.execute(query, params)
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+    # Alias for compatibility with migrated legacy logic
+    async def fetch_user_messages(
+        self,
+        user_id: int,
+        limit: int = 500,
+        since: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
+        """Compatibility wrapper to fetch user messages (delegates to get_user_messages)."""
+        return await self.get_user_messages(user_id=user_id, limit=limit, since=since)
     
     # Spam operations
     async def record_spam_detection(self, spam_record: SpamRecord) -> None:

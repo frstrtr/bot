@@ -1069,12 +1069,12 @@ async def handle_autoreports(
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
-    # MODIFIED: Pass spammer_id (user_id) and report_id, and rename callback prefix
-    # Show only initial Ban action (two-step confirmation via suspiciousban_)
-    ban_btn = InlineKeyboardButton(
-        "Ban", callback_data=f"suspiciousban_{message.chat.id}_{report_id}_{spammer_id}"
+    # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
+    actions_btn = InlineKeyboardButton(
+        "⚙️ Actions (Ban / Delete) ⚙️",
+        callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{spammer_id}",
     )
-    keyboard.add(ban_btn)
+    keyboard.add(actions_btn)
     try:
         # Forward original message to the admin group
         await BOT.forward_message(
@@ -1757,13 +1757,9 @@ async def perform_checks(
     user_name="!UNDEFINED!",
 ):
     """Corutine to perform checks for spam and take action if necessary.
-
     param message_to_delete: tuple: chat_id, message_id: The message to delete.
-
     param event_record: str: The event record to log to inout file.
-
     param user_id: int: The ID of the user to check for spam.
-
     param inout_logmessage: str: The log message for the user's activity.
     """
 
@@ -1792,6 +1788,9 @@ async def perform_checks(
             3605,  # 1 hr
             7205,  # 2 hr
             10805,  # 3 hr
+            21605,  # 6 hr
+            43205,  # 12 hr
+            86405,  # 1 day
         ]
 
         for sleep_time in sleep_times:
@@ -1872,10 +1871,14 @@ async def perform_checks(
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
                             _report_id = int(datetime.now().timestamp())
-                            # First-step action buttons (confirmation shown after click)
-                            kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{baseline.get('chat', {}).get('id')}_{_report_id}_{user_id}"))
                             _chat_id_for_gban = baseline.get('chat', {}).get('id')
-                            kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{_chat_id_for_gban}_{_report_id}_{user_id}"))
+                            # Consolidated actions menu (expands to Ban / Global Ban / Delete)
+                            kb.add(
+                                InlineKeyboardButton(
+                                    "⚙️ Actions (Ban / Delete) ⚙️",
+                                    callback_data=f"suspiciousactions_{_chat_id_for_gban}_{_report_id}_{user_id}",
+                                )
+                            )
 
                             def _fmt(old, new, label, username=False):
                                 if username:
@@ -2701,10 +2704,13 @@ if __name__ == "__main__":
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         _kb = make_lols_kb(inout_userid)
                         _rid = int(datetime.now().timestamp())
-                        # Local ban (chat-level) confirmation
-                        # Step 1 buttons only (confirmation after click)
-                        _kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{update.chat.id}_{_rid}_{inout_userid}"))
-                        _kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{update.chat.id}_{_rid}_{inout_userid}"))
+                        # Consolidated actions button (expands to ban/global/delete options)
+                        _kb.add(
+                            InlineKeyboardButton(
+                                "⚙️ Actions (Ban / Delete) ⚙️",
+                                callback_data=f"suspiciousactions_{update.chat.id}_{_rid}_{inout_userid}",
+                            )
+                        )
                         # Elapsed time since join if available
                         joined_at_raw = _baseline.get("joined_at")
                         elapsed_line = ""
@@ -3117,12 +3123,12 @@ if __name__ == "__main__":
 
         # Keyboard ban/cancel/confirm buttons
         keyboard = InlineKeyboardMarkup()
-        # MODIFIED: Pass user_id (spammer's ID) and report_id, and rename callback prefix
-        ban_btn = InlineKeyboardButton(
-            # First-step ban button (confirmation appears after click)
-            "Ban", callback_data=f"suspiciousban_{message.chat.id}_{report_id}_{user_id}"
+        # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
+        actions_btn = InlineKeyboardButton(
+            "⚙️ Actions (Ban / Delete) ⚙️",
+            callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{user_id}",
         )
-        keyboard.add(ban_btn)
+        keyboard.add(actions_btn)
 
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
         # And store published banner message data to provide link to the reportee
@@ -4313,8 +4319,12 @@ if __name__ == "__main__":
 
                         kb = make_lols_kb(_uid)
                         _report_id = int(datetime.now().timestamp())
-                        kb.add(InlineKeyboardButton("🚫 Ban User", callback_data=f"suspiciousban_{message.chat.id}_{_report_id}_{_uid}"))
-                        kb.add(InlineKeyboardButton("🌐 Global Ban", callback_data=f"suspiciousglobalban_{message.chat.id}_{_report_id}_{_uid}"))
+                        kb.add(
+                            InlineKeyboardButton(
+                                "⚙️ Actions (Ban / Delete) ⚙️",
+                                callback_data=f"suspiciousactions_{message.chat.id}_{_report_id}_{_uid}",
+                            )
+                        )
 
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         chat_title_safe = html.escape(message.chat.title)
@@ -6160,6 +6170,7 @@ if __name__ == "__main__":
         lambda c: c.data.startswith("suspiciousglobalban_")
         or c.data.startswith("suspiciousban_")
         or c.data.startswith("suspiciousdelmsg_")
+    or c.data.startswith("suspiciousactions_")
         or c.data.startswith("confirmdelmsg_")
         or c.data.startswith("canceldelmsg_")
         or c.data.startswith("confirmban_")
@@ -6181,6 +6192,43 @@ if __name__ == "__main__":
         susp_user_id = int(susp_user_id_str)
         susp_message_id = int(susp_message_id_str)
         susp_chat_id = int(susp_chat_id_str)
+
+        # If the consolidated actions button was pressed, expand available actions and return
+        if action_prefix == "suspiciousactions":
+            susp_user_id = int(susp_user_id_str)
+            susp_message_id = int(susp_message_id_str)
+            susp_chat_id = int(susp_chat_id_str)
+            message_link = construct_message_link([susp_chat_id, susp_message_id, None])
+            lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
+            expand_kb = InlineKeyboardMarkup()
+            expand_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+            expand_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+            expand_kb.add(
+                InlineKeyboardButton(
+                    "🌐 Global Ban",
+                    callback_data=f"suspiciousglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+                InlineKeyboardButton(
+                    "🚫 Ban User",
+                    callback_data=f"suspiciousban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                ),
+            )
+            expand_kb.add(
+                InlineKeyboardButton(
+                    "🗑 Delete Msg",
+                    callback_data=f"suspiciousdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                )
+            )
+            try:
+                await BOT.edit_message_reply_markup(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=expand_kb,
+                )
+            except Exception as e:  # noqa
+                LOGGER.error("Failed to expand suspicious actions keyboard: %s", e)
+            await callback_query.answer()
+            return
 
         # Determine 'comand' (action) based on the prefix
         comand = ""

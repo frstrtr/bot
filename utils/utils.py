@@ -585,34 +585,36 @@ def db_init(cursor: Cursor, conn: Connection):
 
 
 def create_inline_keyboard(message_link, lols_link, message: types.Message):
-    """Create the inline keyboard"""
+    """Create the inline keyboard for a suspicious forwarded / monitored message.
+
+    Original version included immediate Global BAN / BAN / Delete Message buttons whose
+    callback prefixes (suspiciousglobalban_/suspiciousban_/suspiciousdelmsg_) are *also*
+    produced elsewhere, leading to duplicate handling / double confirmation flows.
+
+    To avoid duplicate ban handling we:
+      - Keep non-destructive info buttons (View Original / Check Spam Data).
+      - Provide a single consolidated "⚙️ Actions" menu via a neutral callback prefix
+        that downstream code can expand into confirm/cancel buttons (re-using existing
+        suspicious* prefixes only once).
+      - Retain the existing stopchecks_* button (used to mark user legit & stop monitoring).
+
+    If you still want direct ban buttons, wire them through a distinct prefix like
+    actionsban_ to distinguish from primary flow.
+    """
     inline_kb = InlineKeyboardMarkup()
-    # Add buttons to the keyboard, each in a new row
     inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
     inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
-    # Add callback data button to prevent further checks
     inline_kb.add(
         InlineKeyboardButton(
             "🟢 Seems legit, STOP checks 🟢",
             callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
         )
     )
+    # Single actions button to open ban/delete choices (handled separately)
     inline_kb.add(
         InlineKeyboardButton(
-            "❌ Global BAN ❌",
-            callback_data=f"suspiciousglobalban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-        )
-    )
-    inline_kb.add(
-        InlineKeyboardButton(
-            "❌ BAN ❌",
-            callback_data=f"suspiciousban_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-        )
-    )
-    inline_kb.add(
-        InlineKeyboardButton(
-            "❌ Delete Message ❌",
-            callback_data=f"suspiciousdelmsg_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+            "⚙️ Actions (Ban / Delete) ⚙️",
+            callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
         )
     )
     return inline_kb

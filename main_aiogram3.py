@@ -363,11 +363,13 @@ class ModernTelegramBot:
         @self.dp.callback_query(lambda c: c.data.startswith("stopchecks_"))
         async def stop_user_checks(callback_query: CallbackQuery):
             await self._handle_stopchecks_callback(callback_query)
-        
-        @self.dp.callback_query(lambda c: c.data.startswith(("suspiciousglobalban_", "suspiciousban_", "suspiciousdelmsg_", "confirmdelmsg_", "canceldelmsg_", "confirmban_", "cancelban_", "confirmglobalban_", "cancelglobalban_")))
+        @self.dp.callback_query(lambda c: c.data.startswith((
+            "suspiciousactions_", "suspiciousglobalban_", "suspiciousban_", "suspiciousdelmsg_", 
+            "confirmdelmsg_", "canceldelmsg_", "confirmban_", "cancelban_", "confirmglobalban_", "cancelglobalban_"
+        )))
         async def handle_suspicious_callback(callback_query: CallbackQuery):
             await self._handle_suspicious_sender(callback_query)
-        
+
         # Error handling
         @self.dp.error()
         async def error_handler(event: ErrorEvent):
@@ -912,6 +914,7 @@ class ModernTelegramBot:
             
             # Determine action based on prefix
             action_map = {
+                "suspiciousactions": "actions",
                 "suspiciousglobalban": "globalban",
                 "suspiciousban": "ban", 
                 "suspiciousdelmsg": "delmsg",
@@ -952,6 +955,19 @@ class ModernTelegramBot:
             
             callback_answer = None
             
+            # Consolidated actions expansion
+            if action == "actions":
+                kb.row(
+                    InlineKeyboardButton(text="🌐 Global Ban", callback_data=f"suspiciousglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}"),
+                    InlineKeyboardButton(text="🚫 Ban User", callback_data=f"suspiciousban_{susp_chat_id}_{susp_message_id}_{susp_user_id}")
+                )
+                kb.row(
+                    InlineKeyboardButton(text="🗑 Delete Msg", callback_data=f"suspiciousdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}")
+                )
+                await callback_query.message.edit_reply_markup(reply_markup=kb.as_markup())
+                await callback_query.answer()
+                return
+
             # Handle confirmation flow actions
             if action in ["globalban", "ban", "delmsg"]:
                 # Add confirmation buttons
@@ -985,6 +1001,57 @@ class ModernTelegramBot:
                     else:
                         self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id}")
                         
+                    # Bulk delete all tracked messages for this user (DB + active tracking heuristics)
+                    total_attempt = 0
+                    total_deleted = 0
+                    # If database manager supports fetching messages, implement placeholder logic
+                    if hasattr(self, 'db_manager') and self.db_manager:
+                        try:
+                            # Expect a method or direct query; placeholder: self.db_manager.fetch_user_messages(user_id)
+                            if hasattr(self.db_manager, 'fetch_user_messages'):
+                                user_msgs = await self.db_manager.fetch_user_messages(susp_user_id)
+                            else:
+                                user_msgs = []  # Not implemented in modern DB layer
+                            for rec in user_msgs:
+                                try:
+                                    chat_id_rec = rec.get('chat_id') if isinstance(rec, dict) else rec[0]
+                                    msg_id_rec = rec.get('message_id') if isinstance(rec, dict) else rec[1]
+                                    total_attempt += 1
+                                    if len(str(msg_id_rec)) < 13 and msg_id_rec < 4_000_000_000:
+                                        await self.bot.delete_message(chat_id_rec, msg_id_rec)
+                                        total_deleted += 1
+                                except Exception as _e_del:
+                                    self.logger.debug(f"Unable to delete recorded message {rec}: {_e_del}")
+                        except Exception as _e_db_fetch:
+                            self.logger.debug(f"Skip DB bulk fetch for user {susp_user_id}: {_e_db_fetch}")
+                    # Heuristic extra deletion from active checks dict
+                    extra_attempt = 0
+                    extra_deleted = 0
+                    active_entry = self.active_user_checks_dict.get(susp_user_id)
+                    if isinstance(active_entry, dict):
+                        for _k, _v in active_entry.items():
+                            if isinstance(_v, list):
+                                for item in _v:
+                                    chat_candidate = None
+                                    msg_candidate = None
+                                    if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
+                                        chat_candidate, msg_candidate = item[0], item[1]
+                                    elif isinstance(item, int):
+                                        chat_candidate, msg_candidate = susp_chat_id, item
+                                    if chat_candidate is None or msg_candidate is None:
+                                        continue
+                                    extra_attempt += 1
+                                    try:
+                                        if len(str(msg_candidate)) < 13 and msg_candidate < 4_000_000_000:
+                                            await self.bot.delete_message(chat_candidate, msg_candidate)
+                                            extra_deleted += 1
+                                    except Exception as _e_del2:
+                                        self.logger.debug(f"Active-check extra delete fail {msg_candidate} in {chat_candidate}: {_e_del2}")
+                    if total_attempt or extra_attempt:
+                        self.logger.info(
+                            f"Global ban cleanup for {susp_user_id}: attempts main={total_attempt} deleted={total_deleted} extra={extra_attempt}/{extra_deleted}"
+                        )
+
                     # Global ban user
                     await self.ban_user_from_all_chats(susp_user_id, susp_user_name, f"Suspicious activity - Admin decision by @{admin_username}")
                     
@@ -1010,6 +1077,55 @@ class ModernTelegramBot:
                     else:
                         self.logger.debug(f"Skip delete for synthetic message_id={susp_message_id} chat_id={susp_chat_id}")
                         
+                    # Local chat cleanup of tracked messages (if DB layer supports)
+                    local_attempt = 0
+                    local_deleted = 0
+                    if hasattr(self, 'db_manager') and self.db_manager and hasattr(self.db_manager, 'fetch_user_messages'):
+                        try:
+                            user_msgs = await self.db_manager.fetch_user_messages(susp_user_id)
+                            for rec in user_msgs:
+                                try:
+                                    chat_id_rec = rec.get('chat_id') if isinstance(rec, dict) else rec[0]
+                                    msg_id_rec = rec.get('message_id') if isinstance(rec, dict) else rec[1]
+                                    if chat_id_rec != susp_chat_id:
+                                        continue
+                                    local_attempt += 1
+                                    if len(str(msg_id_rec)) < 13 and msg_id_rec < 4_000_000_000:
+                                        await self.bot.delete_message(chat_id_rec, msg_id_rec)
+                                        local_deleted += 1
+                                except Exception as _e_del_loc:
+                                    self.logger.debug(f"Local ban delete fail {rec}: {_e_del_loc}")
+                        except Exception as _e_loc_db:
+                            self.logger.debug(f"Skip local DB fetch for {susp_user_id}: {_e_loc_db}")
+                    # Active user checks heuristic list for this chat
+                    extra_attempt = 0
+                    extra_deleted = 0
+                    active_entry = self.active_user_checks_dict.get(susp_user_id)
+                    if isinstance(active_entry, dict):
+                        for _k, _v in active_entry.items():
+                            if isinstance(_v, list):
+                                for item in _v:
+                                    msg_candidate = None
+                                    if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
+                                        chat_candidate, msg_candidate = item[0], item[1]
+                                        if chat_candidate != susp_chat_id:
+                                            continue
+                                    elif isinstance(item, int):
+                                        msg_candidate = item
+                                    else:
+                                        continue
+                                    extra_attempt += 1
+                                    try:
+                                        if len(str(msg_candidate)) < 13 and msg_candidate < 4_000_000_000:
+                                            await self.bot.delete_message(susp_chat_id, msg_candidate)
+                                            extra_deleted += 1
+                                    except Exception as _e_del_loc2:
+                                        self.logger.debug(f"Active local cleanup fail {msg_candidate}: {_e_del_loc2}")
+                    if local_attempt or extra_attempt:
+                        self.logger.info(
+                            f"Local ban cleanup for {susp_user_id} chat {susp_chat_id}: main {local_attempt}/{local_deleted} extra {extra_attempt}/{extra_deleted}"
+                        )
+
                     # Ban user in specific chat
                     await self.bot.ban_chat_member(chat_id=susp_chat_id, user_id=susp_user_id, revoke_messages=True)
                     
@@ -1102,13 +1218,9 @@ class ModernTelegramBot:
             lols_link = self.build_lols_url(user_id)
             kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
             
-            # Action buttons
+            # Consolidated actions button
             kb.row(
-                InlineKeyboardButton(text="🚫 Ban User", callback_data=f"suspiciousban_{chat_id}_{report_id}_{user_id}"),
-                InlineKeyboardButton(text="🌐 Global Ban", callback_data=f"suspiciousglobalban_{chat_id}_{report_id}_{user_id}")
-            )
-            kb.row(
-                InlineKeyboardButton(text="🗑️ Delete Message", callback_data=f"suspiciousdelmsg_{chat_id}_{report_id}_{user_id}")
+                InlineKeyboardButton(text="⚙️ Actions (Ban / Delete) ⚙️", callback_data=f"suspiciousactions_{chat_id}_{message_id}_{user_id}")
             )
             
             # Send to admin group with suspicious thread

@@ -5258,10 +5258,19 @@ if __name__ == "__main__":
                             ADMIN_SUSPICIOUS,
                             disable_notification=True,
                         )
+                        # Build clickable chat link (public @username or internal /c/ link) with safe fallback
+                        _chat_title_safe = html.escape(message.chat.title)
+                        if message.chat.username:
+                            _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
+                        elif str(message.chat.id).startswith('-100'):
+                            _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
+                        else:
+                            _chat_link_html = f"<b>{_chat_title_safe}</b>"  # non-linkable
+
                         await safe_send_message(
                             BOT,
                             ADMIN_GROUP_ID,
-                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in <b>{message.chat.title}</b> after {human_readable_time}. Please check it out!",
+                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}. Please check it out!",
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             reply_markup=inline_kb,

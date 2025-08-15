@@ -105,6 +105,7 @@ from utils.utils_decorators import (
     is_valid_message,
 )
 
+
 # -----------------------------------------------------------------------------
 # Helper: unified profile change logging
 # -----------------------------------------------------------------------------
@@ -125,45 +126,51 @@ async def log_profile_change(
     Also appends to the inout_ log file so operators have a single chronological stream.
     """
     try:
-        ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         uid_fmt = f"{user_id:<10}"
-        uname = username or '!UNDEFINED!'
+        uname = username or "!UNDEFINED!"
         chat_repr = f"{chat_title or ''}({chat_id})" if chat_id else str(chat_id)
         # Build compact diffs old->new for changed fields
         diff_parts = []
         mapping = {
-            'first name': ('first_name', 'First'),
-            'last name': ('last_name', 'Last'),
-            'username': ('username', 'User'),
-            'profile photo': ('photo_count', 'Photo'),
+            "first name": ("first_name", "First"),
+            "last name": ("last_name", "Last"),
+            "username": ("username", "User"),
+            "profile photo": ("photo_count", "Photo"),
         }
         for field in changed:
             key, label = mapping.get(field, (field, field))
             o = old_values.get(key)
             n = new_values.get(key)
-            if key == 'username':
-                o = ('@' + o) if o else '@!UNDEFINED!'
-                n = ('@' + n) if n else '@!UNDEFINED!'
+            if key == "username":
+                o = ("@" + o) if o else "@!UNDEFINED!"
+                n = ("@" + n) if n else "@!UNDEFINED!"
             diff_parts.append(f"{label}='{o}'→'{n}'")
-        photo_marker = ' P' if photo_changed else ''
+        photo_marker = " P" if photo_changed else ""
         record = f"{ts}: {uid_fmt} PC[{context}{photo_marker}] @{uname:<20} in {chat_repr:<40} changes: {', '.join(diff_parts)}\n"
-        await save_report_file('inout_', 'pc' + record)
+        await save_report_file("inout_", "pc" + record)
         LOGGER.info(record.rstrip())
     except Exception as _e:  # silent failure should not break main flow
-        LOGGER.debug('Failed to log profile change: %s', _e)
+        LOGGER.debug("Failed to log profile change: %s", _e)
 
 
-def make_profile_dict(first_name: str | None, last_name: str | None, username: str | None, photo_count: int | None) -> dict:
+def make_profile_dict(
+    first_name: str | None,
+    last_name: str | None,
+    username: str | None,
+    photo_count: int | None,
+) -> dict:
     """Return a normalized profile snapshot dict used for logging diffs.
 
     Ensures keys are consistent and missing values default to simple primitives.
     """
     return {
-        'first_name': first_name or '',
-        'last_name': last_name or '',
-        'username': username or '',
-        'photo_count': photo_count or 0,
+        "first_name": first_name or "",
+        "last_name": last_name or "",
+        "username": username or "",
+        "photo_count": photo_count or 0,
     }
+
 
 from utils.utils_config import (
     CHANNEL_IDS,
@@ -1823,10 +1830,20 @@ async def perform_checks(
                 if isinstance(active_user_checks_dict[user_id], dict):
                     # Detect post-join profile changes (name/username/photo)
                     _entry = active_user_checks_dict[user_id]
-                    baseline = _entry.get("baseline") if isinstance(_entry, dict) else None
-                    already_notified = _entry.get("notified_profile_change") if isinstance(_entry, dict) else False
+                    baseline = (
+                        _entry.get("baseline") if isinstance(_entry, dict) else None
+                    )
+                    already_notified = (
+                        _entry.get("notified_profile_change")
+                        if isinstance(_entry, dict)
+                        else False
+                    )
                     if baseline and not already_notified:
-                        _chat_info = baseline.get("chat", {}) if isinstance(baseline, dict) else {}
+                        _chat_info = (
+                            baseline.get("chat", {})
+                            if isinstance(baseline, dict)
+                            else {}
+                        )
                         _chat_id = _chat_info.get("id")
 
                         # Start from baseline and override with live data if available
@@ -1842,13 +1859,29 @@ async def perform_checks(
                             cur_last = getattr(_user, "last_name", "") or ""
                             cur_username = getattr(_user, "username", "") or ""
                         except Exception as _e:
-                            LOGGER.debug("%s:@%s unable to fetch chat member for profile-change check: %s", user_id, user_name, _e)
+                            LOGGER.debug(
+                                "%s:@%s unable to fetch chat member for profile-change check: %s",
+                                user_id,
+                                user_name,
+                                _e,
+                            )
 
                         try:
-                            _photos = await BOT.get_user_profile_photos(user_id, limit=1)
-                            cur_photo_count = getattr(_photos, "total_count", 0) if _photos else cur_photo_count
+                            _photos = await BOT.get_user_profile_photos(
+                                user_id, limit=1
+                            )
+                            cur_photo_count = (
+                                getattr(_photos, "total_count", 0)
+                                if _photos
+                                else cur_photo_count
+                            )
                         except Exception as _e:
-                            LOGGER.debug("%s:@%s unable to fetch photo count during checks: %s", user_id, user_name, _e)
+                            LOGGER.debug(
+                                "%s:@%s unable to fetch photo count during checks: %s",
+                                user_id,
+                                user_name,
+                                _e,
+                            )
 
                         changed = []
                         if cur_first != baseline.get("first_name", ""):
@@ -1864,14 +1897,14 @@ async def perform_checks(
                             chat_username = _chat_info.get("username")
                             chat_title = _chat_info.get("title") or ""
                             universal_chatlink = (
-                                f"<a href=\"https://t.me/{chat_username}\">{html.escape(chat_title)}</a>"
+                                f'<a href="https://t.me/{chat_username}">{html.escape(chat_title)}</a>'
                                 if chat_username
                                 else f"<a href=\"https://t.me/c/{str(_chat_id)[4:] if str(_chat_id).startswith('-100') else _chat_id}\">{html.escape(chat_title)}</a>"
                             )
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
                             _report_id = int(datetime.now().timestamp())
-                            _chat_id_for_gban = baseline.get('chat', {}).get('id')
+                            _chat_id_for_gban = baseline.get("chat", {}).get("id")
                             # Consolidated actions menu (expands to Ban / Global Ban / Delete)
                             kb.add(
                                 InlineKeyboardButton(
@@ -1892,12 +1925,26 @@ async def perform_checks(
                                 return f"{label}: {new_disp or '∅'}"
 
                             field_lines = [
-                                _fmt(baseline.get("first_name", ""), cur_first, "First name"),
-                                _fmt(baseline.get("last_name", ""), cur_last, "Last name"),
-                                _fmt(baseline.get("username", ""), cur_username, "Username", username=True),
+                                _fmt(
+                                    baseline.get("first_name", ""),
+                                    cur_first,
+                                    "First name",
+                                ),
+                                _fmt(
+                                    baseline.get("last_name", ""), cur_last, "Last name"
+                                ),
+                                _fmt(
+                                    baseline.get("username", ""),
+                                    cur_username,
+                                    "Username",
+                                    username=True,
+                                ),
                                 f"User ID: <code>{user_id}</code>",
                             ]
-                            if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
+                            if (
+                                baseline.get("photo_count", 0) == 0
+                                and cur_photo_count > 0
+                            ):
                                 field_lines.append("Profile photo: none ➜ <b>set</b>")
 
                             profile_links = (
@@ -1910,7 +1957,9 @@ async def perform_checks(
                             elapsed_line = ""
                             if joined_at_raw:
                                 try:
-                                    joined_dt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                    joined_dt = datetime.strptime(
+                                        joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                    )
                                     delta = datetime.now() - joined_dt
                                     # human friendly formatting
                                     days = delta.days
@@ -1953,15 +2002,15 @@ async def perform_checks(
                             await log_profile_change(
                                 user_id=user_id,
                                 username=cur_username,
-                                context='periodic',
+                                context="periodic",
                                 chat_id=_chat_id,
                                 chat_title=chat_title,
                                 changed=changed,
                                 old_values=make_profile_dict(
-                                    baseline.get('first_name',''),
-                                    baseline.get('last_name',''),
-                                    baseline.get('username',''),
-                                    baseline.get('photo_count',0),
+                                    baseline.get("first_name", ""),
+                                    baseline.get("last_name", ""),
+                                    baseline.get("username", ""),
+                                    baseline.get("photo_count", 0),
                                 ),
                                 new_values=make_profile_dict(
                                     cur_first,
@@ -1969,9 +2018,11 @@ async def perform_checks(
                                     cur_username,
                                     cur_photo_count,
                                 ),
-                                photo_changed=('profile photo' in changed),
+                                photo_changed=("profile photo" in changed),
                             )
-                            active_user_checks_dict[user_id]["notified_profile_change"] = True
+                            active_user_checks_dict[user_id][
+                                "notified_profile_change"
+                            ] = True
 
                     suspicious_messages = {
                         k: v
@@ -2135,7 +2186,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
             user_id,
             user_name,
         )
-    
+
     # Always create and register the new task immediately (non-blocking restart)
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
@@ -2172,9 +2223,16 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
                 await _t
                 LOGGER.info("%s:@%s Previous watchdog cancelled.", _uid, _uname)
             except asyncio.CancelledError:
-                LOGGER.info("%s:@%s Previous watchdog cancellation confirmed.", _uid, _uname)
+                LOGGER.info(
+                    "%s:@%s Previous watchdog cancellation confirmed.", _uid, _uname
+                )
             except Exception as e:
-                LOGGER.error("%s:@%s Error while cancelling previous watchdog: %s", _uid, _uname, e)
+                LOGGER.error(
+                    "%s:@%s Error while cancelling previous watchdog: %s",
+                    _uid,
+                    _uname,
+                    e,
+                )
 
         asyncio.create_task(_await_cancel(existing_task), name=f"cancel:{user_id}")
 
@@ -2254,7 +2312,9 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         active_user_checks_list = []
         for user, uname in active_user_checks_dict.items():
             _disp = (
-                uname.get("username", "!UNDEFINED!") if isinstance(uname, dict) else extract_username(uname)
+                uname.get("username", "!UNDEFINED!")
+                if isinstance(uname, dict)
+                else extract_username(uname)
             )
             active_user_checks_list.append(f"<code>{user}</code>:{_disp}")
             # If uname is a dict, extract URLs from it
@@ -2580,10 +2640,14 @@ if __name__ == "__main__":
             # Check if the user ID is already being processed
             if inout_userid not in active_user_checks_dict:
                 # Only capture baseline on join (is_member True) to compare later on leave
-                if 'is_member' in locals() and is_member:
+                if "is_member" in locals() and is_member:
                     try:
-                        photos = await BOT.get_user_profile_photos(inout_userid, limit=1)
-                        _photo_count = getattr(photos, "total_count", 0) if photos else 0
+                        photos = await BOT.get_user_profile_photos(
+                            inout_userid, limit=1
+                        )
+                        _photo_count = (
+                            getattr(photos, "total_count", 0) if photos else 0
+                        )
                     except Exception as _e:
                         _photo_count = 0
                         LOGGER.debug(
@@ -2667,7 +2731,11 @@ if __name__ == "__main__":
                 # First, compare against baseline captured at join, if available
                 _entry = active_user_checks_dict.get(inout_userid)
                 _baseline = _entry.get("baseline") if isinstance(_entry, dict) else None
-                _already_notified = _entry.get("notified_profile_change") if isinstance(_entry, dict) else False
+                _already_notified = (
+                    _entry.get("notified_profile_change")
+                    if isinstance(_entry, dict)
+                    else False
+                )
                 if _baseline and not _already_notified:
                     # For leave events, Telegram provides the current user data in update.old_chat_member.user
                     _u = update.old_chat_member.user
@@ -2676,10 +2744,19 @@ if __name__ == "__main__":
                     cur_username = getattr(_u, "username", "") or ""
                     try:
                         _p = await BOT.get_user_profile_photos(inout_userid, limit=1)
-                        cur_photo_count = getattr(_p, "total_count", 0) if _p else _baseline.get("photo_count", 0)
+                        cur_photo_count = (
+                            getattr(_p, "total_count", 0)
+                            if _p
+                            else _baseline.get("photo_count", 0)
+                        )
                     except Exception as _e:
                         cur_photo_count = _baseline.get("photo_count", 0)
-                        LOGGER.debug("%s:@%s unable to fetch photo count on leave: %s", inout_userid, inout_username, _e)
+                        LOGGER.debug(
+                            "%s:@%s unable to fetch photo count on leave: %s",
+                            inout_userid,
+                            inout_username,
+                            _e,
+                        )
 
                     _changed = []
                     if cur_first != _baseline.get("first_name", ""):
@@ -2694,10 +2771,16 @@ if __name__ == "__main__":
                     if _changed:
                         _chat_info = _baseline.get("chat", {})
                         _cid = _chat_info.get("id", update.chat.id)
-                        _cuser = _chat_info.get("username") or getattr(update.chat, "username", None)
-                        _ctitle = _chat_info.get("title") or getattr(update.chat, "title", "") or ""
+                        _cuser = _chat_info.get("username") or getattr(
+                            update.chat, "username", None
+                        )
+                        _ctitle = (
+                            _chat_info.get("title")
+                            or getattr(update.chat, "title", "")
+                            or ""
+                        )
                         _link = (
-                            f"<a href=\"https://t.me/{_cuser}\">{html.escape(_ctitle)}</a>"
+                            f'<a href="https://t.me/{_cuser}">{html.escape(_ctitle)}</a>'
                             if _cuser
                             else f"<a href=\"https://t.me/c/{str(_cid)[4:] if str(_cid).startswith('-100') else _cid}\">{html.escape(_ctitle)}</a>"
                         )
@@ -2716,7 +2799,9 @@ if __name__ == "__main__":
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
-                                _jdt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                _jdt = datetime.strptime(
+                                    joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                )
                                 _delta = datetime.now() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
@@ -2754,15 +2839,15 @@ if __name__ == "__main__":
                         await log_profile_change(
                             user_id=inout_userid,
                             username=cur_username,
-                            context='leave',
+                            context="leave",
                             chat_id=_cid,
                             chat_title=_ctitle,
                             changed=_changed,
                             old_values=make_profile_dict(
-                                _baseline.get('first_name',''),
-                                _baseline.get('last_name',''),
-                                _baseline.get('username',''),
-                                _baseline.get('photo_count',0),
+                                _baseline.get("first_name", ""),
+                                _baseline.get("last_name", ""),
+                                _baseline.get("username", ""),
+                                _baseline.get("photo_count", 0),
                             ),
                             new_values=make_profile_dict(
                                 cur_first,
@@ -2770,9 +2855,11 @@ if __name__ == "__main__":
                                 cur_username,
                                 cur_photo_count,
                             ),
-                            photo_changed=('profile photo' in _changed),
+                            photo_changed=("profile photo" in _changed),
                         )
-                        active_user_checks_dict[inout_userid]["notified_profile_change"] = True
+                        active_user_checks_dict[inout_userid][
+                            "notified_profile_change"
+                        ] = True
 
                 last2_join_left_event = CURSOR.execute(
                     """
@@ -3297,8 +3384,12 @@ if __name__ == "__main__":
         if forwarded_reports_states:
             forwarded_report_state = forwarded_reports_states.get(report_id_to_ban)
             if forwarded_report_state:
-                admin_group_banner_message = forwarded_report_state.get("admin_group_banner_message")
-                action_banner_message = forwarded_report_state.get("action_banner_message")
+                admin_group_banner_message = forwarded_report_state.get(
+                    "admin_group_banner_message"
+                )
+                action_banner_message = forwarded_report_state.get(
+                    "action_banner_message"
+                )
                 # prune stored buttons so we don't try to edit twice later
                 if "action_banner_message" in forwarded_report_state:
                     del forwarded_report_state["action_banner_message"]
@@ -3351,7 +3442,9 @@ if __name__ == "__main__":
                             message_id=admin_group_banner_message.message_id,
                         )
                 except Exception as _e:
-                    LOGGER.debug("Editing related banners during confirmation failed: %s", _e)
+                    LOGGER.debug(
+                        "Editing related banners during confirmation failed: %s", _e
+                    )
 
         # FIXME exceptions type
         except KeyError as e:
@@ -3410,7 +3503,9 @@ if __name__ == "__main__":
             if not forwarded_report_state:
                 # Ad-hoc ban (e.g., profile change alert) – perform minimal ban logic
                 author_id = int(author_id_from_callback_str)
-                await ban_user_from_all_chats(author_id, None, CHANNEL_IDS, CHANNEL_DICT)
+                await ban_user_from_all_chats(
+                    author_id, None, CHANNEL_IDS, CHANNEL_DICT
+                )
                 banned_users_dict[author_id] = "!UNDEFINED!"
                 # cancel watchdog if running
                 for task in asyncio.all_tasks():
@@ -4289,19 +4384,30 @@ if __name__ == "__main__":
                         _p = await BOT.get_user_profile_photos(_uid, limit=1)
                         new_pcnt = getattr(_p, "total_count", 0) if _p else old_pcnt
                     except Exception as _e:
-                        LOGGER.debug("%s:@%s unable to fetch photo count on message: %s", _uid, new_usern or "!UNDEFINED!", _e)
+                        LOGGER.debug(
+                            "%s:@%s unable to fetch photo count on message: %s",
+                            _uid,
+                            new_usern or "!UNDEFINED!",
+                            _e,
+                        )
 
                     changed = []
                     diffs = []
                     if new_first != old_first:
                         changed.append("first name")
-                        diffs.append(f"first name: '{html.escape(old_first)}' -> '{html.escape(new_first)}'")
+                        diffs.append(
+                            f"first name: '{html.escape(old_first)}' -> '{html.escape(new_first)}'"
+                        )
                     if new_last != old_last:
                         changed.append("last name")
-                        diffs.append(f"last name: '{html.escape(old_last)}' -> '{html.escape(new_last)}'")
+                        diffs.append(
+                            f"last name: '{html.escape(old_last)}' -> '{html.escape(new_last)}'"
+                        )
                     if new_usern != old_usern:
                         changed.append("username")
-                        diffs.append(f"username: @{old_usern or '!UNDEFINED!'} -> @{new_usern or '!UNDEFINED!'}")
+                        diffs.append(
+                            f"username: @{old_usern or '!UNDEFINED!'} -> @{new_usern or '!UNDEFINED!'}"
+                        )
                     if old_pcnt == 0 and new_pcnt > 0:
                         changed.append("profile photo")
                         diffs.append("profile photo: none -> set")
@@ -4315,7 +4421,12 @@ if __name__ == "__main__":
                                 disable_notification=True,
                             )
                         except Exception as _e:
-                            LOGGER.debug("%s:@%s forward to admin/suspicious failed: %s", _uid, new_usern or "!UNDEFINED!", _e)
+                            LOGGER.debug(
+                                "%s:@%s forward to admin/suspicious failed: %s",
+                                _uid,
+                                new_usern or "!UNDEFINED!",
+                                _e,
+                            )
 
                         kb = make_lols_kb(_uid)
                         _report_id = int(datetime.now().timestamp())
@@ -4365,11 +4476,17 @@ if __name__ == "__main__":
                             f"   └ <a href='tg://openmessage?user_id={_uid}'>Android</a>, <a href='https://t.me/@id{_uid}'>IOS (Apple)</a>"
                         )
                         # Elapsed time since join
-                        joined_at_raw = _baseline.get("joined_at") if isinstance(_baseline, dict) else None
+                        joined_at_raw = (
+                            _baseline.get("joined_at")
+                            if isinstance(_baseline, dict)
+                            else None
+                        )
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
-                                _jdt = datetime.strptime(joined_at_raw, "%Y-%m-%d %H:%M:%S")
+                                _jdt = datetime.strptime(
+                                    joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                )
                                 _delta = datetime.now() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
@@ -4412,9 +4529,9 @@ if __name__ == "__main__":
                         await log_profile_change(
                             user_id=_uid,
                             username=new_usern,
-                            context='immediate',
+                            context="immediate",
                             chat_id=message.chat.id,
-                            chat_title=getattr(message.chat,'title',None),
+                            chat_title=getattr(message.chat, "title", None),
                             changed=changed,
                             old_values=make_profile_dict(
                                 old_first,
@@ -4428,7 +4545,7 @@ if __name__ == "__main__":
                                 new_usern,
                                 new_pcnt,
                             ),
-                            photo_changed=('profile photo' in changed),
+                            photo_changed=("profile photo" in changed),
                         )
                         active_user_checks_dict[_uid]["notified_profile_change"] = True
         except Exception as _e:
@@ -5374,7 +5491,9 @@ if __name__ == "__main__":
             if user_id in active_user_checks_dict:
                 _val = active_user_checks_dict.get(user_id)
                 _disp = (
-                    _val.get("username", "!UNDEFINED!") if isinstance(_val, dict) else (_val or "!UNDEFINED!")
+                    _val.get("username", "!UNDEFINED!")
+                    if isinstance(_val, dict)
+                    else (_val or "!UNDEFINED!")
                 )
                 await message.reply(
                     f"User <code>{_disp}</code> is already being checked.",
@@ -6170,7 +6289,8 @@ if __name__ == "__main__":
         lambda c: c.data.startswith("suspiciousglobalban_")
         or c.data.startswith("suspiciousban_")
         or c.data.startswith("suspiciousdelmsg_")
-    or c.data.startswith("suspiciousactions_")
+        or c.data.startswith("suspiciousactions_")
+        or c.data.startswith("suspiciouscancel_")
         or c.data.startswith("confirmdelmsg_")
         or c.data.startswith("canceldelmsg_")
         or c.data.startswith("confirmban_")
@@ -6193,6 +6313,30 @@ if __name__ == "__main__":
         susp_message_id = int(susp_message_id_str)
         susp_chat_id = int(susp_chat_id_str)
 
+        # If user pressed global cancel/close in expanded actions menu, collapse back to original single Actions button layout
+        if action_prefix == "suspiciouscancel":
+            message_link = construct_message_link([susp_chat_id, susp_message_id, None])
+            lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
+            collapsed_kb = InlineKeyboardMarkup()
+            collapsed_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+            collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+            collapsed_kb.add(
+                InlineKeyboardButton(
+                    "⚙️ Actions (Ban / Delete) ⚙️",
+                    callback_data=f"suspiciousactions_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                )
+            )
+            try:
+                await BOT.edit_message_reply_markup(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=collapsed_kb,
+                )
+            except Exception as e:  # noqa
+                LOGGER.debug("Failed to collapse suspicious actions menu: %s", e)
+            await callback_query.answer("Menu closed.")
+            return
+
         # If the consolidated actions button was pressed, expand available actions and return
         if action_prefix == "suspiciousactions":
             susp_user_id = int(susp_user_id_str)
@@ -6201,7 +6345,9 @@ if __name__ == "__main__":
             message_link = construct_message_link([susp_chat_id, susp_message_id, None])
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             expand_kb = InlineKeyboardMarkup()
-            expand_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+            expand_kb.add(
+                InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+            )
             expand_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             expand_kb.add(
                 InlineKeyboardButton(
@@ -6217,6 +6363,13 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     "🗑 Delete Msg",
                     callback_data=f"suspiciousdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                )
+            )
+            # Global cancel button to revert view
+            expand_kb.add(
+                InlineKeyboardButton(
+                    "🔙 Cancel / Close",
+                    callback_data=f"suspiciouscancel_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 )
             )
             try:
@@ -6400,19 +6553,43 @@ if __name__ == "__main__":
                                     for item in _v:
                                         _chat_id_candidate = None
                                         _msg_id_candidate = None
-                                        if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
-                                            _chat_id_candidate, _msg_id_candidate = item[0], item[1]
+                                        if (
+                                            isinstance(item, tuple)
+                                            and len(item) >= 2
+                                            and all(
+                                                isinstance(x, int) for x in item[:2]
+                                            )
+                                        ):
+                                            _chat_id_candidate, _msg_id_candidate = (
+                                                item[0],
+                                                item[1],
+                                            )
                                         elif isinstance(item, int):
                                             # fall back: assume current suspicious chat
-                                            _chat_id_candidate, _msg_id_candidate = susp_chat_id, item
-                                        if _chat_id_candidate is None or _msg_id_candidate is None:
+                                            _chat_id_candidate, _msg_id_candidate = (
+                                                susp_chat_id,
+                                                item,
+                                            )
+                                        if (
+                                            _chat_id_candidate is None
+                                            or _msg_id_candidate is None
+                                        ):
                                             continue
-                                        if (_chat_id_candidate, _msg_id_candidate) in db_pairs:
+                                        if (
+                                            _chat_id_candidate,
+                                            _msg_id_candidate,
+                                        ) in db_pairs:
                                             continue  # already processed from DB
                                         extra_attempts += 1
                                         try:
-                                            if len(str(_msg_id_candidate)) < 13 and _msg_id_candidate < 4_000_000_000:
-                                                await BOT.delete_message(_chat_id_candidate, _msg_id_candidate)
+                                            if (
+                                                len(str(_msg_id_candidate)) < 13
+                                                and _msg_id_candidate < 4_000_000_000
+                                            ):
+                                                await BOT.delete_message(
+                                                    _chat_id_candidate,
+                                                    _msg_id_candidate,
+                                                )
                                                 extra_deleted += 1
                                         except Exception as _e_del2:
                                             LOGGER.debug(
@@ -6460,10 +6637,10 @@ if __name__ == "__main__":
                 await log_profile_change(
                     user_id=susp_user_id,
                     username=susp_user_name,
-                    context='admin-globalban',
+                    context="admin-globalban",
                     chat_id=susp_chat_id,
                     chat_title=susp_chat_title,
-                    changed=['GLOBAL BAN'],
+                    changed=["GLOBAL BAN"],
                     old_values={},
                     new_values={},
                     photo_changed=False,
@@ -6536,8 +6713,17 @@ if __name__ == "__main__":
                                 if isinstance(_v, list):
                                     for item in _v:
                                         _msg_id_candidate = None
-                                        if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
-                                            _chat_id_candidate, _msg_id_candidate = item[0], item[1]
+                                        if (
+                                            isinstance(item, tuple)
+                                            and len(item) >= 2
+                                            and all(
+                                                isinstance(x, int) for x in item[:2]
+                                            )
+                                        ):
+                                            _chat_id_candidate, _msg_id_candidate = (
+                                                item[0],
+                                                item[1],
+                                            )
                                             if _chat_id_candidate != susp_chat_id:
                                                 continue
                                         elif isinstance(item, int):
@@ -6548,8 +6734,13 @@ if __name__ == "__main__":
                                             continue
                                         extra_attempts += 1
                                         try:
-                                            if len(str(_msg_id_candidate)) < 13 and _msg_id_candidate < 4_000_000_000:
-                                                await BOT.delete_message(susp_chat_id, _msg_id_candidate)
+                                            if (
+                                                len(str(_msg_id_candidate)) < 13
+                                                and _msg_id_candidate < 4_000_000_000
+                                            ):
+                                                await BOT.delete_message(
+                                                    susp_chat_id, _msg_id_candidate
+                                                )
                                                 extra_deleted += 1
                                         except Exception as _e_del2:
                                             LOGGER.debug(
@@ -6599,10 +6790,10 @@ if __name__ == "__main__":
                 await log_profile_change(
                     user_id=susp_user_id,
                     username=susp_user_name,
-                    context='admin-ban',
+                    context="admin-ban",
                     chat_id=susp_chat_id,
                     chat_title=susp_chat_title,
-                    changed=['BAN'],
+                    changed=["BAN"],
                     old_values={},
                     new_values={},
                     photo_changed=False,
@@ -6642,10 +6833,10 @@ if __name__ == "__main__":
                 await log_profile_change(
                     user_id=susp_user_id,
                     username=susp_user_name,
-                    context='admin-delmsg',
+                    context="admin-delmsg",
                     chat_id=susp_chat_id,
                     chat_title=susp_chat_title,
-                    changed=['DELMSG'],
+                    changed=["DELMSG"],
                     old_values={},
                     new_values={},
                     photo_changed=False,

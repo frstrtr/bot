@@ -6363,6 +6363,93 @@ if __name__ == "__main__":
                         susp_message_id,
                         susp_chat_id,
                     )
+                # Bulk delete all known recent messages from this user across chats
+                try:
+                    CURSOR.execute(
+                        "SELECT chat_id, message_id FROM recent_messages WHERE user_id = ?",
+                        (susp_user_id,),
+                    )
+                    rows = CURSOR.fetchall()
+                    deleted_cnt = 0
+                    db_pairs = set()
+                    for _c, _m in rows:
+                        db_pairs.add((_c, _m))
+                    for _c, _m in rows:
+                        try:
+                            # Skip obviously synthetic ids as above
+                            if len(str(_m)) < 13 and _m < 4_000_000_000:
+                                await BOT.delete_message(_c, _m)
+                                deleted_cnt += 1
+                        except Exception as _e_del:
+                            LOGGER.debug(
+                                "Unable to delete message %s in chat %s for global ban cleanup: %s",
+                                _m,
+                                _c,
+                                _e_del,
+                            )
+                    # Also inspect active_user_checks_dict entry for any extra message references not in DB
+                    try:
+                        _active_entry = active_user_checks_dict.get(susp_user_id)
+                        extra_attempts = 0
+                        extra_deleted = 0
+                        if isinstance(_active_entry, dict):
+                            # Heuristically look for list-like values that may contain message tuples or ids
+                            for _k, _v in _active_entry.items():
+                                # Possible patterns: list of (chat_id, message_id) tuples OR list of message_ids with stored chat id
+                                if isinstance(_v, list):
+                                    for item in _v:
+                                        _chat_id_candidate = None
+                                        _msg_id_candidate = None
+                                        if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
+                                            _chat_id_candidate, _msg_id_candidate = item[0], item[1]
+                                        elif isinstance(item, int):
+                                            # fall back: assume current suspicious chat
+                                            _chat_id_candidate, _msg_id_candidate = susp_chat_id, item
+                                        if _chat_id_candidate is None or _msg_id_candidate is None:
+                                            continue
+                                        if (_chat_id_candidate, _msg_id_candidate) in db_pairs:
+                                            continue  # already processed from DB
+                                        extra_attempts += 1
+                                        try:
+                                            if len(str(_msg_id_candidate)) < 13 and _msg_id_candidate < 4_000_000_000:
+                                                await BOT.delete_message(_chat_id_candidate, _msg_id_candidate)
+                                                extra_deleted += 1
+                                        except Exception as _e_del2:
+                                            LOGGER.debug(
+                                                "Active-check cleanup miss delete message %s in chat %s: %s",
+                                                _msg_id_candidate,
+                                                _chat_id_candidate,
+                                                _e_del2,
+                                            )
+                        if extra_attempts:
+                            LOGGER.info(
+                                "%s:@%s globalban active-check extra cleanup attempted %d, deleted %d",
+                                susp_user_id,
+                                susp_user_name,
+                                extra_attempts,
+                                extra_deleted,
+                            )
+                    except Exception as _e_active_extra:
+                        LOGGER.debug(
+                            "Globalban active-check extra cleanup skipped (user %s): %s",
+                            susp_user_id,
+                            _e_active_extra,
+                        )
+                    if rows:
+                        LOGGER.info(
+                            "%s:@%s globalban cleanup attempted %d messages, deleted %d",
+                            susp_user_id,
+                            susp_user_name,
+                            len(rows),
+                            deleted_cnt,
+                        )
+                except Exception as _e_bulk:
+                    LOGGER.error(
+                        "Error bulk-deleting messages for global ban user %s:@%s: %s",
+                        susp_user_id,
+                        susp_user_name,
+                        _e_bulk,
+                    )
                 await ban_user_from_all_chats(
                     susp_user_id,
                     susp_user_name,
@@ -6417,6 +6504,92 @@ if __name__ == "__main__":
                         "Skip delete_message for synthetic suspicious message_id=%s chat_id=%s",
                         susp_message_id,
                         susp_chat_id,
+                    )
+                # Delete all messages from this user in THIS chat only
+                try:
+                    CURSOR.execute(
+                        "SELECT message_id FROM recent_messages WHERE user_id = ? AND chat_id = ?",
+                        (susp_user_id, susp_chat_id),
+                    )
+                    rows = CURSOR.fetchall()
+                    chat_deleted = 0
+                    chat_db_ids = set(_mid for (_mid,) in rows)
+                    for (_mid,) in rows:
+                        try:
+                            if len(str(_mid)) < 13 and _mid < 4_000_000_000:
+                                await BOT.delete_message(susp_chat_id, _mid)
+                                chat_deleted += 1
+                        except Exception as _e_del:
+                            LOGGER.debug(
+                                "Unable to delete message %s in chat %s for local ban cleanup: %s",
+                                _mid,
+                                susp_chat_id,
+                                _e_del,
+                            )
+                    # Active user checks extra messages possibly not flushed to DB
+                    try:
+                        _active_entry = active_user_checks_dict.get(susp_user_id)
+                        extra_attempts = 0
+                        extra_deleted = 0
+                        if isinstance(_active_entry, dict):
+                            for _k, _v in _active_entry.items():
+                                if isinstance(_v, list):
+                                    for item in _v:
+                                        _msg_id_candidate = None
+                                        if isinstance(item, tuple) and len(item) >= 2 and all(isinstance(x, int) for x in item[:2]):
+                                            _chat_id_candidate, _msg_id_candidate = item[0], item[1]
+                                            if _chat_id_candidate != susp_chat_id:
+                                                continue
+                                        elif isinstance(item, int):
+                                            _msg_id_candidate = item
+                                        else:
+                                            continue
+                                        if _msg_id_candidate in chat_db_ids:
+                                            continue
+                                        extra_attempts += 1
+                                        try:
+                                            if len(str(_msg_id_candidate)) < 13 and _msg_id_candidate < 4_000_000_000:
+                                                await BOT.delete_message(susp_chat_id, _msg_id_candidate)
+                                                extra_deleted += 1
+                                        except Exception as _e_del2:
+                                            LOGGER.debug(
+                                                "Local ban active-check cleanup failed msg %s chat %s: %s",
+                                                _msg_id_candidate,
+                                                susp_chat_id,
+                                                _e_del2,
+                                            )
+                        if extra_attempts:
+                            LOGGER.info(
+                                "%s:@%s local ban active-check extra cleanup chat %s attempted %d, deleted %d",
+                                susp_user_id,
+                                susp_user_name,
+                                susp_chat_id,
+                                extra_attempts,
+                                extra_deleted,
+                            )
+                    except Exception as _e_active_local:
+                        LOGGER.debug(
+                            "Local ban active-check extra cleanup skipped (user %s chat %s): %s",
+                            susp_user_id,
+                            susp_chat_id,
+                            _e_active_local,
+                        )
+                    if rows:
+                        LOGGER.info(
+                            "%s:@%s local ban cleanup in chat %s attempted %d messages, deleted %d",
+                            susp_user_id,
+                            susp_user_name,
+                            susp_chat_id,
+                            len(rows),
+                            chat_deleted,
+                        )
+                except Exception as _e_bulk:
+                    LOGGER.error(
+                        "Error deleting messages for local ban user %s:@%s in chat %s: %s",
+                        susp_user_id,
+                        susp_user_name,
+                        susp_chat_id,
+                        _e_bulk,
                     )
                 await BOT.ban_chat_member(
                     chat_id=susp_chat_id,

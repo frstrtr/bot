@@ -96,6 +96,7 @@ from utils.utils import (
     set_forwarded_state,
     get_forwarded_state,
     safe_send_message,
+    normalize_username,
 )
 from utils.utils_decorators import (
     is_not_bot_action,
@@ -104,6 +105,9 @@ from utils.utils_decorators import (
     is_in_monitored_channel,
     is_valid_message,
 )
+
+# Runtime set to avoid duplicate username postings to TECHNO_NAMES
+POSTED_USERNAMES = set()
 
 # -----------------------------------------------------------------------------
 # Helper: unified profile change logging
@@ -1667,12 +1671,14 @@ async def check_n_ban(message: types.Message, reason: str):
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        # log username to the username thread
-        if message.from_user.username:
+        # log username to the username thread (deduplicated)
+        _uname_1191 = normalize_username(message.from_user.username)
+        if _uname_1191 and _uname_1191 not in POSTED_USERNAMES:
+            POSTED_USERNAMES.add(_uname_1191)
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1191)",
+                f"<code>{message.from_user.id}</code> @{_uname_1191} (1191)",
                 LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,

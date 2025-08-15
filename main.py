@@ -1792,6 +1792,9 @@ async def perform_checks(
             3605,  # 1 hr
             7205,  # 2 hr
             10805,  # 3 hr
+            21605,  # 6 hr
+            43205,  # 12 hr
+            86405,  # 24 hr
         ]
 
         for sleep_time in sleep_times:

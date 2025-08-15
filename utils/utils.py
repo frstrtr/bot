@@ -746,3 +746,56 @@ def extract_username(uname):
         return '!UNDEFINED!'
     else:
         return f'@{uname}'
+
+
+def normalize_username(value):
+    """Return a sanitized username without leading '@' or an empty string if undefined.
+
+    Accepts:
+      - Plain string (with/without leading '@').
+      - None / falsy -> '' (undefined)
+      - Dict with possible structure { 'username': 'foo' } or nested via keys like
+        { 'baseline': { 'username': 'foo' } } or { 'baseline': { 'user_name': 'foo' } }.
+
+    Rules:
+      - Trim whitespace.
+      - Strip leading '@'.
+      - Treat 'None', '!UNDEFINED!', empty string as undefined -> ''
+      - Do NOT lowercase (preserve original casing) to keep display fidelity.
+    """
+
+    def _search(d):  # recursive search for username/user_name
+        if not isinstance(d, dict):
+            return None
+        # Direct keys preference order
+        for k in ("username", "user_name"):
+            v = d.get(k)
+            if isinstance(v, str) and v and v not in ("None", "!UNDEFINED!"):
+                return v
+        # Nested dicts (shallow-first)
+        for v in d.values():
+            if isinstance(v, dict):
+                found = _search(v)
+                if found:
+                    return found
+        return None
+
+    uname = None
+    if isinstance(value, dict):
+        uname = _search(value)
+    elif isinstance(value, str):
+        uname = value
+    elif value is None:
+        uname = None
+    else:
+        uname = str(value)
+
+    if not uname or uname in ("None", "!UNDEFINED!"):
+        return ""
+    uname = uname.strip()
+    # Remove leading '@'
+    if uname.startswith("@"):
+        uname = uname[1:]
+    if not uname:
+        return ""
+    return uname

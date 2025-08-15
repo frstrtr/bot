@@ -744,3 +744,42 @@ def extract_username(uname):
         return '!UNDEFINED!'
     else:
         return f'@{uname}'
+
+
+# Added in aiogram3 branch: unified username normalization helper
+def normalize_username(value):
+    """Return a sanitized username without leading '@' or '' if undefined.
+
+    Accepts plain strings, None, or dicts possibly containing 'username'/'user_name' keys
+    nested under arbitrary levels (e.g., baseline structures). Returns '' for undefined.
+    """
+    def _search(d):
+        if not isinstance(d, dict):
+            return None
+        for k in ("username", "user_name"):
+            v = d.get(k)
+            if isinstance(v, str) and v and v not in ("None", "!UNDEFINED!"):
+                return v
+        for v in d.values():
+            if isinstance(v, dict):
+                found = _search(v)
+                if found:
+                    return found
+        return None
+
+    uname = None
+    if isinstance(value, dict):
+        uname = _search(value)
+    elif isinstance(value, str):
+        uname = value
+    elif value is None:
+        uname = None
+    else:
+        uname = str(value)
+
+    if not uname or uname in ("None", "!UNDEFINED!"):
+        return ""
+    uname = uname.strip()
+    if uname.startswith("@"):
+        uname = uname[1:]
+    return uname or ""

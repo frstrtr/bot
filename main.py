@@ -96,7 +96,11 @@ from utils.utils import (
     set_forwarded_state,
     get_forwarded_state,
     safe_send_message,
+    normalize_username,
 )
+
+# Track usernames already posted to TECHNO_NAMES to avoid duplicates in runtime
+POSTED_USERNAMES = set()  # stores normalized usernames without '@'
 from utils.utils_decorators import (
     is_not_bot_action,
     is_forwarded_from_unknown_channel_message,
@@ -1305,15 +1309,41 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             last_3_users_str,  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
-    if user_name and user_name != "!UNDEFINED!":  # exclude noname users
-        await safe_send_message(
-            BOT,
-            TECHNOLOG_GROUP_ID,
-            f"<code>{_id}</code> @{user_name} (1156)",
-            LOGGER,
-            parse_mode="HTML",
-            message_thread_id=TECHNO_NAMES,
-        )
+    # Normalize username for logging / notification (may be dict with nested baseline)
+    def _extract_username(u):
+        if isinstance(u, dict):
+            # Direct 'username' key first
+            val = u.get("username")
+            if val:
+                return str(val).strip()
+            # Check possible nested 'baseline' structure
+            baseline = u.get("baseline")
+            if isinstance(baseline, dict):
+                val = baseline.get("username") or baseline.get("user_name")
+                if val:
+                    return str(val).strip()
+            # Fallback: nothing usable
+            return ""
+        # Primitive / string cases
+        return str(u or "").strip()
+
+    norm_username = _extract_username(user_name).lstrip("@")
+    if not norm_username:
+        norm_username = "!UNDEFINED!"
+
+    # Only send if we have something (we still show !UNDEFINED! explicitly per requirement)
+    # If username is undefined, skip sending this line (requested behavior change)
+    if norm_username == "!UNDEFINED!":
+        LOGGER.debug("%s username undefined; skipping TECHNO_NAMES notification line", _id)
+        return
+    await safe_send_message(
+        BOT,
+        TECHNOLOG_GROUP_ID,
+        f"<code>{_id}</code> @{norm_username} (1156)",
+        LOGGER,
+        parse_mode="HTML",
+        message_thread_id=TECHNO_NAMES,
+    )
 
 
 async def check_and_autoban(
@@ -1434,15 +1464,18 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            if user_name and user_name != "!UNDEFINED!":
+            _norm_username_990 = normalize_username(user_name)
+            if _norm_username_990:
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (990)",
+                    f"<code>{user_id}</code> @{_norm_username_990} (990)",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
+            else:
+                LOGGER.debug("%s username undefined; skipping 990 notification line", user_id)
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
@@ -1485,17 +1518,18 @@ async def check_and_autoban(
                 disable_web_page_preview=True,
                 reply_markup=inline_kb,
             )
-            if user_name and user_name != "!UNDEFINED!":
+            _norm_username = normalize_username(user_name)
+            if _norm_username:
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{user_name} (1013)",
+                    f"<code>{user_id}</code> @{_norm_username} (1013)",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
             else:
-                user_name = "!UNDEFINED!"
+                LOGGER.debug("%s username undefined; skipping 1013 notification line", user_id)
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)
@@ -1545,14 +1579,18 @@ async def check_and_autoban(
             reply_markup=inline_kb,
         )
         if user_name and user_name != "!UNDEFINED!":
-            await safe_send_message(
-                BOT,
-                TECHNOLOG_GROUP_ID,
-                f"<code>{user_id}</code>:@{user_name} (1054)",
-                LOGGER,
-                parse_mode="HTML",
-                message_thread_id=TECHNO_NAMES,
-            )
+            _norm_username_1054 = normalize_username(user_name)
+            if _norm_username_1054:
+                await safe_send_message(
+                    BOT,
+                    TECHNOLOG_GROUP_ID,
+                    f"<code>{user_id}</code> @{_norm_username_1054} (1054)",
+                    LOGGER,
+                    parse_mode="HTML",
+                    message_thread_id=TECHNO_NAMES,
+                )
+            else:
+                LOGGER.debug("%s username undefined; skipping 1054 notification line", user_id)
         return True
 
     return False
@@ -1675,11 +1713,13 @@ async def check_n_ban(message: types.Message, reason: str):
             reply_markup=inline_kb,
         )
         # log username to the username thread
-        if message.from_user.username:
+        _uname_1191 = normalize_username(message.from_user.username)
+        if _uname_1191 and _uname_1191 not in POSTED_USERNAMES:
+            POSTED_USERNAMES.add(_uname_1191)
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
-                f"<code>{message.from_user.id}</code>:@{message.from_user.username} (1191)",
+                f"<code>{message.from_user.id}</code> @{_uname_1191} (1191)",
                 LOGGER,
                 parse_mode="HTML",
                 message_thread_id=TECHNO_NAMES,
@@ -2908,13 +2948,15 @@ if __name__ == "__main__":
                         reply_markup=inline_kb,
                         disable_web_page_preview=True,
                     )
-                    if (
-                        update.old_chat_member.user.username
-                    ):  # post username if the user have it
+                    _uname_1790 = normalize_username(
+                        getattr(update.old_chat_member.user, "username", None)
+                    )
+                    if _uname_1790 and _uname_1790 not in POSTED_USERNAMES:
+                        POSTED_USERNAMES.add(_uname_1790)
                         await safe_send_message(
                             BOT,
                             TECHNOLOG_GROUP_ID,
-                            f"<code>{inout_userid}</code>:@{update.old_chat_member.user.username} (1790)",
+                            f"<code>{inout_userid}</code> @{_uname_1790} (1790)",
                             LOGGER,
                             parse_mode="HTML",
                             message_thread_id=TECHNO_NAMES,
@@ -3924,11 +3966,13 @@ if __name__ == "__main__":
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
-            if forwarded_message_data[4] not in [0, "0", None]:
+            _uname_3088 = normalize_username(forwarded_message_data[4])
+            if _uname_3088 and _uname_3088 not in POSTED_USERNAMES:
+                POSTED_USERNAMES.add(_uname_3088)
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{author_id}</code>:@{forwarded_message_data[4]} (3088)",
+                    f"<code>{author_id}</code> @{_uname_3088} (3088)",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
@@ -4171,11 +4215,13 @@ if __name__ == "__main__":
             )
 
             # Log username if available
-            if username and username != "!UNDEFINED!":
+            _uname_manual = normalize_username(username)
+            if _uname_manual and _uname_manual not in POSTED_USERNAMES:
+                POSTED_USERNAMES.add(_uname_manual)
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code>:@{username} (manual)",
+                    f"<code>{user_id}</code> @{_uname_manual} (manual)",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,

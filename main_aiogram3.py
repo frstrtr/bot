@@ -8,6 +8,7 @@ import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -93,6 +94,7 @@ except ImportError:
 
 try:
     from utils.database import DatabaseManager, initialize_database
+    from utils.utils import get_latest_commit_info
     DATABASE_AVAILABLE = True
 except ImportError:
     print("⚠️  utils.database not available, using fallback")
@@ -2086,19 +2088,57 @@ class ModernTelegramBot:
             bot_info = await self.bot.get_me()
             self.logger.info(f"🤖 Bot started: @{bot_info.username} (ID: {bot_info.id})")
             
-            # Notify admin group
-            if hasattr(self.settings, 'ADMIN_GROUP_ID') and self.settings.ADMIN_GROUP_ID:
+            # Get current time and commit info for startup notification
+            bot_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                commit_info = get_latest_commit_info(self.logger)
+            except:
+                commit_info = "Git info unavailable"
+            
+            # Create startup messages
+            bot_start_log_message = (
+                f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
+                f"Commit info: {commit_info}\n"
+                "Финальная битва между людьми и роботами...\033[0m\n"
+            )
+            bot_start_message = (
+                f"Bot restarted at {bot_start_time}\n{'-' * 40}\n"
+                f"```\n{commit_info}\n```\n"
+                "Финальная битва между людьми и роботами..."
+            )
+            
+            # Log startup info with colors
+            self.logger.info(bot_start_log_message)
+            
+            # Notify technolog group in restart topic (like aiogram 2.x version)
+            if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
                 try:
+                    techno_restart_topic = getattr(self.settings, 'TECHNO_RESTART', None)
                     await self.bot.send_message(
-                        self.settings.ADMIN_GROUP_ID,
+                        self.settings.TECHNOLOG_GROUP_ID,
+                        bot_start_message,
+                        message_thread_id=techno_restart_topic,
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Could not notify technolog group: {e}")
+            
+            # Also notify technolog group with start topic
+            if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
+                try:
+                    techno_start_topic = getattr(self.settings, 'TECHNO_RESTART', None)  # Use restart topic for start message
+                    await self.bot.send_message(
+                        self.settings.TECHNOLOG_GROUP_ID,
                         f"🤖 <b>Bot Started</b>\n\n"
                         f"Name: {bot_info.first_name}\n"
                         f"Username: @{bot_info.username}\n"
                         f"Version: aiogram 3.x\n"
-                        f"Time: {asyncio.get_event_loop().time()}"
+                        f"Time: {bot_start_time}",
+                        parse_mode="HTML",
+                        message_thread_id=techno_start_topic
                     )
                 except Exception as e:
-                    self.logger.warning(f"Could not notify admin group: {e}")
+                    self.logger.warning(f"Could not notify technolog group with start message: {e}")
             
             yield
             

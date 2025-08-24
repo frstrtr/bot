@@ -39,26 +39,34 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     CallbackQuery,
-    ChatMemberStatus,
     # ChatActions,  # for banchan actions
 )
+from aiogram.enums import ChatMemberStatus
 
-from aiogram import executor
+# from aiogram import executor  # Removed in aiogram 3.x
 
 # from aiogram.types import Message
-from aiogram.utils.exceptions import (
-    MessageToDeleteNotFound,
-    MessageCantBeDeleted,
-    MessageCantBeForwarded,
-    RetryAfter,
-    BadRequest,
-    ChatNotFound,
-    MessageToForwardNotFound,
-    MessageIdInvalid,
-    ChatAdminRequired,
-    Unauthorized,
-    # BotKicked,
+# from aiogram.utils.exceptions import (  # Module structure changed in aiogram 3.x
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramRetryAfter,
+    TelegramBadRequest,
+    TelegramNotFound,
+    TelegramForbiddenError,
+    TelegramUnauthorizedError,
 )
+
+# Create aliases for backward compatibility with aiogram 2.x exception names
+MessageToDeleteNotFound = TelegramBadRequest
+MessageCantBeDeleted = TelegramBadRequest  
+MessageCantBeForwarded = TelegramBadRequest
+RetryAfter = TelegramRetryAfter
+BadRequest = TelegramBadRequest
+ChatNotFound = TelegramNotFound
+MessageToForwardNotFound = TelegramBadRequest
+MessageIdInvalid = TelegramBadRequest
+ChatAdminRequired = TelegramForbiddenError
+Unauthorized = TelegramUnauthorizedError
 
 # load utilities
 from utils.utils import (
@@ -6602,13 +6610,27 @@ if __name__ == "__main__":
     # async def cmd_getid(message: types.Message):
     #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
-    executor.start_polling(
-        DP,
-        skip_updates=True,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        allowed_updates=ALLOWED_UPDATES,
-    )
+    # Run the bot using aiogram 3.x pattern
+    async def run_bot():
+        """Main entry point for the bot."""
+        try:
+            # Run startup
+            await on_startup(DP)
+            
+            # Start polling
+            await DP.start_polling(
+                BOT,
+                skip_updates=True,
+                allowed_updates=ALLOWED_UPDATES,
+            )
+        except KeyboardInterrupt:
+            print("Bot stopped by user")
+        finally:
+            # Run shutdown
+            await on_shutdown(DP)
+            
+            # Close SQLite connection
+            CONN.close()
 
-    # Close SQLite connection
-    CONN.close()
+    # Start the bot
+    asyncio.run(run_bot())

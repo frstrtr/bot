@@ -7,6 +7,11 @@ This is a complete rewrite using the latest aiogram features.
 import asyncio
 import logging
 import sys
+import html
+import re
+import time
+import json
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -1308,7 +1313,9 @@ class ModernTelegramBot:
                     cas = results[2] if not isinstance(results[2], Exception) else 0
 
                     # User is spam if any service reports them
-                    is_spam = lols or is_spammer or cas > 0
+                    # Handle None values properly
+                    cas_is_spam = cas is not None and cas > 0
+                    is_spam = lols or is_spammer or cas_is_spam
                     
                     if is_spam:
                         self.logger.info(f"User {user_id} detected as spam: LoLs={lols}, Local={is_spammer}, CAS={cas}")
@@ -1438,18 +1445,28 @@ class ModernTelegramBot:
             
             self.logger.info(f"🐕 {user_id}:@{user_name} Watchdog assigned")
             
-            # Set up cleanup callback
-            def _task_done(t: asyncio.Task, _uid=user_id):
+            # Set up cleanup callback for watchdog task management
+            def _task_done(t: asyncio.Task, _uid=user_id, _uname=user_name):
                 try:
+                    # Remove from running watchdogs registry
                     if self.running_watchdogs.get(_uid) is t:
                         self.running_watchdogs.pop(_uid, None)
-                finally:
+                    
+                    # Log task completion status
                     if t.cancelled():
-                        self.logger.info(f"🛑 {_uid} Watchdog task was cancelled")
+                        self.logger.info(f"🛑 {_uid}:@{_uname} Watchdog task was cancelled (user monitoring persists)")
+                    elif t.done() and not t.exception():
+                        self.logger.info(f"✅ {_uid}:@{_uname} Watchdog task completed successfully")
                     else:
                         exc = t.exception()
                         if exc:
-                            self.logger.error(f"❌ {_uid} Watchdog task raised exception: {exc}")
+                            self.logger.error(f"❌ {_uid}:@{_uname} Watchdog task raised exception: {exc}")
+                            # Only remove from active checks on exception
+                            if _uid in self.active_user_checks_dict:
+                                del self.active_user_checks_dict[_uid]
+                                self.logger.info(f"�️ {_uid}:@{_uname} removed from active checks due to exception")
+                except Exception as e:
+                    self.logger.error(f"Error in watchdog cleanup for {_uid}: {e}")
             
             task.add_done_callback(_task_done)
             return True
@@ -1490,6 +1507,9 @@ class ModernTelegramBot:
                 # Cancel watchdog if running
                 await self.cancel_named_watchdog(user_id, user_name)
                 
+                # Save banned users to persist the ban
+                await self.save_banned_users()
+                
                 # Report to P2P
                 await self.report_spam_2p2p(user_id)
                 
@@ -1515,11 +1535,11 @@ class ModernTelegramBot:
             
             # Ensure directory exists
             if file_type.startswith("daily_spam_"):
-                os.makedirs("daily_spam", exist_ok=True)
-                filename = f"daily_spam/{filename}"
+                os.makedirs("aiogram3_daily_spam", exist_ok=True)
+                filename = f"aiogram3_daily_spam/{filename}"
             elif file_type.startswith("inout_"):
-                os.makedirs("inout", exist_ok=True)
-                filename = f"inout/{filename}"
+                os.makedirs("aiogram3_inout", exist_ok=True)
+                filename = f"aiogram3_inout/{filename}"
             
             # Write data to file
             with open(filename, "a", encoding="utf-8") as f:
@@ -1655,13 +1675,61 @@ class ModernTelegramBot:
         except Exception as e:
             self.logger.error(f"Error handling autoreport investigation: {e}")
     
+    async def save_active_user_checks(self) -> None:
+        """Save active user checks to file for persistence across restarts."""
+        try:
+            active_checks_filename = "aiogram3_active_user_checks.txt"
+            
+            if self.active_user_checks_dict:
+                self.logger.debug(f"Saving active user checks to file: {self.active_user_checks_dict}")
+                
+                with open(active_checks_filename, "w", encoding="utf-8") as file:
+                    for user_id, user_data in self.active_user_checks_dict.items():
+                        # Persist dicts as repr for round-trip; loader already supports dict/string
+                        if isinstance(user_data, dict):
+                            file.write(f"{user_id}:{repr(user_data)}\n")
+                        else:
+                            file.write(f"{user_id}:{user_data}\n")
+                            
+                self.logger.info(f"💾 Saved {len(self.active_user_checks_dict)} active user checks to {active_checks_filename}")
+            else:
+                # Clear the file if no active checks
+                with open(active_checks_filename, "w", encoding="utf-8") as file:
+                    file.write("")
+                self.logger.info(f"💾 Cleared active user checks file (no active checks)")
+                
+        except Exception as e:
+            self.logger.error(f"Error saving active user checks: {e}")
+
+    async def save_banned_users(self) -> None:
+        """Save banned users to file for persistence across restarts."""
+        try:
+            banned_users_filename = "aiogram3_banned_users.txt"
+            
+            if self.banned_users_dict:
+                self.logger.debug(f"Saving banned users to file: {self.banned_users_dict}")
+                
+                # Append to existing file if it exists, otherwise create new
+                mode = "a" if os.path.exists(banned_users_filename) else "w"
+                with open(banned_users_filename, mode, encoding="utf-8") as file:
+                    for user_id, user_data in self.banned_users_dict.items():
+                        # Use repr for consistent serialization
+                        file.write(f"{user_id}:{repr(user_data)}\n")
+                            
+                self.logger.info(f"💾 Saved {len(self.banned_users_dict)} banned users to {banned_users_filename}")
+            else:
+                self.logger.debug("No banned users to save")
+                
+        except Exception as e:
+            self.logger.error(f"Error saving banned users: {e}")
+
     async def load_banned_users(self) -> None:
         """Load banned users from file."""
         try:
             import os
             import ast
             
-            banned_users_filename = "banned_users.txt"
+            banned_users_filename = "aiogram3_banned_users.txt"
             
             if not os.path.exists(banned_users_filename):
                 self.logger.error(f"File not found: {banned_users_filename}")
@@ -1691,7 +1759,7 @@ class ModernTelegramBot:
             import os
             import ast
             
-            active_checks_filename = "active_user_checks.txt"
+            active_checks_filename = "aiogram3_active_user_checks.txt"
             
             if not os.path.exists(active_checks_filename):
                 self.logger.error(f"File not found: {active_checks_filename}")
@@ -1737,7 +1805,7 @@ class ModernTelegramBot:
                                 )
                             )
                             
-                            self.logger.info(f"{user_id}:@{username} loaded from file & 3hr monitoring started...")
+                            self.logger.info(f"{user_id}:@{username} loaded from file & 24hr progressive monitoring started...")
                             await asyncio.sleep(1)  # 1-second interval between task creations
             
             self.logger.info(f"Active users checks dict ({len(self.active_user_checks_dict)}) loaded from file")
@@ -1757,9 +1825,9 @@ class ModernTelegramBot:
             self.logger.error(f"Error in load_and_start_checks: {e}")
     
     async def perform_checks(self, user_id: int, user_name: str = "!UNDEFINED!", event_record: str = "", inout_logmessage: str = ""):
-        """Perform 3-hour monitoring checks on a user with watchdog system."""
+        """Perform progressive 24-hour monitoring checks on a user with watchdog system."""
         try:
-            self.logger.info(f"🔍 Starting 3-hour monitoring for user {user_id}:@{user_name}")
+            self.logger.info(f"🔍 Starting 24-hour progressive monitoring for user {user_id}:@{user_name}")
             
             # Add user to active checks if not already there
             if user_id not in self.active_user_checks_dict:
@@ -1767,67 +1835,408 @@ class ModernTelegramBot:
                     "username": user_name,
                     "start_time": asyncio.get_event_loop().time(),
                     "event_record": event_record,
-                    "inout_logmessage": inout_logmessage
+                    "inout_logmessage": inout_logmessage,
+                    "notified_profile_change": False,
+                    "baseline": None  # Will be set if we have chat member info
                 }
+            
+            # Progressive monitoring intervals (in seconds)
+            # Original: 1min, 3min, 5min, 10min, 20min, 30min, 1hr, 2hr, 3hr, 6hr, 12hr, 24hr
+            sleep_times = [
+                65,      # 1 min
+                185,     # 3 min  
+                305,     # 5 min
+                605,     # 10 min
+                1205,    # 20 min
+                1805,    # 30 min
+                3605,    # 1 hr
+                7205,    # 2 hr
+                10805,   # 3 hr
+                21605,   # 6 hr
+                43205,   # 12 hr
+                86405,   # 24 hr
+            ]
+            
+            # Color mapping for spam check results
+            color_map = {
+                False: "🟢",  # Green for clean
+                True: "🔴",   # Red for spam
+                None: "🟡",   # Yellow for unknown
+            }
             
             # Create monitoring coroutine
             async def monitoring_coro():
-                # Wait for 3 hours (or shorter for testing)
-                monitoring_duration = 3 * 60 * 60  # 3 hours in seconds
-                await asyncio.sleep(monitoring_duration)
+                message_to_delete = None
                 
-                # After 3 hours, perform final check
-                if user_id in self.active_user_checks_dict:
-                    final_check = await self.autoban(user_id, f"3hr monitoring completed - {event_record}")
+                for i, sleep_time in enumerate(sleep_times):
+                    # Check if user still in monitoring (might have been banned elsewhere)
+                    if user_id not in self.active_user_checks_dict:
+                        self.logger.info(f"👤 {user_id}:@{user_name} no longer in active checks, stopping monitoring")
+                        return
                     
-                    if not final_check:
-                        # User is clean, remove from monitoring
-                        if user_id in self.active_user_checks_dict:
-                            del self.active_user_checks_dict[user_id]
-                        self.logger.info(f"✅ User {user_id}:@{user_name} monitoring completed - user is clean")
-                    else:
-                        self.logger.info(f"🔨 User {user_id}:@{user_name} monitoring completed - user was banned")
+                    # Sleep for the specified interval
+                    await asyncio.sleep(sleep_time)
+                    
+                    # Perform spam check
+                    is_spam = await self.spam_check(user_id)
+                    
+                    # Log the check with timing info
+                    color_icon = color_map.get(is_spam, "🟡")
+                    minutes = sleep_time // 60
+                    remaining_checks = len(sleep_times) - i - 1
+                    self.logger.info(f"{color_icon} {user_id}:@{user_name} {minutes:02d}min check spam: {is_spam} (checks left: {remaining_checks})")
+                    
+                    # Check for profile changes (if we have baseline data)
+                    if user_id in self.active_user_checks_dict:
+                        user_entry = self.active_user_checks_dict[user_id]
+                        
+                        if isinstance(user_entry, dict):
+                            baseline = user_entry.get("baseline")
+                            already_notified = user_entry.get("notified_profile_change", False)
+                            
+                            if baseline and not already_notified:
+                                await self._check_profile_changes(user_id, user_name, user_entry, baseline)
+                            
+                            # Look for suspicious messages to track
+                            suspicious_messages = {
+                                k: v for k, v in user_entry.items()
+                                if isinstance(k, str) and "_" in k and k not in ("username", "baseline", "notified_profile_change", "start_time", "event_record", "inout_logmessage")
+                            }
+                            
+                            if suspicious_messages:
+                                # Get the first suspicious message for deletion tracking
+                                chat_id, message_id = next(iter(suspicious_messages)).split("_")
+                                message_to_delete = [int(chat_id), int(message_id)]
+                    
+                    # Perform autoban check
+                    if await self.autoban(user_id, user_name, f"Progressive check {minutes}min - {event_record}"):
+                        self.logger.info(f"🔨 {user_id}:@{user_name} banned during {minutes}min progressive check")
+                        return
+                
+                # If we reach here, user completed all 24-hour checks and is clean
+                if user_id in self.active_user_checks_dict:
+                    del self.active_user_checks_dict[user_id]
+                    self.logger.info(f"✅ {user_id}:@{user_name} completed 24-hour monitoring - user is clean")
             
             # Create watchdog for this monitoring task
             await self.create_named_watchdog(monitoring_coro(), user_id, user_name)
             
         except asyncio.CancelledError:
-            self.logger.info(f"🛑 Monitoring cancelled for user {user_id}:@{user_name}")
+            self.logger.info(f"🛑 Progressive monitoring cancelled for user {user_id}:@{user_name}")
             if user_id in self.active_user_checks_dict:
-                del self.active_user_checks_dict[user_id]
+                # Move to banned users when cancelled
+                self.banned_users_dict[user_id] = self.active_user_checks_dict.pop(user_id, None)
+                self.logger.info(f"📝 {user_id}:@{user_name} moved to banned users during cancellation")
         except Exception as e:
             self.logger.error(f"Error in perform_checks for user {user_id}: {e}")
             if user_id in self.active_user_checks_dict:
                 del self.active_user_checks_dict[user_id]
     
+    async def _check_profile_changes(self, user_id: int, user_name: str, user_entry: dict, baseline: dict):
+        """Check for profile changes during monitoring period."""
+        try:
+            chat_info = baseline.get("chat", {})
+            chat_id = chat_info.get("id")
+            
+            if not chat_id:
+                return
+            
+            # Get current profile data
+            cur_first = baseline.get("first_name", "")
+            cur_last = baseline.get("last_name", "")
+            cur_username = baseline.get("username", "")
+            cur_photo_count = baseline.get("photo_count", 0)
+            
+            try:
+                # Get live chat member data
+                member = await self.bot.get_chat_member(chat_id, user_id)
+                user = member.user
+                cur_first = user.first_name or ""
+                cur_last = user.last_name or ""
+                cur_username = user.username or ""
+            except Exception as e:
+                self.logger.debug(f"Unable to fetch chat member for {user_id}: {e}")
+            
+            try:
+                # Get current photo count
+                photos = await self.bot.get_user_profile_photos(user_id, limit=1)
+                cur_photo_count = photos.total_count if photos else cur_photo_count
+            except Exception as e:
+                self.logger.debug(f"Unable to fetch photo count for {user_id}: {e}")
+            
+            # Detect changes
+            changed = []
+            if cur_first != baseline.get("first_name", ""):
+                changed.append("first_name")
+            if cur_last != baseline.get("last_name", ""):
+                changed.append("last_name")
+            if cur_username != baseline.get("username", ""):
+                changed.append("username")
+            if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
+                changed.append("profile_photo")
+            
+            if changed:
+                await self._send_profile_change_report(user_id, user_name, chat_info, baseline, {
+                    "first_name": cur_first,
+                    "last_name": cur_last,
+                    "username": cur_username,
+                    "photo_count": cur_photo_count
+                }, changed)
+                
+                # Mark as notified
+                user_entry["notified_profile_change"] = True
+                
+        except Exception as e:
+            self.logger.error(f"Error checking profile changes for {user_id}: {e}")
+    
+    async def _send_profile_change_report(self, user_id: int, user_name: str, chat_info: dict, 
+                                        old_profile: dict, new_profile: dict, changed: list):
+        """Send profile change report to admin."""
+        try:
+            from datetime import datetime
+            import html
+            
+            if not self.admin_group_id:
+                return
+            
+            chat_title = chat_info.get("title", "Unknown Chat")
+            chat_username = chat_info.get("username")
+            chat_id = chat_info.get("id")
+            
+            # Create chat link
+            if chat_username:
+                chat_link = f'<a href="https://t.me/{chat_username}">{html.escape(chat_title)}</a>'
+            else:
+                chat_link = f'<a href="https://t.me/c/{str(chat_id)[4:]}">{html.escape(chat_title)}</a>'
+            
+            # Format field changes
+            def format_field(old_val, new_val, label, is_username=False):
+                if is_username:
+                    old_disp = f"@{old_val}" if old_val else "@!UNDEFINED!"
+                    new_disp = f"@{new_val}" if new_val else "@!UNDEFINED!"
+                else:
+                    old_disp = html.escape(old_val) if old_val else "∅"
+                    new_disp = html.escape(new_val) if new_val else "∅"
+                
+                if old_val != new_val:
+                    return f"{label}: {old_disp} ➜ <b>{new_disp}</b>"
+                return f"{label}: {new_disp}"
+            
+            field_lines = [
+                format_field(old_profile.get("first_name", ""), new_profile.get("first_name", ""), "First name"),
+                format_field(old_profile.get("last_name", ""), new_profile.get("last_name", ""), "Last name"),
+                format_field(old_profile.get("username", ""), new_profile.get("username", ""), "Username", True),
+                f"User ID: <code>{user_id}</code>"
+            ]
+            
+            if "profile_photo" in changed:
+                field_lines.append("Profile photo: none ➜ <b>set</b>")
+            
+            # Profile links
+            profile_links = (
+                f"🔗 <b>Profile links:</b>\n"
+                f"   ├ <a href='tg://user?id={user_id}'>ID-based profile link</a>\n"
+                f"   └ <a href='https://t.me/@id{user_id}'>Direct link</a>"
+            )
+            
+            # Calculate elapsed time if available
+            joined_at = old_profile.get("joined_at")
+            elapsed_line = ""
+            if joined_at:
+                try:
+                    if isinstance(joined_at, str):
+                        joined_dt = datetime.strptime(joined_at, "%Y-%m-%d %H:%M:%S")
+                    else:
+                        joined_dt = joined_at
+                    
+                    delta = datetime.now() - joined_dt
+                    days = delta.days
+                    hours, rem = divmod(delta.seconds, 3600)
+                    minutes, seconds = divmod(rem, 60)
+                    
+                    parts = []
+                    if days: parts.append(f"{days}d")
+                    if hours: parts.append(f"{hours}h")
+                    if minutes and not days: parts.append(f"{minutes}m")
+                    if seconds and not days and not hours: parts.append(f"{seconds}s")
+                    
+                    human_elapsed = " ".join(parts) or f"{seconds}s"
+                    elapsed_line = f"\nJoined at: {joined_at} (elapsed: {human_elapsed})"
+                except Exception:
+                    elapsed_line = f"\nJoined at: {joined_at}"
+            
+            timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            
+            message_text = (
+                f"🚨 <b>Suspicious profile change detected</b> after joining {chat_link}.\n\n"
+                + "\n".join(field_lines) + 
+                f"\n\nChanges: <b>{', '.join(changed)}</b> at {timestamp}."
+                + elapsed_line + "\n\n" + profile_links
+            )
+            
+            # Create action buttons
+            from aiogram.utils.keyboard import InlineKeyboardBuilder
+            kb = InlineKeyboardBuilder()
+            
+            # Spam check link
+            lols_link = self.build_lols_url(user_id)
+            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            
+            # Action buttons
+            report_id = int(datetime.now().timestamp())
+            kb.row(InlineKeyboardButton(text="🚫 Ban User", callback_data=f"suspiciousban_{chat_id}_{report_id}_{user_id}"))
+            kb.row(InlineKeyboardButton(text="🌐 Global Ban", callback_data=f"suspiciousglobalban_{chat_id}_{report_id}_{user_id}"))
+            
+            # Send to admin group
+            await self.bot.send_message(
+                chat_id=self.admin_group_id,
+                text=message_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=kb.as_markup(),
+                message_thread_id=getattr(self.settings, 'ADMIN_SUSPICIOUS', None),
+                disable_web_page_preview=True
+            )
+            
+            # Log the profile change
+            await self.log_profile_change(
+                user_id=user_id,
+                username=new_profile.get("username", ""),
+                context='periodic',
+                chat_id=chat_id,
+                chat_title=chat_title,
+                changed=changed,
+                old_values=old_profile,
+                new_values=new_profile,
+                photo_changed=('profile_photo' in changed)
+            )
+            
+            self.logger.info(f"📋 Sent profile change report for {user_id} to admin")
+            
+        except Exception as e:
+            self.logger.error(f"Error sending profile change report for {user_id}: {e}")
+    
+    async def _store_suspicious_message(self, message: Message, user_id: int):
+        """Store message from user being monitored for later tracking."""
+        try:
+            # Ensure user entry is a dict
+            if not isinstance(self.active_user_checks_dict.get(user_id), dict):
+                username = self.active_user_checks_dict.get(user_id, "!UNDEFINED!")
+                self.active_user_checks_dict[user_id] = {
+                    "username": username if username != "None" else "!UNDEFINED!"
+                }
+            
+            # Create message key and link
+            message_key = f"{message.chat.id}_{message.message_id}"
+            
+            # Create message link
+            if message.chat.username:
+                message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+            else:
+                # For private groups, use the format with removed -100 prefix
+                chat_id_str = str(message.chat.id)
+                if chat_id_str.startswith("-100"):
+                    chat_id_clean = chat_id_str[4:]  # Remove -100 prefix
+                    message_link = f"https://t.me/c/{chat_id_clean}/{message.message_id}"
+                else:
+                    message_link = f"tg://openmessage?chat_id={message.chat.id}&message_id={message.message_id}"
+            
+            # Store the message link in active_user_checks_dict
+            self.active_user_checks_dict[user_id][message_key] = message_link
+            
+            # Log the suspicious message
+            username = message.from_user.username or "!UNDEFINED!"
+            self.logger.warning(
+                f"🔍 {user_id}:@{username} sent monitored message {message.message_id} "
+                f"in {message.chat.title} ({message.chat.id}). Link: {message_link}"
+            )
+            
+            # Auto-save active checks to persist the message data
+            await self.save_active_user_checks()
+            
+        except Exception as e:
+            self.logger.error(f"Error storing suspicious message for user {user_id}: {e}")
+
     async def log_lists(self):
-        """Log active checks and banned users, then clean up daily data."""
+        """Log active checks and banned users, then perform daily cleanup like aiogram2."""
         try:
             self.logger.info(f"Daily log: {len(self.banned_users_dict)} banned users, {len(self.active_user_checks_dict)} active checks")
             
-            # Save data to files
             from datetime import datetime, timedelta
             import os
+            import ast
             
+            # Get yesterday's date 
             today = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
             
             # Ensure directories exist
-            os.makedirs("inout", exist_ok=True)
-            os.makedirs("daily_spam", exist_ok=True)
+            os.makedirs("aiogram3_inout", exist_ok=True)
+            os.makedirs("aiogram3_daily_spam", exist_ok=True)
             
-            # Save banned users to file
-            filename = f"inout/banned_users_{today}.txt"
-            with open(filename, "w", encoding="utf-8") as f:
-                for user_id, user_name in self.banned_users_dict.items():
-                    f.write(f"{user_id}: {user_name}\n")
+            # Read current banned users from runtime file and merge with dict
+            banned_users_filename = "aiogram3_banned_users.txt"
+            if os.path.exists(banned_users_filename):
+                with open(banned_users_filename, "r", encoding="utf-8") as file:
+                    for line in file:
+                        parts = line.strip().split(":", 1)
+                        if len(parts) == 2:
+                            user_id, user_name_repr = parts
+                            try:
+                                user_name = ast.literal_eval(user_name_repr.strip())
+                            except (ValueError, SyntaxError):
+                                user_name = user_name_repr.strip()  # Keep as string if not valid dict
+                            self.banned_users_dict[int(user_id)] = user_name
+                        else:
+                            self.logger.warning(f"Skipping invalid line: {line}")
+                
+                # Remove the runtime file after reading
+                os.remove(banned_users_filename)
+                self.logger.info(f"Read and removed runtime banned users file: {len(self.banned_users_dict)} total users")
             
-            # Clear banned users dict for new day
+            # Save banned users to daily file with yesterday's date
+            daily_banned_filename = f"aiogram3_inout/banned_users_{today}.txt"
+            with open(daily_banned_filename, "w", encoding="utf-8") as file:
+                for user_id, user_data in self.banned_users_dict.items():
+                    file.write(f"{user_id}:{user_data}\n")
+            
+            # Move yesterday's files to appropriate folders
+            self._move_old_files_to_folders()
+            
+            # Clear banned users dict for new day (fresh start)
             self.banned_users_dict.clear()
             
-            self.logger.info(f"Daily cleanup completed, banned users saved to {filename}")
+            self.logger.info(f"✅ Daily cleanup completed: banned users saved to {daily_banned_filename}")
             
         except Exception as e:
             self.logger.error(f"Error in log_lists: {e}")
+    
+    def _move_old_files_to_folders(self):
+        """Move old daily files to their respective folders like aiogram2."""
+        try:
+            import os
+            from datetime import datetime
+            
+            current_date = datetime.now().strftime("%d-%m-%Y")
+            
+            # Move old daily_spam files to aiogram3_daily_spam folder
+            for file in os.listdir("."):
+                if file.startswith("aiogram3_daily_spam_") and not file.endswith(f"{current_date}.txt"):
+                    try:
+                        os.rename(file, f"aiogram3_daily_spam/{file}")
+                        self.logger.debug(f"Moved {file} to aiogram3_daily_spam/")
+                    except Exception as e:
+                        self.logger.error(f"Failed to move {file}: {e}")
+            
+            # Move old inout files to aiogram3_inout folder  
+            for file in os.listdir("."):
+                if file.startswith("aiogram3_inout_") and not file.endswith(f"{current_date}.txt"):
+                    try:
+                        os.rename(file, f"aiogram3_inout/{file}")
+                        self.logger.debug(f"Moved {file} to aiogram3_inout/")
+                    except Exception as e:
+                        self.logger.error(f"Failed to move {file}: {e}")
+                        
+        except Exception as e:
+            self.logger.error(f"Error moving old files: {e}")
     
     def setup_scheduled_tasks(self):
         """Setup daily scheduled tasks."""
@@ -1836,6 +2245,12 @@ class ModernTelegramBot:
             @aiocron.crontab("0 4 * * *", tz=ZoneInfo("Indian/Mauritius"))
             async def scheduled_log():
                 await self.log_lists()
+            
+            # Schedule periodic save of active user checks every hour
+            @aiocron.crontab("0 * * * *", tz=ZoneInfo("Indian/Mauritius"))
+            async def scheduled_save():
+                await self.save_active_user_checks()
+                await self.save_banned_users()
             
             self.logger.info("✅ Scheduled tasks setup completed")
         else:
@@ -1942,6 +2357,10 @@ class ModernTelegramBot:
                     except Exception as e:
                         self.logger.error(f"Failed to delete message from banned user: {e}")
                     return
+                
+                # If user is being monitored, store their message for tracking
+                if user_id in self.active_user_checks_dict:
+                    await self._store_suspicious_message(message, user_id)
                 
                 # Perform spam analysis
                 if self.spam_service:
@@ -2145,6 +2564,10 @@ class ModernTelegramBot:
         finally:
             # Shutdown
             self.logger.info("🛑 Bot shutting down...")
+            
+            # Save active user checks and banned users before shutdown
+            await self.save_active_user_checks()
+            await self.save_banned_users()
             
             if self.spam_service:
                 await self.spam_service.close()

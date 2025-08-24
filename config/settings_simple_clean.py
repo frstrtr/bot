@@ -31,9 +31,6 @@ class Settings:
         # Database
         self.DATABASE_URL = env_vars.get('DATABASE_URL', os.getenv('DATABASE_URL', 'sqlite:///messages.db'))
         
-        # Spam dictionary file
-        self.SPAM_DICT_FILE = env_vars.get('SPAM_DICT_FILE', os.getenv('SPAM_DICT_FILE', 'spam_dict.txt'))
-        
         # Group IDs (where bot operates)
         self.ADMIN_GROUP_ID = int(env_vars.get('ADMIN_GROUP_ID', os.getenv('ADMIN_GROUP_ID', '0')))
         self.TECHNOLOG_GROUP_ID = int(env_vars.get('TECHNOLOG_GROUP_ID', os.getenv('TECHNOLOG_GROUP_ID', '0')))

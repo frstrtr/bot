@@ -1395,15 +1395,19 @@ class ModernTelegramBot:
             self.logger.error(f"Error in ban_user_from_all_chats for user {user_id}: {e}")
             return False
     
-    async def cancel_named_watchdog(self, user_id: int, user_name: str = "!UNDEFINED!") -> bool:
+    async def cancel_named_watchdog(self, user_id: int, user_name: str = "!UNDEFINED!", move_to_banned: bool = False) -> bool:
         """Cancel a running watchdog task for a given user ID."""
         try:
             if user_id in self.running_watchdogs:
-                # Move user from active checks to banned users
-                if user_id in self.active_user_checks_dict:
+                # Optionally move user from active checks to banned users
+                if move_to_banned and user_id in self.active_user_checks_dict:
                     user_data = self.active_user_checks_dict.pop(user_id, None)
-                    self.banned_users_dict[user_id] = user_data
-                    self.logger.info(f"✅ {user_id}:@{user_name} removed from active checks during watchdog cancellation")
+                    # Only add to banned if not already banned (avoid duplicates)
+                    if user_id not in self.banned_users_dict:
+                        self.banned_users_dict[user_id] = user_data
+                        self.logger.info(f"✅ {user_id}:@{user_name} moved from active checks to banned users")
+                    else:
+                        self.logger.debug(f"ℹ️  {user_id}:@{user_name} already in banned users, not duplicating")
                 
                 # Cancel the task
                 task = self.running_watchdogs.pop(user_id)
@@ -1505,7 +1509,7 @@ class ModernTelegramBot:
                     del self.active_user_checks_dict[user_id]
                 
                 # Cancel watchdog if running
-                await self.cancel_named_watchdog(user_id, user_name)
+                await self.cancel_named_watchdog(user_id, user_name, move_to_banned=True)
                 
                 # Save banned users to persist the ban
                 await self.save_banned_users()
@@ -2155,6 +2159,31 @@ class ModernTelegramBot:
             
         except Exception as e:
             self.logger.error(f"Error storing suspicious message for user {user_id}: {e}")
+    
+    def is_user_or_source_banned(self, message: Message) -> tuple[bool, str]:
+        """Check if user or forwarded source is banned. Returns (is_banned, reason)."""
+        if not message.from_user:
+            return False, ""
+        
+        user_id = message.from_user.id
+        
+        # Check if direct user is banned
+        if user_id in self.banned_users_dict:
+            return True, f"user {user_id} is banned"
+        
+        # Check forwarded from chat
+        if message.forward_origin and hasattr(message.forward_origin, 'chat') and message.forward_origin.chat:
+            forward_chat_id = message.forward_origin.chat.id
+            if forward_chat_id in self.banned_users_dict:
+                return True, f"forwarded from banned chat {forward_chat_id}"
+        
+        # Check forwarded from user
+        elif message.forward_origin and hasattr(message.forward_origin, 'sender_user') and message.forward_origin.sender_user:
+            forward_user_id = message.forward_origin.sender_user.id
+            if forward_user_id in self.banned_users_dict:
+                return True, f"forwarded from banned user {forward_user_id}"
+        
+        return False, ""
 
     async def log_lists(self):
         """Log active checks and banned users, then perform daily cleanup like aiogram2."""
@@ -2349,13 +2378,14 @@ class ModernTelegramBot:
             if message.from_user and not message.from_user.is_bot:
                 user_id = message.from_user.id
                 
-                # Check if user is already banned
-                if user_id in self.banned_users_dict:
+                # Check if user or forwarded source is banned
+                is_banned, ban_reason = self.is_user_or_source_banned(message)
+                if is_banned:
                     try:
                         await message.delete()
-                        self.logger.info(f"Deleted message from banned user {user_id}")
+                        self.logger.info(f"Deleted message from {user_id} - {ban_reason}")
                     except Exception as e:
-                        self.logger.error(f"Failed to delete message from banned user: {e}")
+                        self.logger.error(f"Failed to delete message: {e}")
                     return
                 
                 # If user is being monitored, store their message for tracking

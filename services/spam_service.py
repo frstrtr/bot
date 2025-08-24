@@ -410,25 +410,51 @@ class SpamService:
         detected_patterns = []
         max_confidence = 0.0
         
+        # Get spam triggers from settings
+        spam_triggers = getattr(self.settings, 'SPAM_TRIGGERS', [
+            'url', 'text_link', 'email', 'phone_number', 'hashtag', 
+            'mention', 'cashtag', 'bot_command', 'story'
+        ])
+        
         for entity in entities:
             entity_type = entity.get('type')
             
-            # Check for spam entity types
-            if entity_type in ['url', 'text_link']:
-                url = entity.get('url', '')
-                if url:
-                    url_result = await self._analyze_url(url)
-                    if url_result.is_spam:
-                        detected_patterns.extend(url_result.detected_patterns)
-                        max_confidence = max(max_confidence, url_result.confidence)
-            
-            elif entity_type == 'mention':
-                # Suspicious mention patterns could be checked here
-                pass
-            
-            elif entity_type in ['email', 'phone_number']:
+            # Check if this entity type is in our spam triggers (simple like aiogram2)
+            if entity_type in spam_triggers:
                 detected_patterns.append(f'entity_{entity_type}')
-                max_confidence = max(max_confidence, 0.6)
+                
+                # Set confidence based on entity type (optimized from aiogram2)
+                if entity_type in ['url', 'text_link']:
+                    # URLs are highly suspicious
+                    confidence = 0.8
+                    # If we have the actual URL, analyze it further
+                    url = entity.get('url', '')
+                    if url:
+                        url_result = await self._analyze_url(url)
+                        if url_result.is_spam:
+                            detected_patterns.extend(url_result.detected_patterns)
+                            confidence = max(confidence, url_result.confidence)
+                    max_confidence = max(max_confidence, confidence)
+                    
+                elif entity_type in ['email', 'phone_number']:
+                    # Contact info is moderately suspicious
+                    max_confidence = max(max_confidence, 0.7)
+                    
+                elif entity_type == 'story':
+                    # Stories are moderately suspicious (new trigger)
+                    max_confidence = max(max_confidence, 0.6)
+                    
+                elif entity_type in ['mention', 'hashtag', 'cashtag']:
+                    # Social media entities are less suspicious
+                    max_confidence = max(max_confidence, 0.5)
+                    
+                elif entity_type == 'bot_command':
+                    # Bot commands are least suspicious
+                    max_confidence = max(max_confidence, 0.3)
+                    
+                else:
+                    # Default for any other configured trigger types
+                    max_confidence = max(max_confidence, 0.5)
         
         return SpamDetectionResult(
             is_spam=max_confidence >= 0.7,
@@ -589,6 +615,29 @@ class SpamService:
     ) -> List[SpamRecord]:
         """Get user's spam detection history."""
         return await self.db.get_spam_history(user_id, hours)
+    
+    def has_spam_entities(self, message: types.Message) -> Optional[str]:
+        """
+        Check if the message contains spam entities (simplified version like aiogram2).
+        
+        Args:
+            message: The message to check.
+            
+        Returns:
+            str: The entity type that triggered spam detection, or None if no spam entities found.
+        """
+        # Get spam triggers from settings
+        spam_triggers = getattr(self.settings, 'SPAM_TRIGGERS', [
+            'url', 'text_link', 'email', 'phone_number', 'hashtag', 
+            'mention', 'cashtag', 'bot_command', 'story'
+        ])
+        
+        if message.entities:
+            for entity in message.entities:
+                if entity.type in spam_triggers:
+                    # Spam detected - return the entity type that triggered it
+                    return entity.type
+        return None
     
     async def update_spam_patterns(self, patterns: List[Dict[str, Any]]) -> None:
         """Update spam patterns dynamically."""

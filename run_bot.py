@@ -170,9 +170,7 @@ def check_file_structure():
     
     optional_files = [
         'banned_users.txt',
-        'active_user_checks.txt',
-        'config.xml',
-        'groups.xml'
+        'active_user_checks.txt'
     ]
     
     missing_required = []
@@ -231,7 +229,7 @@ def check_deployment_readiness():
             warnings.append(f"Log directory '{log_dir}' doesn't exist (will be created)")
     
     # Check database
-    if not Path('messages.db').exists():
+    if not Path('aiogram3_messages.db').exists():
         warnings.append("Database file doesn't exist (will be created)")
     
     # Check backup directory

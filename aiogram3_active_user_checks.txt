@@ -1,0 +1,2 @@
+7692152739:None
+1596000729:{'username': 'enjoy_life_its_just_one', 'baseline': {'first_name': 'Deepak', 'last_name': '', 'username': 'enjoy_life_its_just_one', 'photo_count': 1, 'chat': {'id': -1002140993856, 'username': 'morisexpats', 'title': 'Mauritius Expats and Tourists'}}}

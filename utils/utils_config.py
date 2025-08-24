@@ -141,7 +141,7 @@ def load_config():
         TECHNOLOG_GROUP_NAME = config_XML_root.find("techno_log_group_name").text
 
         BOT = Bot(token=API_TOKEN)
-        DP = Dispatcher(BOT)
+        DP = Dispatcher()  # In aiogram 3.x, Dispatcher doesn't take Bot parameter
         DP["forwarded_reports_states"] = {}
         ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 

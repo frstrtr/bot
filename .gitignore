@@ -43,3 +43,7 @@ backup_*/
 # Include important files
 !spam_dict.txt
 !.env.example
+
+# temporary files
+aiogram3_banned_users.txt
+aiogram3_active_user_checks.txt

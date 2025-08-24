@@ -10,10 +10,12 @@ try:
     from pydantic import BaseModel, Field, field_validator
     from pydantic_settings import BaseSettings
     PYDANTIC_AVAILABLE = True
+    # For compatibility with older code, alias field_validator as validator
+    validator = field_validator
 except ImportError:
     try:
         # Fallback for older pydantic
-        from pydantic import BaseSettings, Field, validator as field_validator
+        from pydantic import BaseSettings, Field, validator, field_validator
         PYDANTIC_AVAILABLE = True
     except ImportError:
         # Ultimate fallback
@@ -30,6 +32,8 @@ except ImportError:
             def decorator(func):
                 return func
             return decorator
+        
+        validator = field_validator
 
 
 class Settings(BaseSettings):

@@ -100,9 +100,14 @@ except ImportError:
 try:
     from utils.database import DatabaseManager, initialize_database
     from utils.utils import get_latest_commit_info
+    from utils.persistence import DataPersistence
+    from utils.message_validator import MessageValidator
+    from utils.profile_manager import ProfileManager
+    from utils.ui_builder import UIBuilder
+    from utils.admin_manager import AdminManager
     DATABASE_AVAILABLE = True
 except ImportError:
-    print("⚠️  utils.database not available, using fallback")
+    print("⚠️  utils modules not available, using fallback")
     DATABASE_AVAILABLE = False
     
     class DatabaseManager:
@@ -110,6 +115,41 @@ except ImportError:
         async def initialize(self): pass
         async def update_user_activity(self, user_id): pass
         async def store_message(self, *args, **kwargs): pass
+    
+    class DataPersistence:
+        def __init__(self, *args, **kwargs): pass
+        async def save_banned_users(self, *args): pass
+        async def load_banned_users(self): return {}
+        async def save_active_user_checks(self, *args): pass
+        async def load_active_user_checks(self): return {}
+        async def save_report_file(self, *args): return True
+    
+    class MessageValidator:
+        def __init__(self, *args, **kwargs): pass
+        def is_forwarded_from_unknown_channel(self, message): return False
+        def is_in_monitored_channel(self, message): return False
+        def is_valid_message(self, message): return True
+        def is_admin_user_message(self, message, admin_ids): return False
+    
+    class ProfileManager:
+        @staticmethod
+        def make_profile_dict(*args, **kwargs): return {}
+        @staticmethod
+        def format_profile_field(*args, **kwargs): return ""
+        @staticmethod
+        def compare_profiles(*args, **kwargs): return False, ""
+    
+    class UIBuilder:
+        @staticmethod
+        def build_lols_url(user_id): return f"https://t.me/lolsbotbot?start=u{user_id}"
+        @staticmethod
+        def make_lols_kb(user_id): return InlineKeyboardMarkup(inline_keyboard=[])
+        @staticmethod
+        def make_ban_confirmation_keyboard(user_id): return InlineKeyboardMarkup(inline_keyboard=[])
+    
+    class AdminManager:
+        def __init__(self, *args, **kwargs): pass
+        def is_admin(self, user_id): return False
     
     async def initialize_database(): pass
 
@@ -202,6 +242,16 @@ class ModernTelegramBot:
         # Validate configuration
         if not self.settings.BOT_TOKEN:
             raise ValueError("BOT_TOKEN is required in .env file")
+        
+        # Initialize utility modules
+        self.persistence = DataPersistence() if DATABASE_AVAILABLE else DataPersistence()
+        self.message_validator = MessageValidator(
+            channel_ids=getattr(self.settings, 'CHANNEL_IDS', []),
+            allowed_forward_channels=getattr(self.settings, 'ALLOWED_FORWARD_CHANNELS', [])
+        ) if DATABASE_AVAILABLE else MessageValidator()
+        self.admin_manager = AdminManager(
+            admin_user_ids=getattr(self.settings, 'ADMIN_USER_IDS', [])
+        ) if DATABASE_AVAILABLE else AdminManager()
         
         # Global dictionaries for tracking users (from aiogram 2.x compatibility)
         self.active_user_checks_dict = {}
@@ -798,7 +848,7 @@ class ModernTelegramBot:
     
     def _is_admin(self, user_id: int) -> bool:
         """Check if user is admin."""
-        return user_id == self.ADMIN_USER_ID
+        return self.admin_manager.is_admin(user_id) or user_id == self.ADMIN_USER_ID
     
     async def _handle_banuser_callback(self, callback_query: CallbackQuery):
         """Handle banuser_* callbacks - ask for ban confirmation."""
@@ -952,7 +1002,7 @@ class ModernTelegramBot:
                 susp_user_name = str(user_info)
                 
             # Create message and spam check links
-            message_link = f"https://t.me/c/{str(susp_chat_id)[4:]}/{susp_message_id}"
+            message_link = self.ui_builder.create_message_link(susp_chat_id, susp_message_id)
             lols_link = self.build_lols_url(susp_user_id)
             
             # Create inline keyboard with links
@@ -1218,7 +1268,7 @@ class ModernTelegramBot:
             kb = InlineKeyboardBuilder()
             
             # Message link
-            message_link = f"https://t.me/c/{str(chat_id)[4:]}/{message_id}"
+            message_link = self.ui_builder.create_message_link(chat_id, message_id)
             kb.row(InlineKeyboardButton(text="🔗 View Original Message", url=message_link))
             
             # Spam check link
@@ -1355,14 +1405,11 @@ class ModernTelegramBot:
     
     def build_lols_url(self, user_id: int) -> str:
         """Return LOLS bot deep link for a given user id."""
-        return f"https://t.me/oLolsBot?start={user_id}"
-    
+        return self.ui_builder.build_lols_url(user_id)
+
     def make_lols_kb(self, user_id: int) -> InlineKeyboardMarkup:
         """Create a one-button keyboard with the LOLS check link."""
-        lols_url = self.build_lols_url(user_id)
-        kb = InlineKeyboardBuilder()
-        kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
-        return kb.as_markup()
+        return self.ui_builder.make_lols_kb(user_id)
     
     async def ban_user_from_all_chats(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Spam detected") -> bool:
         """Ban a user from all specified chats and log the results."""
@@ -1479,7 +1526,7 @@ class ModernTelegramBot:
             self.logger.error(f"Error creating watchdog for user {user_id}: {e}")
             return False
     
-    async def autoban(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Automated spam detection") -> bool:
+    async def autoban(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Automated spam detection", suppress_logging: bool = False) -> bool:
         """Function to automatically ban a user from all chats."""
         try:
             # Check if already banned
@@ -1490,7 +1537,8 @@ class ModernTelegramBot:
             # Perform spam check first
             is_spam = await self.spam_check(user_id)
             if not is_spam:
-                self.logger.info(f"User {user_id} passed spam check, not banning")
+                if not suppress_logging:
+                    self.logger.info(f"User {user_id} passed spam check, not banning")
                 return False
             
             # Ban from all chats
@@ -1604,12 +1652,7 @@ class ModernTelegramBot:
     
     def make_profile_dict(self, first_name: str = None, last_name: str = None, username: str = None, photo_count: int = None) -> dict:
         """Return a normalized profile snapshot dict used for logging diffs."""
-        return {
-            'first_name': first_name or '',
-            'last_name': last_name or '',
-            'username': username or '',
-            'photo_count': photo_count or 0,
-        }
+        return self.profile_manager.make_profile_dict(first_name, last_name, username, photo_count)
     
     async def check_and_autoban(self, user_id: int, reason: str = "Automated ban", **kwargs) -> bool:
         """Check user and automatically ban if conditions are met."""
@@ -1681,141 +1724,47 @@ class ModernTelegramBot:
     
     async def save_active_user_checks(self) -> None:
         """Save active user checks to file for persistence across restarts."""
-        try:
-            active_checks_filename = "aiogram3_active_user_checks.txt"
-            
-            if self.active_user_checks_dict:
-                self.logger.debug(f"Saving active user checks to file: {self.active_user_checks_dict}")
-                
-                with open(active_checks_filename, "w", encoding="utf-8") as file:
-                    for user_id, user_data in self.active_user_checks_dict.items():
-                        # Persist dicts as repr for round-trip; loader already supports dict/string
-                        if isinstance(user_data, dict):
-                            file.write(f"{user_id}:{repr(user_data)}\n")
-                        else:
-                            file.write(f"{user_id}:{user_data}\n")
-                            
-                self.logger.info(f"💾 Saved {len(self.active_user_checks_dict)} active user checks to {active_checks_filename}")
-            else:
-                # Clear the file if no active checks
-                with open(active_checks_filename, "w", encoding="utf-8") as file:
-                    file.write("")
-                self.logger.info(f"💾 Cleared active user checks file (no active checks)")
-                
-        except Exception as e:
-            self.logger.error(f"Error saving active user checks: {e}")
+        await self.persistence.save_active_user_checks(self.active_user_checks_dict)
 
     async def save_banned_users(self) -> None:
         """Save banned users to file for persistence across restarts."""
-        try:
-            banned_users_filename = "aiogram3_banned_users.txt"
-            
-            if self.banned_users_dict:
-                self.logger.debug(f"Saving banned users to file: {self.banned_users_dict}")
-                
-                # Append to existing file if it exists, otherwise create new
-                mode = "a" if os.path.exists(banned_users_filename) else "w"
-                with open(banned_users_filename, mode, encoding="utf-8") as file:
-                    for user_id, user_data in self.banned_users_dict.items():
-                        # Use repr for consistent serialization
-                        file.write(f"{user_id}:{repr(user_data)}\n")
-                            
-                self.logger.info(f"💾 Saved {len(self.banned_users_dict)} banned users to {banned_users_filename}")
-            else:
-                self.logger.debug("No banned users to save")
-                
-        except Exception as e:
-            self.logger.error(f"Error saving banned users: {e}")
+        await self.persistence.save_banned_users(self.banned_users_dict)
 
     async def load_banned_users(self) -> None:
         """Load banned users from file."""
-        try:
-            import os
-            import ast
-            
-            banned_users_filename = "aiogram3_banned_users.txt"
-            
-            if not os.path.exists(banned_users_filename):
-                self.logger.error(f"File not found: {banned_users_filename}")
-                return
-            
-            with open(banned_users_filename, "r", encoding="utf-8") as file:
-                for line in file:
-                    if line.strip():
-                        parts = line.strip().split(":", 1)
-                        if len(parts) == 2:
-                            user_id = int(parts[0])
-                            user_name_repr = parts[1]
-                            try:
-                                user_name = ast.literal_eval(user_name_repr)
-                            except (ValueError, SyntaxError):
-                                user_name = user_name_repr
-                            self.banned_users_dict[user_id] = user_name
-            
-            self.logger.info(f"Banned users dict ({len(self.banned_users_dict)}) loaded from file")
-            
-        except Exception as e:
-            self.logger.error(f"Error loading banned users: {e}")
+        self.banned_users_dict = await self.persistence.load_banned_users()
     
     async def load_active_user_checks(self) -> None:
         """Load active user checks from file and start monitoring."""
-        try:
-            import os
-            import ast
+        self.active_user_checks_dict = await self.persistence.load_active_user_checks()
+        
+        # Start monitoring for each loaded user
+        for user_id, user_data in self.active_user_checks_dict.items():
+            # Extract username for logging
+            if isinstance(user_data, dict):
+                username = user_data.get("username", "!UNDEFINED!")
+            else:
+                username = user_data if user_data != "None" else "!UNDEFINED!"
             
-            active_checks_filename = "aiogram3_active_user_checks.txt"
+            # Start monitoring with 1 second delay between tasks
+            from datetime import datetime
+            event_message = (
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                f"{user_id} ❌ \t\t\tbanned everywhere during initial checks on_startup"
+            )
             
-            if not os.path.exists(active_checks_filename):
-                self.logger.error(f"File not found: {active_checks_filename}")
-                return
+            # Start the check in watchdog system
+            asyncio.create_task(
+                self.perform_checks(
+                    user_id=user_id,
+                    user_name=username,
+                    event_record=event_message,
+                    inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event"
+                )
+            )
             
-            with open(active_checks_filename, "r", encoding="utf-8") as file:
-                for line in file:
-                    if line.strip():
-                        parts = line.strip().split(":", 1)
-                        if len(parts) == 2:
-                            user_id = int(parts[0])
-                            user_name = parts[1]
-                            
-                            # Try to parse as dict if it looks like one
-                            try:
-                                if user_name.startswith("{") and user_name.endswith("}"):
-                                    user_name = ast.literal_eval(user_name)
-                            except (ValueError, SyntaxError):
-                                pass
-                            
-                            self.active_user_checks_dict[user_id] = user_name
-                            
-                            # Extract username for logging
-                            if isinstance(user_name, dict):
-                                username = user_name.get("username", "!UNDEFINED!")
-                            else:
-                                username = user_name if user_name != "None" else "!UNDEFINED!"
-                            
-                            # Start monitoring with 1 second delay between tasks
-                            from datetime import datetime
-                            event_message = (
-                                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
-                                f"{user_id} ❌ \t\t\tbanned everywhere during initial checks on_startup"
-                            )
-                            
-                            # Start the check in watchdog system
-                            asyncio.create_task(
-                                self.perform_checks(
-                                    user_id=user_id,
-                                    user_name=username,
-                                    event_record=event_message,
-                                    inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event"
-                                )
-                            )
-                            
-                            self.logger.info(f"{user_id}:@{username} loaded from file & 24hr progressive monitoring started...")
-                            await asyncio.sleep(1)  # 1-second interval between task creations
-            
-            self.logger.info(f"Active users checks dict ({len(self.active_user_checks_dict)}) loaded from file")
-            
-        except Exception as e:
-            self.logger.error(f"Error loading active user checks: {e}")
+            self.logger.info(f"{user_id}:@{username} loaded from file & 24hr progressive monitoring started...")
+            await asyncio.sleep(1)  # 1-second interval between task creations
     
     async def load_and_start_checks(self) -> None:
         """Load all data files and start monitoring."""
@@ -1913,7 +1862,7 @@ class ModernTelegramBot:
                                 message_to_delete = [int(chat_id), int(message_id)]
                     
                     # Perform autoban check
-                    if await self.autoban(user_id, user_name, f"Progressive check {minutes}min - {event_record}"):
+                    if await self.autoban(user_id, user_name, f"Progressive check {minutes}min - {event_record}", suppress_logging=True):
                         self.logger.info(f"🔨 {user_id}:@{user_name} banned during {minutes}min progressive check")
                         return
                 
@@ -2132,17 +2081,8 @@ class ModernTelegramBot:
             # Create message key and link
             message_key = f"{message.chat.id}_{message.message_id}"
             
-            # Create message link
-            if message.chat.username:
-                message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
-            else:
-                # For private groups, use the format with removed -100 prefix
-                chat_id_str = str(message.chat.id)
-                if chat_id_str.startswith("-100"):
-                    chat_id_clean = chat_id_str[4:]  # Remove -100 prefix
-                    message_link = f"https://t.me/c/{chat_id_clean}/{message.message_id}"
-                else:
-                    message_link = f"tg://openmessage?chat_id={message.chat.id}&message_id={message.message_id}"
+            # Create message link using UIBuilder
+            message_link = self.ui_builder.create_message_link_from_message(message)
             
             # Store the message link in active_user_checks_dict
             self.active_user_checks_dict[user_id][message_key] = message_link
@@ -2287,43 +2227,21 @@ class ModernTelegramBot:
     
     def _is_forwarded_from_unknown_channel(self, message: Message) -> bool:
         """Check if message is forwarded from an unknown channel."""
-        if not message.forward_origin:
-            return False
-        
-        # Check if it's forwarded from a channel
-        if hasattr(message.forward_origin, 'chat') and message.forward_origin.chat:
-            channel_id = message.forward_origin.chat.id
-            # Check if channel is not in allowed forward channels
-            allowed_channels = getattr(self.settings, 'ALLOWED_FORWARD_CHANNELS', [])
-            return channel_id not in allowed_channels
-        
-        return False
+        return self.message_validator.is_forwarded_from_unknown_channel(message, self.settings)
     
     def _is_in_monitored_channel(self, message: Message) -> bool:
         """Check if message is in a monitored channel."""
-        if not message.chat:
-            return False
-        
-        monitored_channels = getattr(self.settings, 'CHANNEL_IDS', [])
-        return message.chat.id in monitored_channels
+        return self.message_validator.is_in_monitored_channel(message, self.settings)
     
     def _is_valid_message(self, message: Message) -> bool:
         """Check if message is valid for unhandled message processing."""
-        if not message.chat or not message.from_user:
-            return False
-        
-        # Exclude admin groups, technolog group, admin user, and managed channels
         excluded_ids = [
             self.admin_group_id,
             self.technolog_group_id, 
             self.ADMIN_USER_ID
         ] + getattr(self.settings, 'CHANNEL_IDS', [])
         
-        return (
-            message.chat.id not in excluded_ids and
-            not message.forward_origin and  # Not forwarded
-            not message.from_user.is_bot     # Not from bot
-        )
+        return self.message_validator.is_valid_message(message, excluded_ids)
     
     def _is_admin_user_message(self, message: Message) -> bool:
         """Check if message is from admin user and not forwarded."""

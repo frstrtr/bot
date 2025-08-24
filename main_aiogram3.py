@@ -2490,28 +2490,36 @@ class ModernTelegramBot:
                 except Exception as e:
                     self.logger.warning(f"Could not notify technolog group: {e}")
             
-            # Also notify technolog group with start topic
-            if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
-                try:
-                    techno_start_topic = getattr(self.settings, 'TECHNO_RESTART', None)  # Use restart topic for start message
-                    await self.bot.send_message(
-                        self.settings.TECHNOLOG_GROUP_ID,
-                        f"🤖 <b>Bot Started</b>\n\n"
-                        f"Name: {bot_info.first_name}\n"
-                        f"Username: @{bot_info.username}\n"
-                        f"Version: aiogram 3.x\n"
-                        f"Time: {bot_start_time}",
-                        parse_mode="HTML",
-                        message_thread_id=techno_start_topic
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Could not notify technolog group with start message: {e}")
             
             yield
             
         finally:
             # Shutdown
             self.logger.info("🛑 Bot shutting down...")
+            
+            # Get bot info for shutdown notification
+            try:
+                bot_info = await self.bot.get_me()
+                bot_shutdown_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Notify technolog group about shutdown
+                if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
+                    try:
+                        techno_start_topic = getattr(self.settings, 'TECHNO_RESTART', None)  # Use restart topic for shutdown message
+                        await self.bot.send_message(
+                            self.settings.TECHNOLOG_GROUP_ID,
+                            f"🔴 <b>Bot Shutdown</b>\n\n"
+                            f"Name: {bot_info.first_name}\n"
+                            f"Username: @{bot_info.username}\n"
+                            f"Version: aiogram 3.x\n"
+                            f"Time: {bot_shutdown_time}",
+                            parse_mode="HTML",
+                            message_thread_id=techno_start_topic
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Could not notify technolog group with shutdown message: {e}")
+            except Exception as e:
+                self.logger.warning(f"Could not send shutdown notification: {e}")
             
             # Save active user checks and banned users before shutdown
             await self.save_active_user_checks()

@@ -1523,13 +1523,13 @@ async def check_and_autoban(
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"<code>{user_id}</code> @{_norm_username} (1013)",
+                    f"<code>{user_id}</code> @{_norm_username} (1526)",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
             else:
-                LOGGER.debug("%s username undefined; skipping 1013 notification line", user_id)
+                LOGGER.debug("%s username undefined; skipping 1526 notification line", user_id)
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)

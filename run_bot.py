@@ -63,8 +63,8 @@ def check_config():
     """Check if configuration is valid."""
     print("🔍 Checking configuration...")
     try:
-        from config.settings_simple import Settings
-        config = Settings()
+        from config.settings import get_settings
+        config = get_settings()
         
         # Check required config values
         required_attrs = ['BOT_TOKEN', 'BOT_NAME', 'ADMIN_GROUP_ID', 'CHANNEL_NAMES']
@@ -85,7 +85,7 @@ def check_config():
         
     except (ImportError, FileNotFoundError, ValueError, AttributeError) as e:
         print(f"❌ Configuration error: {e}")
-        print("   Please check your .env file and config/settings_simple.py")
+        print("   Please check your .env file and config/settings.py")
         return False
 
 
@@ -163,7 +163,7 @@ def check_file_structure():
     
     required_files = [
         'main_aiogram3.py',
-        'config/settings_simple.py',
+        'config/settings.py',
         'requirements_modern.txt',
         '.env'  # Optional but recommended
     ]
@@ -212,15 +212,18 @@ def check_deployment_readiness():
     
     # Check environment
     try:
-        import os
-        if not os.getenv('BOT_TOKEN'):
-            issues.append("BOT_TOKEN not set in environment")
+        # Load from .env file like the bot does
+        from config.settings import get_settings
+        config = get_settings()
         
-        if not os.getenv('ADMIN_GROUP_ID'):
-            warnings.append("ADMIN_GROUP_ID not set in environment")
+        if not config.BOT_TOKEN:
+            issues.append("BOT_TOKEN not configured in .env file")
+        
+        if not config.ADMIN_GROUP_ID:
+            warnings.append("ADMIN_GROUP_ID not configured in .env file")
             
-    except Exception:
-        warnings.append("Could not check environment variables")
+    except Exception as e:
+        issues.append(f"Could not load configuration: {e}")
     
     # Check log directories
     log_dirs = ['logs', 'inout', 'daily_spam']
@@ -340,11 +343,11 @@ def main():
         print("  python run_bot.py --help          - Show this help")
         print("\n📁 Important files:")
         print("  main_aiogram3.py              - Modern aiogram 3.x bot")
-        print("  config/settings_simple.py     - Configuration")
+        print("  config/settings.py           - Unified configuration")
         print("  requirements_modern.txt       - Dependencies")
         print("  .env                          - Environment variables")
         print("\n🛠️  Development commands:")
-        print("  python config/settings_simple.py test    - Test config")
+        print("  python config/settings.py test    - Test config")
         print("  python main_aiogram3.py                  - Direct start")
         print("\n🎯 Implementation Status:")
         print("  ✅ External API spam checks (LoLs, CAS, P2P)")

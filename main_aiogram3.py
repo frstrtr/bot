@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # aiogram 3.x imports - with fallbacks for development
 try:
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram import Bot, Dispatcher, BaseMiddleware
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
@@ -55,6 +56,7 @@ try:
         Update,
         ErrorEvent
     )
+    from aiogram.enums import ChatMemberStatus
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
     AIOGRAM_3_AVAILABLE = True
@@ -77,6 +79,14 @@ except ImportError:
         DATABASE_URL: str = "messages.db"
         ADMIN_GROUP_ID: int = 0
         TECHNOLOG_GROUP_ID: int = 0
+        CHANNEL_DICT: dict = {}
+        CHANNEL_IDS: list = []
+        CHANNEL_NAMES: list = []
+        ADMIN_USER_IDS: list = []
+        ALLOWED_FORWARD_CHANNELS: list = []
+        LOCAL_SPAM_API_URL: str = ""
+        LOLS_API_URL: str = ""
+        CAS_API_URL: str = ""
     
     def get_settings():
         s = Settings()
@@ -99,7 +109,7 @@ except ImportError:
 
 try:
     from utils.database import DatabaseManager, initialize_database
-    from utils.utils import get_latest_commit_info
+    from utils.utils import get_latest_commit_info, extract_status_change, get_channel_id_by_name
     from utils.persistence import DataPersistence
     from utils.message_validator import MessageValidator
     from utils.profile_manager import ProfileManager
@@ -252,6 +262,8 @@ class ModernTelegramBot:
         self.admin_manager = AdminManager(
             admin_user_ids=getattr(self.settings, 'ADMIN_USER_IDS', [])
         ) if DATABASE_AVAILABLE else AdminManager()
+        self.ui_builder = UIBuilder() if DATABASE_AVAILABLE else UIBuilder()
+        self.profile_manager = ProfileManager() if DATABASE_AVAILABLE else ProfileManager()
         
         # Global dictionaries for tracking users (from aiogram 2.x compatibility)
         self.active_user_checks_dict = {}
@@ -314,10 +326,31 @@ class ModernTelegramBot:
         
         # Admin middleware
         admin_ids = getattr(self.settings, 'ADMIN_USER_IDS', [])
+        processed_ids = []
+        
         if isinstance(admin_ids, str):
-            admin_ids = [int(x.strip()) for x in admin_ids.split(',') if x.strip()]
+            # Handle comma-separated string
+            for x in admin_ids.split(','):
+                if x.strip():
+                    try:
+                        processed_ids.append(int(x.strip()))
+                    except ValueError:
+                        continue
         elif isinstance(admin_ids, int):
-            admin_ids = [admin_ids]
+            # Handle single integer
+            processed_ids = [admin_ids]
+        elif isinstance(admin_ids, list):
+            # Handle list - convert all elements to integers
+            for x in admin_ids:
+                try:
+                    if isinstance(x, str) and x.strip():
+                        processed_ids.append(int(x.strip()))
+                    elif isinstance(x, int):
+                        processed_ids.append(x)
+                except (ValueError, AttributeError):
+                    continue
+        
+        admin_ids = processed_ids
         
         if admin_ids:
             self.dp.message.middleware(AdminMiddleware(admin_ids))
@@ -393,6 +426,11 @@ class ModernTelegramBot:
         @self.dp.chat_member()
         async def chat_member_update(update: ChatMemberUpdated):
             await self._handle_chat_member_update(update)
+        
+        # Handle system messages for user join/leave events
+        @self.dp.message(lambda message: message.new_chat_members or message.left_chat_member)
+        async def handle_system_messages(message: Message):
+            await self._handle_system_messages(message)
         
         # Regular messages
         @self.dp.message()
@@ -605,28 +643,235 @@ class ModernTelegramBot:
             await message.answer("❌ An error occurred while getting statistics.")
     
     async def _handle_chat_member_update(self, update: ChatMemberUpdated):
-        """Handle chat member updates."""
+        """Handle chat member updates with full aiogram2 compatibility."""
         try:
-            if (update.new_chat_member.status == 'member' and 
-                update.old_chat_member.status in ['left', 'kicked']):
-                # User joined
-                user = update.new_chat_member.user
-                self.logger.info(f"User {user.id} ({user.full_name}) joined chat {update.chat.id}")
+            # Skip if this is the bot's own action to prevent loops
+            if update.from_user.id == (await self.bot.get_me()).id:
+                return
+            
+            # Who did the action (admin/user who changed status)
+            by_user = None
+            
+            # Check if user is already banned to prevent double actions
+            user_id = update.old_chat_member.user.id
+            if user_id in self.banned_users_dict:
+                self.logger.info(f"{user_id}:@{update.old_chat_member.user.username or '!UNDEFINED!'} already banned - skipping actions.")
+                return
+            
+            # Determine who made the change
+            if update.from_user.id != user_id:
+                # Someone else changed user status
+                by_username = update.from_user.username or "!UNDEFINED!"
+                by_userfirstname = update.from_user.first_name
+                by_userlastname = update.from_user.last_name or ""
+                by_user = f"by {by_userfirstname} {by_userlastname} @{by_username} (<code>{update.from_user.id}</code>)\n"
+            
+            # Get status information
+            old_status = update.old_chat_member.status
+            new_status = update.new_chat_member.status
+            
+            # Get user information
+            user_firstname = update.old_chat_member.user.first_name
+            user_lastname = update.old_chat_member.user.last_name or ""
+            username = update.old_chat_member.user.username or "!UNDEFINED!"
+            
+            # Perform spam check
+            is_spam = await self.spam_check(user_id)
+            
+            # Create detailed event record for logging
+            from datetime import datetime
+            event_record = (
+                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+                f"{user_id:<10} "
+                f"{'❌  ' if is_spam is True else '🟢 ' if is_spam is False else '❓ '}"
+                f"{username} {user_firstname} {user_lastname:<32} "
+                f"{old_status:<15} --> {new_status:<15} in "
+                f"{'@' + update.chat.username + ': ' if update.chat.username else '':<24}{update.chat.title:<30} by "
+                f"{update.from_user.id:<10} "
+                f"@{update.from_user.username or '!UNDEFINED!'} {update.from_user.first_name} {update.from_user.last_name or ''}\n"
+            )
+            
+            # Save event to inout file
+            await self.save_report_file("inout_", "gcm" + event_record)
+            
+            # Create detailed message for admin notification
+            escaped_firstname = html.escape(user_firstname)
+            escaped_lastname = html.escape(user_lastname)
+            
+            # Construct chat link
+            if update.chat.username:
+                universal_chatlink = f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
+            else:
+                chat_id_str = str(update.chat.id)
+                if chat_id_str.startswith("-100"):
+                    chat_link_id = chat_id_str[4:]
+                else:
+                    chat_link_id = str(update.chat.id)
+                universal_chatlink = f'<a href="https://t.me/c/{chat_link_id}">{update.chat.title}</a>'
+            
+            # Get timestamp
+            greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            
+            # Construct admin notification message
+            inout_logmessage = (
+                f"{escaped_firstname} {escaped_lastname} "
+                f"@{username} (<code>{user_id}</code>)\n"
+                f"{'❌ -->' if is_spam is True else '🟢 -->' if is_spam is False else '❓ '}"
+                f" {new_status}\n"
+                f"{by_user if by_user else ''}"
+                f"💬 {universal_chatlink}\n"
+                f"🕔 {greet_timestamp}\n"
+                f"🔗 <b>profile links:</b>\n"
+                f"   ├ <b><a href='tg://user?id={user_id}'>id based profile link</a></b>\n"
+                f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
+            )
+            
+            # Create inline keyboard
+            kb = InlineKeyboardBuilder()
+            
+            # Add LOLS button
+            lols_url = self.build_lols_url(user_id)
+            kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
+            
+            # Add ban button if user is not already identified as spam
+            if is_spam is not True:
+                kb.row(InlineKeyboardButton(text="🚫 Ban User", callback_data=f"banuser_{user_id}"))
+            
+            # Send notification to technolog group
+            if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
+                try:
+                    await self.bot.send_message(
+                        chat_id=self.settings.TECHNOLOG_GROUP_ID,
+                        text=inout_logmessage,
+                        parse_mode=ParseMode.HTML,
+                        message_thread_id=getattr(self.settings, 'TECHNO_INOUT', None),
+                        disable_web_page_preview=True,
+                        reply_markup=kb.as_markup()
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to send chat member update to technolog group: {e}")
+            
+            # Console logging with colors
+            status_colors = {
+                ChatMemberStatus.KICKED: "\033[91m",  # Red
+                ChatMemberStatus.RESTRICTED: "\033[93m",  # Yellow
+            }
+            color = status_colors.get(new_status, "")
+            reset_color = "\033[0m" if color else ""
+            
+            self.logger.info(
+                f"{color}{user_id}:@{username} --> {new_status} in {update.chat.title}{reset_color}"
+            )
+            
+            # Handle spam users immediately
+            if is_spam is True:
+                await self.autoban(user_id, username, f"Chat member spam detection - {event_record}")
+                return
+            
+            # Extract status change for further processing
+            result = extract_status_change(update)
+            if result is None:
+                return
+            
+            was_member, is_member = result
+            
+            # Handle kicked/restricted users with progressive monitoring
+            if new_status in (ChatMemberStatus.KICKED, ChatMemberStatus.RESTRICTED):
+                # Start progressive monitoring with watchdog
+                await self.create_named_watchdog(
+                    self.perform_checks(
+                        user_id=user_id,
+                        user_name=username,
+                        event_record=event_record,
+                        inout_logmessage=inout_logmessage
+                    ),
+                    user_id=user_id,
+                    user_name=username
+                )
+            
+            # Handle member status changes (join, leave, etc.)
+            elif new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.LEFT):
+                self.logger.debug(f"\033[96m{user_id}:@{username} Scheduling perform_checks coroutine\033[0m")
                 
-                # Check for auto-ban conditions
-                if self.ban_service:
-                    result = await self.ban_service.check_auto_ban_conditions(
-                        bot=self.bot,
-                        user_id=user.id,
-                        chat_id=update.chat.id
+                # Check if user is not already being monitored
+                if user_id not in self.active_user_checks_dict:
+                    # Capture baseline data on join for future comparison
+                    if is_member:  # User joined
+                        try:
+                            photos = await self.bot.get_user_profile_photos(user_id, limit=1)
+                            photo_count = getattr(photos, "total_count", 0) if photos else 0
+                        except Exception as e:
+                            photo_count = 0
+                            self.logger.debug(f"{user_id}:@{username} unable to fetch initial photo count: {e}")
+                        
+                        # Store baseline data for profile change detection
+                        self.active_user_checks_dict[user_id] = {
+                            "username": username,
+                            "baseline": {
+                                "first_name": user_firstname or "",
+                                "last_name": user_lastname or "",
+                                "username": username or "",
+                                "photo_count": photo_count,
+                                "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "chat": {
+                                    "id": update.chat.id,
+                                    "username": getattr(update.chat, "username", None),
+                                    "title": getattr(update.chat, "title", "") or "",
+                                },
+                            },
+                        }
+                    
+                    # Start progressive monitoring
+                    asyncio.create_task(
+                        self.perform_checks(
+                            event_record=event_record,
+                            user_id=user_id,
+                            inout_logmessage=inout_logmessage,
+                            user_name=username
+                        )
                     )
                     
-                    if result and result.success:
-                        self.logger.info(f"Auto-banned user {user.id} upon joining")
-                        self.stats['users_banned'] += 1
+                    self.logger.info(f"🔍 Started progressive monitoring for {user_id}:@{username}")
             
         except Exception as e:
             self.logger.error(f"Error handling chat member update: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+    
+    async def _handle_system_messages(self, message: Message):
+        """Handle system messages for user join/leave events and automatically delete them."""
+        try:
+            # Log the system message event
+            user_info = "Unknown"
+            if message.new_chat_members:
+                # User(s) joined
+                users = ", ".join([f"{user.first_name or ''} {user.last_name or ''}".strip() or f"@{user.username}" or str(user.id) 
+                                 for user in message.new_chat_members])
+                user_info = f"joined: {users}"
+            elif message.left_chat_member:
+                # User left
+                user = message.left_chat_member
+                user_info = f"left: {user.first_name or ''} {user.last_name or ''}".strip() or f"@{user.username}" or str(user.id)
+            
+            self.logger.info(
+                f"{message.from_user.id}:@{message.from_user.username or '!UNDEFINED!'} "
+                f"system message in {message.chat.title}: {user_info}, deleting system message..."
+            )
+            
+            # Delete the system message
+            try:
+                await message.delete()
+                self.logger.debug(f"Successfully deleted system message {message.message_id} in chat {message.chat.id}")
+            except Exception as delete_error:
+                self.logger.error(f"Failed to delete system message {message.message_id}: {delete_error}")
+                # Optionally send a reply if deletion fails
+                try:
+                    await message.reply("Sorry, I can't delete this system message.")
+                except Exception as reply_error:
+                    self.logger.error(f"Failed to send reply about deletion failure: {reply_error}")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling system message: {e}")
     
     async def _handle_message(self, message: Message):
         """Handle regular messages."""
@@ -890,9 +1135,11 @@ class ModernTelegramBot:
             # Use ban service to ban the user
             if self.ban_service:
                 ban_result = await self.ban_service.ban_user(
+                    bot=self.bot,
                     user_id=user_id,
-                    reason="Manual ban by admin",
-                    admin_id=callback_query.from_user.id
+                    chat_id=callback_query.message.chat.id,
+                    banned_by=callback_query.from_user.id,
+                    reason="Manual ban by admin"
                 )
                 
                 if ban_result.success:
@@ -990,7 +1237,16 @@ class ModernTelegramBot:
                 return
                 
             # Get user and chat info
-            susp_chat_title = self.settings.CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
+            if hasattr(self.settings, 'CHANNEL_DICT') and self.settings.CHANNEL_DICT:
+                susp_chat_title = self.settings.CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
+            else:
+                # Fallback: try to get chat info directly
+                try:
+                    chat_info = await self.bot.get_chat(susp_chat_id)
+                    susp_chat_title = chat_info.title or f"Chat_{susp_chat_id}"
+                except Exception:
+                    susp_chat_title = f"!UNKNOWN_CHAT_{susp_chat_id}!"
+                    
             admin_id = callback_query.from_user.id
             admin_username = callback_query.from_user.username or "!NoName!"
             
@@ -1002,10 +1258,21 @@ class ModernTelegramBot:
                 susp_user_name = str(user_info)
                 
             # Create message and spam check links
-            message_link = self.ui_builder.create_message_link(susp_chat_id, susp_message_id)
-            lols_link = self.build_lols_url(susp_user_id)
-            
-            # Create inline keyboard with links
+            if hasattr(self, 'ui_builder') and self.ui_builder:
+                message_link = self.ui_builder.create_message_link(susp_chat_id, susp_message_id)
+            else:
+                # Fallback message link creation
+                if susp_chat_id < 0:
+                    chat_id_str = str(susp_chat_id)
+                    if chat_id_str.startswith("-100"):
+                        chat_link_id = chat_id_str[4:]
+                        message_link = f"https://t.me/c/{chat_link_id}/{susp_message_id}"
+                    else:
+                        message_link = f"https://t.me/c/{abs(susp_chat_id)}/{susp_message_id}"
+                else:
+                    message_link = f"https://t.me/{susp_chat_id}/{susp_message_id}"
+                    
+            lols_link = self.build_lols_url(susp_user_id)            # Create inline keyboard with links
             kb = InlineKeyboardBuilder()
             kb.row(InlineKeyboardButton(text="🔗 View Original Message 🔗", url=message_link))
             kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
@@ -1402,6 +1669,21 @@ class ModernTelegramBot:
         except Exception as e:
             self.logger.error(f"Unexpected error reporting spammer {spammer_id}: {e}")
             return False
+    
+    def get_channel_id_by_name(self, channel_name: str) -> Optional[int]:
+        """Get channel ID by channel name from settings."""
+        try:
+            if hasattr(self.settings, 'CHANNEL_DICT') and self.settings.CHANNEL_DICT:
+                return get_channel_id_by_name(self.settings.CHANNEL_DICT, channel_name)
+            else:
+                self.logger.warning(f"CHANNEL_DICT not available in settings")
+                return None
+        except ValueError as e:
+            self.logger.error(f"Channel name '{channel_name}' not found: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting channel ID for '{channel_name}': {e}")
+            return None
     
     def build_lols_url(self, user_id: int) -> str:
         """Return LOLS bot deep link for a given user id."""
@@ -2227,11 +2509,11 @@ class ModernTelegramBot:
     
     def _is_forwarded_from_unknown_channel(self, message: Message) -> bool:
         """Check if message is forwarded from an unknown channel."""
-        return self.message_validator.is_forwarded_from_unknown_channel(message, self.settings)
+        return self.message_validator.is_forwarded_from_unknown_channel(message)
     
     def _is_in_monitored_channel(self, message: Message) -> bool:
         """Check if message is in a monitored channel."""
-        return self.message_validator.is_in_monitored_channel(message, self.settings)
+        return self.message_validator.is_in_monitored_channel(message)
     
     def _is_valid_message(self, message: Message) -> bool:
         """Check if message is valid for unhandled message processing."""
@@ -2241,7 +2523,7 @@ class ModernTelegramBot:
             self.ADMIN_USER_ID
         ] + getattr(self.settings, 'CHANNEL_IDS', [])
         
-        return self.message_validator.is_valid_message(message, excluded_ids)
+        return self.message_validator.is_valid_message(message)
     
     def _is_admin_user_message(self, message: Message) -> bool:
         """Check if message is from admin user and not forwarded."""
@@ -2283,13 +2565,14 @@ class ModernTelegramBot:
         """Handle messages in monitored channels."""
         try:
             # Store message if database is available
-            if self.database_manager:
-                await self.database_manager.store_message(
+            if self.db_manager:
+                await self.db_manager.store_message(
                     message_id=message.message_id,
                     chat_id=message.chat.id,
                     user_id=message.from_user.id if message.from_user else 0,
+                    date=message.date,
                     text=message.text or message.caption or "",
-                    timestamp=message.date
+                    entities=str(message.entities) if message.entities else None
                 )
             
             # Check for spam if user is provided

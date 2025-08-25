@@ -43,6 +43,9 @@ class Settings:
         admin_ids_str = env_vars.get('ADMIN_USER_IDS', os.getenv('ADMIN_USER_IDS', ''))
         self.ADMIN_USER_IDS = self._parse_int_list(admin_ids_str)
         
+        # Single admin ID (for backwards compatibility)
+        self.ADMIN_ID = int(env_vars.get('ADMIN_ID', os.getenv('ADMIN_ID', '0')))
+        
         # Monitored channels (comma-separated list of channel IDs)
         channel_ids_str = env_vars.get('CHANNEL_IDS', os.getenv('CHANNEL_IDS', ''))
         self.CHANNEL_IDS = self._parse_int_list(channel_ids_str)
@@ -88,6 +91,13 @@ class Settings:
         self.API_TIMEOUT = int(env_vars.get('API_TIMEOUT', os.getenv('API_TIMEOUT', '10')))
         self.RATE_LIMIT_CALLS = int(env_vars.get('RATE_LIMIT_CALLS', os.getenv('RATE_LIMIT_CALLS', '30')))
         self.RATE_LIMIT_PERIOD = int(env_vars.get('RATE_LIMIT_PERIOD', os.getenv('RATE_LIMIT_PERIOD', '60')))
+    
+    @property
+    def CHANNEL_DICT(self) -> Dict[int, str]:
+        """Create a mapping of channel IDs to names."""
+        if len(self.CHANNEL_IDS) == len(self.CHANNEL_NAMES):
+            return dict(zip(self.CHANNEL_IDS, self.CHANNEL_NAMES))
+        return {}
     
     def _parse_int_list(self, value: str) -> List[int]:
         """Parse comma-separated string into list of integers."""

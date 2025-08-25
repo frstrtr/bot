@@ -67,7 +67,7 @@ except ImportError as e:
 
 # Project imports with graceful fallbacks
 try:
-    from config.settings_simple import get_settings, Settings
+    from config.settings import get_settings, Settings
     CONFIG_AVAILABLE = True
 except ImportError:
     print("⚠️  config.settings_simple not available, using minimal config")

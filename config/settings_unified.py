@@ -16,12 +16,8 @@ class Settings:
     def __init__(self):
         """Initialize settings from environment and .env file."""
         
-        # Load .env file if it exists (look in parent directory if not in current)
+        # Load .env file if it exists
         env_file = Path(".env")
-        if not env_file.exists():
-            # Look in parent directory (for when imported from config/ subdirectory)
-            env_file = Path("../.env")
-        
         env_vars = {}
         
         if env_file.exists():
@@ -154,23 +150,17 @@ class Settings:
     
     def validate_required_fields(self) -> None:
         """Validate that all required fields are set."""
-        missing_fields = []
+        required_fields = {
+            'BOT_TOKEN': self.BOT_TOKEN,
+            'BOT_USER_ID': self.BOT_USER_ID,
+            'ADMIN_GROUP_ID': self.ADMIN_GROUP_ID,
+            'TECHNOLOG_GROUP_ID': self.TECHNOLOG_GROUP_ID,
+        }
         
-        # Check BOT_TOKEN (must be non-empty string)
-        if not self.BOT_TOKEN or not self.BOT_TOKEN.strip():
-            missing_fields.append('BOT_TOKEN')
-        
-        # Check BOT_USER_ID (must be positive integer)
-        if not self.BOT_USER_ID or self.BOT_USER_ID <= 0:
-            missing_fields.append('BOT_USER_ID')
-        
-        # Check ADMIN_GROUP_ID (must be non-zero, can be negative for Telegram groups)
-        if not self.ADMIN_GROUP_ID or self.ADMIN_GROUP_ID == 0:
-            missing_fields.append('ADMIN_GROUP_ID')
-        
-        # Check TECHNOLOG_GROUP_ID (must be non-zero, can be negative for Telegram groups)
-        if not self.TECHNOLOG_GROUP_ID or self.TECHNOLOG_GROUP_ID == 0:
-            missing_fields.append('TECHNOLOG_GROUP_ID')
+        missing_fields = [
+            field for field, value in required_fields.items() 
+            if not value or (isinstance(value, int) and value == 0)
+        ]
         
         if missing_fields:
             raise ValueError(f"Missing required configuration: {', '.join(missing_fields)}")

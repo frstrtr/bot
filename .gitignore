@@ -47,3 +47,4 @@ backup_*/
 # temporary files
 aiogram3_banned_users.txt
 aiogram3_active_user_checks.txt
+aiogram3_banned_users.txt

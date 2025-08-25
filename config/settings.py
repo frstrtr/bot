@@ -4,21 +4,31 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 try:
     from pydantic import BaseModel, Field, field_validator
-    from pydantic_settings import BaseSettings
+    try:
+        from pydantic_settings import BaseSettings, SettingsSourceCallable, SettingsConfigDict
+    except ImportError:
+        # Fallback for older pydantic versions where BaseSettings is in pydantic
+        from pydantic import BaseSettings
+        from typing import Callable, Any
+        SettingsSourceCallable = Callable[[], dict[str, Any]]
+        # Define a fallback SettingsConfigDict
+        SettingsConfigDict = dict
     PYDANTIC_AVAILABLE = True
-    # For compatibility with older code, alias field_validator as validator
-    validator = field_validator
 except ImportError:
     try:
-        # Fallback for older pydantic
+        # Fallback for older pydantic versions where BaseSettings is in pydantic
         from pydantic import BaseSettings, Field, validator, field_validator
+        # Define SettingsSourceCallable fallback
+        from typing import Callable, Any
+        SettingsSourceCallable = Callable[[], dict[str, Any]]
+        SettingsConfigDict = dict
         PYDANTIC_AVAILABLE = True
     except ImportError:
-        # Ultimate fallback
+        # Ultimate fallback when pydantic is not available
         PYDANTIC_AVAILABLE = False
         class BaseSettings:
             def __init__(self, **kwargs):
@@ -33,7 +43,9 @@ except ImportError:
                 return func
             return decorator
         
-        validator = field_validator
+        # Fallback type for SettingsSourceCallable
+        from typing import Callable, Any
+        SettingsSourceCallable = Callable[[], dict[str, Any]]
 
 
 class Settings(BaseSettings):
@@ -42,6 +54,7 @@ class Settings(BaseSettings):
     # Bot settings
     BOT_TOKEN: str = Field(..., env="BOT_TOKEN")
     BOT_NAME: str = Field("SpamDetectorBot", env="BOT_NAME")
+    BOT_USER_ID: str = Field(..., env="BOT_USER_ID")
     
     # Database
     DATABASE_URL: str = Field("sqlite:///bot.db", env="DATABASE_URL")
@@ -64,21 +77,19 @@ class Settings(BaseSettings):
     TECHNO_ORIGINALS: int = Field(..., env="TECHNO_ORIGINALS")
     TECHNO_UNHANDLED: int = Field(..., env="TECHNO_UNHANDLED")
     
-    # Monitored channels
-    CHANNEL_IDS: List[int] = Field(default_factory=list, env="CHANNEL_IDS")
-    CHANNEL_NAMES: List[str] = Field(default_factory=list, env="CHANNEL_NAMES")
+    # Monitored channels  
+    CHANNEL_IDS: str = Field(default="", env="CHANNEL_IDS")
+    CHANNEL_NAMES: str = Field(default="", env="CHANNEL_NAMES")
     
     # Spam detection
-    SPAM_TRIGGERS: List[str] = Field(
+    SPAM_TRIGGERS: Union[str, List[str]] = Field(
         default_factory=lambda: ["url", "text_link", "email", "phone_number"],
         env="SPAM_TRIGGERS"
     )
     
     # Allowed forward channels
-    ALLOWED_FORWARD_CHANNELS: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        env="ALLOWED_FORWARD_CHANNELS"
-    )
+    ALLOWED_FORWARD_CHANNELS: Union[str, List[int]] = Field(default_factory=list, env="ALLOWED_FORWARD_CHANNELS")
+    ALLOWED_FORWARD_CHANNEL_NAMES: Union[str, List[str]] = Field(default_factory=list, env="ALLOWED_FORWARD_CHANNEL_NAMES")
     
     # External APIs
     LOCAL_SPAM_API_URL: str = Field("http://127.0.0.1:8081", env="LOCAL_SPAM_API_URL")
@@ -97,7 +108,7 @@ class Settings(BaseSettings):
     WEBHOOK_SECRET: str | None = Field(None, env="WEBHOOK_SECRET")
     
     # Monitoring intervals (in seconds)
-    SPAM_CHECK_INTERVALS: List[int] = Field(
+    SPAM_CHECK_INTERVALS: Union[str, List[int]] = Field(
         default_factory=lambda: [65, 185, 305, 605, 1205, 1805, 3605, 7205, 10805],
         env="SPAM_CHECK_INTERVALS"
     )
@@ -107,67 +118,131 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
     
     # Admin user IDs
-    ADMIN_USER_IDS: List[int] = Field(default_factory=list, env="ADMIN_USER_IDS")
+    ADMIN_USER_IDS: Union[str, List[int]] = Field(default_factory=list, env="ADMIN_USER_IDS")
     
-    @validator("CHANNEL_IDS", pre=True)
+    # Channel dictionary for ID->name mapping (computed property)
+    @property
+    def CHANNEL_DICT(self) -> Dict[int, str]:
+        """Create a mapping of channel IDs to names."""
+        channel_ids = self.CHANNEL_IDS or []
+        channel_names = self.CHANNEL_NAMES or []
+        if len(channel_ids) == len(channel_names):
+            return dict(zip(channel_ids, channel_names))
+        return {}
+    
+    @field_validator("CHANNEL_IDS", mode="before")
+    @classmethod
     def parse_channel_ids(cls, v):
         """Parse channel IDs from string or keep as list."""
-        if isinstance(v, str):
-            return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
-    
-    @validator("CHANNEL_NAMES", pre=True) 
+        if isinstance(v, str) and v.strip():
+            result = [int(x.strip()) for x in v.split(",") if x.strip()]
+            return result
+        return v if v is not None else []
+
+    @field_validator("CHANNEL_NAMES", mode="before")
+    @classmethod
     def parse_channel_names(cls, v):
         """Parse channel names from string or keep as list."""
-        if isinstance(v, str):
+        if isinstance(v, str) and v.strip():
             return [x.strip() for x in v.split(",") if x.strip()]
-        return v
+        return v if v is not None else []
     
-    @validator("SPAM_TRIGGERS", pre=True)
+    @field_validator("SPAM_TRIGGERS", mode="before")
+    @classmethod
     def parse_spam_triggers(cls, v):
         """Parse spam triggers from string or keep as list."""
-        if isinstance(v, str):
+        if isinstance(v, str) and v.strip():
             return [x.strip() for x in v.split(",") if x.strip()]
-        return v
+        return v if v is not None else ["url", "text_link", "email", "phone_number"]
     
-    @validator("SPAM_CHECK_INTERVALS", pre=True)
+    @field_validator("SPAM_CHECK_INTERVALS", mode="before")
+    @classmethod
     def parse_spam_intervals(cls, v):
         """Parse spam check intervals from string or keep as list."""
-        if isinstance(v, str):
+        if isinstance(v, str) and v.strip():
             return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
+        return v if v is not None else [65, 185, 305, 605, 1205, 1805, 3605, 7205, 10805]
     
-    @validator("ADMIN_USER_IDS", pre=True)
+    @field_validator("ADMIN_USER_IDS", mode="before")
+    @classmethod
     def parse_admin_user_ids(cls, v):
         """Parse admin user IDs from string or keep as list.""" 
-        if isinstance(v, str):
+        if isinstance(v, str) and v.strip():
             return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-        
-        @classmethod
-        def customise_sources(
-            cls,
-            init_settings: SettingsSourceCallable,
-            env_settings: SettingsSourceCallable,
-            file_secret_settings: SettingsSourceCallable,
-        ) -> tuple[SettingsSourceCallable, ...]:
-            """Customize settings sources priority."""
-            return (
-                init_settings,
-                env_settings,
-                file_secret_settings,
-            )
+        return v if v is not None else []
 
+    @field_validator("ALLOWED_FORWARD_CHANNELS", mode="before")
+    @classmethod
+    def parse_allowed_forward_channels(cls, v):
+        """Parse allowed forward channels from string or keep as list."""
+        if isinstance(v, str) and v.strip():
+            return [int(x.strip()) for x in v.split(",") if x.strip()]
+        return v if v is not None else []
 
+    @field_validator("ALLOWED_FORWARD_CHANNEL_NAMES", mode="before")
+    @classmethod
+    def parse_allowed_forward_channel_names(cls, v):
+        """Parse allowed forward channel names from string or keep as list."""
+        if isinstance(v, str) and v.strip():
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return v if v is not None else []
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8", 
+        "case_sensitive": False,  # Allow case insensitive env var matching
+        "extra": "allow",  # Allow extra fields to avoid validation errors
+    }
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    # Load environment variables manually to ensure they're processed
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    # Create settings instance
+    settings = Settings()
+    
+    # Manually apply environment variable parsing for fields that need it
+    # This ensures the field validators are bypassed and we get the correct values
+    
+    # Parse CHANNEL_IDS
+    channel_ids_str = os.getenv('CHANNEL_IDS', '')
+    if channel_ids_str.strip():
+        settings.CHANNEL_IDS = [int(x.strip()) for x in channel_ids_str.split(',') if x.strip()]
+    
+    # Parse CHANNEL_NAMES  
+    channel_names_str = os.getenv('CHANNEL_NAMES', '')
+    if channel_names_str.strip():
+        settings.CHANNEL_NAMES = [x.strip() for x in channel_names_str.split(',') if x.strip()]
+    
+    # Parse ALLOWED_FORWARD_CHANNELS
+    allowed_channels_str = os.getenv('ALLOWED_FORWARD_CHANNELS', '')
+    if allowed_channels_str.strip():
+        settings.ALLOWED_FORWARD_CHANNELS = [int(x.strip()) for x in allowed_channels_str.split(',') if x.strip()]
+    
+    # Parse ALLOWED_FORWARD_CHANNEL_NAMES
+    allowed_names_str = os.getenv('ALLOWED_FORWARD_CHANNEL_NAMES', '')
+    if allowed_names_str.strip():
+        settings.ALLOWED_FORWARD_CHANNEL_NAMES = [x.strip() for x in allowed_names_str.split(',') if x.strip()]
+    
+    # Parse ADMIN_USER_IDS
+    admin_ids_str = os.getenv('ADMIN_USER_IDS', '')
+    if admin_ids_str.strip():
+        settings.ADMIN_USER_IDS = [int(x.strip()) for x in admin_ids_str.split(',') if x.strip()]
+    
+    # Parse SPAM_TRIGGERS
+    spam_triggers_str = os.getenv('SPAM_TRIGGERS', '')
+    if spam_triggers_str.strip():
+        settings.SPAM_TRIGGERS = [x.strip() for x in spam_triggers_str.split(',') if x.strip()]
+    
+    # Parse SPAM_CHECK_INTERVALS
+    intervals_str = os.getenv('SPAM_CHECK_INTERVALS', '')
+    if intervals_str.strip():
+        settings.SPAM_CHECK_INTERVALS = [int(x.strip()) for x in intervals_str.split(',') if x.strip()]
+    
+    return settings
 
 
 # Legacy compatibility layer for existing code

@@ -646,8 +646,22 @@ class ModernTelegramBot:
         """Handle chat member updates with full aiogram2 compatibility."""
         try:
             # Skip if this is the bot's own action to prevent loops
-            if update.from_user.id == (await self.bot.get_me()).id:
+            # Use bot user ID from settings instead of API call
+            bot_user_id = getattr(self.settings, 'BOT_USER_ID', None)
+            if not bot_user_id:
+                # Extract from token as fallback
+                try:
+                    bot_user_id = int(self.settings.BOT_TOKEN.split(':')[0])
+                except:
+                    bot_user_id = None
+            
+            if bot_user_id and update.from_user.id == bot_user_id:
+                self.logger.debug(f"Skipping bot's own action: {update.from_user.id}")
                 return
+            
+            # Check for other known bots (like Telegram Channel Bot)
+            telegram_channel_bot_id = 136817688  # Telegram @Channel_bot ID
+            is_other_bot = update.from_user.is_bot and update.from_user.id != bot_user_id
             
             # Who did the action (admin/user who changed status)
             by_user = None
@@ -737,7 +751,7 @@ class ModernTelegramBot:
             if is_spam is not True:
                 kb.row(InlineKeyboardButton(text="🚫 Ban User", callback_data=f"banuser_{user_id}"))
             
-            # Send notification to technolog group
+            # Send notification to technolog group (for all events)
             if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
                 try:
                     await self.bot.send_message(
@@ -750,6 +764,36 @@ class ModernTelegramBot:
                     )
                 except Exception as e:
                     self.logger.error(f"Failed to send chat member update to technolog group: {e}")
+            
+            # IMPORTANT: Send admin/bot actions to ADMIN GROUP when someone else did the action
+            if by_user and (new_status in [ChatMemberStatus.KICKED, ChatMemberStatus.RESTRICTED]):
+                # This is an admin or bot action that kicked/restricted someone - send to admin group
+                if is_other_bot:
+                    admin_message = inout_logmessage.replace(
+                        "kicked", "<b>KICKED BY BOT</b>", 1
+                    ).replace(
+                        "restricted", "<b>RESTRICTED BY BOT</b>", 1
+                    )
+                else:
+                    admin_message = inout_logmessage.replace(
+                        "kicked", "<b>KICKED BY ADMIN</b>", 1
+                    ).replace(
+                        "restricted", "<b>RESTRICTED BY ADMIN</b>", 1
+                    )
+                
+                if hasattr(self.settings, 'ADMIN_GROUP_ID') and self.settings.ADMIN_GROUP_ID:
+                    try:
+                        await self.bot.send_message(
+                            chat_id=self.settings.ADMIN_GROUP_ID,
+                            text=admin_message,
+                            parse_mode=ParseMode.HTML,
+                            message_thread_id=getattr(self.settings, 'ADMIN_MANBAN', None),
+                            disable_web_page_preview=True,
+                            reply_markup=kb.as_markup()
+                        )
+                        self.logger.info(f"✅ Admin/Bot action notification sent for {user_id}:@{username} - {new_status}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to send admin action notification to admin group: {e}")
             
             # Console logging with colors
             status_colors = {

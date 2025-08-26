@@ -750,6 +750,10 @@ class ModernTelegramBot:
             # Add ban button if user is not already identified as spam
             if is_spam is not True:
                 kb.row(InlineKeyboardButton(text="🚫 Ban User", callback_data=f"banuser_{user_id}"))
+                
+                # Add "Mark as Legitimate" button for users under monitoring
+                if user_id in self.active_user_checks_dict:
+                    kb.row(InlineKeyboardButton(text="✅ Mark as Legitimate", callback_data=f"stopchecks_{user_id}_{update.chat.id}_0"))
             
             # Send notification to technolog group (for all events)
             if hasattr(self.settings, 'TECHNOLOG_GROUP_ID') and self.settings.TECHNOLOG_GROUP_ID:
@@ -1171,20 +1175,24 @@ class ModernTelegramBot:
             await callback_query.answer("Error processing ban request")
     
     async def _handle_confirmban_callback(self, callback_query: CallbackQuery):
-        """Handle confirmbanuser_* callbacks - execute the ban."""
+        """Handle confirmbanuser_* callbacks - execute the ban using centralized ban service."""
         try:
             parts = callback_query.data.split("_")
             user_id = int(parts[1])
             
-            # Use actual ban method to ban the user from all monitored chats
-            ban_success = await self.ban_user_from_all_chats(
+            # Use centralized ban service to ban the user from all monitored chats
+            ban_results = await self.ban_service.ban_user_from_all_chats(
+                bot=self.bot,
                 user_id=user_id,
+                banned_by=callback_query.from_user.id,
+                reason=f"Manual ban by admin @{callback_query.from_user.username or callback_query.from_user.id}",
                 user_name="!UNDEFINED!",  # We don't have username in callback data
-                reason=f"Manual ban by admin @{callback_query.from_user.username or callback_query.from_user.id}"
+                delete_messages=True,
+                notify_admins=True
             )
             
-            if ban_success:
-                # Update banned users dict
+            if ban_results['success']:
+                # Update banned users dict for local tracking
                 self.banned_users_dict[user_id] = f"BANNED_BY_ADMIN_{callback_query.from_user.id}"
                 
                 # Save banned users to file
@@ -1196,11 +1204,27 @@ class ModernTelegramBot:
                 ])
                 
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-                await callback_query.answer("✅ User banned successfully!")
                 
-                self.logger.info(f"User {user_id} banned by admin {callback_query.from_user.id}")
+                # Success message with statistics
+                success_msg = (
+                    f"✅ User banned successfully!\n"
+                    f"📊 {ban_results['successful_bans']}/{ban_results['total_chats']} chats"
+                )
+                if ban_results['failed_bans'] > 0:
+                    success_msg += f"\n⚠️ {ban_results['failed_bans']} failed"
+                
+                await callback_query.answer(success_msg)
+                
+                self.logger.info(f"User {user_id} banned by admin {callback_query.from_user.id} via ban service")
             else:
-                await callback_query.answer("❌ Ban failed - check bot permissions or user not found")
+                # Show failure with details
+                error_msg = "❌ Ban failed"
+                if ban_results['errors']:
+                    error_msg += f": {ban_results['errors'][0]}"  # Show first error
+                if len(ban_results['errors']) > 1:
+                    error_msg += f" (+{len(ban_results['errors'])-1} more)"
+                    
+                await callback_query.answer(error_msg)
                 
         except Exception as e:
             self.logger.error(f"Error in confirmban callback: {e}")
@@ -1218,29 +1242,98 @@ class ModernTelegramBot:
             await callback_query.answer("Error cancelling ban")
     
     async def _handle_stopchecks_callback(self, callback_query: CallbackQuery):
-        """Handle stopchecks_* callbacks - stop user monitoring."""
+        """Handle stopchecks_* callbacks - stop user monitoring and mark as legitimate."""
         try:
             parts = callback_query.data.split("_")
             user_id = int(parts[1])
+            orig_chat_id = int(parts[2]) if len(parts) > 2 else None
+            orig_message_id = int(parts[3]) if len(parts) > 3 else None
             
-            # Remove user from active checks
+            # Get admin info
+            admin_username = callback_query.from_user.username or "!NoAdminName!"
+            admin_id = callback_query.from_user.id
+            
+            # Get user info
+            user_data = self.active_user_checks_dict.get(user_id)
+            if isinstance(user_data, dict):
+                user_name = str(user_data.get("username", "!UNDEFINED!")).lstrip("@")
+            elif isinstance(user_data, str):
+                user_name = user_data.lstrip("@") if user_data != "None" else "!UNDEFINED!"
+            else:
+                user_name = "!UNDEFINED!"
+            
             if user_id in self.active_user_checks_dict:
-                user_data = self.active_user_checks_dict[user_id]
+                # Remove user from active checks
                 del self.active_user_checks_dict[user_id]
                 
-                display_name = user_data.get("username", "!UNDEFINED!") if isinstance(user_data, dict) else (user_data or "!UNDEFINED!")
+                # Cancel watchdog if running
+                cancelled = await self.cancel_named_watchdog(user_id, user_name, move_to_banned=False)
                 
-                # Remove keyboard
-                await callback_query.message.edit_reply_markup(reply_markup=None)
-                await callback_query.answer(f"✅ Stopped monitoring {display_name}")
+                # Save active checks
+                await self.save_active_user_checks()
                 
-                self.logger.info(f"Stopped monitoring user {user_id} by admin {callback_query.from_user.id}")
+                # Create links for the updated message
+                lols_link = self.build_lols_url(user_id)
+                message_link = ""
+                if orig_chat_id and orig_message_id:
+                    message_link = self.ui_builder.create_message_link(orig_chat_id, orig_message_id)
+                
+                # Update the message with new keyboard showing links only
+                kb = InlineKeyboardBuilder()
+                if message_link:
+                    kb.row(InlineKeyboardButton(text="🔗 View Original Message", url=message_link))
+                kb.row(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+                
+                # Update message markup
+                try:
+                    await callback_query.message.edit_reply_markup(reply_markup=kb.as_markup())
+                except Exception as e:
+                    self.logger.error(f"Error updating message markup in stopchecks for user {user_id}: {e}")
+                
+                # Log the action
+                self.logger.info(
+                    f"🟢 {user_id}:@{user_name} Identified as legitimate user by admin {admin_id}:@{admin_username}. "
+                    f"Future checks cancelled. Watchdog {'cancelled' if cancelled else 'not running'}."
+                )
+                
+                # Create notification message
+                notification_text = (
+                    f"Future checks for @{user_name} (<code>{user_id}</code>) cancelled by Admin @{admin_username}.\n"
+                    f"User marked as legitimate. To re-check, use <code>/check {user_id}</code>."
+                )
+                
+                # Send notification to current chat
+                try:
+                    await self.bot.send_message(
+                        chat_id=callback_query.message.chat.id,
+                        text=notification_text,
+                        parse_mode=ParseMode.HTML,
+                        message_thread_id=callback_query.message.message_thread_id,
+                        disable_web_page_preview=True
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error sending notification in stopchecks: {e}")
+                
+                # Send notification to technolog group
+                try:
+                    await self.bot.send_message(
+                        chat_id=self.settings.TECHNOLOG_GROUP_ID,
+                        text=notification_text,
+                        parse_mode=ParseMode.HTML,
+                        message_thread_id=getattr(self.settings, 'TECHNO_ADMIN', None),
+                        disable_web_page_preview=True
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error sending technolog notification in stopchecks: {e}")
+                
+                await callback_query.answer(f"✅ {user_name} marked as legitimate - monitoring stopped")
+                
             else:
-                await callback_query.answer("User not being monitored")
+                await callback_query.answer("❌ User not being monitored")
                 
         except Exception as e:
             self.logger.error(f"Error in stopchecks callback: {e}")
-            await callback_query.answer("Error stopping checks")
+            await callback_query.answer("❌ Error stopping checks")
     
     async def _handle_suspicious_sender(self, callback_query: CallbackQuery):
         """Handle suspicious sender callback actions with confirmation flow."""
@@ -1418,11 +1511,26 @@ class ModernTelegramBot:
                             f"Global ban cleanup for {susp_user_id}: attempts main={total_attempt} deleted={total_deleted} extra={extra_attempt}/{extra_deleted}"
                         )
 
-                    # Global ban user
-                    await self.ban_user_from_all_chats(susp_user_id, susp_user_name, f"Suspicious activity - Admin decision by @{admin_username}")
+                    # Global ban user using centralized ban service
+                    ban_results = await self.ban_service.ban_user_from_all_chats(
+                        bot=self.bot,
+                        user_id=susp_user_id,
+                        banned_by=admin_id,
+                        reason=f"Suspicious activity - Admin decision by @{admin_username}",
+                        user_name=susp_user_name,
+                        delete_messages=True,
+                        notify_admins=True
+                    )
                     
-                    self.logger.info(f"{susp_user_id}:@{susp_user_name} SUSPICIOUS banned globally by admin @{admin_username}({admin_id})")
-                    callback_answer = "User banned globally and message deleted!"
+                    if ban_results['success']:
+                        self.logger.info(
+                            f"{susp_user_id}:@{susp_user_name} SUSPICIOUS banned globally by admin @{admin_username}({admin_id}) "
+                            f"({ban_results['successful_bans']}/{ban_results['total_chats']} chats)"
+                        )
+                        callback_answer = f"User banned globally! ({ban_results['successful_bans']}/{ban_results['total_chats']} chats)"
+                    else:
+                        self.logger.error(f"Failed to ban suspicious user {susp_user_id} - {ban_results['errors']}")
+                        callback_answer = "Ban failed - check logs for details"
                     
                     # Report to P2P spam server
                     await self.report_spam_2p2p(susp_user_id)
@@ -1589,6 +1697,10 @@ class ModernTelegramBot:
                 InlineKeyboardButton(text="⚙️ Actions (Ban / Delete) ⚙️", callback_data=f"suspiciousactions_{chat_id}_{message_id}_{user_id}")
             )
             
+            # Add "Mark as Legitimate" button if user is being monitored
+            if user_id in self.active_user_checks_dict:
+                kb.row(InlineKeyboardButton(text="✅ Mark as Legitimate", callback_data=f"stopchecks_{user_id}_{chat_id}_{message_id}"))
+            
             # Send to admin group with suspicious thread
             await self.bot.send_message(
                 chat_id=self.admin_group_id,
@@ -1736,7 +1848,23 @@ class ModernTelegramBot:
         return self.ui_builder.make_lols_kb(user_id)
     
     async def ban_user_from_all_chats(self, user_id: int, user_name: str = "!UNDEFINED!", reason: str = "Spam detected") -> bool:
-        """Ban a user from all specified chats and log the results."""
+        """
+        [DEPRECATED] Ban a user from all specified chats and log the results.
+        
+        DEPRECATED: Use ban_service.ban_user_from_all_chats() instead for:
+        - Rate limiting
+        - Database integration  
+        - Admin notifications
+        - Permission checking
+        - Comprehensive error handling
+        
+        This method is kept for backward compatibility only.
+        """
+        self.logger.warning(
+            f"DEPRECATED: ban_user_from_all_chats() called for user {user_id}. "
+            "Use ban_service.ban_user_from_all_chats() instead."
+        )
+        
         try:
             channel_ids = getattr(self.settings, 'CHANNEL_IDS', [])
             if not channel_ids:
@@ -1865,11 +1993,19 @@ class ModernTelegramBot:
                     self.logger.info(f"User {user_id} passed spam check, not banning")
                 return False
             
-            # Ban from all chats
-            ban_success = await self.ban_user_from_all_chats(user_id, user_name, reason)
+            # Ban from all chats using centralized ban service
+            ban_results = await self.ban_service.ban_user_from_all_chats(
+                bot=self.bot,
+                user_id=user_id,
+                banned_by=0,  # System ban
+                reason=reason,
+                user_name=user_name,
+                delete_messages=True,
+                notify_admins=True
+            )
             
-            if ban_success:
-                # Add to banned users
+            if ban_results['success']:
+                # Add to banned users (keeping legacy format for compatibility)
                 self.banned_users_dict[user_id] = {
                     "username": user_name,
                     "reason": reason,
@@ -1889,10 +2025,16 @@ class ModernTelegramBot:
                 # Report to P2P
                 await self.report_spam_2p2p(user_id)
                 
-                self.logger.info(f"🔨 {user_id}:@{user_name} AUTO-BANNED: {reason}")
+                self.logger.info(
+                    f"🔨 {user_id}:@{user_name} AUTO-BANNED via ban service: {reason} "
+                    f"({ban_results['successful_bans']}/{ban_results['total_chats']} chats)"
+                )
                 return True
             else:
-                self.logger.error(f"Failed to autoban user {user_id}")
+                self.logger.error(
+                    f"Failed to autoban user {user_id} via ban service - "
+                    f"{ban_results['failed_bans']}/{ban_results['total_chats']} failed"
+                )
                 return False
                 
         except Exception as e:
@@ -2363,6 +2505,10 @@ class ModernTelegramBot:
             report_id = int(datetime.now().timestamp())
             kb.row(InlineKeyboardButton(text="🚫 Ban User", callback_data=f"suspiciousban_{chat_id}_{report_id}_{user_id}"))
             kb.row(InlineKeyboardButton(text="🌐 Global Ban", callback_data=f"suspiciousglobalban_{chat_id}_{report_id}_{user_id}"))
+            
+            # Add "Mark as Legitimate" button if user is being monitored
+            if user_id in self.active_user_checks_dict:
+                kb.row(InlineKeyboardButton(text="✅ Mark as Legitimate", callback_data=f"stopchecks_{user_id}_{chat_id}_{report_id}"))
             
             # Send to admin group
             await self.bot.send_message(

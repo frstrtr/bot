@@ -304,20 +304,32 @@ class DatabaseManager:
     async def record_spam_detection(self, spam_record: SpamRecord) -> None:
         """Record spam detection."""
         async with self.get_connection() as conn:
-            await conn.execute("""
-                INSERT INTO spam_detections 
-                (user_id, message_id, chat_id, detected_at, spam_type, confidence, content_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                spam_record.user_id,
-                spam_record.message_id,
-                spam_record.chat_id,
-                spam_record.detected_at,
-                spam_record.spam_type,
-                spam_record.confidence,
-                spam_record.content_hash
-            ))
-            await conn.commit()
+            try:
+                # Ensure user exists in the database before recording spam detection
+                await conn.execute("""
+                    INSERT OR IGNORE INTO users (user_id, last_seen, message_count) 
+                    VALUES (?, CURRENT_TIMESTAMP, 0)
+                """, (spam_record.user_id,))
+                
+                # Record the spam detection
+                await conn.execute("""
+                    INSERT INTO spam_detections 
+                    (user_id, message_id, chat_id, detected_at, spam_type, confidence, content_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    spam_record.user_id,
+                    spam_record.message_id,
+                    spam_record.chat_id,
+                    spam_record.detected_at,
+                    spam_record.spam_type,
+                    spam_record.confidence,
+                    spam_record.content_hash
+                ))
+                await conn.commit()
+                
+            except Exception as e:
+                logger.error(f"Database connection error: {e}")
+                raise
     
     async def get_spam_history(
         self, 
@@ -341,19 +353,39 @@ class DatabaseManager:
     async def record_ban(self, ban_record: BanRecord) -> None:
         """Record user ban."""
         async with self.get_connection() as conn:
-            await conn.execute("""
-                INSERT INTO bans 
-                (user_id, banned_by, banned_at, reason, is_active, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                ban_record.user_id,
-                ban_record.banned_by,
-                ban_record.banned_at,
-                ban_record.reason,
-                ban_record.is_active,
-                ban_record.expires_at
-            ))
-            await conn.commit()
+            try:
+                # Ensure both users exist in the database before recording ban
+                # Insert user_id if it doesn't exist
+                await conn.execute("""
+                    INSERT OR IGNORE INTO users (user_id, last_seen, message_count) 
+                    VALUES (?, CURRENT_TIMESTAMP, 0)
+                """, (ban_record.user_id,))
+                
+                # Insert banned_by user if it doesn't exist 
+                # For system bans (banned_by=0), we also need to ensure user 0 exists
+                await conn.execute("""
+                    INSERT OR IGNORE INTO users (user_id, last_seen, message_count) 
+                    VALUES (?, CURRENT_TIMESTAMP, 0)
+                """, (ban_record.banned_by,))
+                
+                # Now record the ban
+                await conn.execute("""
+                    INSERT INTO bans 
+                    (user_id, banned_by, banned_at, reason, is_active, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    ban_record.user_id,
+                    ban_record.banned_by,
+                    ban_record.banned_at,
+                    ban_record.reason,
+                    ban_record.is_active,
+                    ban_record.expires_at
+                ))
+                await conn.commit()
+                
+            except Exception as e:
+                logger.error(f"Database connection error: {e}")
+                raise
     
     async def is_user_banned(self, user_id: int) -> bool:
         """Check if user is currently banned."""

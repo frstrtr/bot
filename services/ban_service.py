@@ -106,11 +106,12 @@ class BanService:
         
         try:
             # Check if we have permission to ban
-            if not await self._can_ban_user(bot, chat_id, user_id):
+            can_ban, ban_check_error = await self._can_ban_user_detailed(bot, chat_id, user_id)
+            if not can_ban:
                 return BanResult(
                     success=False,
                     action=action,
-                    error_message="Cannot ban this user (insufficient permissions or user is admin)"
+                    error_message=ban_check_error or "Cannot ban this user (insufficient permissions or user is admin)"
                 )
             
             # Check rate limiting
@@ -166,7 +167,18 @@ class BanService:
                 )
                 
             except TelegramBadRequest as e:
-                error_msg = f"Failed to ban user: {str(e)}"
+                error_str = str(e).lower()
+                if 'user not found' in error_str or 'chat not found' in error_str:
+                    error_msg = f"Cannot ban user {user_id}: user not found (likely deleted account)"
+                elif 'deactivated' in error_str:
+                    error_msg = f"Cannot ban user {user_id}: account deactivated"
+                elif 'insufficient rights' in error_str or 'not enough rights' in error_str:
+                    error_msg = f"Cannot ban user {user_id}: insufficient bot permissions"
+                elif 'user is an administrator' in error_str:
+                    error_msg = f"Cannot ban user {user_id}: user is administrator"
+                else:
+                    error_msg = f"Failed to ban user {user_id}: {str(e)}"
+                
                 logger.error(error_msg)
                 return BanResult(
                     success=False,
@@ -204,11 +216,12 @@ class BanService:
         
         try:
             # Check permissions
-            if not await self._can_ban_user(bot, chat_id, user_id):
+            can_ban, ban_check_error = await self._can_ban_user_detailed(bot, chat_id, user_id)
+            if not can_ban:
                 return BanResult(
                     success=False,
                     action=action,
-                    error_message="Cannot kick this user"
+                    error_message=ban_check_error or "Cannot kick this user"
                 )
             
             # Ban the user
@@ -375,24 +388,52 @@ class BanService:
         return None
     
     async def _can_ban_user(self, bot: Bot, chat_id: int, user_id: int) -> bool:
-        """Check if we can ban a specific user."""
+        """Check if we can ban a specific user (legacy method)."""
+        can_ban, _ = await self._can_ban_user_detailed(bot, chat_id, user_id)
+        return can_ban
+
+    async def _can_ban_user_detailed(self, bot: Bot, chat_id: int, user_id: int) -> tuple[bool, Optional[str]]:
+        """Check if we can ban a specific user with detailed error message."""
         try:
-            # Get chat member info
-            member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+            # First check if the bot has admin permissions in this chat
+            try:
+                bot_member = await bot.get_chat_member(chat_id=chat_id, user_id=bot.id)
+                if bot_member.status not in ['administrator', 'creator']:
+                    return False, f"Bot is not admin in chat {chat_id}"
+                
+                # Check if bot has ban permissions
+                if hasattr(bot_member, 'can_restrict_members') and not bot_member.can_restrict_members:
+                    return False, f"Bot lacks ban permissions in chat {chat_id}"
+                    
+            except TelegramBadRequest as e:
+                return False, f"Cannot check bot permissions in chat {chat_id}: {str(e)}"
             
-            # Cannot ban administrators or creators
-            if member.status in ['administrator', 'creator']:
-                return False
+            # Get target user info
+            try:
+                member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+                
+                # Cannot ban administrators or creators
+                if member.status in ['administrator', 'creator']:
+                    return False, f"User {user_id} is admin/creator in chat {chat_id}"
+                
+                # Check if user is already banned
+                if member.status == 'kicked':
+                    return False, f"User {user_id} already banned in chat {chat_id}"
+                
+                return True, None
+                
+            except TelegramBadRequest as e:
+                error_str = str(e).lower()
+                if 'user not found' in error_str or 'chat not found' in error_str:
+                    return False, f"User {user_id} not found in chat {chat_id} (possibly deleted account)"
+                elif 'deactivated' in error_str:
+                    return False, f"User {user_id} has deactivated account"
+                else:
+                    return False, f"Cannot access user {user_id} in chat {chat_id}: {str(e)}"
             
-            # Check if user is already banned
-            if member.status == 'kicked':
-                return False
-            
-            return True
-            
-        except TelegramBadRequest:
-            # User not found or other error
-            return False
+        except Exception as e:
+            logger.error(f"Unexpected error checking ban permissions for user {user_id} in chat {chat_id}: {e}")
+            return False, f"Unexpected error: {str(e)}"
     
     async def _check_ban_rate_limit(self) -> bool:
         """Check if ban rate limit is exceeded."""
@@ -530,6 +571,158 @@ class BanService:
         except Exception as e:
             logger.error(f"Error getting ban statistics: {e}")
             return {}
+    
+    async def ban_user_from_all_chats(
+        self,
+        bot: Bot,
+        user_id: int,
+        banned_by: int,
+        reason: str = "Manual ban",
+        user_name: Optional[str] = None,
+        duration: Optional[timedelta] = None,
+        delete_messages: bool = True,
+        notify_admins: bool = True
+    ) -> Dict[str, any]:
+        """Ban a user from all monitored chats using the centralized ban service."""
+        
+        results = {
+            'success': False,
+            'total_chats': 0,
+            'successful_bans': 0,
+            'failed_bans': 0,
+            'errors': [],
+            'ban_results': []
+        }
+        
+        try:
+            # Get channel list from settings
+            channel_ids = getattr(self.settings, 'CHANNEL_IDS', [])
+            if not channel_ids:
+                results['errors'].append("No channels configured for global ban")
+                logger.warning("No channels configured for global ban")
+                return results
+            
+            results['total_chats'] = len(channel_ids)
+            
+            # Ban user from each chat using the centralized ban service
+            for chat_id in channel_ids:
+                try:
+                    ban_result = await self.ban_user(
+                        bot=bot,
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        banned_by=banned_by,
+                        reason=reason,
+                        duration=duration,
+                        delete_messages=delete_messages,
+                        notify_admins=False  # We'll send one global notification
+                    )
+                    
+                    results['ban_results'].append({
+                        'chat_id': chat_id,
+                        'success': ban_result.success,
+                        'error': ban_result.error_message
+                    })
+                    
+                    if ban_result.success:
+                        results['successful_bans'] += 1
+                        logger.debug(f"Successfully banned user {user_id} in chat {chat_id}")
+                    else:
+                        results['failed_bans'] += 1
+                        chat_name = getattr(self.settings, 'CHANNEL_DICT', {}).get(chat_id, f"Chat {chat_id}")
+                        error_msg = f"Failed to ban user {user_id} in {chat_name}: {ban_result.error_message}"
+                        results['errors'].append(error_msg)
+                        logger.error(error_msg)
+                    
+                    # Rate limiting between ban attempts
+                    await asyncio.sleep(0.5)
+                    
+                except Exception as e:
+                    results['failed_bans'] += 1
+                    chat_name = getattr(self.settings, 'CHANNEL_DICT', {}).get(chat_id, f"Chat {chat_id}")
+                    error_msg = f"Exception banning user {user_id} in {chat_name}: {str(e)}"
+                    results['errors'].append(error_msg)
+                    logger.error(error_msg)
+                    continue
+            
+            # Determine overall success
+            results['success'] = results['successful_bans'] > 0
+            
+            # Send global notification if any bans succeeded and notifications are enabled
+            if results['success'] and notify_admins:
+                await self._notify_global_ban(
+                    bot=bot,
+                    user_id=user_id,
+                    user_name=user_name or "!UNDEFINED!",
+                    banned_by=banned_by,
+                    reason=reason,
+                    results=results
+                )
+            
+            # Log summary
+            if results['success']:
+                logger.info(
+                    f"🚫 Global ban completed for user {user_id}:@{user_name or '!UNDEFINED!'} - "
+                    f"{results['successful_bans']}/{results['total_chats']} chats - {reason}"
+                )
+            else:
+                logger.error(f"❌ Global ban failed for user {user_id} - no successful bans")
+            
+            return results
+            
+        except Exception as e:
+            error_msg = f"Critical error in ban_user_from_all_chats: {str(e)}"
+            results['errors'].append(error_msg)
+            logger.error(error_msg)
+            return results
+    
+    async def _notify_global_ban(
+        self,
+        bot: Bot,
+        user_id: int,
+        user_name: str,
+        banned_by: int,
+        reason: str,
+        results: Dict[str, any]
+    ) -> None:
+        """Send notification about global ban to admin group."""
+        try:
+            # Get banner info
+            try:
+                banner = await bot.get_chat_member(list(getattr(self.settings, 'CHANNEL_IDS', []))[0], banned_by)
+                banner_name = banner.user.first_name or f"ID: {banned_by}"
+                banner_username = f"@{banner.user.username}" if banner.user.username else ""
+            except:
+                banner_name = "System" if banned_by == 0 else f"ID: {banned_by}"
+                banner_username = ""
+            
+            # Format notification message
+            message = (
+                f"🔨 GLOBAL BAN EXECUTED\n\n"
+                f"👤 User: {user_name} (ID: {user_id})\n"
+                f"👮 Banned by: {banner_name} {banner_username}\n"
+                f"📝 Reason: {reason}\n"
+                f"📊 Results: {results['successful_bans']}/{results['total_chats']} chats\n"
+                f"🕐 Time: {datetime.now().strftime('%H:%M:%S')}"
+            )
+            
+            if results['failed_bans'] > 0:
+                message += f"\n⚠️ Failed: {results['failed_bans']} chats"
+            
+            # Send to admin group
+            admin_group_id = getattr(self.settings, 'ADMIN_GROUP_ID', None)
+            if admin_group_id:
+                try:
+                    await bot.send_message(
+                        chat_id=admin_group_id,
+                        text=message,
+                        message_thread_id=getattr(self.settings, 'ADMIN_AUTOBAN', None)
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send global ban notification: {e}")
+        
+        except Exception as e:
+            logger.error(f"Error in global ban notification: {e}")
     
     async def cleanup_expired_bans(self, bot: Bot) -> None:
         """Clean up expired temporary bans."""

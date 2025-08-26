@@ -1176,33 +1176,31 @@ class ModernTelegramBot:
             parts = callback_query.data.split("_")
             user_id = int(parts[1])
             
-            # Use ban service to ban the user
-            if self.ban_service:
-                ban_result = await self.ban_service.ban_user(
-                    bot=self.bot,
-                    user_id=user_id,
-                    chat_id=callback_query.message.chat.id,
-                    banned_by=callback_query.from_user.id,
-                    reason="Manual ban by admin"
-                )
+            # Use actual ban method to ban the user from all monitored chats
+            ban_success = await self.ban_user_from_all_chats(
+                user_id=user_id,
+                user_name="!UNDEFINED!",  # We don't have username in callback data
+                reason=f"Manual ban by admin @{callback_query.from_user.username or callback_query.from_user.id}"
+            )
+            
+            if ban_success:
+                # Update banned users dict
+                self.banned_users_dict[user_id] = f"BANNED_BY_ADMIN_{callback_query.from_user.id}"
                 
-                if ban_result.success:
-                    # Update banned users dict
-                    self.banned_users_dict[user_id] = f"BANNED_BY_ADMIN_{callback_query.from_user.id}"
-                    
-                    # Remove keyboard and show ban confirmation
-                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="💀💀💀 B.A.N.N.E.D. 💀💀💀", url=f"https://api.lols.bot/account?id={user_id}")]
-                    ])
-                    
-                    await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-                    await callback_query.answer("✅ User banned successfully!")
-                    
-                    self.logger.info(f"User {user_id} banned by admin {callback_query.from_user.id}")
-                else:
-                    await callback_query.answer(f"❌ Ban failed: {ban_result.error_message}")
+                # Save banned users to file
+                await self.save_banned_users()
+                
+                # Remove keyboard and show ban confirmation
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="💀💀💀 B.A.N.N.E.D. 💀💀💀", url=f"https://api.lols.bot/account?id={user_id}")]
+                ])
+                
+                await callback_query.message.edit_reply_markup(reply_markup=keyboard)
+                await callback_query.answer("✅ User banned successfully!")
+                
+                self.logger.info(f"User {user_id} banned by admin {callback_query.from_user.id}")
             else:
-                await callback_query.answer("❌ Ban service not available")
+                await callback_query.answer("❌ Ban failed - check bot permissions or user not found")
                 
         except Exception as e:
             self.logger.error(f"Error in confirmban callback: {e}")

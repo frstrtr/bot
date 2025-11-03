@@ -5571,6 +5571,40 @@ if __name__ == "__main__":
                         if phone:
                             suspicious_items["phones"].append(phone)
             
+            # Additional regex-based phone number detection for local numbers
+            # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
+            phone_patterns = [
+                r'\+230\s*\d{7,8}',           # +230 followed by 7-8 digits
+                r'00230\s*\d{7,8}',           # 00230 followed by 7-8 digits  
+                r'(?<!\d)230\s*\d{7,8}',      # 230 followed by 7-8 digits (not preceded by digit)
+                r'\+\d{10,15}',                # International format +XXXXXXXXXXX
+                r'(?<!\d)\d{3}[-\s]?\d{3}[-\s]?\d{4}(?!\d)',  # Format: 123-456-7890 or 123 456 7890
+            ]
+            
+            # Check message text
+            if message.text:
+                for pattern in phone_patterns:
+                    matches = re.findall(pattern, message.text)
+                    for match in matches:
+                        # Clean up the matched phone number
+                        cleaned_phone = match.strip()
+                        # Avoid duplicates
+                        if cleaned_phone not in suspicious_items["phones"]:
+                            has_suspicious_content = True
+                            suspicious_items["phones"].append(cleaned_phone)
+            
+            # Check caption text
+            if message.caption:
+                for pattern in phone_patterns:
+                    matches = re.findall(pattern, message.caption)
+                    for match in matches:
+                        # Clean up the matched phone number
+                        cleaned_phone = match.strip()
+                        # Avoid duplicates
+                        if cleaned_phone not in suspicious_items["phones"]:
+                            has_suspicious_content = True
+                            suspicious_items["phones"].append(cleaned_phone)
+            
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
             if has_suspicious_content:
                 try:

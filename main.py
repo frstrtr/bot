@@ -5574,9 +5574,9 @@ if __name__ == "__main__":
             # Additional regex-based phone number detection for local numbers
             # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
             phone_patterns = [
-                r'\+230\s*\d{7,8}',           # +230 followed by 7-8 digits
-                r'00230\s*\d{7,8}',           # 00230 followed by 7-8 digits  
-                r'(?<!\d)230\s*\d{7,8}',      # 230 followed by 7-8 digits (not preceded by digit)
+                r'\+230\s*\d{6,8}',           # +230 followed by 6-8 digits
+                r'00230\s*\d{6,8}',           # 00230 followed by 6-8 digits
+                r'(?<!\d)230\s*\d{6,8}',      # 230 followed by 6-8 digits (not preceded by digit)
                 r'\+\d{10,15}',                # International format +XXXXXXXXXXX
                 r'(?<!\d)\d{3}[-\s]?\d{3}[-\s]?\d{4}(?!\d)',  # Format: 123-456-7890 or 123 456 7890
             ]

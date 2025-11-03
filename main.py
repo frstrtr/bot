@@ -4298,6 +4298,138 @@ if __name__ == "__main__":
 
         await callback_query.answer("Ban cancelled.", show_alert=False)
 
+    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelconfirm_"))
+    async def ban_channel_confirm(callback_query: CallbackQuery):
+        """Function to show confirmation for channel ban."""
+        # Parse channel_id and source_chat_id from callback data
+        parts = callback_query.data.split("_")
+        channel_id = int(parts[1])
+        source_chat_id = int(parts[2])
+        
+        # Get channel info
+        try:
+            chat = await BOT.get_chat(channel_id)
+            channel_name = chat.title if chat.title else "Unknown Channel"
+            channel_username = f"@{chat.username}" if chat.username else ""
+        except (Unauthorized, BadRequest) as e:
+            LOGGER.warning("Cannot get chat info for channel %s: %s", channel_id, str(e))
+            channel_name = "Unknown Channel"
+            channel_username = ""
+        
+        # Create confirmation keyboard
+        confirm_kb = InlineKeyboardMarkup()
+        confirm_kb.row(
+            InlineKeyboardButton(
+                "✅ Confirm Ban",
+                callback_data=f"banchannelexecute_{channel_id}_{source_chat_id}",
+            ),
+            InlineKeyboardButton(
+                "❌ Cancel",
+                callback_data=f"banchannelcancel_{channel_id}_{source_chat_id}",
+            ),
+        )
+        
+        # Update message with confirmation
+        try:
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=confirm_kb,
+            )
+            await callback_query.answer(
+                f"Confirm ban for: {channel_name} {channel_username}\n({channel_id})",
+                show_alert=True,
+            )
+        except Exception as e:
+            LOGGER.error("Failed to show channel ban confirmation: %s", e)
+            await callback_query.answer("Error showing confirmation", show_alert=True)
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelexecute_"))
+    async def ban_channel_execute(callback_query: CallbackQuery):
+        """Function to execute the channel ban."""
+        # Parse channel_id from callback data
+        parts = callback_query.data.split("_")
+        channel_id = int(parts[1])
+        source_chat_id = int(parts[2])
+        
+        admin_username = callback_query.from_user.username or "!NoName!"
+        admin_id = callback_query.from_user.id
+        
+        try:
+            # Ban channel from all monitored chats
+            success, channel_name, channel_username = await ban_rogue_chat_everywhere(
+                channel_id, CHANNEL_IDS
+            )
+            
+            # Remove buttons
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=None,
+            )
+            
+            if success:
+                result_message = (
+                    f"✅ Channel {channel_name} {channel_username} "
+                    f"(<code>{channel_id}</code>) banned from all monitored chats "
+                    f"by admin @{admin_username} (<code>{admin_id}</code>)"
+                )
+                LOGGER.info(
+                    "Channel %s %s (%s) banned by admin @%s(%s)",
+                    channel_name,
+                    channel_username,
+                    channel_id,
+                    admin_username,
+                    admin_id,
+                )
+                await callback_query.answer("Channel banned successfully!", show_alert=True)
+            else:
+                result_message = (
+                    f"⚠️ Channel {channel_name} {channel_username} "
+                    f"(<code>{channel_id}</code>) ban failed or partially completed. "
+                    f"Check logs for details."
+                )
+                await callback_query.answer("Channel ban failed - check logs", show_alert=True)
+            
+            # Send result to admin thread
+            await safe_send_message(
+                BOT,
+                TECHNOLOG_GROUP_ID,
+                result_message,
+                LOGGER,
+                parse_mode="HTML",
+                message_thread_id=TECHNO_ADMIN,
+            )
+            
+        except Exception as e:
+            LOGGER.error("Failed to execute channel ban for %s: %s", channel_id, e)
+            await callback_query.answer("Error executing channel ban", show_alert=True)
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelcancel_"))
+    async def ban_channel_cancel(callback_query: CallbackQuery):
+        """Function to cancel the channel ban."""
+        # Parse channel_id from callback data
+        parts = callback_query.data.split("_")
+        channel_id = int(parts[1])
+        source_chat_id = int(parts[2])
+        
+        # Restore original button
+        channel_ban_kb = InlineKeyboardMarkup()
+        channel_ban_kb.add(
+            InlineKeyboardButton(
+                "🚫 Ban Channel",
+                callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}",
+            )
+        )
+        
+        await BOT.edit_message_reply_markup(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            reply_markup=channel_ban_kb,
+        )
+        
+        await callback_query.answer("Channel ban cancelled.", show_alert=False)
+
     @DP.message_handler(
         is_in_monitored_channel,
         content_types=ALLOWED_CONTENT_TYPES,
@@ -4328,14 +4460,29 @@ if __name__ == "__main__":
                         message.chat.username if message.chat.username else None,
                     ]
                 )
+                # Create keyboard with Ban Channel button
+                channel_ban_kb = InlineKeyboardMarkup()
+                channel_ban_kb.add(
+                    InlineKeyboardButton(
+                        "🚫 Ban Channel",
+                        callback_data=f"banchannelconfirm_{message.sender_chat.id}_{message.chat.id}",
+                    )
+                )
+                
+                channel_info = f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
+                if message.sender_chat.username:
+                    channel_info += f"<b>Username:</b> @{message.sender_chat.username}\n"
+                channel_info += f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>"
+                
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"From chat: {message.chat.title}\nMessage link: <a href='{message_link}'>Click here</a>",
+                    f"From chat: {message.chat.title}\nMessage link: <a href='{message_link}'>Click here</a>\n\n{channel_info}",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
+                    reply_markup=channel_ban_kb,
                 )
             except MessageIdInvalid as e:
                 LOGGER.error(

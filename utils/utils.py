@@ -723,25 +723,14 @@ def extract_username(uname):
         str: The extracted username in the format '@username' or '!UNDEFINED!' if not found.
     """
     
-    def find_username(d):
-        if isinstance(d, dict):
-            # Direct username key
-            username = d.get('username', None)
-            if username is not None and username != 'None' and username != '' and username != '!UNDEFINED!':
-                return username
-            # Search nested dicts
-            for v in d.values():
-                if isinstance(v, dict):
-                    nested = find_username(v)
-                    if nested is not None and nested != 'None' and nested != '' and nested != '!UNDEFINED!':
-                        return nested
-        return None
-
     if isinstance(uname, dict):
-        username = find_username(uname)
-        if username is None:
+        # Only check the top-level 'username' key, don't search nested dicts
+        # to avoid accidentally picking up chat usernames from baseline.chat.username
+        username = uname.get('username', None)
+        if username is not None and username != 'None' and username != '' and username != '!UNDEFINED!':
+            return f'@{username}'
+        else:
             return '!UNDEFINED!'
-        return f'@{username}'
     elif uname is None or uname == 'None' or uname == '' or uname == '!UNDEFINED!':
         return '!UNDEFINED!'
     else:

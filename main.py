@@ -5467,6 +5467,32 @@ if __name__ == "__main__":
                     return text.encode('utf-16-le')[offset*2:(offset+length)*2].decode('utf-16-le')
                 return None
             
+            # Helper function to show invisible characters as unicode codepoints
+            def make_visible(text, max_len=100):
+                """Make invisible/special characters visible as unicode codepoints."""
+                if not text:
+                    return ""
+                # Truncate if too long
+                if len(text) > max_len:
+                    text = text[:max_len] + "..."
+                # Replace invisible/control characters with their unicode representation
+                result = []
+                for char in text:
+                    # Check if character is invisible, whitespace, or control character
+                    if char in ['\u200b', '\u200c', '\u200d', '\ufeff', '\u00a0', '\u2060', '\u180e']:
+                        # Zero-width or invisible spaces
+                        result.append(f"[U+{ord(char):04X}]")
+                    elif ord(char) < 32 or (ord(char) >= 127 and ord(char) < 160):
+                        # Control characters
+                        result.append(f"[U+{ord(char):04X}]")
+                    elif char == '\n':
+                        result.append('\\n')
+                    elif char == '\t':
+                        result.append('\\t')
+                    else:
+                        result.append(char)
+                return ''.join(result)
+            
             # Check message entities for links, mentions, phone numbers
             if message.entities and message.text:
                 for entity in message.entities:
@@ -5477,7 +5503,8 @@ if __name__ == "__main__":
                         if entity_type == "text_link":
                             url = entity.get("url", "")
                             visible_text = extract_entity_text(message.text, entity)
-                            suspicious_items["links"].append(f"{url} (hidden as: {visible_text})")
+                            visible_clean = make_visible(visible_text, max_len=50)
+                            suspicious_items["links"].append(f"{url} (hidden as: {visible_clean})")
                         else:
                             url = extract_entity_text(message.text, entity)
                             if url:
@@ -5503,7 +5530,8 @@ if __name__ == "__main__":
                         if entity_type == "text_link":
                             url = entity.get("url", "")
                             visible_text = extract_entity_text(message.caption, entity)
-                            suspicious_items["links"].append(f"{url} (hidden as: {visible_text})")
+                            visible_clean = make_visible(visible_text, max_len=50)
+                            suspicious_items["links"].append(f"{url} (hidden as: {visible_clean})")
                         else:
                             url = extract_entity_text(message.caption, entity)
                             if url:
@@ -5542,31 +5570,64 @@ if __name__ == "__main__":
                     lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
                     inline_kb = create_inline_keyboard(message_link, lols_link, message)
                     
-                    # Build detailed content list
+                    # Build detailed content list with length limiting
                     content_details = []
+                    max_items_per_type = 10  # Limit items to prevent message overflow
+                    
                     if suspicious_items["links"]:
-                        content_details.append(f"<b>🔗 Links ({len(suspicious_items['links'])}):</b>")
-                        for link in suspicious_items["links"]:
-                            content_details.append(f"  • {html.escape(link)}")
+                        links_count = len(suspicious_items["links"])
+                        content_details.append(f"<b>🔗 Links ({links_count}):</b>")
+                        for i, link in enumerate(suspicious_items["links"][:max_items_per_type]):
+                            # Truncate very long URLs
+                            link_display = link if len(link) <= 200 else link[:200] + "..."
+                            content_details.append(f"  • <code>{html.escape(link_display)}</code>")
+                        if links_count > max_items_per_type:
+                            content_details.append(f"  ... and {links_count - max_items_per_type} more")
+                    
                     if suspicious_items["mentions"]:
-                        content_details.append(f"<b>👤 Mentions ({len(suspicious_items['mentions'])}):</b>")
-                        for mention in suspicious_items["mentions"]:
-                            content_details.append(f"  • {html.escape(mention)}")
+                        mentions_count = len(suspicious_items["mentions"])
+                        content_details.append(f"<b>👤 Mentions ({mentions_count}):</b>")
+                        for i, mention in enumerate(suspicious_items["mentions"][:max_items_per_type]):
+                            content_details.append(f"  • <code>{html.escape(mention)}</code>")
+                        if mentions_count > max_items_per_type:
+                            content_details.append(f"  ... and {mentions_count - max_items_per_type} more")
+                    
                     if suspicious_items["phones"]:
-                        content_details.append(f"<b>📞 Phone Numbers ({len(suspicious_items['phones'])}):</b>")
-                        for phone in suspicious_items["phones"]:
+                        phones_count = len(suspicious_items["phones"])
+                        content_details.append(f"<b>📞 Phone Numbers ({phones_count}):</b>")
+                        for i, phone in enumerate(suspicious_items["phones"][:max_items_per_type]):
                             content_details.append(f"  • <code>{html.escape(phone)}</code>")
+                        if phones_count > max_items_per_type:
+                            content_details.append(f"  ... and {phones_count - max_items_per_type} more")
                     
                     content_report = "\n".join(content_details)
                     
-                    await safe_send_message(
-                        BOT,
-                        ADMIN_GROUP_ID,
+                    # Build the full message
+                    full_message = (
                         f"⚠️ <b>Suspicious Content Detected</b>\n"
                         f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
                         f"(<code>{message.from_user.id}</code>)\n"
                         f"Chat: {_chat_link_html}\n\n"
-                        f"{content_report}",
+                        f"{content_report}"
+                    )
+                    
+                    # Check if message exceeds Telegram's limit (4096 chars)
+                    if len(full_message) > 4000:  # Leave some margin
+                        # Truncate the content report
+                        available_space = 4000 - len(full_message) + len(content_report)
+                        content_report = content_report[:available_space] + "\n\n... (message truncated)"
+                        full_message = (
+                            f"⚠️ <b>Suspicious Content Detected</b>\n"
+                            f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
+                            f"(<code>{message.from_user.id}</code>)\n"
+                            f"Chat: {_chat_link_html}\n\n"
+                            f"{content_report}"
+                        )
+                    
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        full_message,
                         LOGGER,
                         message_thread_id=ADMIN_SUSPICIOUS,
                         reply_markup=inline_kb,

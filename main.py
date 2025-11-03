@@ -1715,7 +1715,18 @@ async def check_n_ban(message: types.Message, reason: str):
                 e,
             )
         # send the telefrag log message to the admin group
-        inline_kb = make_lols_kb(message.from_user.id)
+        # Create keyboard with both LOLS check and Actions button
+        inline_kb = InlineKeyboardMarkup()
+        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=f"https://t.me/oLolsBot?start={message.from_user.id}"))
+        # Add Actions button for manual review/unban
+        report_id = int(str(message.chat.id)[4:] + str(message.message_id)) if message.chat.id < 0 else int(str(message.chat.id) + str(message.message_id))
+        inline_kb.add(
+            InlineKeyboardButton(
+                "⚙️ Actions (Unban / Review) ⚙️",
+                callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{message.from_user.id}",
+            )
+        )
+        
         chat_link = (
             f"https://t.me/{message.chat.username}"
             if message.chat.username
@@ -1726,7 +1737,7 @@ async def check_n_ban(message: types.Message, reason: str):
             if message.chat.username
             else message.chat.title
         )
-        await safe_send_message(
+        admin_autoban_banner = await safe_send_message(
             BOT,
             ADMIN_GROUP_ID,
             f"Alert! 🚨 User @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>) has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}...",
@@ -1736,6 +1747,19 @@ async def check_n_ban(message: types.Message, reason: str):
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
+        
+        # Store the autoban state for Actions button to work
+        set_forwarded_state(
+            DP,
+            report_id,
+            {
+                "original_forwarded_message": message,
+                "admin_group_banner_message": admin_autoban_banner,
+                "action_banner_message": None,
+                "report_chat_id": message.chat.id,
+            },
+        )
+        
         # log username to the username thread
         _uname_1191 = normalize_username(message.from_user.username)
         if _uname_1191 and _uname_1191 not in POSTED_USERNAMES:

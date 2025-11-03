@@ -2375,11 +2375,8 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         # Create a list for active user checks with user_id as key and username as value
         active_user_checks_list = []
         for user, uname in active_user_checks_dict.items():
-            # Use extract_username to ensure @ symbol is added, but not for !UNDEFINED!
+            # extract_username handles @ symbol correctly (adds @ for valid usernames, no @ for !UNDEFINED!)
             _disp = extract_username(uname)
-            # Remove @ from !UNDEFINED!
-            if _disp == "@!UNDEFINED!":
-                _disp = "!UNDEFINED!"
             active_user_checks_list.append(f"<code>{user}</code>:{_disp}")
             # If uname is a dict, extract URLs from it
             if isinstance(uname, dict):
@@ -2387,13 +2384,10 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                     if k != "username" and isinstance(v, str) and v.startswith("http"):
                         active_user_checks_list.append(v)
         # Create a list for banned users with user_id as key and user_name as value
-        banned_users_list = []
-        for user_id, user_name in banned_users_dict.items():
-            _disp = extract_username(user_name)
-            # Remove @ from !UNDEFINED!
-            if _disp == "@!UNDEFINED!":
-                _disp = "!UNDEFINED!"
-            banned_users_list.append(f"<code>{user_id}</code>:{_disp}")
+        banned_users_list = [
+            f"<code>{user_id}</code>:{extract_username(user_name)}"
+            for user_id, user_name in banned_users_dict.items()
+        ]
 
         # Split lists into chunks
         max_message_length = (

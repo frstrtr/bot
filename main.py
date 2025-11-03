@@ -5449,6 +5449,133 @@ if __name__ == "__main__":
                 else:
                     return
 
+            # Check if message contains suspicious content: links, mentions, or phone numbers
+            has_suspicious_content = False
+            suspicious_items = {
+                "links": [],
+                "mentions": [],
+                "phones": []
+            }
+            
+            # Helper function to extract text from entity
+            def extract_entity_text(text, entity):
+                """Extract text from message entity."""
+                offset = entity.get("offset", 0)
+                length = entity.get("length", 0)
+                if text and offset is not None and length:
+                    # Handle UTF-16 encoding (Telegram uses UTF-16 for offsets)
+                    return text.encode('utf-16-le')[offset*2:(offset+length)*2].decode('utf-16-le')
+                return None
+            
+            # Check message entities for links, mentions, phone numbers
+            if message.entities and message.text:
+                for entity in message.entities:
+                    entity_type = entity.get("type")
+                    if entity_type in ["url", "text_link"]:
+                        has_suspicious_content = True
+                        # Extract URL from text_link or visible url
+                        if entity_type == "text_link":
+                            url = entity.get("url", "")
+                            visible_text = extract_entity_text(message.text, entity)
+                            suspicious_items["links"].append(f"{url} (hidden as: {visible_text})")
+                        else:
+                            url = extract_entity_text(message.text, entity)
+                            if url:
+                                suspicious_items["links"].append(url)
+                    elif entity_type == "mention":
+                        has_suspicious_content = True
+                        mention = extract_entity_text(message.text, entity)
+                        if mention:
+                            suspicious_items["mentions"].append(mention)
+                    elif entity_type == "phone_number":
+                        has_suspicious_content = True
+                        phone = extract_entity_text(message.text, entity)
+                        if phone:
+                            suspicious_items["phones"].append(phone)
+            
+            # Check caption entities for media messages
+            if message.caption_entities and message.caption:
+                for entity in message.caption_entities:
+                    entity_type = entity.get("type")
+                    if entity_type in ["url", "text_link"]:
+                        has_suspicious_content = True
+                        # Extract URL from text_link or visible url
+                        if entity_type == "text_link":
+                            url = entity.get("url", "")
+                            visible_text = extract_entity_text(message.caption, entity)
+                            suspicious_items["links"].append(f"{url} (hidden as: {visible_text})")
+                        else:
+                            url = extract_entity_text(message.caption, entity)
+                            if url:
+                                suspicious_items["links"].append(url)
+                    elif entity_type == "mention":
+                        has_suspicious_content = True
+                        mention = extract_entity_text(message.caption, entity)
+                        if mention:
+                            suspicious_items["mentions"].append(mention)
+                    elif entity_type == "phone_number":
+                        has_suspicious_content = True
+                        phone = extract_entity_text(message.caption, entity)
+                        if phone:
+                            suspicious_items["phones"].append(phone)
+            
+            # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
+            if has_suspicious_content:
+                try:
+                    # Forward the message to suspicious thread
+                    await message.forward(
+                        ADMIN_GROUP_ID,
+                        ADMIN_SUSPICIOUS,
+                        disable_notification=True,
+                    )
+                    
+                    # Build clickable chat link
+                    _chat_title_safe = html.escape(message.chat.title)
+                    if message.chat.username:
+                        _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
+                    elif str(message.chat.id).startswith('-100'):
+                        _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
+                    else:
+                        _chat_link_html = f"<b>{_chat_title_safe}</b>"
+                    
+                    # Get lols link and create keyboard
+                    lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
+                    inline_kb = create_inline_keyboard(message_link, lols_link, message)
+                    
+                    # Build detailed content list
+                    content_details = []
+                    if suspicious_items["links"]:
+                        content_details.append(f"<b>🔗 Links ({len(suspicious_items['links'])}):</b>")
+                        for link in suspicious_items["links"]:
+                            content_details.append(f"  • {html.escape(link)}")
+                    if suspicious_items["mentions"]:
+                        content_details.append(f"<b>👤 Mentions ({len(suspicious_items['mentions'])}):</b>")
+                        for mention in suspicious_items["mentions"]:
+                            content_details.append(f"  • {html.escape(mention)}")
+                    if suspicious_items["phones"]:
+                        content_details.append(f"<b>📞 Phone Numbers ({len(suspicious_items['phones'])}):</b>")
+                        for phone in suspicious_items["phones"]:
+                            content_details.append(f"  • <code>{html.escape(phone)}</code>")
+                    
+                    content_report = "\n".join(content_details)
+                    
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        f"⚠️ <b>Suspicious Content Detected</b>\n"
+                        f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
+                        f"(<code>{message.from_user.id}</code>)\n"
+                        f"Chat: {_chat_link_html}\n\n"
+                        f"{content_report}",
+                        LOGGER,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        reply_markup=inline_kb,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+                except Exception as e:
+                    LOGGER.error("Error forwarding suspicious content message: %s", e)
+
         # If other user/admin or bot deletes message earlier than this bot we got an error
         except MessageIdInvalid as e:
             LOGGER.error(

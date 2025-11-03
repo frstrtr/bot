@@ -1246,13 +1246,20 @@ async def ban_user_from_all_chats(
         user_name (str): The name of the user to ban.
         channel_ids (list): A list of channel IDs to ban the user from.
         channel_dict (dict): A dictionary mapping channel IDs to channel names.
+    
+    Returns:
+        tuple: (success_count, fail_count, total_count)
     """
-
+    success_count = 0
+    fail_count = 0
+    
     for chat_id in channel_ids:
         try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
-            # LOGGER.debug("Successfully banned USER %s in %s", user_id, chat_id)
+            success_count += 1
+            LOGGER.info("Successfully banned USER %s in chat %s", user_id, chat_id)
         except BadRequest as e:  # if user were Deleted Account while banning
+            fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
                 "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT?",
@@ -1264,13 +1271,30 @@ async def ban_user_from_all_chats(
             await asyncio.sleep(1)
             # XXX remove user_id check coroutine and from monitoring list?
             continue
+        except Exception as e:  # Catch any other exceptions
+            fail_count += 1
+            chat_name = get_channel_name_by_id(channel_dict, chat_id)
+            LOGGER.error(
+                "%s - unexpected error banning in chat %s (%s): %s",
+                user_id,
+                chat_name,
+                chat_id,
+                e,
+            )
+            await asyncio.sleep(1)
+            continue
 
+    total_count = len(channel_ids)
     # RED color for the log
     LOGGER.info(
-        "\033[91m%s:@%s identified as a SPAMMER, and has been banned from all chats.\033[0m",
+        "\033[91m%s:@%s identified as a SPAMMER, banned from %d/%d chats.\033[0m",
         user_id,
         user_name if user_name else "!UNDEFINED!",
+        success_count,
+        total_count,
     )
+    
+    return success_count, fail_count, total_count
 
 
 async def autoban(_id, user_name="!UNDEFINED!"):
@@ -1283,7 +1307,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         )  # add and remove the user to the banned_users_dict
 
         # remove user from all known chats first
-        await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+        success_count, fail_count, total_count = await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
 
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
@@ -1298,7 +1322,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         banned_users_dict[_id] = user_name
 
         # remove user from all known chats first
-        await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+        success_count, fail_count, total_count = await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
 
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
@@ -2930,7 +2954,7 @@ if __name__ == "__main__":
                         inout_chattitle,
                     )
                     # ban user from all chats
-                    await ban_user_from_all_chats(
+                    success_count, fail_count, total_count = await ban_user_from_all_chats(
                         inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
                     )
                     lols_url = build_lols_url(inout_userid)
@@ -3545,7 +3569,7 @@ if __name__ == "__main__":
             if not forwarded_report_state:
                 # Ad-hoc ban (e.g., profile change alert) – perform minimal ban logic
                 author_id = int(author_id_from_callback_str)
-                await ban_user_from_all_chats(
+                success_count, fail_count, total_count = await ban_user_from_all_chats(
                     author_id, None, CHANNEL_IDS, CHANNEL_DICT
                 )
                 banned_users_dict[author_id] = "!UNDEFINED!"
@@ -4168,7 +4192,7 @@ if __name__ == "__main__":
                 )
 
             # Ban user from all chats
-            await ban_user_from_all_chats(user_id, username, CHANNEL_IDS, CHANNEL_DICT)
+            success_count, fail_count, total_count = await ban_user_from_all_chats(user_id, username, CHANNEL_IDS, CHANNEL_DICT)
 
             # Add to banned users dict
             banned_users_dict[user_id] = username
@@ -4895,7 +4919,7 @@ if __name__ == "__main__":
                         message.chat.username if message.chat.username else "NoName",
                         e,
                     )
-                await ban_user_from_all_chats(
+                success_count, fail_count, total_count = await ban_user_from_all_chats(
                     message.from_user.id,
                     (
                         message.from_user.username
@@ -6682,7 +6706,8 @@ if __name__ == "__main__":
                         susp_user_name,
                         _e_bulk,
                     )
-                await ban_user_from_all_chats(
+                # Ban user from all monitored chats
+                success_count, fail_count, total_count = await ban_user_from_all_chats(
                     susp_user_id,
                     susp_user_name,
                     CHANNEL_IDS,
@@ -6701,13 +6726,15 @@ if __name__ == "__main__":
                     photo_changed=False,
                 )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS banned globally by admin @%s(%s)",
+                    "%s:@%s SUSPICIOUS banned globally by admin @%s(%s) - %d/%d chats",
                     susp_user_id,
                     susp_user_name,
                     admin_username,
                     admin_id,
+                    success_count,
+                    total_count,
                 )
-                callback_answer = "User banned globally and the message were deleted!"
+                callback_answer = f"User banned globally! ({success_count}/{total_count} chats) Messages deleted!"
             except BadRequest as e:
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."

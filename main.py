@@ -4338,21 +4338,11 @@ if __name__ == "__main__":
 
     @DP.callback_query_handler(lambda c: c.data.startswith("banchannelconfirm_"))
     async def ban_channel_confirm(callback_query: CallbackQuery):
-        """Function to show confirmation for channel ban."""
+        """Function to show confirmation buttons for channel ban."""
         # Parse channel_id and source_chat_id from callback data
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
-        
-        # Get channel info
-        try:
-            chat = await BOT.get_chat(channel_id)
-            channel_name = chat.title if chat.title else "Unknown Channel"
-            channel_username = f"@{chat.username}" if chat.username else ""
-        except (Unauthorized, BadRequest) as e:
-            LOGGER.warning("Cannot get chat info for channel %s: %s", channel_id, str(e))
-            channel_name = "Unknown Channel"
-            channel_username = ""
         
         # Create confirmation keyboard
         confirm_kb = InlineKeyboardMarkup()
@@ -4367,17 +4357,15 @@ if __name__ == "__main__":
             ),
         )
         
-        # Update message with confirmation
+        # Update message with confirmation buttons (no popup alert)
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
                 reply_markup=confirm_kb,
             )
-            await callback_query.answer(
-                f"Confirm ban for: {channel_name} {channel_username}\n({channel_id})",
-                show_alert=True,
-            )
+            # Answer without popup alert
+            await callback_query.answer()
         except Exception as e:
             LOGGER.error("Failed to show channel ban confirmation: %s", e)
             await callback_query.answer("Error showing confirmation", show_alert=True)
@@ -4393,18 +4381,25 @@ if __name__ == "__main__":
         admin_username = callback_query.from_user.username or "!NoName!"
         admin_id = callback_query.from_user.id
         
+        # Answer callback immediately to prevent timeout (no popup alert)
+        await callback_query.answer()
+        
         try:
             # Ban channel from all monitored chats
             success, channel_name, channel_username = await ban_rogue_chat_everywhere(
                 channel_id, CHANNEL_IDS
             )
             
-            # Remove buttons
-            await BOT.edit_message_reply_markup(
-                chat_id=callback_query.message.chat.id,
-                message_id=callback_query.message.message_id,
-                reply_markup=None,
-            )
+            # Remove buttons from message
+            try:
+                await BOT.edit_message_reply_markup(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=None,
+                )
+            except Exception as edit_error:
+                # Ignore errors when trying to remove buttons (message might be too old)
+                LOGGER.debug("Could not remove buttons: %s", edit_error)
             
             if success:
                 result_message = (
@@ -4420,14 +4415,12 @@ if __name__ == "__main__":
                     admin_username,
                     admin_id,
                 )
-                await callback_query.answer("Channel banned successfully!", show_alert=True)
             else:
                 result_message = (
                     f"⚠️ Channel {channel_name} {channel_username} "
                     f"(<code>{channel_id}</code>) ban failed or partially completed. "
                     f"Check logs for details."
                 )
-                await callback_query.answer("Channel ban failed - check logs", show_alert=True)
             
             # Send result to admin thread
             await safe_send_message(
@@ -4441,7 +4434,6 @@ if __name__ == "__main__":
             
         except Exception as e:
             LOGGER.error("Failed to execute channel ban for %s: %s", channel_id, e)
-            await callback_query.answer("Error executing channel ban", show_alert=True)
 
     @DP.callback_query_handler(lambda c: c.data.startswith("banchannelcancel_"))
     async def ban_channel_cancel(callback_query: CallbackQuery):
@@ -4466,7 +4458,7 @@ if __name__ == "__main__":
             reply_markup=channel_ban_kb,
         )
         
-        await callback_query.answer("Channel ban cancelled.", show_alert=False)
+        await callback_query.answer("Cancelled", show_alert=False)
 
     @DP.message_handler(
         is_in_monitored_channel,
@@ -4491,6 +4483,24 @@ if __name__ == "__main__":
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
                 )
+                
+                # DELETE CHANNEL message immediately after forwarding
+                try:
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                    LOGGER.info(
+                        "🔴 CHANNEL MESSAGE deleted: %s (%s) from chat %s - message forwarded to admins",
+                        message.sender_chat.title or "Unknown",
+                        message.sender_chat.id,
+                        message.chat.title,
+                    )
+                except Exception as del_error:
+                    LOGGER.warning(
+                        "🔴 CHANNEL MESSAGE: Could not delete message %s in chat %s: %s",
+                        message.message_id,
+                        message.chat.id,
+                        del_error,
+                    )
+                
                 message_link = construct_message_link(
                     [
                         message.chat.id,
@@ -4507,15 +4517,18 @@ if __name__ == "__main__":
                     )
                 )
                 
-                channel_info = f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
+                channel_info = f"<b>⚠️ CHANNEL MESSAGE DETECTED</b>\n\n"
+                channel_info += f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
                 if message.sender_chat.username:
                     channel_info += f"<b>Username:</b> @{message.sender_chat.username}\n"
-                channel_info += f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>"
+                channel_info += f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>\n"
+                channel_info += f"<b>Posted in:</b> {message.chat.title}\n"
+                channel_info += f"<b>Status:</b> ❌ Deleted from chat"
                 
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"From chat: {message.chat.title}\nMessage link: <a href='{message_link}'>Click here</a>\n\n{channel_info}",
+                    f"{channel_info}\n\nMessage link (deleted): <a href='{message_link}'>Click here</a>",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_ORIGINALS,
@@ -4524,18 +4537,18 @@ if __name__ == "__main__":
                 )
             except MessageIdInvalid as e:
                 LOGGER.error(
-                    "Message ID %s is invalid or the message was deleted in chat %s (%s): %s",
+                    "🔴 CHANNEL MESSAGE: Message ID %s is invalid or was deleted in chat %s (%s): %s",
                     message.message_id,
                     message.chat.title,
                     message.chat.id,
                     e,
                 )
             except MessageToForwardNotFound as e:
-                LOGGER.error("Channel message already deleted: %s", e)
+                LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted: %s", e)
             except MessageCantBeForwarded as e:
-                LOGGER.error("Channel message can't be forwarded: %s", e)
+                LOGGER.error("🔴 CHANNEL MESSAGE: Can't be forwarded: %s", e)
             except BadRequest as e:
-                LOGGER.error("Channel message processing error: %s", e)
+                LOGGER.error("🔴 CHANNEL MESSAGE: Processing error: %s", e)
                 # return XXX do not stop processing
             try:
                 # Convert the Message object to a dictionary
@@ -4549,25 +4562,20 @@ if __name__ == "__main__":
                         formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
                     )
                 LOGGER.debug(
-                    "\nReceived CHANNEL message object:\n %s\n",
+                    "\n🔴 CHANNEL MESSAGE object received:\n %s\n",
                     formatted_message,
                 )
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    (
-                        formatted_message_tlgrm
-                        if formatted_message_tlgrm
-                        else formatted_message
-                    ),
+                    f"🔴 <b>CHANNEL MESSAGE DEBUG:</b>\n\n<pre>{formatted_message_tlgrm if formatted_message_tlgrm else formatted_message}</pre>",
                     LOGGER,
+                    parse_mode="HTML",
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )
-                # DELETE CHANNEL messages
-                await BOT.delete_message(message.chat.id, message.message_id)
             except MessageToDeleteNotFound as e:
-                LOGGER.error("Channel message already deleted! %s", e)
+                LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted! %s", e)
 
             return  # XXX STOP processing and do not store message in the DB
 

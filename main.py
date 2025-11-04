@@ -176,6 +176,20 @@ def make_profile_dict(
     }
 
 
+def format_username_for_log(username: str | None) -> str:
+    """Format username for logging with @ prefix, or return !UNDEFINED! if no username.
+    
+    Args:
+        username: The username string, may be None or empty
+        
+    Returns:
+        Formatted string: '@username' or '!UNDEFINED!'
+    """
+    if not username or username == "!UNDEFINED!":
+        return "!UNDEFINED!"
+    return f"@{username}"
+
+
 from utils.utils_config import (
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
@@ -1903,10 +1917,10 @@ async def perform_checks(
 
             # Log the message with the appropriate color
             LOGGER.debug(
-                "%s%s:@%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
+                "%s%s:%s %02dmin check lols_cas_spam: %s\033[0m IDs to check left: %s",
                 color_code,
                 user_id,
-                user_name if user_name else "!UNDEFINED!",
+                format_username_for_log(user_name),
                 sleep_time // 60,
                 lols_spam,
                 len(active_user_checks_dict),
@@ -2309,16 +2323,19 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
         async def _await_cancel(_t: asyncio.Task, _uid=user_id, _uname=user_name):
             try:
                 await _t
-                LOGGER.info("%s:@%s Previous watchdog cancelled.", _uid, _uname)
+                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
+                LOGGER.info("%s:%s Previous watchdog cancelled.", _uid, _formatted_uname)
             except asyncio.CancelledError:
+                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
                 LOGGER.info(
-                    "%s:@%s Previous watchdog cancellation confirmed.", _uid, _uname
+                    "%s:%s Previous watchdog cancellation confirmed.", _uid, _formatted_uname
                 )
             except Exception as e:
+                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
                 LOGGER.error(
-                    "%s:@%s Error while cancelling previous watchdog: %s",
+                    "%s:%s Error while cancelling previous watchdog: %s",
                     _uid,
-                    _uname,
+                    _formatted_uname,
                     e,
                 )
 

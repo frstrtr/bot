@@ -57,6 +57,8 @@ from aiogram.utils.exceptions import (
     MessageIdInvalid,
     ChatAdminRequired,
     Unauthorized,
+    MessageNotModified,
+    InvalidQueryID,
     # BotKicked,
 )
 
@@ -4344,6 +4346,12 @@ if __name__ == "__main__":
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
         
+        # Answer callback immediately
+        try:
+            await callback_query.answer()
+        except (InvalidQueryID, BadRequest) as answer_error:
+            LOGGER.debug("Could not answer callback: %s", answer_error)
+        
         # Create confirmation keyboard
         confirm_kb = InlineKeyboardMarkup()
         confirm_kb.row(
@@ -4364,11 +4372,8 @@ if __name__ == "__main__":
                 message_id=callback_query.message.message_id,
                 reply_markup=confirm_kb,
             )
-            # Answer without popup alert
-            await callback_query.answer()
-        except Exception as e:
-            LOGGER.error("Failed to show channel ban confirmation: %s", e)
-            await callback_query.answer("Error showing confirmation", show_alert=True)
+        except (MessageNotModified, InvalidQueryID, BadRequest) as e:
+            LOGGER.debug("Could not update buttons: %s", e)
 
     @DP.callback_query_handler(lambda c: c.data.startswith("banchannelexecute_"))
     async def ban_channel_execute(callback_query: CallbackQuery):
@@ -4382,7 +4387,11 @@ if __name__ == "__main__":
         admin_id = callback_query.from_user.id
         
         # Answer callback immediately to prevent timeout (no popup alert)
-        await callback_query.answer()
+        try:
+            await callback_query.answer()
+        except Exception as answer_error:
+            # Query might be too old, but continue with ban anyway
+            LOGGER.debug("Could not answer callback query: %s", answer_error)
         
         try:
             # Ban channel from all monitored chats
@@ -4397,8 +4406,8 @@ if __name__ == "__main__":
                     message_id=callback_query.message.message_id,
                     reply_markup=None,
                 )
-            except Exception as edit_error:
-                # Ignore errors when trying to remove buttons (message might be too old)
+            except (MessageNotModified, InvalidQueryID, BadRequest) as edit_error:
+                # Ignore errors when trying to remove buttons (already removed, message too old, etc.)
                 LOGGER.debug("Could not remove buttons: %s", edit_error)
             
             if success:
@@ -4443,6 +4452,12 @@ if __name__ == "__main__":
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
         
+        # Answer callback immediately
+        try:
+            await callback_query.answer("Cancelled", show_alert=False)
+        except (InvalidQueryID, BadRequest) as answer_error:
+            LOGGER.debug("Could not answer callback: %s", answer_error)
+        
         # Restore original button
         channel_ban_kb = InlineKeyboardMarkup()
         channel_ban_kb.add(
@@ -4452,13 +4467,14 @@ if __name__ == "__main__":
             )
         )
         
-        await BOT.edit_message_reply_markup(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            reply_markup=channel_ban_kb,
-        )
-        
-        await callback_query.answer("Cancelled", show_alert=False)
+        try:
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=channel_ban_kb,
+            )
+        except (MessageNotModified, InvalidQueryID, BadRequest) as e:
+            LOGGER.debug("Could not restore buttons: %s", e)
 
     @DP.message_handler(
         is_in_monitored_channel,

@@ -5669,6 +5669,15 @@ if __name__ == "__main__":
                     lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
                     inline_kb = create_inline_keyboard(message_link, lols_link, message)
                     
+                    # Add check profile button for the message sender
+                    profile_link = f"tg://user?id={message.from_user.id}"
+                    inline_kb.add(
+                        InlineKeyboardButton(
+                            f"👤 Check Profile: {message.from_user.first_name}",
+                            url=profile_link,
+                        )
+                    )
+                    
                     # Build detailed content list with length limiting
                     content_details = []
                     max_items_per_type = 10  # Limit items to prevent message overflow
@@ -5687,7 +5696,10 @@ if __name__ == "__main__":
                         mentions_count = len(suspicious_items["mentions"])
                         content_details.append(f"<b>👤 Mentions ({mentions_count}):</b>")
                         for i, mention in enumerate(suspicious_items["mentions"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(mention)}</code>")
+                            # Create clickable Telegram link for each mention
+                            username_clean = mention.lstrip('@')
+                            mention_link = f'<a href="https://t.me/{username_clean}">{html.escape(mention)}</a>'
+                            content_details.append(f"  • {mention_link}")
                         if mentions_count > max_items_per_type:
                             content_details.append(f"  ... and {mentions_count - max_items_per_type} more")
                     

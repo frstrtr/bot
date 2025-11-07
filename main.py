@@ -678,17 +678,13 @@ async def load_active_user_checks():
     with open(active_checks_filename, "r", encoding="utf-8") as file:
         for line in file:
             user_id = int(line.strip().split(":")[0])
-            user_name = line.strip().split(":", 1)[1]
+            user_name_repr = line.strip().split(":", 1)[1]
             try:
-                # Attempt to parse user_name as a dictionary if it looks like a dict
-                user_name = (
-                    ast.literal_eval(user_name)
-                    if user_name.startswith("{") and user_name.endswith("}")
-                    else user_name
-                )
+                # Always use ast.literal_eval since we now consistently use repr() when saving
+                user_name = ast.literal_eval(user_name_repr)
             except (ValueError, SyntaxError):
-                # If parsing fails, keep user_name as a string
-                pass
+                # Fallback for malformed data or legacy format
+                user_name = user_name_repr
             active_user_checks_dict[user_id] = user_name
             event_message = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
@@ -805,11 +801,8 @@ async def on_shutdown(_dp):
         )
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
-                # Persist dicts as repr for round-trip; loader already supports dict/string
-                if isinstance(_uname, dict):
-                    file.write(f"{_id}:{repr(_uname)}\n")
-                else:
-                    file.write(f"{_id}:{_uname}\n")
+                # Always use repr() for consistent serialization (handles dict, None, strings, etc.)
+                file.write(f"{_id}:{repr(_uname)}\n")
     else:
         # clear the file if no active checks
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:

@@ -88,6 +88,7 @@ from utils.utils import (
     create_inline_keyboard,
     check_user_legit,
     report_spam_2p2p,
+    # remove_spam_from_2p2p,  # TODO: Uncomment when P2P server implements /remove_id endpoint
     report_spam_from_message,
     split_list,
     extract_username,
@@ -2772,6 +2773,29 @@ if __name__ == "__main__":
                             inout_username,
                             update.from_user.username or "!UNDEFINED!",
                         )
+
+                    # TODO: Remove from P2P network spam list when P2P server implements /remove_id endpoint
+                    # try:
+                    #     p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER)
+                    #     if p2p_removed:
+                    #         LOGGER.info(
+                    #             "\033[92m%s:@%s removed from P2P spam list - admin manually re-added\033[0m",
+                    #             inout_userid,
+                    #             inout_username,
+                    #         )
+                    #     else:
+                    #         LOGGER.warning(
+                    #             "\033[93m%s:@%s could not be removed from P2P spam list\033[0m",
+                    #             inout_userid,
+                    #             inout_username,
+                    #         )
+                    # except Exception as p2p_e:
+                    #     LOGGER.error(
+                    #         "%s:@%s failed to remove from P2P: %s",
+                    #         inout_userid,
+                    #         inout_username,
+                    #         p2p_e,
+                    #     )
 
                     # Mark as legit in database
                     try:
@@ -6488,6 +6512,16 @@ if __name__ == "__main__":
             if user_id in banned_users_dict:
                 del banned_users_dict[user_id]
                 LOGGER.info("%d removed from banned_users_dict", user_id)
+
+            # TODO: Remove from P2P network spam list when P2P server implements /remove_id endpoint
+            # try:
+            #     p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER)
+            #     if p2p_removed:
+            #         LOGGER.info("\033[92m%d removed from P2P spam list\033[0m", user_id)
+            #     else:
+            #         LOGGER.warning("\033[93m%d could not be removed from P2P spam list\033[0m", user_id)
+            # except Exception as p2p_e:
+            #     LOGGER.error("Failed to remove user %d from P2P: %s", user_id, p2p_e)
 
             # Mark user as legit in database to prevent future auto-checks
             try:

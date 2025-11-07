@@ -5612,6 +5612,31 @@ if __name__ == "__main__":
                         if phone:
                             suspicious_items["phones"].append(phone)
             
+            # Additional regex-based plain text @username detection
+            # Detects @username patterns that Telegram makes clickable but aren't formal mention entities
+            # Pattern: @ followed by 5-32 alphanumeric/underscore characters (Telegram username rules)
+            username_pattern = r'@([a-zA-Z0-9_]{5,32})\b'
+            
+            # Check message text for plain @username patterns
+            if message.text:
+                plain_mentions = re.findall(username_pattern, message.text)
+                for username in plain_mentions:
+                    mention_with_at = f"@{username}"
+                    # Avoid duplicates (might already be captured as formal mention entity)
+                    if mention_with_at not in suspicious_items["mentions"]:
+                        has_suspicious_content = True
+                        suspicious_items["mentions"].append(mention_with_at)
+            
+            # Check caption text for plain @username patterns
+            if message.caption:
+                plain_mentions = re.findall(username_pattern, message.caption)
+                for username in plain_mentions:
+                    mention_with_at = f"@{username}"
+                    # Avoid duplicates
+                    if mention_with_at not in suspicious_items["mentions"]:
+                        has_suspicious_content = True
+                        suspicious_items["mentions"].append(mention_with_at)
+            
             # Additional regex-based phone number detection for local numbers
             # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
             phone_patterns = [

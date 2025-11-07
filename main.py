@@ -2730,6 +2730,98 @@ if __name__ == "__main__":
             ChatMemberStatus.LEFT,
         ):  # only if user joined or kicked or restricted or left
 
+            # Check if admin manually re-added a user (was in banned/checks dict, now MEMBER, added by admin)
+            is_manual_readd = (
+                inout_status == ChatMemberStatus.MEMBER
+                and by_user  # Action done by someone other than the user themselves
+                and update.from_user.id != inout_userid  # Confirmed: someone else added user
+                and (inout_userid in banned_users_dict or inout_userid in active_user_checks_dict)
+            )
+
+            if is_manual_readd:
+                # Verify the person who added user back is actually an admin
+                try:
+                    is_admin_user = await is_admin(update.from_user.id, update.chat.id)
+                except Exception as admin_check_error:
+                    LOGGER.error(
+                        "Failed to check if user %s is admin in chat %s: %s",
+                        update.from_user.id,
+                        update.chat.id,
+                        admin_check_error,
+                    )
+                    is_admin_user = False
+
+                if is_admin_user:
+                    # Admin manually re-added a previously banned/monitored user
+                    # Cancel watchdog and mark as legit
+                    await cancel_named_watchdog(inout_userid, inout_username)
+                    
+                    if inout_userid in active_user_checks_dict:
+                        del active_user_checks_dict[inout_userid]
+                        LOGGER.info(
+                            "\033[92m%s:@%s removed from active checks - admin @%s manually re-added user\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+                    if inout_userid in banned_users_dict:
+                        del banned_users_dict[inout_userid]
+                        LOGGER.info(
+                            "\033[92m%s:@%s removed from banned list - admin @%s manually re-added user\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+
+                    # Mark as legit in database
+                    try:
+                        CURSOR.execute(
+                            """
+                            UPDATE recent_messages 
+                            SET new_chat_member = 1, left_chat_member = 1 
+                            WHERE user_id = ?
+                            """,
+                            (inout_userid,),
+                        )
+                        CONN.commit()
+                        LOGGER.info(
+                            "\033[92m%s:@%s marked as LEGIT in database - admin @%s manually re-added\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+                    except Exception as db_e:
+                        LOGGER.error(
+                            "%s:@%s failed to mark as legit in DB: %s",
+                            inout_userid,
+                            inout_username,
+                            db_e,
+                        )
+
+                    # Notify admin group
+                    admin_name = f"{update.from_user.first_name} {update.from_user.last_name or ''}".strip()
+                    admin_username = update.from_user.username or "!UNDEFINED!"
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        f"✅ User @{inout_username} (<code>{inout_userid}</code>) was manually re-added by admin {admin_name} @{admin_username} (<code>{update.from_user.id}</code>) and marked as LEGIT.\n"
+                        f"All monitoring cancelled. User will not be auto-banned.",
+                        LOGGER,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_MANBAN,
+                    )
+                    
+                    # Skip normal processing - user is now trusted
+                    return
+                else:
+                    LOGGER.warning(
+                        "\033[93m%s:@%s was re-added by non-admin user @%s (%s) - continuing normal checks\033[0m",
+                        inout_userid,
+                        inout_username,
+                        update.from_user.username or "!UNDEFINED!",
+                        update.from_user.id,
+                    )
+
             # Get the current timestamp
 
             # Log the message with the timestamp
@@ -6386,11 +6478,31 @@ if __name__ == "__main__":
             user_id = int(command_args[1])
             LOGGER.debug("%d - User ID to unban", user_id)
 
-            # remove from banned and checks dicts
+            # Cancel any running watchdog task for this user
+            await cancel_named_watchdog(user_id, "manual_unban")
+
+            # Remove from banned and checks dicts
             if user_id in active_user_checks_dict:
                 del active_user_checks_dict[user_id]
+                LOGGER.info("%d removed from active_user_checks_dict", user_id)
             if user_id in banned_users_dict:
                 del banned_users_dict[user_id]
+                LOGGER.info("%d removed from banned_users_dict", user_id)
+
+            # Mark user as legit in database to prevent future auto-checks
+            try:
+                CURSOR.execute(
+                    """
+                    UPDATE recent_messages 
+                    SET new_chat_member = 1, left_chat_member = 1 
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                )
+                CONN.commit()
+                LOGGER.info("%d marked as legit in database", user_id)
+            except Exception as db_e:
+                LOGGER.error("Failed to mark user %d as legit in DB: %s", user_id, db_e)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)

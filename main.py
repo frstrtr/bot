@@ -704,10 +704,12 @@ async def load_active_user_checks():
                     inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                 )
             )
+            # Format for logging: add @ prefix if username exists, otherwise show !UNDEFINED!
+            display_username = f"@{normalized_username}" if normalized_username else "!UNDEFINED!"
             LOGGER.info(
                 "%s:%s loaded from file & 3hr monitoring started ...",
                 user_id,
-                normalized_username,
+                display_username,
             )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)

@@ -693,11 +693,8 @@ async def load_active_user_checks():
                 + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
             )
             # Start the check NON-BLOCKING
-            # Normalize username for both task and logging
-            if isinstance(user_name, dict):
-                normalized_username = user_name.get("username", "!UNDEFINED!")
-            else:
-                normalized_username = user_name if user_name not in ["None", None, ""] else "!UNDEFINED!"
+            # Normalize username for both task and logging using normalize_username function
+            normalized_username = normalize_username(user_name)
             
             asyncio.create_task(
                 perform_checks(
@@ -707,12 +704,10 @@ async def load_active_user_checks():
                     inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                 )
             )
-            # Format username for logging (with @ prefix only if it's not !UNDEFINED!)
-            log_username = normalized_username if normalized_username == "!UNDEFINED!" else f"@{normalized_username}"
             LOGGER.info(
                 "%s:%s loaded from file & 3hr monitoring started ...",
                 user_id,
-                log_username,
+                normalized_username,
             )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)

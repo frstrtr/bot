@@ -650,7 +650,7 @@ async def load_banned_users():
     banned_users_filename = "banned_users.txt"
 
     if not os.path.exists(banned_users_filename):
-        LOGGER.error("File not found: %s", banned_users_filename)
+        LOGGER.info("File not found: %s (will be created when users are banned)", banned_users_filename)
         return
 
     with open(banned_users_filename, "r", encoding="utf-8") as file:
@@ -673,7 +673,7 @@ async def load_active_user_checks():
     active_checks_filename = "active_user_checks.txt"
 
     if not os.path.exists(active_checks_filename):
-        LOGGER.error("File not found: %s", active_checks_filename)
+        LOGGER.info("File not found: %s (will be created when users are monitored)", active_checks_filename)
         return
 
     with open(active_checks_filename, "r", encoding="utf-8") as file:

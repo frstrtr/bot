@@ -5519,7 +5519,11 @@ if __name__ == "__main__":
             suspicious_items = {
                 "links": [],
                 "mentions": [],
-                "phones": []
+                "phones": [],
+                "hashtags": [],
+                "cashtags": [],
+                "bot_commands": [],
+                "emails": []
             }
             
             # Helper function to extract text from entity
@@ -5579,11 +5583,44 @@ if __name__ == "__main__":
                         mention = extract_entity_text(message.text, entity)
                         if mention:
                             suspicious_items["mentions"].append(mention)
+                    elif entity_type == "text_mention":
+                        # Direct mention of user by ID (users without username)
+                        has_suspicious_content = True
+                        user = entity.get("user")
+                        if user:
+                            user_id = user.get("id")
+                            user_name = user.get("username")
+                            first_name = user.get("first_name", "")
+                            if user_name:
+                                suspicious_items["mentions"].append(f"@{user_name}")
+                            else:
+                                # User has no username, show ID and first name
+                                suspicious_items["mentions"].append(f"ID:{user_id} ({first_name})")
                     elif entity_type == "phone_number":
                         has_suspicious_content = True
                         phone = extract_entity_text(message.text, entity)
                         if phone:
                             suspicious_items["phones"].append(phone)
+                    elif entity_type == "hashtag":
+                        has_suspicious_content = True
+                        hashtag = extract_entity_text(message.text, entity)
+                        if hashtag:
+                            suspicious_items["hashtags"].append(hashtag)
+                    elif entity_type == "cashtag":
+                        has_suspicious_content = True
+                        cashtag = extract_entity_text(message.text, entity)
+                        if cashtag:
+                            suspicious_items["cashtags"].append(cashtag)
+                    elif entity_type == "bot_command":
+                        has_suspicious_content = True
+                        bot_cmd = extract_entity_text(message.text, entity)
+                        if bot_cmd:
+                            suspicious_items["bot_commands"].append(bot_cmd)
+                    elif entity_type == "email":
+                        has_suspicious_content = True
+                        email = extract_entity_text(message.text, entity)
+                        if email:
+                            suspicious_items["emails"].append(email)
             
             # Check caption entities for media messages
             if message.caption_entities and message.caption:
@@ -5606,11 +5643,44 @@ if __name__ == "__main__":
                         mention = extract_entity_text(message.caption, entity)
                         if mention:
                             suspicious_items["mentions"].append(mention)
+                    elif entity_type == "text_mention":
+                        # Direct mention of user by ID (users without username)
+                        has_suspicious_content = True
+                        user = entity.get("user")
+                        if user:
+                            user_id = user.get("id")
+                            user_name = user.get("username")
+                            first_name = user.get("first_name", "")
+                            if user_name:
+                                suspicious_items["mentions"].append(f"@{user_name}")
+                            else:
+                                # User has no username, show ID and first name
+                                suspicious_items["mentions"].append(f"ID:{user_id} ({first_name})")
                     elif entity_type == "phone_number":
                         has_suspicious_content = True
                         phone = extract_entity_text(message.caption, entity)
                         if phone:
                             suspicious_items["phones"].append(phone)
+                    elif entity_type == "hashtag":
+                        has_suspicious_content = True
+                        hashtag = extract_entity_text(message.caption, entity)
+                        if hashtag:
+                            suspicious_items["hashtags"].append(hashtag)
+                    elif entity_type == "cashtag":
+                        has_suspicious_content = True
+                        cashtag = extract_entity_text(message.caption, entity)
+                        if cashtag:
+                            suspicious_items["cashtags"].append(cashtag)
+                    elif entity_type == "bot_command":
+                        has_suspicious_content = True
+                        bot_cmd = extract_entity_text(message.caption, entity)
+                        if bot_cmd:
+                            suspicious_items["bot_commands"].append(bot_cmd)
+                    elif entity_type == "email":
+                        has_suspicious_content = True
+                        email = extract_entity_text(message.caption, entity)
+                        if email:
+                            suspicious_items["emails"].append(email)
             
             # Additional regex-based phone number detection for local numbers
             # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
@@ -5673,12 +5743,29 @@ if __name__ == "__main__":
                     if suspicious_items["mentions"]:
                         max_mention_buttons = 5
                         for mention in suspicious_items["mentions"][:max_mention_buttons]:
-                            # Remove @ prefix and create lolsBot deeplink with u- prefix
-                            username_clean = mention.lstrip('@')
-                            mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                            # Check if it's a username mention or ID mention
+                            if mention.startswith('@'):
+                                # Username mention - use u- prefix
+                                username_clean = mention.lstrip('@')
+                                mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                button_text = f"🔍 Check {mention}"
+                            elif mention.startswith('ID:'):
+                                # ID mention format: "ID:12345 (FirstName)"
+                                # Extract user ID
+                                user_id = mention.split('(')[0].replace('ID:', '').strip()
+                                mention_lols_link = f"https://t.me/oLolsBot?start={user_id}"
+                                # Shorten display name if too long
+                                display_name = mention if len(mention) <= 25 else mention[:22] + "..."
+                                button_text = f"🔍 Check {display_name}"
+                            else:
+                                # Fallback - treat as username
+                                username_clean = mention.lstrip('@')
+                                mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                button_text = f"🔍 Check {mention}"
+                            
                             inline_kb.add(
                                 InlineKeyboardButton(
-                                    f"🔍 Check {mention}",
+                                    button_text,
                                     url=mention_lols_link,
                                 )
                             )
@@ -5712,6 +5799,38 @@ if __name__ == "__main__":
                             content_details.append(f"  • <code>{html.escape(phone)}</code>")
                         if phones_count > max_items_per_type:
                             content_details.append(f"  ... and {phones_count - max_items_per_type} more")
+                    
+                    if suspicious_items["hashtags"]:
+                        hashtags_count = len(suspicious_items["hashtags"])
+                        content_details.append(f"<b>#️⃣ Hashtags ({hashtags_count}):</b>")
+                        for i, hashtag in enumerate(suspicious_items["hashtags"][:max_items_per_type]):
+                            content_details.append(f"  • <code>{html.escape(hashtag)}</code>")
+                        if hashtags_count > max_items_per_type:
+                            content_details.append(f"  ... and {hashtags_count - max_items_per_type} more")
+                    
+                    if suspicious_items["cashtags"]:
+                        cashtags_count = len(suspicious_items["cashtags"])
+                        content_details.append(f"<b>💰 Cashtags ({cashtags_count}):</b>")
+                        for i, cashtag in enumerate(suspicious_items["cashtags"][:max_items_per_type]):
+                            content_details.append(f"  • <code>{html.escape(cashtag)}</code>")
+                        if cashtags_count > max_items_per_type:
+                            content_details.append(f"  ... and {cashtags_count - max_items_per_type} more")
+                    
+                    if suspicious_items["bot_commands"]:
+                        bot_commands_count = len(suspicious_items["bot_commands"])
+                        content_details.append(f"<b>🤖 Bot Commands ({bot_commands_count}):</b>")
+                        for i, bot_cmd in enumerate(suspicious_items["bot_commands"][:max_items_per_type]):
+                            content_details.append(f"  • <code>{html.escape(bot_cmd)}</code>")
+                        if bot_commands_count > max_items_per_type:
+                            content_details.append(f"  ... and {bot_commands_count - max_items_per_type} more")
+                    
+                    if suspicious_items["emails"]:
+                        emails_count = len(suspicious_items["emails"])
+                        content_details.append(f"<b>📧 Emails ({emails_count}):</b>")
+                        for i, email in enumerate(suspicious_items["emails"][:max_items_per_type]):
+                            content_details.append(f"  • <code>{html.escape(email)}</code>")
+                        if emails_count > max_items_per_type:
+                            content_details.append(f"  ... and {emails_count - max_items_per_type} more")
                     
                     content_report = "\n".join(content_details)
                     

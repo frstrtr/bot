@@ -88,6 +88,7 @@ from utils.utils import (
     create_inline_keyboard,
     check_user_legit,
     report_spam_2p2p,
+    # remove_spam_from_2p2p,  # TODO: Uncomment when P2P server implements /remove_id endpoint
     report_spam_from_message,
     split_list,
     extract_username,
@@ -649,7 +650,7 @@ async def load_banned_users():
     banned_users_filename = "banned_users.txt"
 
     if not os.path.exists(banned_users_filename):
-        LOGGER.error("File not found: %s", banned_users_filename)
+        LOGGER.info("File not found: %s (will be created when users are banned)", banned_users_filename)
         return
 
     with open(banned_users_filename, "r", encoding="utf-8") as file:
@@ -672,23 +673,19 @@ async def load_active_user_checks():
     active_checks_filename = "active_user_checks.txt"
 
     if not os.path.exists(active_checks_filename):
-        LOGGER.error("File not found: %s", active_checks_filename)
+        LOGGER.info("File not found: %s (will be created when users are monitored)", active_checks_filename)
         return
 
     with open(active_checks_filename, "r", encoding="utf-8") as file:
         for line in file:
             user_id = int(line.strip().split(":")[0])
-            user_name = line.strip().split(":", 1)[1]
+            user_name_repr = line.strip().split(":", 1)[1]
             try:
-                # Attempt to parse user_name as a dictionary if it looks like a dict
-                user_name = (
-                    ast.literal_eval(user_name)
-                    if user_name.startswith("{") and user_name.endswith("}")
-                    else user_name
-                )
+                # Always use ast.literal_eval since we now consistently use repr() when saving
+                user_name = ast.literal_eval(user_name_repr)
             except (ValueError, SyntaxError):
-                # If parsing fails, keep user_name as a string
-                pass
+                # Fallback for malformed data or legacy format
+                user_name = user_name_repr
             active_user_checks_dict[user_id] = user_name
             event_message = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
@@ -696,22 +693,23 @@ async def load_active_user_checks():
                 + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
             )
             # Start the check NON-BLOCKING
-            if isinstance(user_name, dict):
-                user_name = user_name.get("username", "!UNDEFINED!")
-            else:
-                user_name = user_name if user_name != "None" else "!UNDEFINED!"
+            # Normalize username for both task and logging using normalize_username function
+            normalized_username = normalize_username(user_name)
+            
             asyncio.create_task(
                 perform_checks(
                     user_id=user_id,
-                    user_name=user_name,
+                    user_name=normalized_username,
                     event_record=event_message,
                     inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                 )
             )
+            # Format for logging: add @ prefix if username exists, otherwise show !UNDEFINED!
+            display_username = f"@{normalized_username}" if normalized_username else "!UNDEFINED!"
             LOGGER.info(
-                "%s:@%s loaded from file & 3hr monitoring started ...",
+                "%s:%s loaded from file & 3hr monitoring started ...",
                 user_id,
-                user_name if user_name != "None" else "!UNDEFINED!",
+                display_username,
             )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
@@ -801,11 +799,8 @@ async def on_shutdown(_dp):
         )
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
             for _id, _uname in active_user_checks_dict.items():
-                # Persist dicts as repr for round-trip; loader already supports dict/string
-                if isinstance(_uname, dict):
-                    file.write(f"{_id}:{repr(_uname)}\n")
-                else:
-                    file.write(f"{_id}:{_uname}\n")
+                # Always use repr() for consistent serialization (handles dict, None, strings, etc.)
+                file.write(f"{_id}:{repr(_uname)}\n")
     else:
         # clear the file if no active checks
         with open("active_user_checks.txt", "w", encoding="utf-8") as file:
@@ -2732,6 +2727,121 @@ if __name__ == "__main__":
             # ChatMemberStatus.RESTRICTED,
             ChatMemberStatus.LEFT,
         ):  # only if user joined or kicked or restricted or left
+
+            # Check if admin manually re-added a user (was in banned/checks dict, now MEMBER, added by admin)
+            is_manual_readd = (
+                inout_status == ChatMemberStatus.MEMBER
+                and by_user  # Action done by someone other than the user themselves
+                and update.from_user.id != inout_userid  # Confirmed: someone else added user
+                and (inout_userid in banned_users_dict or inout_userid in active_user_checks_dict)
+            )
+
+            if is_manual_readd:
+                # Verify the person who added user back is actually an admin
+                try:
+                    is_admin_user = await is_admin(update.from_user.id, update.chat.id)
+                except Exception as admin_check_error:
+                    LOGGER.error(
+                        "Failed to check if user %s is admin in chat %s: %s",
+                        update.from_user.id,
+                        update.chat.id,
+                        admin_check_error,
+                    )
+                    is_admin_user = False
+
+                if is_admin_user:
+                    # Admin manually re-added a previously banned/monitored user
+                    # Cancel watchdog and mark as legit
+                    await cancel_named_watchdog(inout_userid, inout_username)
+                    
+                    if inout_userid in active_user_checks_dict:
+                        del active_user_checks_dict[inout_userid]
+                        LOGGER.info(
+                            "\033[92m%s:@%s removed from active checks - admin @%s manually re-added user\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+                    if inout_userid in banned_users_dict:
+                        del banned_users_dict[inout_userid]
+                        LOGGER.info(
+                            "\033[92m%s:@%s removed from banned list - admin @%s manually re-added user\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+
+                    # TODO: Remove from P2P network spam list when P2P server implements /remove_id endpoint
+                    # try:
+                    #     p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER)
+                    #     if p2p_removed:
+                    #         LOGGER.info(
+                    #             "\033[92m%s:@%s removed from P2P spam list - admin manually re-added\033[0m",
+                    #             inout_userid,
+                    #             inout_username,
+                    #         )
+                    #     else:
+                    #         LOGGER.warning(
+                    #             "\033[93m%s:@%s could not be removed from P2P spam list\033[0m",
+                    #             inout_userid,
+                    #             inout_username,
+                    #         )
+                    # except Exception as p2p_e:
+                    #     LOGGER.error(
+                    #         "%s:@%s failed to remove from P2P: %s",
+                    #         inout_userid,
+                    #         inout_username,
+                    #         p2p_e,
+                    #     )
+
+                    # Mark as legit in database
+                    try:
+                        CURSOR.execute(
+                            """
+                            UPDATE recent_messages 
+                            SET new_chat_member = 1, left_chat_member = 1 
+                            WHERE user_id = ?
+                            """,
+                            (inout_userid,),
+                        )
+                        CONN.commit()
+                        LOGGER.info(
+                            "\033[92m%s:@%s marked as LEGIT in database - admin @%s manually re-added\033[0m",
+                            inout_userid,
+                            inout_username,
+                            update.from_user.username or "!UNDEFINED!",
+                        )
+                    except Exception as db_e:
+                        LOGGER.error(
+                            "%s:@%s failed to mark as legit in DB: %s",
+                            inout_userid,
+                            inout_username,
+                            db_e,
+                        )
+
+                    # Notify admin group
+                    admin_name = f"{update.from_user.first_name} {update.from_user.last_name or ''}".strip()
+                    admin_username = update.from_user.username or "!UNDEFINED!"
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        f"✅ User @{inout_username} (<code>{inout_userid}</code>) was manually re-added by admin {admin_name} @{admin_username} (<code>{update.from_user.id}</code>) and marked as LEGIT.\n"
+                        f"All monitoring cancelled. User will not be auto-banned.",
+                        LOGGER,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_MANBAN,
+                    )
+                    
+                    # Skip normal processing - user is now trusted
+                    return
+                else:
+                    LOGGER.warning(
+                        "\033[93m%s:@%s was re-added by non-admin user @%s (%s) - continuing normal checks\033[0m",
+                        inout_userid,
+                        inout_username,
+                        update.from_user.username or "!UNDEFINED!",
+                        update.from_user.id,
+                    )
 
             # Get the current timestamp
 
@@ -5682,6 +5792,31 @@ if __name__ == "__main__":
                         if email:
                             suspicious_items["emails"].append(email)
             
+            # Additional regex-based plain text @username detection
+            # Detects @username patterns that Telegram makes clickable but aren't formal mention entities
+            # Pattern: @ followed by 5-32 alphanumeric/underscore characters (Telegram username rules)
+            username_pattern = r'@([a-zA-Z0-9_]{5,32})\b'
+            
+            # Check message text for plain @username patterns
+            if message.text:
+                plain_mentions = re.findall(username_pattern, message.text)
+                for username in plain_mentions:
+                    mention_with_at = f"@{username}"
+                    # Avoid duplicates (might already be captured as formal mention entity)
+                    if mention_with_at not in suspicious_items["mentions"]:
+                        has_suspicious_content = True
+                        suspicious_items["mentions"].append(mention_with_at)
+            
+            # Check caption text for plain @username patterns
+            if message.caption:
+                plain_mentions = re.findall(username_pattern, message.caption)
+                for username in plain_mentions:
+                    mention_with_at = f"@{username}"
+                    # Avoid duplicates
+                    if mention_with_at not in suspicious_items["mentions"]:
+                        has_suspicious_content = True
+                        suspicious_items["mentions"].append(mention_with_at)
+            
             # Additional regex-based phone number detection for local numbers
             # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
             phone_patterns = [
@@ -6483,11 +6618,41 @@ if __name__ == "__main__":
             user_id = int(command_args[1])
             LOGGER.debug("%d - User ID to unban", user_id)
 
-            # remove from banned and checks dicts
+            # Cancel any running watchdog task for this user
+            await cancel_named_watchdog(user_id, "manual_unban")
+
+            # Remove from banned and checks dicts
             if user_id in active_user_checks_dict:
                 del active_user_checks_dict[user_id]
+                LOGGER.info("%d removed from active_user_checks_dict", user_id)
             if user_id in banned_users_dict:
                 del banned_users_dict[user_id]
+                LOGGER.info("%d removed from banned_users_dict", user_id)
+
+            # TODO: Remove from P2P network spam list when P2P server implements /remove_id endpoint
+            # try:
+            #     p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER)
+            #     if p2p_removed:
+            #         LOGGER.info("\033[92m%d removed from P2P spam list\033[0m", user_id)
+            #     else:
+            #         LOGGER.warning("\033[93m%d could not be removed from P2P spam list\033[0m", user_id)
+            # except Exception as p2p_e:
+            #     LOGGER.error("Failed to remove user %d from P2P: %s", user_id, p2p_e)
+
+            # Mark user as legit in database to prevent future auto-checks
+            try:
+                CURSOR.execute(
+                    """
+                    UPDATE recent_messages 
+                    SET new_chat_member = 1, left_chat_member = 1 
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                )
+                CONN.commit()
+                LOGGER.info("%d marked as legit in database", user_id)
+            except Exception as db_e:
+                LOGGER.error("Failed to mark user %d as legit in DB: %s", user_id, db_e)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)

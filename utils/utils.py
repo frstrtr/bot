@@ -658,6 +658,31 @@ async def report_spam_2p2p(spammer_id: int, logger) -> bool:
         return False
 
 
+async def remove_spam_from_2p2p(user_id: int, logger) -> bool:
+    """Function to remove user from P2P spamcheck server (mark as legit)"""
+    try:
+        # local P2P spamcheck server - assuming there's a whitelist/remove endpoint
+        url = f"http://localhost:8081/remove_id?user_id={user_id}"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url) as response:
+                if response.status == 200:
+                    logger.info(
+                        f"{user_id} successfully removed from P2P spamcheck server (marked as legit)."
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        f"{user_id} failed to remove from P2P server, status: {response.status}"
+                    )
+                    return False
+    except aiohttp.ServerTimeoutError as e:
+        logger.error(f"Server timeout error removing user from P2P: {e}")
+        return False
+    except aiohttp.ClientError as e:
+        logger.error(f"Client error removing user from P2P: {e}")
+        return False
+
+
 async def report_spam_from_message(message: types.Message, logger, userid_toexclude):
     """
     Reports spam from various IDs found in a message.

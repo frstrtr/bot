@@ -16,7 +16,8 @@ ADMIN_AUTOBAN = None
 ADMIN_MANBAN = None
 ADMIN_SUSPICIOUS = None
 TECHNO_RESTART = None
-TECHNO_INOUT = None
+TECHNO_IN = None
+TECHNO_OUT = None
 ADMIN_USER_ID = None
 TECHNO_NAMES = None
 CHANNEL_NAMES = []
@@ -43,7 +44,7 @@ API_TOKEN = None  # Initialize API_TOKEN at the module level
 def load_config():
     """Load configuration values from an XML file."""
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
-    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_INOUT, ADMIN_USER_ID, TECHNO_NAMES
+    global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_IN, TECHNO_OUT, ADMIN_USER_ID, TECHNO_NAMES
     global CHANNEL_NAMES, SPAM_TRIGGERS, ADMIN_SUSPICIOUS, TECHNO_ADMIN
     global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
@@ -92,7 +93,8 @@ def load_config():
         TECHNO_ORIGINALS = int(config_XML_root.find("techno_originals").text)
         TECHNO_UNHANDLED = int(config_XML_root.find("techno_unhandled").text)
         TECHNO_RESTART = int(config_XML_root.find("techno_restart").text)
-        TECHNO_INOUT = int(config_XML_root.find("techno_inout").text)
+        TECHNO_IN = int(config_XML_root.find("techno_in").text)
+        TECHNO_OUT = int(config_XML_root.find("techno_out").text)
         TECHNO_NAMES = int(config_XML_root.find("techno_names").text)
         TECHNO_ADMIN = int(config_XML_root.find("techno_admin").text)
 

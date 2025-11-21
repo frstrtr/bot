@@ -180,10 +180,10 @@ def make_profile_dict(
 
 def format_username_for_log(username: str | None) -> str:
     """Format username for logging with @ prefix, or return !UNDEFINED! if no username.
-    
+
     Args:
         username: The username string, may be None or empty
-        
+
     Returns:
         Formatted string: '@username' or '!UNDEFINED!'
     """
@@ -203,7 +203,8 @@ from utils.utils_config import (
     ADMIN_MANBAN,
     ADMIN_SUSPICIOUS,
     TECHNO_RESTART,
-    TECHNO_INOUT,
+    TECHNO_IN,
+    TECHNO_OUT,
     ADMIN_USER_ID,
     TECHNO_NAMES,
     CHANNEL_NAMES,
@@ -1262,13 +1263,13 @@ async def ban_user_from_all_chats(
         user_name (str): The name of the user to ban.
         channel_ids (list): A list of channel IDs to ban the user from.
         channel_dict (dict): A dictionary mapping channel IDs to channel names.
-    
+
     Returns:
         tuple: (success_count, fail_count, total_count)
     """
     success_count = 0
     fail_count = 0
-    
+
     for chat_id in channel_ids:
         try:
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
@@ -1310,7 +1311,7 @@ async def ban_user_from_all_chats(
         success_count,
         total_count,
     )
-    
+
     return success_count, fail_count, total_count
 
 
@@ -1324,7 +1325,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         )  # add and remove the user to the banned_users_dict
 
         # remove user from all known chats first
-        success_count, fail_count, total_count = await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+        success_count, fail_count, total_count = await ban_user_from_all_chats(
+            _id, user_name, CHANNEL_IDS, CHANNEL_DICT
+        )
 
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
@@ -1339,7 +1342,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         banned_users_dict[_id] = user_name
 
         # remove user from all known chats first
-        success_count, fail_count, total_count = await ban_user_from_all_chats(_id, user_name, CHANNEL_IDS, CHANNEL_DICT)
+        success_count, fail_count, total_count = await ban_user_from_all_chats(
+            _id, user_name, CHANNEL_IDS, CHANNEL_DICT
+        )
 
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
@@ -1350,6 +1355,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             last_3_users_str,  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
+
     # Normalize username for logging / notification (may be dict with nested baseline)
     def _extract_username(u):
         if isinstance(u, dict):
@@ -1375,7 +1381,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     # Only send if we have something (we still show !UNDEFINED! explicitly per requirement)
     # If username is undefined, skip sending this line (requested behavior change)
     if norm_username == "!UNDEFINED!":
-        LOGGER.debug("%s username undefined; skipping TECHNO_NAMES notification line", _id)
+        LOGGER.debug(
+            "%s username undefined; skipping TECHNO_NAMES notification line", _id
+        )
         return
     await safe_send_message(
         BOT,
@@ -1516,7 +1524,9 @@ async def check_and_autoban(
                     message_thread_id=TECHNO_NAMES,
                 )
             else:
-                LOGGER.debug("%s username undefined; skipping 990 notification line", user_id)
+                LOGGER.debug(
+                    "%s username undefined; skipping 990 notification line", user_id
+                )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
                 + " by Хранитель Порядков\n"
@@ -1570,7 +1580,9 @@ async def check_and_autoban(
                     message_thread_id=TECHNO_NAMES,
                 )
             else:
-                LOGGER.debug("%s username undefined; skipping 1526 notification line", user_id)
+                LOGGER.debug(
+                    "%s username undefined; skipping 1526 notification line", user_id
+                )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
                 .replace("--> left", "--> kicked", 1)
@@ -1631,7 +1643,9 @@ async def check_and_autoban(
                     message_thread_id=TECHNO_NAMES,
                 )
             else:
-                LOGGER.debug("%s username undefined; skipping 1054 notification line", user_id)
+                LOGGER.debug(
+                    "%s username undefined; skipping 1054 notification line", user_id
+                )
         return True
 
     return False
@@ -1734,16 +1748,25 @@ async def check_n_ban(message: types.Message, reason: str):
         # send the telefrag log message to the admin group
         # Create keyboard with both LOLS check and Actions button
         inline_kb = InlineKeyboardMarkup()
-        inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=f"https://t.me/oLolsBot?start={message.from_user.id}"))
+        inline_kb.add(
+            InlineKeyboardButton(
+                "ℹ️ Check Spam Data ℹ️",
+                url=f"https://t.me/oLolsBot?start={message.from_user.id}",
+            )
+        )
         # Add Actions button for manual review/unban
-        report_id = int(str(message.chat.id)[4:] + str(message.message_id)) if message.chat.id < 0 else int(str(message.chat.id) + str(message.message_id))
+        report_id = (
+            int(str(message.chat.id)[4:] + str(message.message_id))
+            if message.chat.id < 0
+            else int(str(message.chat.id) + str(message.message_id))
+        )
         inline_kb.add(
             InlineKeyboardButton(
                 "⚙️ Actions (Unban / Review) ⚙️",
                 callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{message.from_user.id}",
             )
         )
-        
+
         chat_link = (
             f"https://t.me/{message.chat.username}"
             if message.chat.username
@@ -1764,7 +1787,7 @@ async def check_n_ban(message: types.Message, reason: str):
             disable_web_page_preview=True,
             reply_markup=inline_kb,
         )
-        
+
         # Store the autoban state for Actions button to work
         set_forwarded_state(
             DP,
@@ -1776,7 +1799,7 @@ async def check_n_ban(message: types.Message, reason: str):
                 "report_chat_id": message.chat.id,
             },
         )
-        
+
         # log username to the username thread
         _uname_1191 = normalize_username(message.from_user.username)
         if _uname_1191 and _uname_1191 not in POSTED_USERNAMES:
@@ -2326,15 +2349,31 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
         async def _await_cancel(_t: asyncio.Task, _uid=user_id, _uname=user_name):
             try:
                 await _t
-                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
-                LOGGER.info("%s:%s Previous watchdog cancelled.", _uid, _formatted_uname)
-            except asyncio.CancelledError:
-                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
+                _formatted_uname = (
+                    f"@{_uname}"
+                    if _uname and _uname != "!UNDEFINED!"
+                    else "!UNDEFINED!"
+                )
                 LOGGER.info(
-                    "%s:%s Previous watchdog cancellation confirmed.", _uid, _formatted_uname
+                    "%s:%s Previous watchdog cancelled.", _uid, _formatted_uname
+                )
+            except asyncio.CancelledError:
+                _formatted_uname = (
+                    f"@{_uname}"
+                    if _uname and _uname != "!UNDEFINED!"
+                    else "!UNDEFINED!"
+                )
+                LOGGER.info(
+                    "%s:%s Previous watchdog cancellation confirmed.",
+                    _uid,
+                    _formatted_uname,
                 )
             except Exception as e:
-                _formatted_uname = f"@{_uname}" if _uname and _uname != "!UNDEFINED!" else "!UNDEFINED!"
+                _formatted_uname = (
+                    f"@{_uname}"
+                    if _uname and _uname != "!UNDEFINED!"
+                    else "!UNDEFINED!"
+                )
                 LOGGER.error(
                     "%s:%s Error while cancelling previous watchdog: %s",
                     _uid,
@@ -2656,6 +2695,7 @@ if __name__ == "__main__":
 
         inline_kb = make_lols_kb(inout_userid)
 
+        inoout_thread = None # initialize
         # Add buttons for the user actions only if the user is not a spammer
         if lols_spam is not True:
             inline_kb.add(
@@ -2663,13 +2703,16 @@ if __name__ == "__main__":
                     "🚫 Ban User", callback_data=f"banuser_{inout_userid}"
                 )
             )
+            inout_thread = TECHNO_IN
+        else:
+            inout_thread = TECHNO_OUT
 
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP,
             inout_logmessage,
             LOGGER,
-            message_thread_id=TECHNO_INOUT,
+            message_thread_id=inout_thread,
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
@@ -2995,8 +3038,10 @@ if __name__ == "__main__":
                         inout_chattitle,
                     )
                     # ban user from all chats
-                    success_count, fail_count, total_count = await ban_user_from_all_chats(
-                        inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
+                    success_count, fail_count, total_count = (
+                        await ban_user_from_all_chats(
+                            inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
+                        )
                     )
                     lols_url = build_lols_url(inout_userid)
                     inline_kb = InlineKeyboardMarkup().add(
@@ -4233,7 +4278,9 @@ if __name__ == "__main__":
                 )
 
             # Ban user from all chats
-            success_count, fail_count, total_count = await ban_user_from_all_chats(user_id, username, CHANNEL_IDS, CHANNEL_DICT)
+            success_count, fail_count, total_count = await ban_user_from_all_chats(
+                user_id, username, CHANNEL_IDS, CHANNEL_DICT
+            )
 
             # Add to banned users dict
             banned_users_dict[user_id] = username
@@ -4346,13 +4393,13 @@ if __name__ == "__main__":
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
-        
+
         # Answer callback immediately
         try:
             await callback_query.answer()
         except (InvalidQueryID, BadRequest) as answer_error:
             LOGGER.debug("Could not answer callback: %s", answer_error)
-        
+
         # Create confirmation keyboard
         confirm_kb = InlineKeyboardMarkup()
         confirm_kb.row(
@@ -4365,7 +4412,7 @@ if __name__ == "__main__":
                 callback_data=f"banchannelcancel_{channel_id}_{source_chat_id}",
             ),
         )
-        
+
         # Update message with confirmation buttons (no popup alert)
         try:
             await BOT.edit_message_reply_markup(
@@ -4383,23 +4430,23 @@ if __name__ == "__main__":
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
-        
+
         admin_username = callback_query.from_user.username or "!NoName!"
         admin_id = callback_query.from_user.id
-        
+
         # Answer callback immediately to prevent timeout (no popup alert)
         try:
             await callback_query.answer()
         except Exception as answer_error:
             # Query might be too old, but continue with ban anyway
             LOGGER.debug("Could not answer callback query: %s", answer_error)
-        
+
         try:
             # Ban channel from all monitored chats
             success, channel_name, channel_username = await ban_rogue_chat_everywhere(
                 channel_id, CHANNEL_IDS
             )
-            
+
             # Remove buttons from message
             try:
                 await BOT.edit_message_reply_markup(
@@ -4410,7 +4457,7 @@ if __name__ == "__main__":
             except (MessageNotModified, InvalidQueryID, BadRequest) as edit_error:
                 # Ignore errors when trying to remove buttons (already removed, message too old, etc.)
                 LOGGER.debug("Could not remove buttons: %s", edit_error)
-            
+
             if success:
                 result_message = (
                     f"✅ Channel {channel_name} {channel_username} "
@@ -4431,7 +4478,7 @@ if __name__ == "__main__":
                     f"(<code>{channel_id}</code>) ban failed or partially completed. "
                     f"Check logs for details."
                 )
-            
+
             # Send result to admin thread
             await safe_send_message(
                 BOT,
@@ -4441,7 +4488,7 @@ if __name__ == "__main__":
                 parse_mode="HTML",
                 message_thread_id=TECHNO_ADMIN,
             )
-            
+
         except Exception as e:
             LOGGER.error("Failed to execute channel ban for %s: %s", channel_id, e)
 
@@ -4452,13 +4499,13 @@ if __name__ == "__main__":
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
-        
+
         # Answer callback immediately
         try:
             await callback_query.answer("Cancelled", show_alert=False)
         except (InvalidQueryID, BadRequest) as answer_error:
             LOGGER.debug("Could not answer callback: %s", answer_error)
-        
+
         # Restore original button
         channel_ban_kb = InlineKeyboardMarkup()
         channel_ban_kb.add(
@@ -4467,7 +4514,7 @@ if __name__ == "__main__":
                 callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}",
             )
         )
-        
+
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
@@ -4500,7 +4547,7 @@ if __name__ == "__main__":
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
                 )
-                
+
                 # DELETE CHANNEL message immediately after forwarding
                 try:
                     await BOT.delete_message(message.chat.id, message.message_id)
@@ -4517,7 +4564,7 @@ if __name__ == "__main__":
                         message.chat.id,
                         del_error,
                     )
-                
+
                 message_link = construct_message_link(
                     [
                         message.chat.id,
@@ -4533,15 +4580,21 @@ if __name__ == "__main__":
                         callback_data=f"banchannelconfirm_{message.sender_chat.id}_{message.chat.id}",
                     )
                 )
-                
+
                 channel_info = f"<b>⚠️ CHANNEL MESSAGE DETECTED</b>\n\n"
-                channel_info += f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
+                channel_info += (
+                    f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
+                )
                 if message.sender_chat.username:
-                    channel_info += f"<b>Username:</b> @{message.sender_chat.username}\n"
-                channel_info += f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>\n"
+                    channel_info += (
+                        f"<b>Username:</b> @{message.sender_chat.username}\n"
+                    )
+                channel_info += (
+                    f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>\n"
+                )
                 channel_info += f"<b>Posted in:</b> {message.chat.title}\n"
                 channel_info += f"<b>Status:</b> ❌ Deleted from chat"
-                
+
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
@@ -5496,10 +5549,12 @@ if __name__ == "__main__":
                         _chat_title_safe = html.escape(message.chat.title)
                         if message.chat.username:
                             _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
-                        elif str(message.chat.id).startswith('-100'):
+                        elif str(message.chat.id).startswith("-100"):
                             _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
                         else:
-                            _chat_link_html = f"<b>{_chat_title_safe}</b>"  # non-linkable
+                            _chat_link_html = (
+                                f"<b>{_chat_title_safe}</b>"  # non-linkable
+                            )
 
                         await safe_send_message(
                             BOT,
@@ -5524,9 +5579,9 @@ if __name__ == "__main__":
                 "hashtags": [],
                 "cashtags": [],
                 "bot_commands": [],
-                "emails": []
+                "emails": [],
             }
-            
+
             # Helper function to extract text from entity
             def extract_entity_text(text, entity):
                 """Extract text from message entity."""
@@ -5534,9 +5589,11 @@ if __name__ == "__main__":
                 length = entity.get("length", 0)
                 if text and offset is not None and length:
                     # Handle UTF-16 encoding (Telegram uses UTF-16 for offsets)
-                    return text.encode('utf-16-le')[offset*2:(offset+length)*2].decode('utf-16-le')
+                    return text.encode("utf-16-le")[
+                        offset * 2 : (offset + length) * 2
+                    ].decode("utf-16-le")
                 return None
-            
+
             # Helper function to show invisible characters as unicode codepoints
             def make_visible(text, max_len=100):
                 """Make invisible/special characters visible as unicode codepoints."""
@@ -5549,20 +5606,28 @@ if __name__ == "__main__":
                 result = []
                 for char in text:
                     # Check if character is invisible, whitespace, or control character
-                    if char in ['\u200b', '\u200c', '\u200d', '\ufeff', '\u00a0', '\u2060', '\u180e']:
+                    if char in [
+                        "\u200b",
+                        "\u200c",
+                        "\u200d",
+                        "\ufeff",
+                        "\u00a0",
+                        "\u2060",
+                        "\u180e",
+                    ]:
                         # Zero-width or invisible spaces
                         result.append(f"[U+{ord(char):04X}]")
                     elif ord(char) < 32 or (ord(char) >= 127 and ord(char) < 160):
                         # Control characters
                         result.append(f"[U+{ord(char):04X}]")
-                    elif char == '\n':
-                        result.append('\\n')
-                    elif char == '\t':
-                        result.append('\\t')
+                    elif char == "\n":
+                        result.append("\\n")
+                    elif char == "\t":
+                        result.append("\\t")
                     else:
                         result.append(char)
-                return ''.join(result)
-            
+                return "".join(result)
+
             # Check message entities for links, mentions, phone numbers
             if message.entities and message.text:
                 for entity in message.entities:
@@ -5574,7 +5639,9 @@ if __name__ == "__main__":
                             url = entity.get("url", "")
                             visible_text = extract_entity_text(message.text, entity)
                             visible_clean = make_visible(visible_text, max_len=50)
-                            suspicious_items["links"].append(f"{url} (hidden as: {visible_clean})")
+                            suspicious_items["links"].append(
+                                f"{url} (hidden as: {visible_clean})"
+                            )
                         else:
                             url = extract_entity_text(message.text, entity)
                             if url:
@@ -5596,7 +5663,9 @@ if __name__ == "__main__":
                                 suspicious_items["mentions"].append(f"@{user_name}")
                             else:
                                 # User has no username, show ID and first name
-                                suspicious_items["mentions"].append(f"ID:{user_id} ({first_name})")
+                                suspicious_items["mentions"].append(
+                                    f"ID:{user_id} ({first_name})"
+                                )
                     elif entity_type == "phone_number":
                         has_suspicious_content = True
                         phone = extract_entity_text(message.text, entity)
@@ -5622,7 +5691,7 @@ if __name__ == "__main__":
                         email = extract_entity_text(message.text, entity)
                         if email:
                             suspicious_items["emails"].append(email)
-            
+
             # Check caption entities for media messages
             if message.caption_entities and message.caption:
                 for entity in message.caption_entities:
@@ -5634,7 +5703,9 @@ if __name__ == "__main__":
                             url = entity.get("url", "")
                             visible_text = extract_entity_text(message.caption, entity)
                             visible_clean = make_visible(visible_text, max_len=50)
-                            suspicious_items["links"].append(f"{url} (hidden as: {visible_clean})")
+                            suspicious_items["links"].append(
+                                f"{url} (hidden as: {visible_clean})"
+                            )
                         else:
                             url = extract_entity_text(message.caption, entity)
                             if url:
@@ -5656,7 +5727,9 @@ if __name__ == "__main__":
                                 suspicious_items["mentions"].append(f"@{user_name}")
                             else:
                                 # User has no username, show ID and first name
-                                suspicious_items["mentions"].append(f"ID:{user_id} ({first_name})")
+                                suspicious_items["mentions"].append(
+                                    f"ID:{user_id} ({first_name})"
+                                )
                     elif entity_type == "phone_number":
                         has_suspicious_content = True
                         phone = extract_entity_text(message.caption, entity)
@@ -5682,17 +5755,17 @@ if __name__ == "__main__":
                         email = extract_entity_text(message.caption, entity)
                         if email:
                             suspicious_items["emails"].append(email)
-            
+
             # Additional regex-based phone number detection for local numbers
             # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
             phone_patterns = [
-                r'\+230\s*\d{6,8}',           # +230 followed by 6-8 digits
-                r'00230\s*\d{6,8}',           # 00230 followed by 6-8 digits
-                r'(?<!\d)230\s*\d{6,8}',      # 230 followed by 6-8 digits (not preceded by digit)
-                r'\+\d{10,15}',                # International format +XXXXXXXXXXX
-                r'(?<!\d)\d{3}[-\s]?\d{3}[-\s]?\d{4}(?!\d)',  # Format: 123-456-7890 or 123 456 7890
+                r"\+230\s*\d{6,8}",  # +230 followed by 6-8 digits
+                r"00230\s*\d{6,8}",  # 00230 followed by 6-8 digits
+                r"(?<!\d)230\s*\d{6,8}",  # 230 followed by 6-8 digits (not preceded by digit)
+                r"\+\d{10,15}",  # International format +XXXXXXXXXXX
+                r"(?<!\d)\d{3}[-\s]?\d{3}[-\s]?\d{4}(?!\d)",  # Format: 123-456-7890 or 123 456 7890
             ]
-            
+
             # Check message text
             if message.text:
                 for pattern in phone_patterns:
@@ -5704,7 +5777,7 @@ if __name__ == "__main__":
                         if cleaned_phone not in suspicious_items["phones"]:
                             has_suspicious_content = True
                             suspicious_items["phones"].append(cleaned_phone)
-            
+
             # Check caption text
             if message.caption:
                 for pattern in phone_patterns:
@@ -5716,7 +5789,7 @@ if __name__ == "__main__":
                         if cleaned_phone not in suspicious_items["phones"]:
                             has_suspicious_content = True
                             suspicious_items["phones"].append(cleaned_phone)
-            
+
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
             if has_suspicious_content:
                 try:
@@ -5726,115 +5799,181 @@ if __name__ == "__main__":
                         ADMIN_SUSPICIOUS,
                         disable_notification=True,
                     )
-                    
+
                     # Build clickable chat link
                     _chat_title_safe = html.escape(message.chat.title)
                     if message.chat.username:
                         _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
-                    elif str(message.chat.id).startswith('-100'):
+                    elif str(message.chat.id).startswith("-100"):
                         _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
                     else:
                         _chat_link_html = f"<b>{_chat_title_safe}</b>"
-                    
+
                     # Get lols link and create keyboard
                     lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"
                     inline_kb = create_inline_keyboard(message_link, lols_link, message)
-                    
+
                     # Add check buttons for each mentioned username (up to 5 to avoid button overflow)
                     if suspicious_items["mentions"]:
                         max_mention_buttons = 5
-                        for mention in suspicious_items["mentions"][:max_mention_buttons]:
+                        for mention in suspicious_items["mentions"][
+                            :max_mention_buttons
+                        ]:
                             # Check if it's a username mention or ID mention
-                            if mention.startswith('@'):
+                            if mention.startswith("@"):
                                 # Username mention - use u- prefix
-                                username_clean = mention.lstrip('@')
-                                mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                username_clean = mention.lstrip("@")
+                                mention_lols_link = (
+                                    f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                )
                                 button_text = f"🔍 Check {mention}"
-                            elif mention.startswith('ID:'):
+                            elif mention.startswith("ID:"):
                                 # ID mention format: "ID:12345 (FirstName)"
                                 # Extract user ID
-                                user_id = mention.split('(')[0].replace('ID:', '').strip()
-                                mention_lols_link = f"https://t.me/oLolsBot?start={user_id}"
+                                user_id = (
+                                    mention.split("(")[0].replace("ID:", "").strip()
+                                )
+                                mention_lols_link = (
+                                    f"https://t.me/oLolsBot?start={user_id}"
+                                )
                                 # Shorten display name if too long
-                                display_name = mention if len(mention) <= 25 else mention[:22] + "..."
+                                display_name = (
+                                    mention
+                                    if len(mention) <= 25
+                                    else mention[:22] + "..."
+                                )
                                 button_text = f"🔍 Check {display_name}"
                             else:
                                 # Fallback - treat as username
-                                username_clean = mention.lstrip('@')
-                                mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                username_clean = mention.lstrip("@")
+                                mention_lols_link = (
+                                    f"https://t.me/oLolsBot?start=u-{username_clean}"
+                                )
                                 button_text = f"🔍 Check {mention}"
-                            
+
                             inline_kb.add(
                                 InlineKeyboardButton(
                                     button_text,
                                     url=mention_lols_link,
                                 )
                             )
-                    
+
                     # Build detailed content list with length limiting
                     content_details = []
                     max_items_per_type = 10  # Limit items to prevent message overflow
-                    
+
                     if suspicious_items["links"]:
                         links_count = len(suspicious_items["links"])
                         content_details.append(f"<b>🔗 Links ({links_count}):</b>")
-                        for i, link in enumerate(suspicious_items["links"][:max_items_per_type]):
+                        for i, link in enumerate(
+                            suspicious_items["links"][:max_items_per_type]
+                        ):
                             # Truncate very long URLs
-                            link_display = link if len(link) <= 200 else link[:200] + "..."
-                            content_details.append(f"  • <code>{html.escape(link_display)}</code>")
+                            link_display = (
+                                link if len(link) <= 200 else link[:200] + "..."
+                            )
+                            content_details.append(
+                                f"  • <code>{html.escape(link_display)}</code>"
+                            )
                         if links_count > max_items_per_type:
-                            content_details.append(f"  ... and {links_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {links_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["mentions"]:
                         mentions_count = len(suspicious_items["mentions"])
-                        content_details.append(f"<b>👤 Mentions ({mentions_count}):</b>")
-                        for i, mention in enumerate(suspicious_items["mentions"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(mention)}</code>")
+                        content_details.append(
+                            f"<b>👤 Mentions ({mentions_count}):</b>"
+                        )
+                        for i, mention in enumerate(
+                            suspicious_items["mentions"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(mention)}</code>"
+                            )
                         if mentions_count > max_items_per_type:
-                            content_details.append(f"  ... and {mentions_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {mentions_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["phones"]:
                         phones_count = len(suspicious_items["phones"])
-                        content_details.append(f"<b>📞 Phone Numbers ({phones_count}):</b>")
-                        for i, phone in enumerate(suspicious_items["phones"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(phone)}</code>")
+                        content_details.append(
+                            f"<b>📞 Phone Numbers ({phones_count}):</b>"
+                        )
+                        for i, phone in enumerate(
+                            suspicious_items["phones"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(phone)}</code>"
+                            )
                         if phones_count > max_items_per_type:
-                            content_details.append(f"  ... and {phones_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {phones_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["hashtags"]:
                         hashtags_count = len(suspicious_items["hashtags"])
                         content_details.append(f"<b>#️⃣ Hashtags ({hashtags_count}):</b>")
-                        for i, hashtag in enumerate(suspicious_items["hashtags"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(hashtag)}</code>")
+                        for i, hashtag in enumerate(
+                            suspicious_items["hashtags"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(hashtag)}</code>"
+                            )
                         if hashtags_count > max_items_per_type:
-                            content_details.append(f"  ... and {hashtags_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {hashtags_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["cashtags"]:
                         cashtags_count = len(suspicious_items["cashtags"])
-                        content_details.append(f"<b>💰 Cashtags ({cashtags_count}):</b>")
-                        for i, cashtag in enumerate(suspicious_items["cashtags"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(cashtag)}</code>")
+                        content_details.append(
+                            f"<b>💰 Cashtags ({cashtags_count}):</b>"
+                        )
+                        for i, cashtag in enumerate(
+                            suspicious_items["cashtags"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(cashtag)}</code>"
+                            )
                         if cashtags_count > max_items_per_type:
-                            content_details.append(f"  ... and {cashtags_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {cashtags_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["bot_commands"]:
                         bot_commands_count = len(suspicious_items["bot_commands"])
-                        content_details.append(f"<b>🤖 Bot Commands ({bot_commands_count}):</b>")
-                        for i, bot_cmd in enumerate(suspicious_items["bot_commands"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(bot_cmd)}</code>")
+                        content_details.append(
+                            f"<b>🤖 Bot Commands ({bot_commands_count}):</b>"
+                        )
+                        for i, bot_cmd in enumerate(
+                            suspicious_items["bot_commands"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(bot_cmd)}</code>"
+                            )
                         if bot_commands_count > max_items_per_type:
-                            content_details.append(f"  ... and {bot_commands_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {bot_commands_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["emails"]:
                         emails_count = len(suspicious_items["emails"])
                         content_details.append(f"<b>📧 Emails ({emails_count}):</b>")
-                        for i, email in enumerate(suspicious_items["emails"][:max_items_per_type]):
-                            content_details.append(f"  • <code>{html.escape(email)}</code>")
+                        for i, email in enumerate(
+                            suspicious_items["emails"][:max_items_per_type]
+                        ):
+                            content_details.append(
+                                f"  • <code>{html.escape(email)}</code>"
+                            )
                         if emails_count > max_items_per_type:
-                            content_details.append(f"  ... and {emails_count - max_items_per_type} more")
-                    
+                            content_details.append(
+                                f"  ... and {emails_count - max_items_per_type} more"
+                            )
+
                     content_report = "\n".join(content_details)
-                    
+
                     # Build the full message
                     full_message = (
                         f"⚠️ <b>Suspicious Content Detected</b>\n"
@@ -5843,12 +5982,15 @@ if __name__ == "__main__":
                         f"Chat: {_chat_link_html}\n\n"
                         f"{content_report}"
                     )
-                    
+
                     # Check if message exceeds Telegram's limit (4096 chars)
                     if len(full_message) > 4000:  # Leave some margin
                         # Truncate the content report
                         available_space = 4000 - len(full_message) + len(content_report)
-                        content_report = content_report[:available_space] + "\n\n... (message truncated)"
+                        content_report = (
+                            content_report[:available_space]
+                            + "\n\n... (message truncated)"
+                        )
                         full_message = (
                             f"⚠️ <b>Suspicious Content Detected</b>\n"
                             f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
@@ -5856,7 +5998,7 @@ if __name__ == "__main__":
                             f"Chat: {_chat_link_html}\n\n"
                             f"{content_report}"
                         )
-                    
+
                     await safe_send_message(
                         BOT,
                         ADMIN_GROUP_ID,
@@ -6962,7 +7104,9 @@ if __name__ == "__main__":
             message_link = construct_message_link([susp_chat_id, susp_message_id, None])
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             collapsed_kb = InlineKeyboardMarkup()
-            collapsed_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
+            collapsed_kb.add(
+                InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
+            )
             collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             collapsed_kb.add(
                 InlineKeyboardButton(

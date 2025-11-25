@@ -6626,11 +6626,61 @@ if __name__ == "__main__":
             user_id = int(command_args[1])
             LOGGER.debug("%d - User ID to unban", user_id)
 
+            # Get username before removing from dicts
+            user_name_data = active_user_checks_dict.get(user_id) or banned_users_dict.get(user_id)
+            user_name = "!UNDEFINED!"
+            if isinstance(user_name_data, dict):
+                user_name = str(user_name_data.get("username", "!UNDEFINED!")).lstrip("@")
+            elif isinstance(user_name_data, str):
+                user_name = (
+                    user_name_data.lstrip("@")
+                    if user_name_data != "None"
+                    else "!UNDEFINED!"
+                )
+
+            # Cancel any active watchdog for this user
+            await cancel_named_watchdog(user_id, user_name)
+
             # remove from banned and checks dicts
             if user_id in active_user_checks_dict:
                 del active_user_checks_dict[user_id]
             if user_id in banned_users_dict:
                 del banned_users_dict[user_id]
+
+            # Mark user as legit in database
+            admin_id = message.from_user.id
+            admin_username = message.from_user.username or "!NoAdminName!"
+            try:
+                CURSOR.execute(
+                    """
+                    INSERT OR REPLACE INTO recent_messages
+                    (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, received_date, new_chat_member, left_chat_member)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ADMIN_GROUP_ID,
+                        message.message_id,
+                        user_id,
+                        user_name if user_name != "!UNDEFINED!" else None,
+                        None,
+                        None,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        1,
+                        1,
+                    ),
+                )
+                CONN.commit()
+                LOGGER.info(
+                    "\033[92m%s:@%s marked as legitimate in database by admin %s:@%s\033[0m",
+                    user_id,
+                    user_name,
+                    admin_id,
+                    admin_username,
+                )
+            except sqlite3.Error as db_err:
+                LOGGER.error(
+                    "Database error while marking user %d as legit: %s", user_id, db_err
+                )
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)
@@ -6655,7 +6705,16 @@ if __name__ == "__main__":
                         )
 
             await message.reply(
-                f"User {user_id} has been unbanned in all specified channels."
+                f"User {user_id} (@{user_name}) has been unbanned in all specified channels and marked as legitimate."
+            )
+            
+            # Notify tech group
+            await safe_send_message(
+                BOT,
+                TECHNOLOG_GROUP_ID,
+                f"User {user_id} (@{user_name}) unbanned by admin {admin_id}:@{admin_username}. Marked as legitimate.",
+                LOGGER,
+                message_thread_id=TECHNO_ADMIN,
             )
         except ValueError as ve:
             await message.reply(str(ve))

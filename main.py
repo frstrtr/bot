@@ -2777,6 +2777,86 @@ if __name__ == "__main__":
             ChatMemberStatus.LEFT,
         ):  # only if user joined or kicked or restricted or left
 
+            # Check if admin manually re-added a previously banned/monitored user
+            if (
+                inout_status == ChatMemberStatus.MEMBER
+                and is_member
+                and not was_member
+                and update.from_user.id != inout_userid  # Someone else added the user
+                and (inout_userid in banned_users_dict or inout_userid in active_user_checks_dict)
+            ):
+                # Check if the person who added the user is an admin in that chat
+                try:
+                    is_admin_in_chat = await is_admin(update.from_user.id, update.chat.id)
+                    if is_admin_in_chat:
+                        admin_username = update.from_user.username or "!NoAdminName!"
+                        admin_id = update.from_user.id
+                        
+                        LOGGER.info(
+                            "\033[95m%s:@%s manually re-added by admin %s:@%s - cancelling checks and marking as legit\033[0m",
+                            inout_userid,
+                            inout_username,
+                            admin_id,
+                            admin_username,
+                        )
+                        
+                        # Cancel watchdog
+                        await cancel_named_watchdog(inout_userid, inout_username)
+                        
+                        # Remove from dicts
+                        if inout_userid in active_user_checks_dict:
+                            del active_user_checks_dict[inout_userid]
+                        if inout_userid in banned_users_dict:
+                            del banned_users_dict[inout_userid]
+                        
+                        # Mark as legit in database
+                        try:
+                            CURSOR.execute(
+                                """
+                                INSERT OR REPLACE INTO recent_messages
+                                (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, received_date, new_chat_member, left_chat_member)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    update.chat.id,
+                                    int(f"{int(getattr(update, 'date', datetime.now()).timestamp())}"),
+                                    inout_userid,
+                                    inout_username if inout_username != "!UNDEFINED!" else None,
+                                    inout_userfirstname,
+                                    inout_userlastname if inout_userlastname else None,
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    1,
+                                    1,
+                                ),
+                            )
+                            CONN.commit()
+                            LOGGER.info(
+                                "\033[92m%s:@%s marked as legitimate in database by admin %s:@%s re-add action\033[0m",
+                                inout_userid,
+                                inout_username,
+                                admin_id,
+                                admin_username,
+                            )
+                        except sqlite3.Error as db_err:
+                            LOGGER.error(
+                                "Database error while marking user %d as legit on admin re-add: %s", inout_userid, db_err
+                            )
+                        
+                        # Notify tech group
+                        await safe_send_message(
+                            BOT,
+                            TECHNOLOG_GROUP_ID,
+                            f"User {inout_userid} (@{inout_username}) manually re-added to {inout_chattitle} by admin {admin_id}:@{admin_username}. Marked as legitimate.",
+                            LOGGER,
+                            message_thread_id=TECHNO_ADMIN,
+                        )
+                        
+                        return  # Skip further processing
+                except Exception as admin_check_err:
+                    LOGGER.error(
+                        "Error checking admin status for user re-add: %s", admin_check_err
+                    )
+
             # Get the current timestamp
 
             # Log the message with the timestamp

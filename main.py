@@ -88,6 +88,7 @@ from utils.utils import (
     create_inline_keyboard,
     check_user_legit,
     report_spam_2p2p,
+    remove_spam_from_2p2p,
     report_spam_from_message,
     split_list,
     extract_username,
@@ -2840,6 +2841,26 @@ if __name__ == "__main__":
                         except sqlite3.Error as db_err:
                             LOGGER.error(
                                 "Database error while marking user %d as legit on admin re-add: %s", inout_userid, db_err
+                            )
+                        
+                        # Remove from P2P network spam list
+                        try:
+                            p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER)
+                            if p2p_removed:
+                                LOGGER.info(
+                                    "\033[92m%s:@%s removed from P2P spam list by admin re-add\033[0m",
+                                    inout_userid,
+                                    inout_username,
+                                )
+                            else:
+                                LOGGER.warning(
+                                    "\033[93m%s:@%s could not be removed from P2P spam list\033[0m",
+                                    inout_userid,
+                                    inout_username,
+                                )
+                        except Exception as p2p_e:
+                            LOGGER.error(
+                                "Failed to remove user %s from P2P on admin re-add: %s", inout_userid, p2p_e
                             )
                         
                         # Notify tech group
@@ -6761,6 +6782,16 @@ if __name__ == "__main__":
                 LOGGER.error(
                     "Database error while marking user %d as legit: %s", user_id, db_err
                 )
+
+            # Remove from P2P network spam list
+            try:
+                p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER)
+                if p2p_removed:
+                    LOGGER.info("\033[92m%d removed from P2P spam list\033[0m", user_id)
+                else:
+                    LOGGER.warning("\033[93m%d could not be removed from P2P spam list\033[0m", user_id)
+            except Exception as p2p_e:
+                LOGGER.error("Failed to remove user %d from P2P: %s", user_id, p2p_e)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)

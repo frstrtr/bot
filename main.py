@@ -6905,16 +6905,19 @@ if __name__ == "__main__":
             "<b>Parameters:</b>\n"
             "  • <code>&lt;target&gt;</code> - Chat identifier (required)\n"
             "    - Numeric chat ID: <code>-1001234567890</code>\n"
-            "    - Public username: <code>@channelname</code> or <code>@groupname</code>\n"
-            "    - Chat link: <code>t.me/chatname</code> or <code>https://t.me/chatname</code>\n"
+            "    - With thread/topic: <code>-1001234567890:123</code>\n"
+            "    - Public username: <code>@groupname</code>\n"
+            "    - Chat link: <code>t.me/chatname</code>\n"
+            "    - Topic link: <code>t.me/chatname/456</code> (456 = topic ID)\n"
             "  • <code>&lt;message&gt;</code> - Text to send (required)\n"
             "    - Supports HTML formatting\n"
             "    - Can be multiline\n\n"
             "<b>Examples:</b>\n"
             "  <code>/say -1001234567890 Hello everyone!</code>\n"
+            "  <code>/say -1001234567890:123 Hello to topic 123!</code>\n"
             "  <code>/say @mychannel &lt;b&gt;Important&lt;/b&gt; announcement</code>\n"
             "  <code>/say t.me/mygroup Hello from the link!</code>\n"
-            "  <code>/say -1001234567890 Line 1\nLine 2\nLine 3</code>\n\n"
+            "  <code>/say t.me/mygroup/456 Hello to topic 456!</code>\n\n"
             
             "↩️ <b>/reply</b> - Reply to a specific message in a chat\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -7004,42 +7007,67 @@ if __name__ == "__main__":
                     "Usage: <code>/say &lt;target&gt; message</code>\n"
                     "Examples:\n"
                     "  <code>/say -1001234567890 Hello!</code>\n"
+                    "  <code>/say -1001234567890:123 Hello to topic!</code>\n"
                     "  <code>/say @chatusername Hello!</code>\n"
-                    "  <code>/say t.me/chatname Hello!</code>",
+                    "  <code>/say t.me/chatname Hello!</code>\n"
+                    "  <code>/say t.me/chatname/456 Hello to topic!</code>",
                     parse_mode="HTML",
                 )
                 return
 
             target = parts[1]
             text_to_send = parts[2]
+            thread_id = None  # For forum topics
 
-            # Determine target chat
+            # Determine target chat and optional thread
             if target.startswith("@"):
                 chat_id = target  # Use username directly
+            elif ":" in target and target.split(":")[0].lstrip("-").isdigit():
+                # Format: -1001234567890:123 (chat_id:thread_id)
+                parts_target = target.split(":", 1)
+                chat_id = int(parts_target[0])
+                if parts_target[1].isdigit():
+                    thread_id = int(parts_target[1])
             elif target.lstrip("-").isdigit():
                 chat_id = int(target)
             elif "t.me/" in target:
-                # Extract username from t.me link (e.g., t.me/chatname or https://t.me/chatname)
-                # Handle formats: t.me/chatname, https://t.me/chatname, http://t.me/chatname
+                # Extract username and optional topic from t.me link
+                # Formats: t.me/chatname, t.me/chatname/123, https://t.me/chatname/123
                 import re
-                match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})', target)
-                if match:
-                    chat_id = f"@{match.group(1)}"
+                # Try to match with topic ID first
+                match_with_topic = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})/(\d+)', target)
+                if match_with_topic:
+                    chat_id = f"@{match_with_topic.group(1)}"
+                    thread_id = int(match_with_topic.group(2))
                 else:
-                    await message.reply(
-                        "Invalid t.me link format. Use: <code>t.me/chatname</code>",
-                        parse_mode="HTML",
-                    )
-                    return
+                    # Match without topic
+                    match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})', target)
+                    if match:
+                        chat_id = f"@{match.group(1)}"
+                    else:
+                        await message.reply(
+                            "Invalid t.me link format. Use: <code>t.me/chatname</code> or <code>t.me/chatname/topic_id</code>",
+                            parse_mode="HTML",
+                        )
+                        return
             else:
                 await message.reply(
                     "Invalid target. Use:\n"
                     "• Numeric ID: <code>-1001234567890</code>\n"
+                    "• With topic: <code>-1001234567890:123</code>\n"
                     "• Username: <code>@chatname</code>\n"
-                    "• Link: <code>t.me/chatname</code>",
+                    "• Link: <code>t.me/chatname</code> or <code>t.me/chatname/topic_id</code>",
                     parse_mode="HTML",
                 )
                 return
+
+            # Build kwargs for send
+            send_kwargs = {
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            }
+            if thread_id:
+                send_kwargs["message_thread_id"] = thread_id
 
             # Send the message
             sent_msg = await safe_send_message(
@@ -7047,32 +7075,46 @@ if __name__ == "__main__":
                 chat_id,
                 text_to_send,
                 LOGGER,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
+                **send_kwargs,
             )
 
             if sent_msg:
-                # Build link to sent message
+                # Build link to sent message (include thread in link if applicable)
                 if isinstance(chat_id, str) and chat_id.startswith("@"):
-                    msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
+                    if thread_id:
+                        msg_link = f"https://t.me/{chat_id[1:]}/{thread_id}/{sent_msg.message_id}"
+                    else:
+                        msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
                 else:
                     chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
-                    msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+                    if thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{sent_msg.message_id}"
+                    else:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+                
+                # Build target description
+                target_desc = f"<code>{chat_id}</code>"
+                if thread_id:
+                    target_desc += f" (topic {thread_id})"
                 
                 await message.reply(
-                    f"✅ Message sent to <code>{chat_id}</code>\n"
+                    f"✅ Message sent to {target_desc}\n"
                     f"🔗 <a href='{msg_link}'>View message</a>",
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
             else:
-                await message.reply(f"❌ Failed to send message to {chat_id}")
+                target_desc = str(chat_id)
+                if thread_id:
+                    target_desc += f" (topic {thread_id})"
+                await message.reply(f"❌ Failed to send message to {target_desc}")
 
             LOGGER.info(
-                "Admin %s:@%s sent message to chat %s",
+                "Admin %s:@%s sent message to chat %s (thread=%s)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 chat_id,
+                thread_id,
             )
 
         except Exception as e:

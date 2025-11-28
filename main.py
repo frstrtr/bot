@@ -6881,6 +6881,390 @@ if __name__ == "__main__":
         """Function to log active checks and banned users dict."""
         await log_lists(message.chat.id, message.message_thread_id)
 
+    # Helper to check if message is from superadmin in private chat
+    def is_superadmin_private(message: types.Message) -> bool:
+        """Check if message is from superadmin in private chat."""
+        return (
+            message.chat.type == "private"
+            and message.from_user.id == ADMIN_USER_ID
+        )
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["say"])
+    async def say_to_chat(message: types.Message):
+        """Send a message to a specific chat as the bot.
+        
+        Usage: /say <chat_id_or_link> <message>
+        Example: /say -1001234567890 Hello everyone!
+        Example: /say @chatusername Hello everyone!
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        try:
+            # Parse command: /say <target> <message>
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/say &lt;chat_id_or_@username&gt; message</code>\n"
+                    "Example: <code>/say -1001234567890 Hello everyone!</code>\n"
+                    "Example: <code>/say @chatusername Hello everyone!</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            target = parts[1]
+            text_to_send = parts[2]
+
+            # Determine target chat
+            if target.startswith("@"):
+                chat_id = target  # Use username directly
+            elif target.lstrip("-").isdigit():
+                chat_id = int(target)
+            else:
+                await message.reply(
+                    "Invalid chat ID or username. Use numeric ID (e.g., -1001234567890) or @username."
+                )
+                return
+
+            # Send the message
+            sent_msg = await safe_send_message(
+                BOT,
+                chat_id,
+                text_to_send,
+                LOGGER,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+
+            if sent_msg:
+                # Build link to sent message
+                if isinstance(chat_id, str) and chat_id.startswith("@"):
+                    msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
+                else:
+                    chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+                    msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+                
+                await message.reply(
+                    f"✅ Message sent to <code>{chat_id}</code>\n"
+                    f"🔗 <a href='{msg_link}'>View message</a>",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+            else:
+                await message.reply(f"❌ Failed to send message to {chat_id}")
+
+            LOGGER.info(
+                "Admin %s:@%s sent message to chat %s",
+                message.from_user.id,
+                message.from_user.username or "!UNDEFINED!",
+                chat_id,
+            )
+
+        except Exception as e:
+            LOGGER.error("Error in say_to_chat: %s", e)
+            await message.reply(f"Error: {e}")
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["reply"])
+    async def reply_to_message(message: types.Message):
+        """Reply to a specific message in a chat as the bot.
+        
+        Usage: /reply <message_link> <reply_text>
+        Example: /reply https://t.me/chatname/123 Thanks for your message!
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        try:
+            # Parse command: /reply <link> <text>
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/reply &lt;message_link&gt; reply_text</code>\n"
+                    "Example: <code>/reply https://t.me/chatname/123 Thanks!</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            message_link = parts[1]
+            reply_text = parts[2]
+
+            # Extract chat and message ID from link
+            chat_username, target_message_id = extract_chat_name_and_message_id_from_link(message_link)
+            
+            if not chat_username or not target_message_id:
+                await message.reply("Invalid message link format.")
+                return
+
+            # Determine chat_id
+            if chat_username.lstrip("-").isdigit():
+                chat_id = int(chat_username)
+            else:
+                chat_id = f"@{chat_username}"
+
+            # Send reply
+            sent_msg = await safe_send_message(
+                BOT,
+                chat_id,
+                reply_text,
+                LOGGER,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_to_message_id=target_message_id,
+            )
+
+            if sent_msg:
+                # Build link to sent reply
+                if isinstance(chat_id, str) and chat_id.startswith("@"):
+                    msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
+                else:
+                    chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+                    msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
+
+                await message.reply(
+                    f"✅ Reply sent to message in <code>{chat_id}</code>\n"
+                    f"🔗 <a href='{msg_link}'>View reply</a>",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+            else:
+                await message.reply(f"❌ Failed to reply to message in {chat_id}")
+
+            LOGGER.info(
+                "Admin %s:@%s replied to message %s in chat %s",
+                message.from_user.id,
+                message.from_user.username or "!UNDEFINED!",
+                target_message_id,
+                chat_id,
+            )
+
+        except Exception as e:
+            LOGGER.error("Error in reply_to_message: %s", e)
+            await message.reply(f"Error: {e}")
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["broadcast"])
+    async def broadcast_message(message: types.Message):
+        """Broadcast a message to all or selected monitored chats.
+        
+        Usage: /broadcast <message>              - Send to ALL monitored chats
+        Usage: /broadcast -list chat1,chat2 <message> - Send to specific chats
+        Example: /broadcast Hello everyone!
+        Example: /broadcast -list -1001234,-1005678 Hello!
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        try:
+            text = message.text
+            
+            # Check for -list flag
+            if " -list " in text:
+                # Parse: /broadcast -list chat1,chat2,... message
+                match = text.split(" -list ", 1)
+                if len(match) < 2:
+                    await message.reply("Invalid format. Use: /broadcast -list chat1,chat2 message")
+                    return
+                
+                rest = match[1].split(maxsplit=1)
+                if len(rest) < 2:
+                    await message.reply("Please provide both chat list and message.")
+                    return
+                
+                chat_list_str = rest[0]
+                broadcast_text = rest[1]
+                
+                # Parse chat IDs
+                target_chats = []
+                for chat_str in chat_list_str.split(","):
+                    chat_str = chat_str.strip()
+                    if chat_str.startswith("@"):
+                        target_chats.append(chat_str)
+                    elif chat_str.lstrip("-").isdigit():
+                        target_chats.append(int(chat_str))
+                    else:
+                        await message.reply(f"Invalid chat ID: {chat_str}")
+                        return
+            else:
+                # Broadcast to all monitored chats
+                parts = text.split(maxsplit=1)
+                if len(parts) < 2:
+                    await message.reply(
+                        "Usage: <code>/broadcast message</code> - Send to all monitored chats\n"
+                        "Usage: <code>/broadcast -list chat1,chat2 message</code> - Send to specific chats\n\n"
+                        f"📋 Monitored chats ({len(CHANNEL_IDS)}):\n" +
+                        "\n".join([f"  • <code>{cid}</code> - {CHANNEL_DICT.get(cid, 'Unknown')}" for cid in CHANNEL_IDS[:10]]) +
+                        (f"\n  ... and {len(CHANNEL_IDS) - 10} more" if len(CHANNEL_IDS) > 10 else ""),
+                        parse_mode="HTML",
+                    )
+                    return
+                
+                broadcast_text = parts[1]
+                target_chats = list(CHANNEL_IDS)
+
+            # Confirm before broadcasting to all
+            if len(target_chats) == len(CHANNEL_IDS) and len(target_chats) > 3:
+                confirm_kb = InlineKeyboardMarkup()
+                # Store broadcast text temporarily in callback data (limited to 64 bytes)
+                # For longer messages, we'll need a different approach
+                if len(broadcast_text) > 40:
+                    # Store in a temp dict for retrieval
+                    broadcast_id = int(datetime.now().timestamp())
+                    if not hasattr(DP, 'pending_broadcasts'):
+                        DP.pending_broadcasts = {}
+                    DP.pending_broadcasts[broadcast_id] = {
+                        "text": broadcast_text,
+                        "chats": target_chats,
+                        "admin_id": message.from_user.id,
+                    }
+                    confirm_kb.add(
+                        InlineKeyboardButton("✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
+                        InlineKeyboardButton("❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
+                    )
+                else:
+                    # Short message - encode directly (not recommended, but as fallback)
+                    broadcast_id = int(datetime.now().timestamp())
+                    if not hasattr(DP, 'pending_broadcasts'):
+                        DP.pending_broadcasts = {}
+                    DP.pending_broadcasts[broadcast_id] = {
+                        "text": broadcast_text,
+                        "chats": target_chats,
+                        "admin_id": message.from_user.id,
+                    }
+                    confirm_kb.add(
+                        InlineKeyboardButton("✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
+                        InlineKeyboardButton("❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
+                    )
+                
+                await message.reply(
+                    f"⚠️ <b>Broadcast Confirmation</b>\n\n"
+                    f"You are about to send a message to <b>{len(target_chats)}</b> chats.\n\n"
+                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>",
+                    parse_mode="HTML",
+                    reply_markup=confirm_kb,
+                )
+                return
+
+            # Send to target chats (for small lists, send directly)
+            success_count = 0
+            fail_count = 0
+            failed_chats = []
+
+            status_msg = await message.reply(f"📤 Broadcasting to {len(target_chats)} chats...")
+
+            for chat_id in target_chats:
+                try:
+                    await safe_send_message(
+                        BOT,
+                        chat_id,
+                        broadcast_text,
+                        LOGGER,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+                    success_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    failed_chats.append(f"{chat_id}: {str(e)[:30]}")
+                    LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
+
+            # Update status message
+            result_text = (
+                f"✅ <b>Broadcast Complete</b>\n\n"
+                f"Sent: {success_count}/{len(target_chats)}\n"
+                f"Failed: {fail_count}"
+            )
+            if failed_chats and len(failed_chats) <= 5:
+                result_text += "\n\nFailed chats:\n" + "\n".join([f"  • {fc}" for fc in failed_chats])
+            elif failed_chats:
+                result_text += f"\n\nFailed chats: {len(failed_chats)} (check logs)"
+
+            await status_msg.edit_text(result_text, parse_mode="HTML")
+
+            LOGGER.info(
+                "Admin %s:@%s broadcast message to %d chats (success: %d, failed: %d)",
+                message.from_user.id,
+                message.from_user.username or "!UNDEFINED!",
+                len(target_chats),
+                success_count,
+                fail_count,
+            )
+
+        except Exception as e:
+            LOGGER.error("Error in broadcast_message: %s", e)
+            await message.reply(f"Error: {e}")
+
+    @DP.callback_query_handler(lambda c: c.data.startswith("broadcast_"))
+    async def handle_broadcast_callback(callback_query: CallbackQuery):
+        """Handle broadcast confirmation/cancellation."""
+        try:
+            parts = callback_query.data.split("_")
+            action = parts[1]  # confirm or cancel
+            broadcast_id = int(parts[2])
+
+            if not hasattr(DP, 'pending_broadcasts') or broadcast_id not in DP.pending_broadcasts:
+                await callback_query.answer("Broadcast expired or not found.", show_alert=True)
+                await callback_query.message.edit_reply_markup(reply_markup=None)
+                return
+
+            broadcast_data = DP.pending_broadcasts.pop(broadcast_id)
+
+            # Verify admin
+            if callback_query.from_user.id != broadcast_data["admin_id"]:
+                await callback_query.answer("Only the admin who initiated can confirm.", show_alert=True)
+                return
+
+            if action == "cancel":
+                await callback_query.message.edit_text("❌ Broadcast cancelled.")
+                await callback_query.answer("Cancelled.")
+                return
+
+            # Execute broadcast
+            target_chats = broadcast_data["chats"]
+            broadcast_text = broadcast_data["text"]
+
+            await callback_query.message.edit_text(f"📤 Broadcasting to {len(target_chats)} chats...")
+            await callback_query.answer("Broadcasting...")
+
+            success_count = 0
+            fail_count = 0
+            failed_chats = []
+
+            for chat_id in target_chats:
+                try:
+                    await safe_send_message(
+                        BOT,
+                        chat_id,
+                        broadcast_text,
+                        LOGGER,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+                    success_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    failed_chats.append(f"{chat_id}: {str(e)[:30]}")
+                    LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
+
+            # Update with results
+            result_text = (
+                f"✅ <b>Broadcast Complete</b>\n\n"
+                f"Sent: {success_count}/{len(target_chats)}\n"
+                f"Failed: {fail_count}"
+            )
+            if failed_chats and len(failed_chats) <= 5:
+                result_text += "\n\nFailed chats:\n" + "\n".join([f"  • {fc}" for fc in failed_chats])
+
+            await callback_query.message.edit_text(result_text, parse_mode="HTML")
+
+            LOGGER.info(
+                "Admin %s:@%s broadcast confirmed to %d chats (success: %d, failed: %d)",
+                callback_query.from_user.id,
+                callback_query.from_user.username or "!UNDEFINED!",
+                len(target_chats),
+                success_count,
+                fail_count,
+            )
+
+        except Exception as e:
+            LOGGER.error("Error in handle_broadcast_callback: %s", e)
+            await callback_query.answer(f"Error: {e}", show_alert=True)
+
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):
         """Function to unban the user with userid in all channels listed in CHANNEL_NAMES."""
@@ -8159,7 +8543,7 @@ if __name__ == "__main__":
     # TODO: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
     # TODO: Implement scheduler for chat closure at night
     # TODO: Switch to aiogram 3.13.1 or higher
-    # TODO: Reply to individual messages by bot in monitored groups
+    # NOTE: Admin can reply/send messages via /say, /reply, /broadcast commands
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

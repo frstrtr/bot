@@ -104,7 +104,7 @@ def load_config():
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
         
         # Superadmin private group for /copy, /forward commands (optional)
-        superadmin_group_elem = config_XML_root.find("superadmin_group_id")
+        superadmin_group_elem = config_XML_root.find("SUPERADMIN_GROUP_ID")
         SUPERADMIN_GROUP_ID = int(superadmin_group_elem.text) if superadmin_group_elem is not None else None
         
         CHANNEL_IDS = [

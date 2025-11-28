@@ -7180,11 +7180,13 @@ if __name__ == "__main__":
                 await message.reply("Invalid message link format.")
                 return
 
-            # Determine chat_id
-            if chat_username.lstrip("-").isdigit():
+            # Determine chat_id (may already be int from private link, or string for public)
+            if isinstance(chat_username, int):
+                chat_id = chat_username
+            elif str(chat_username).lstrip("-").isdigit():
                 chat_id = int(chat_username)
             else:
-                chat_id = f"@{chat_username}"
+                chat_id = chat_username  # Already has @ prefix from parser
 
             # Send reply
             sent_msg = await safe_send_message(

@@ -7028,6 +7028,12 @@ if __name__ == "__main__":
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
+        LOGGER.info(
+            "%s:@%s COMM /say in chat %s",
+            message.from_user.id,
+            message.from_user.username or "!UNDEFINED!",
+            message.chat.id,
+        )
         try:
             # Parse command: /say <target> <message>
             parts = message.text.split(maxsplit=2)
@@ -7139,7 +7145,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to send message to {target_desc}")
 
             LOGGER.info(
-                "Admin %s:@%s sent message to chat %s (thread=%s)",
+                "%s:@%s sent message to chat %s (thread=%s)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 chat_id,
@@ -7147,7 +7153,7 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error("Error in say_to_chat: %s", e)
+            LOGGER.error("%s:@%s Error in say_to_chat: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["reply"])
@@ -7159,6 +7165,12 @@ if __name__ == "__main__":
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
+        LOGGER.info(
+            "%s:@%s COMM /reply in chat %s",
+            message.from_user.id,
+            message.from_user.username or "!UNDEFINED!",
+            message.chat.id,
+        )
         try:
             # Parse command: /reply <link> <text>
             parts = message.text.split(maxsplit=2)
@@ -7217,7 +7229,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to reply to message in {chat_id}")
 
             LOGGER.info(
-                "Admin %s:@%s replied to message %s in chat %s",
+                "%s:@%s replied to message %s in chat %s",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 target_message_id,
@@ -7225,7 +7237,7 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error("Error in reply_to_message: %s", e)
+            LOGGER.error("%s:@%s Error in reply_to_message: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     def parse_target_with_thread(target: str):
@@ -7291,6 +7303,12 @@ if __name__ == "__main__":
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
+        LOGGER.info(
+            "%s:@%s COMM /forward in chat %s",
+            message.from_user.id,
+            message.from_user.username or "!UNDEFINED!",
+            message.chat.id,
+        )
         try:
             parts = message.text.split(maxsplit=2)
             if len(parts) < 3:
@@ -7368,7 +7386,7 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "Admin %s:@%s forwarded message %s from %s to %s (thread=%s)",
+                    "%s:@%s forwarded message %s from %s to %s (thread=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
@@ -7381,7 +7399,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to forward message: {e}")
 
         except Exception as e:
-            LOGGER.error("Error in forward_message_cmd: %s", e)
+            LOGGER.error("%s:@%s Error in forward_message_cmd: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["copy"])
@@ -7393,6 +7411,12 @@ if __name__ == "__main__":
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
+        LOGGER.info(
+            "%s:@%s COMM /copy in chat %s",
+            message.from_user.id,
+            message.from_user.username or "!UNDEFINED!",
+            message.chat.id,
+        )
         try:
             parts = message.text.split(maxsplit=2)
             if len(parts) < 3:
@@ -7470,7 +7494,7 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "Admin %s:@%s copied message %s from %s to %s (thread=%s)",
+                    "%s:@%s copied message %s from %s to %s (thread=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
@@ -7483,7 +7507,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to copy message: {e}")
 
         except Exception as e:
-            LOGGER.error("Error in copy_message_cmd: %s", e)
+            LOGGER.error("%s:@%s Error in copy_message_cmd: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["broadcast"])
@@ -7497,6 +7521,12 @@ if __name__ == "__main__":
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
+        LOGGER.info(
+            "%s:@%s COMM /broadcast in chat %s",
+            message.from_user.id,
+            message.from_user.username or "!UNDEFINED!",
+            message.chat.id,
+        )
         try:
             text = message.text
             
@@ -7624,7 +7654,7 @@ if __name__ == "__main__":
             await status_msg.edit_text(result_text, parse_mode="HTML")
 
             LOGGER.info(
-                "Admin %s:@%s broadcast message to %d chats (success: %d, failed: %d)",
+                "%s:@%s broadcast message to %d chats (success: %d, failed: %d)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 len(target_chats),
@@ -7633,7 +7663,7 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error("Error in broadcast_message: %s", e)
+            LOGGER.error("%s:@%s Error in broadcast_message: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.callback_query_handler(lambda c: c.data.startswith("broadcast_"))
@@ -7767,7 +7797,7 @@ if __name__ == "__main__":
             await status_msg.edit_text(result_text, parse_mode="HTML")
 
             LOGGER.info(
-                "Admin %s:@%s broadcast CONFIRMED via text to %d chats (success: %d, failed: %d)",
+                "%s:@%s broadcast CONFIRMED via text to %d chats (success: %d, failed: %d)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 len(target_chats),
@@ -7776,7 +7806,7 @@ if __name__ == "__main__":
             )
 
         except Exception as e:
-            LOGGER.error("Error in handle_broadcast_text_confirm: %s", e)
+            LOGGER.error("%s:@%s Error in handle_broadcast_text_confirm: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)

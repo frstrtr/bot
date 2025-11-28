@@ -6889,6 +6889,47 @@ if __name__ == "__main__":
             and message.from_user.id == ADMIN_USER_ID
         )
 
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["help", "adminhelp"])
+    async def superadmin_help(message: types.Message):
+        """Show help for superadmin communication commands.
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        help_text = (
+            "🤖 <b>Superadmin Communication Commands</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "📤 <b>/say</b> - Send message to a chat\n"
+            "<code>/say &lt;chat_id_or_@username&gt; message</code>\n"
+            "Examples:\n"
+            "  • <code>/say -1001234567890 Hello everyone!</code>\n"
+            "  • <code>/say @chatusername Hello!</code>\n\n"
+            
+            "↩️ <b>/reply</b> - Reply to a specific message\n"
+            "<code>/reply &lt;message_link&gt; reply_text</code>\n"
+            "Example:\n"
+            "  • <code>/reply https://t.me/chatname/123 Thanks!</code>\n\n"
+            
+            "📢 <b>/broadcast</b> - Send to multiple chats\n"
+            "<code>/broadcast message</code> - All monitored chats\n"
+            "<code>/broadcast -list chat1,chat2 message</code> - Specific chats\n"
+            "Examples:\n"
+            "  • <code>/broadcast Hello everyone!</code>\n"
+            "  • <code>/broadcast -list -1001234,-1005678 Hello!</code>\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💬 <b>Replying to User Messages</b>\n\n"
+            "When users send messages to the bot, they are forwarded here.\n"
+            "To reply: Simply <b>reply to the forwarded message</b> with your text.\n"
+            "Your reply will be sent back to the original user.\n\n"
+            
+            "💡 <b>Tips:</b>\n"
+            "• Use HTML formatting in messages\n"
+            "• Broadcast asks for confirmation if sending to many chats\n"
+            "• All commands work only in this private chat\n"
+        )
+        await message.reply(help_text, parse_mode="HTML")
+
     @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["say"])
     async def say_to_chat(message: types.Message):
         """Send a message to a specific chat as the bot.

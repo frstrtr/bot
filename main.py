@@ -1014,7 +1014,12 @@ async def handle_autoreports(
 
     CONN.commit()
 
-    message_link = f"https://t.me/c/{str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)}/{str(message.message_id)}"
+    # Construct message link using chat username if available
+    if message.chat.username:
+        message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+    else:
+        chat_id_str = str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)
+        message_link = f"https://t.me/c/{chat_id_str}/{message.message_id}"
 
     # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
     if message.forward_from:
@@ -1765,7 +1770,7 @@ async def check_n_ban(message: types.Message, reason: str):
         chat_link = (
             f"https://t.me/{message.chat.username}"
             if message.chat.username
-            else f"https://t.me/c/{message.chat.id}"
+            else f"https://t.me/c/{str(message.chat.id)[4:] if str(message.chat.id).startswith('-100') else message.chat.id}"
         )
         chat_link_name = (
             f"@{message.chat.username}:({message.chat.title})"

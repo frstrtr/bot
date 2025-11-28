@@ -429,27 +429,30 @@ def format_spam_report(message: types.Message) -> str:
 
 
 def extract_chat_name_and_message_id_from_link(message_link):
-    """Extract chat ID and message ID from a message link."""
+    """Extract chat ID and message ID from a message link.
+    
+    Supports:
+    - https://t.me/chatname/123
+    - https://t.me/chatname/456/123 (with topic)
+    - https://t.me/c/1234567890/123
+    - https://t.me/c/1234567890/456/123 (with topic)
+    """
     if not str(message_link).startswith("https://t.me/"):
         raise ValueError("Invalid message link format")
     try:
         parts = message_link.split("/")
-        if len(parts) == 5:
-            chat_id = parts[3]
-            message_id = int(parts[-1])
-        elif "c" in parts:
-            chat_id = parts[4]
-            message_id = int(parts[-1])
-        else:
-            chat_id = parts[3]
-            message_id = int(parts[-1])
-
+        # parts[0] = 'https:', parts[1] = '', parts[2] = 't.me', parts[3+] = path
+        
         if "c" in parts:
-            chat_id = int("-100" + chat_id)
-        elif chat_id != "":
-            chat_id = "@" + chat_id
+            # Private link: t.me/c/chat_id/msg_id or t.me/c/chat_id/topic_id/msg_id
+            c_index = parts.index("c")
+            chat_id_str = parts[c_index + 1]
+            chat_id = int("-100" + chat_id_str)
+            message_id = int(parts[-1])
         else:
-            raise ValueError("Invalid message link format")
+            # Public link: t.me/chatname/msg_id or t.me/chatname/topic_id/msg_id
+            chat_id = "@" + parts[3]
+            message_id = int(parts[-1])
 
         return chat_id, message_id
     except (IndexError, ValueError) as e:

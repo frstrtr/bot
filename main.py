@@ -4927,6 +4927,7 @@ if __name__ == "__main__":
                         message_text = (
                             "Suspicious profile change detected while under watch.\n"
                             f"In chat: {chat_link_html}\n"
+                            f"🔗 <a href='{message_link}'>Original message</a>\n"
                             + "\n".join(field_lines)
                             + f"\nChanges: <b>{', '.join(changed)}</b> at {_ts}."
                             + elapsed_line
@@ -5644,7 +5645,7 @@ if __name__ == "__main__":
                         await safe_send_message(
                             BOT,
                             ADMIN_GROUP_ID,
-                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}. Please check it out!",
+                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}.\n🔗 <a href='{message_link}'>Original message</a>\nPlease check it out!",
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             reply_markup=inline_kb,
@@ -6064,7 +6065,8 @@ if __name__ == "__main__":
                         f"⚠️ <b>Suspicious Content Detected</b>\n"
                         f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
                         f"(<code>{message.from_user.id}</code>)\n"
-                        f"Chat: {_chat_link_html}\n\n"
+                        f"Chat: {_chat_link_html}\n"
+                        f"🔗 <a href='{message_link}'>Original message</a>\n\n"
                         f"{content_report}"
                     )
 
@@ -6080,7 +6082,8 @@ if __name__ == "__main__":
                             f"⚠️ <b>Suspicious Content Detected</b>\n"
                             f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
                             f"(<code>{message.from_user.id}</code>)\n"
-                            f"Chat: {_chat_link_html}\n\n"
+                            f"Chat: {_chat_link_html}\n"
+                            f"🔗 <a href='{message_link}'>Original message</a>\n\n"
                             f"{content_report}"
                         )
 

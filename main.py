@@ -2100,11 +2100,7 @@ async def perform_checks(
                         if changed:
                             chat_username = _chat_info.get("username")
                             chat_title = _chat_info.get("title") or ""
-                            universal_chatlink = (
-                                f'<a href="https://t.me/{chat_username}">{html.escape(chat_title)}</a>'
-                                if chat_username
-                                else f"<a href=\"https://t.me/c/{str(_chat_id)[4:] if str(_chat_id).startswith('-100') else _chat_id}\">{html.escape(chat_title)}</a>"
-                            )
+                            universal_chatlink = build_chat_link(_chat_id, chat_username, chat_title)
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
                             _report_id = int(datetime.now().timestamp())
@@ -2748,11 +2744,7 @@ if __name__ == "__main__":
         escaped_inout_userfirstname = html.escape(inout_userfirstname)
         escaped_inout_userlastname = html.escape(inout_userlastname)
         # construct chatlink for any type of chat
-        universal_chatlink = (
-            f'<a href="https://t.me/{update.chat.username}">{update.chat.title}</a>'
-            if update.chat.username
-            else f'<a href="https://t.me/c/{str(update.chat.id)[4:] if str(update.chat.id).startswith("-100") else update.chat.id}">{update.chat.title}</a>'
-        )
+        universal_chatlink = build_chat_link(update.chat.id, update.chat.username, update.chat.title)
         # Get current date and time DD-MM-YY HH:MM
         greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Construct the log message
@@ -3103,11 +3095,7 @@ if __name__ == "__main__":
                             or getattr(update.chat, "title", "")
                             or ""
                         )
-                        _link = (
-                            f'<a href="https://t.me/{_cuser}">{html.escape(_ctitle)}</a>'
-                            if _cuser
-                            else f"<a href=\"https://t.me/c/{str(_cid)[4:] if str(_cid).startswith('-100') else _cid}\">{html.escape(_ctitle)}</a>"
-                        )
+                        _link = build_chat_link(_cid, _cuser, _ctitle)
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         _kb = make_lols_kb(inout_userid)
                         _rid = int(datetime.now().timestamp())
@@ -4031,13 +4019,13 @@ if __name__ == "__main__":
             # Attempting to delete all messages one by one
             for channel_id, message_id, user_name in result:
                 try:
-                    message_link = construct_message_link(
-                        [channel_id, message_id, None]
-                    )
-                    chat_link = f"https://t.me/c/{str(channel_id)[4:]}/"
+                    # Use cached username if available for public links
+                    cached_username = get_cached_chat_username(channel_id)
+                    message_link = build_message_link(channel_id, message_id, cached_username)
+                    chat_link_html = build_chat_link(channel_id, cached_username, CHANNEL_DICT.get(channel_id, "Chat"))
                     bot_chatlink_message = (
                         f"Attempting to delete message <code>{message_id}</code>\n"
-                        f"in chat <a href='{chat_link}'>{CHANNEL_DICT[channel_id]}</a> (<code>{channel_id}</code>)\n"
+                        f"in chat {chat_link_html} (<code>{channel_id}</code>)\n"
                         f"<a href='{message_link}'>{message_link}</a>"
                     )
                     await safe_send_message(
@@ -4221,7 +4209,9 @@ if __name__ == "__main__":
                     channel_id_to_ban,
                     CHANNEL_IDS,
                 )
-                chan_ban_msg = f"<a href='https://t.me/c/{str(channel_id_to_ban)[4:]}'>Channel</a>:(<code>{channel_id_to_ban}</code>) also banned by AUTOREPORT#{report_id_to_ban}. "
+                # Use cached username if available for public channel link
+                chan_link_html = build_chat_link(channel_id_to_ban, get_cached_chat_username(channel_id_to_ban), "Channel")
+                chan_ban_msg = f"{chan_link_html}:(<code>{channel_id_to_ban}</code>) also banned by AUTOREPORT#{report_id_to_ban}. "
             else:
                 chan_ban_msg = ""
 
@@ -4945,15 +4935,7 @@ if __name__ == "__main__":
 
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         chat_title_safe = html.escape(message.chat.title)
-                        chat_link_html = (
-                            f"<a href='https://t.me/{message.chat.username}'>{chat_title_safe}</a>"
-                            if message.chat.username
-                            else (
-                                f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{chat_title_safe}</a>"
-                                if str(message.chat.id).startswith("-100")
-                                else chat_title_safe
-                            )
-                        )
+                        chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
 
                         # Build unified diff-style lines
                         def _fmt(old, new, label, username=False):
@@ -5131,14 +5113,10 @@ if __name__ == "__main__":
 
             # Send info to ADMIN_AUTOBAN
             chat_title_safe = html.escape(message.chat.title)
+            chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+            # Add @username to display if available
             if message.chat.username:
-                chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{chat_title_safe} (@{message.chat.username})</a>"
-            elif str(message.chat.id).startswith(
-                "-100"
-            ):  # For supergroups and channels
-                chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{chat_title_safe}</a>"
-            else:  # Fallback for other chat types (e.g., basic groups, though less common for this bot's scope)
-                chat_link_html = f"{chat_title_safe}"  # Just the title, as direct links can be unreliable
+                chat_link_html = chat_link_html.replace(f">{chat_title_safe}</a>", f">{chat_title_safe} (@{message.chat.username})</a>")
 
             admin_notification_text = (
                 f"Deleted message: <code>{message_link}</code>\n"
@@ -5221,13 +5199,7 @@ if __name__ == "__main__":
                         message.chat.title
                     )  # Used when no link is formed
 
-                    if message.chat.username:
-                        banned_in_chat_link_html = f'<a href="https://t.me/{message.chat.username}">{escaped_chat_title_for_link}</a>'
-                    elif str(message.chat.id).startswith("-100"):
-                        chat_id_suffix = str(message.chat.id)[4:]
-                        banned_in_chat_link_html = f'<a href="https://t.me/c/{chat_id_suffix}">{escaped_chat_title_for_link}</a>'
-                    else:
-                        banned_in_chat_link_html = escaped_chat_title_for_display
+                    banned_in_chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
                     # ban spammer in all chats
                     ban_member_task = await check_and_autoban(
                         f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} ({message.from_user.id}) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
@@ -5720,14 +5692,7 @@ if __name__ == "__main__":
                         )
                         # Build clickable chat link (public @username or internal /c/ link) with safe fallback
                         _chat_title_safe = html.escape(message.chat.title)
-                        if message.chat.username:
-                            _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
-                        elif str(message.chat.id).startswith("-100"):
-                            _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
-                        else:
-                            _chat_link_html = (
-                                f"<b>{_chat_title_safe}</b>"  # non-linkable
-                            )
+                        _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
 
                         await safe_send_message(
                             BOT,
@@ -5975,12 +5940,7 @@ if __name__ == "__main__":
 
                     # Build clickable chat link
                     _chat_title_safe = html.escape(message.chat.title)
-                    if message.chat.username:
-                        _chat_link_html = f"<a href='https://t.me/{message.chat.username}'>{_chat_title_safe}</a>"
-                    elif str(message.chat.id).startswith("-100"):
-                        _chat_link_html = f"<a href='https://t.me/c/{str(message.chat.id)[4:]}'>{_chat_title_safe}</a>"
-                    else:
-                        _chat_link_html = f"<b>{_chat_title_safe}</b>"
+                    _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
 
                     # Get lols link and create keyboard
                     lols_link = f"https://t.me/oLolsBot?start={message.from_user.id}"

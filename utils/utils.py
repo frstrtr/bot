@@ -592,17 +592,16 @@ def create_inline_keyboard(message_link, lols_link, message: types.Message):
     produced elsewhere, leading to duplicate handling / double confirmation flows.
 
     To avoid duplicate ban handling we:
-      - Keep non-destructive info buttons (View Original / Check Spam Data).
+      - Keep non-destructive info buttons (Check Spam Data).
       - Provide a single consolidated "⚙️ Actions" menu via a neutral callback prefix
         that downstream code can expand into confirm/cancel buttons (re-using existing
         suspicious* prefixes only once).
       - Retain the existing stopchecks_* button (used to mark user legit & stop monitoring).
 
-    If you still want direct ban buttons, wire them through a distinct prefix like
-    actionsban_ to distinguish from primary flow.
+    Note: "View Original Message" button removed since the original message is always
+    forwarded above this notification, and buttons don't work when forwarding reports.
     """
     inline_kb = InlineKeyboardMarkup()
-    inline_kb.add(InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link))
     inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
     inline_kb.add(
         InlineKeyboardButton(

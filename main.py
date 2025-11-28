@@ -7234,6 +7234,7 @@ if __name__ == "__main__":
         - With thread: -1001234567890:123
         - Username: @chatname
         - t.me link: t.me/chatname or t.me/chatname/456
+        - t.me/c link: t.me/c/1234567890 or t.me/c/1234567890/456
         
         Returns: (chat_id, thread_id) where thread_id may be None
         """
@@ -7249,8 +7250,21 @@ if __name__ == "__main__":
                 thread_id = int(parts[1])
         elif target.lstrip("-").isdigit():
             chat_id = int(target)
+        elif "t.me/c/" in target:
+            # Private chat link: t.me/c/1234567890 or t.me/c/1234567890/456
+            match_with_topic = re.search(r't\.me/c/(\d+)/(\d+)', target)
+            if match_with_topic:
+                # Convert to full chat ID format: -100 + chat_id
+                chat_id = int(f"-100{match_with_topic.group(1)}")
+                thread_id = int(match_with_topic.group(2))
+            else:
+                match = re.search(r't\.me/c/(\d+)', target)
+                if match:
+                    chat_id = int(f"-100{match.group(1)}")
+                else:
+                    return None, None
         elif "t.me/" in target:
-            # Try to match with topic ID first
+            # Public chat link: t.me/chatname or t.me/chatname/456
             match_with_topic = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})/(\d+)', target)
             if match_with_topic:
                 chat_id = f"@{match_with_topic.group(1)}"

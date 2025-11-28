@@ -261,6 +261,9 @@ bot_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 active_user_checks_dict = dict()
 banned_users_dict = dict()
 
+# Threshold for flagging very new accounts (very high user IDs)
+HIGH_USER_ID_THRESHOLD = 8_200_000_000
+
 # Cache for chat usernames (chat_id -> username)
 # Populated when processing messages, used for constructing public links
 chat_username_cache: dict[int, str | None] = {}
@@ -2853,6 +2856,51 @@ if __name__ == "__main__":
         if result is None:
             return
         was_member, is_member = result
+
+        # Check for very high user ID on JOIN events (very new accounts are suspicious)
+        if is_member and not was_member and inout_userid > HIGH_USER_ID_THRESHOLD:
+            # User is joining and has very high ID - send alert to suspicious thread
+            _report_id = int(datetime.now().timestamp())
+            _chat_link_html = build_chat_link(update.chat.id, update.chat.username, update.chat.title)
+            _high_id_message = (
+                f"🆕 <b>Very New Account Joined</b>\n"
+                f"User ID: <code>{inout_userid}</code> (> 8.2B)\n"
+                f"Name: {html.escape(inout_userfirstname)} {html.escape(inout_userlastname)}\n"
+                f"Username: @{inout_username}\n"
+                f"Chat: {_chat_link_html}\n\n"
+                f"🔗 <b>Profile links:</b>\n"
+                f"   ├ <a href='tg://user?id={inout_userid}'>ID based profile link</a>\n"
+                f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, "
+                f"<a href='https://t.me/@id{inout_userid}'>iOS</a>"
+            )
+            _high_id_kb = make_lols_kb(inout_userid)
+            _high_id_kb.add(
+                InlineKeyboardButton(
+                    "⚙️ Actions (Ban / Delete) ⚙️",
+                    callback_data=f"suspiciousactions_{update.chat.id}_{_report_id}_{inout_userid}",
+                )
+            )
+            _high_id_kb.add(
+                InlineKeyboardButton(
+                    "✅ Mark as Legit",
+                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_{_report_id}",
+                )
+            )
+            await safe_send_message(
+                BOT,
+                ADMIN_GROUP_ID,
+                _high_id_message,
+                LOGGER,
+                message_thread_id=ADMIN_SUSPICIOUS,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=_high_id_kb,
+            )
+            LOGGER.warning(
+                "\033[93m%s:@%s has very high user ID (>8.2B) - flagged as suspicious on join\033[0m",
+                inout_userid,
+                inout_username,
+            )
 
         # Check lols after user join/leave event in 3hr and ban if spam
         if (
@@ -5794,7 +5842,13 @@ if __name__ == "__main__":
                 "cashtags": [],
                 "bot_commands": [],
                 "emails": [],
+                "high_user_id": False,
             }
+
+            # Check for high user ID (accounts created recently have IDs > 8.2 billion)
+            if message.from_user.id > HIGH_USER_ID_THRESHOLD:
+                has_suspicious_content = True
+                suspicious_items["high_user_id"] = True
 
             # Helper function to extract text from entity
             def extract_entity_text(text, entity):
@@ -6180,6 +6234,9 @@ if __name__ == "__main__":
                             content_details.append(
                                 f"  ... and {emails_count - max_items_per_type} more"
                             )
+
+                    if suspicious_items["high_user_id"]:
+                        content_details.insert(0, f"<b>🆕 Very New Account (ID &gt; 8.2B)</b>")
 
                     content_report = "\n".join(content_details)
 
@@ -8083,7 +8140,7 @@ if __name__ == "__main__":
     # Spam detection improvements:
     # TODO: Hash banned spam messages and check signature for autoreport
     # TODO: Extract and store links/channels from banned messages for auto-blacklist matching
-    # TODO: More attention to messages from users with IDs > 8,000,000,000
+    # NOTE: Messages from users with IDs > 8.2B are flagged as suspicious (very new accounts)
     # TODO: Check for message edits and name changes after joining
     # TODO: Check profile photo date/DC location - warn if just uploaded
     #

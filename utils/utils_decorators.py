@@ -6,16 +6,19 @@ from utils.utils_config import (
     ADMIN_USER_ID,
     CHANNEL_IDS,
     BOT_USERID,
+    SUPERADMIN_GROUP_ID,
 )
 
 
 def is_valid_message(
     message: types.Message,
 ) -> bool:
-    """Check if the message is not from admin groups, technolog group, admin user, or BOT managed channels, and is not forwarded."""
+    """Check if the message is not from admin groups, technolog group, admin user, superadmin group, or BOT managed channels, and is not forwarded."""
+    excluded_chats = [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID] + CHANNEL_IDS
+    if SUPERADMIN_GROUP_ID:
+        excluded_chats.append(SUPERADMIN_GROUP_ID)
     return (
-        message.chat.id
-        not in [ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, ADMIN_USER_ID] + CHANNEL_IDS
+        message.chat.id not in excluded_chats
         and message.forward_from_chat is None
     )
 

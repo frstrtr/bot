@@ -6906,12 +6906,14 @@ if __name__ == "__main__":
             "  • <code>&lt;target&gt;</code> - Chat identifier (required)\n"
             "    - Numeric chat ID: <code>-1001234567890</code>\n"
             "    - Public username: <code>@channelname</code> or <code>@groupname</code>\n"
+            "    - Chat link: <code>t.me/chatname</code> or <code>https://t.me/chatname</code>\n"
             "  • <code>&lt;message&gt;</code> - Text to send (required)\n"
             "    - Supports HTML formatting\n"
             "    - Can be multiline\n\n"
             "<b>Examples:</b>\n"
             "  <code>/say -1001234567890 Hello everyone!</code>\n"
             "  <code>/say @mychannel &lt;b&gt;Important&lt;/b&gt; announcement</code>\n"
+            "  <code>/say t.me/mygroup Hello from the link!</code>\n"
             "  <code>/say -1001234567890 Line 1\nLine 2\nLine 3</code>\n\n"
             
             "↩️ <b>/reply</b> - Reply to a specific message in a chat\n"
@@ -6999,9 +7001,11 @@ if __name__ == "__main__":
             parts = message.text.split(maxsplit=2)
             if len(parts) < 3:
                 await message.reply(
-                    "Usage: <code>/say &lt;chat_id_or_@username&gt; message</code>\n"
-                    "Example: <code>/say -1001234567890 Hello everyone!</code>\n"
-                    "Example: <code>/say @chatusername Hello everyone!</code>",
+                    "Usage: <code>/say &lt;target&gt; message</code>\n"
+                    "Examples:\n"
+                    "  <code>/say -1001234567890 Hello!</code>\n"
+                    "  <code>/say @chatusername Hello!</code>\n"
+                    "  <code>/say t.me/chatname Hello!</code>",
                     parse_mode="HTML",
                 )
                 return
@@ -7014,9 +7018,26 @@ if __name__ == "__main__":
                 chat_id = target  # Use username directly
             elif target.lstrip("-").isdigit():
                 chat_id = int(target)
+            elif "t.me/" in target:
+                # Extract username from t.me link (e.g., t.me/chatname or https://t.me/chatname)
+                # Handle formats: t.me/chatname, https://t.me/chatname, http://t.me/chatname
+                import re
+                match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})', target)
+                if match:
+                    chat_id = f"@{match.group(1)}"
+                else:
+                    await message.reply(
+                        "Invalid t.me link format. Use: <code>t.me/chatname</code>",
+                        parse_mode="HTML",
+                    )
+                    return
             else:
                 await message.reply(
-                    "Invalid chat ID or username. Use numeric ID (e.g., -1001234567890) or @username."
+                    "Invalid target. Use:\n"
+                    "• Numeric ID: <code>-1001234567890</code>\n"
+                    "• Username: <code>@chatname</code>\n"
+                    "• Link: <code>t.me/chatname</code>",
+                    parse_mode="HTML",
                 )
                 return
 

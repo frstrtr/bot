@@ -352,13 +352,7 @@ def get_spammer_details(
             "(user_id = :user_id)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
         )
-        # FIXME is it neccessary below?
-        params.update(
-            {
-                "forward_date": message_forward_date,
-                "forwarded_from_id": forwarded_from_id,
-            }
-        )
+        # Note: forward_date/forwarded_from_id not needed here - condition only uses user_id
 
     else:
         # This is a forwarded forwarded message
@@ -3699,7 +3693,6 @@ if __name__ == "__main__":
                         "Editing related banners during confirmation failed: %s", _e
                     )
 
-        # FIXME exceptions type
         except KeyError as e:
             LOGGER.error(
                 "\033[93m%s Error while removing the buttons: %s. Message reported by non-admin user?\033[0m",
@@ -3900,8 +3893,6 @@ if __name__ == "__main__":
                         task.cancel()
 
             # save event to the ban file
-            # XXX save the event to the inout file
-            # FIXME chat @name below
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                 f"{author_id:<10} "
@@ -3928,10 +3919,8 @@ if __name__ == "__main__":
                 else "!UNDEFINED!"
             )
 
-            # select all messages from the user in the chat
-            # and this is not records about join or leave
-            # and this record have name of the chat
-            # FIXME private chats do not have names :(
+            # Select all messages from the user in chats with usernames
+            # Note: Private chats are excluded (chat_username IS NOT NULL) since they don't have public usernames
             query = """
                 SELECT chat_id, message_id, user_name
                 FROM recent_messages 
@@ -5519,7 +5508,7 @@ if __name__ == "__main__":
                     # start the perform_checks coroutine
                     # TODO need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
-                    # FIXME remove -100 from public group id?
+                    # Note: -100 prefix is required for supergroup API calls
                     LOGGER.info(
                         "%s:@%s Nightwatch Message to delete: %s",
                         message.from_id,
@@ -7963,7 +7952,9 @@ if __name__ == "__main__":
         # empty banned_users_dict
         banned_users_dict.clear()
 
-    # FIXME double night message check in SRM
+    # NOTE: Night message check happens twice intentionally:
+    #   1. First check (line ~5500) triggers perform_checks watchdog for new users
+    #   2. Second check (line ~5590) logs additional messages from users already being watched
     # XXX remove user watchdog if banned when suspicious message detected
     # TODO reply to individual messages by bot in the monitored groups or make posts
     # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport

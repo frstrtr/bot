@@ -6932,6 +6932,30 @@ if __name__ == "__main__":
             "  <code>/reply https://t.me/mygroup/123 Thanks for the info!</code>\n"
             "  <code>/reply https://t.me/c/1234567890/456 &lt;i&gt;Noted&lt;/i&gt;</code>\n\n"
             
+            "📩 <b>/forward</b> - Forward a message (shows original sender)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "<b>Syntax:</b> <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n\n"
+            "<b>Parameters:</b>\n"
+            "  • <code>&lt;message_link&gt;</code> - Link to message to forward\n"
+            "  • <code>&lt;target&gt;</code> - Destination (chat ID, @username, or t.me link)\n"
+            "    - Supports topic: <code>-1001234:123</code> or <code>t.me/chat/456</code>\n\n"
+            "<b>Examples:</b>\n"
+            "  <code>/forward https://t.me/source/123 -1001234567890</code>\n"
+            "  <code>/forward https://t.me/source/123 @targetgroup</code>\n"
+            "  <code>/forward https://t.me/source/123 t.me/target/456</code>\n\n"
+            
+            "📋 <b>/copy</b> - Copy a message (appears as bot's message)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "<b>Syntax:</b> <code>/copy &lt;message_link&gt; &lt;target&gt;</code>\n\n"
+            "<b>Parameters:</b>\n"
+            "  • <code>&lt;message_link&gt;</code> - Link to message to copy\n"
+            "  • <code>&lt;target&gt;</code> - Destination (chat ID, @username, or t.me link)\n"
+            "    - Supports topic: <code>-1001234:123</code> or <code>t.me/chat/456</code>\n\n"
+            "<b>Examples:</b>\n"
+            "  <code>/copy https://t.me/source/123 -1001234567890</code>\n"
+            "  <code>/copy https://t.me/source/123 @targetgroup</code>\n"
+            "💡 No \"Forwarded from\" header - looks like bot posted it\n\n"
+            
             "📢 <b>/broadcast</b> - Send message to multiple chats\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "<b>Syntax:</b>\n"
@@ -7195,6 +7219,250 @@ if __name__ == "__main__":
 
         except Exception as e:
             LOGGER.error("Error in reply_to_message: %s", e)
+            await message.reply(f"Error: {e}")
+
+    def parse_target_with_thread(target: str):
+        """Parse target string and extract chat_id and optional thread_id.
+        
+        Supports:
+        - Numeric ID: -1001234567890
+        - With thread: -1001234567890:123
+        - Username: @chatname
+        - t.me link: t.me/chatname or t.me/chatname/456
+        
+        Returns: (chat_id, thread_id) where thread_id may be None
+        """
+        import re
+        thread_id = None
+        
+        if target.startswith("@"):
+            chat_id = target
+        elif ":" in target and target.split(":")[0].lstrip("-").isdigit():
+            parts = target.split(":", 1)
+            chat_id = int(parts[0])
+            if parts[1].isdigit():
+                thread_id = int(parts[1])
+        elif target.lstrip("-").isdigit():
+            chat_id = int(target)
+        elif "t.me/" in target:
+            # Try to match with topic ID first
+            match_with_topic = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})/(\d+)', target)
+            if match_with_topic:
+                chat_id = f"@{match_with_topic.group(1)}"
+                thread_id = int(match_with_topic.group(2))
+            else:
+                match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})', target)
+                if match:
+                    chat_id = f"@{match.group(1)}"
+                else:
+                    return None, None
+        else:
+            return None, None
+        
+        return chat_id, thread_id
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["forward"])
+    async def forward_message_cmd(message: types.Message):
+        """Forward a message to a target chat (shows 'Forwarded from' header).
+        
+        Usage: /forward <message_link> <target>
+        Example: /forward https://t.me/source/123 -1001234567890
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        try:
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n"
+                    "Example: <code>/forward https://t.me/source/123 -1001234567890</code>\n"
+                    "Example: <code>/forward https://t.me/source/123 @targetgroup</code>\n"
+                    "Example: <code>/forward https://t.me/source/123 t.me/target/456</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            message_link = parts[1]
+            target = parts[2]
+
+            # Extract source chat and message ID
+            try:
+                source_chat, source_msg_id = extract_chat_name_and_message_id_from_link(message_link)
+            except ValueError as e:
+                await message.reply(f"❌ Invalid message link: {e}")
+                return
+
+            # Parse target
+            target_chat, thread_id = parse_target_with_thread(target)
+            if target_chat is None:
+                await message.reply(
+                    "❌ Invalid target. Use:\n"
+                    "• Numeric ID: <code>-1001234567890</code>\n"
+                    "• With topic: <code>-1001234567890:123</code>\n"
+                    "• Username: <code>@chatname</code>\n"
+                    "• Link: <code>t.me/chatname</code> or <code>t.me/chatname/topic_id</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            # Forward the message
+            try:
+                if thread_id:
+                    forwarded = await BOT.forward_message(
+                        chat_id=target_chat,
+                        from_chat_id=source_chat,
+                        message_id=source_msg_id,
+                        message_thread_id=thread_id,
+                    )
+                else:
+                    forwarded = await BOT.forward_message(
+                        chat_id=target_chat,
+                        from_chat_id=source_chat,
+                        message_id=source_msg_id,
+                    )
+
+                # Build success message
+                target_desc = f"<code>{target_chat}</code>"
+                if thread_id:
+                    target_desc += f" (topic {thread_id})"
+
+                # Build link to forwarded message
+                if isinstance(target_chat, str) and target_chat.startswith("@"):
+                    if thread_id:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{thread_id}/{forwarded.message_id}"
+                    else:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{forwarded.message_id}"
+                else:
+                    chat_id_str = str(target_chat)[4:] if str(target_chat).startswith("-100") else str(target_chat)
+                    if thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{forwarded.message_id}"
+                    else:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{forwarded.message_id}"
+
+                await message.reply(
+                    f"✅ Message forwarded to {target_desc}\n"
+                    f"🔗 <a href='{msg_link}'>View message</a>",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+
+                LOGGER.info(
+                    "Admin %s:@%s forwarded message %s from %s to %s (thread=%s)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    source_msg_id,
+                    source_chat,
+                    target_chat,
+                    thread_id,
+                )
+
+            except Exception as e:
+                await message.reply(f"❌ Failed to forward message: {e}")
+
+        except Exception as e:
+            LOGGER.error("Error in forward_message_cmd: %s", e)
+            await message.reply(f"Error: {e}")
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["copy"])
+    async def copy_message_cmd(message: types.Message):
+        """Copy a message to a target chat (no 'Forwarded from' header).
+        
+        Usage: /copy <message_link> <target>
+        Example: /copy https://t.me/source/123 -1001234567890
+        
+        NOTE: Only available to superadmin in private chat.
+        """
+        try:
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/copy &lt;message_link&gt; &lt;target&gt;</code>\n"
+                    "Example: <code>/copy https://t.me/source/123 -1001234567890</code>\n"
+                    "Example: <code>/copy https://t.me/source/123 @targetgroup</code>\n"
+                    "💡 No 'Forwarded from' header - appears as bot's message",
+                    parse_mode="HTML",
+                )
+                return
+
+            message_link = parts[1]
+            target = parts[2]
+
+            # Extract source chat and message ID
+            try:
+                source_chat, source_msg_id = extract_chat_name_and_message_id_from_link(message_link)
+            except ValueError as e:
+                await message.reply(f"❌ Invalid message link: {e}")
+                return
+
+            # Parse target
+            target_chat, thread_id = parse_target_with_thread(target)
+            if target_chat is None:
+                await message.reply(
+                    "❌ Invalid target. Use:\n"
+                    "• Numeric ID: <code>-1001234567890</code>\n"
+                    "• With topic: <code>-1001234567890:123</code>\n"
+                    "• Username: <code>@chatname</code>\n"
+                    "• Link: <code>t.me/chatname</code> or <code>t.me/chatname/topic_id</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            # Copy the message (no forwarded header)
+            try:
+                if thread_id:
+                    copied = await BOT.copy_message(
+                        chat_id=target_chat,
+                        from_chat_id=source_chat,
+                        message_id=source_msg_id,
+                        message_thread_id=thread_id,
+                    )
+                else:
+                    copied = await BOT.copy_message(
+                        chat_id=target_chat,
+                        from_chat_id=source_chat,
+                        message_id=source_msg_id,
+                    )
+
+                # Build success message
+                target_desc = f"<code>{target_chat}</code>"
+                if thread_id:
+                    target_desc += f" (topic {thread_id})"
+
+                # Build link to copied message
+                if isinstance(target_chat, str) and target_chat.startswith("@"):
+                    if thread_id:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{thread_id}/{copied.message_id}"
+                    else:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{copied.message_id}"
+                else:
+                    chat_id_str = str(target_chat)[4:] if str(target_chat).startswith("-100") else str(target_chat)
+                    if thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{copied.message_id}"
+                    else:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{copied.message_id}"
+
+                await message.reply(
+                    f"✅ Message copied to {target_desc}\n"
+                    f"🔗 <a href='{msg_link}'>View message</a>",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+
+                LOGGER.info(
+                    "Admin %s:@%s copied message %s from %s to %s (thread=%s)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    source_msg_id,
+                    source_chat,
+                    target_chat,
+                    thread_id,
+                )
+
+            except Exception as e:
+                await message.reply(f"❌ Failed to copy message: {e}")
+
+        except Exception as e:
+            LOGGER.error("Error in copy_message_cmd: %s", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["broadcast"])

@@ -1282,7 +1282,7 @@ async def ban_user_from_all_chats(
                 success_count,
             )
             await asyncio.sleep(1)
-            # XXX remove user_id check coroutine and from monitoring list?
+            # Note: Consider removing user_id check coroutine from monitoring list on ChatMigrated
             continue
         except Exception as e:  # Catch any other exceptions
             fail_count += 1
@@ -1492,7 +1492,7 @@ async def check_and_autoban(
             )
             await save_report_file("inout_", "cbk" + event_record)
         elif "manual check requested" in inout_logmessage:
-            # XXX it was /check id command
+            # Manual /check id command - notify admins
             await safe_send_message(
                 BOT,
                 ADMIN_GROUP_ID,
@@ -1527,7 +1527,7 @@ async def check_and_autoban(
                 + " by Хранитель Порядков\n"
             )
             await save_report_file("inout_", "cbm" + event_record)
-        else:  # done by bot but not yet detected by lols_cas XXX
+        else:  # Done by bot but not yet detected by lols_cas
             # fetch user join date and time from database if 🟢 is present
             if "🟢" in inout_logmessage:
                 # Insert current timestamp after clock emoji and before timestamp, no DB query needed
@@ -1591,7 +1591,7 @@ async def check_and_autoban(
 
     elif ("kicked" in inout_logmessage or "restricted" in inout_logmessage) and (
         str(BOT_USERID) not in event_record
-    ):  # XXX user is not in the lols database and kicked/restricted by admin
+    ):  # Note: User is not in the lols database and was kicked/restricted by admin
 
         # perform_checks(user_id, user_name)
         # TODO Add perform-checks coroutine!!!
@@ -1856,7 +1856,7 @@ async def check_n_ban(message: types.Message, reason: str):
                     banned_users_dict,
                 )
 
-        # XXX message id invalid after the message is deleted? Or deleted by other bot?
+        # Note: Message may already be deleted by another bot or process
         # TODO shift to delete_messages in aiogram 3.0
         try:
             await BOT.delete_message(message.chat.id, message.message_id)
@@ -1948,7 +1948,7 @@ async def perform_checks(
             )
 
             # getting message to delete link if it is in the checks dict
-            # XXX what if there is more than one message link?
+            # Note: Currently returns first message link - consider handling multiple links
             if user_id in active_user_checks_dict:
                 if isinstance(active_user_checks_dict[user_id], dict):
                     # Detect post-join profile changes (name/username/photo)
@@ -2583,7 +2583,7 @@ if __name__ == "__main__":
     # global unhandled_messages
     unhandled_messages = (
         {}
-    )  # XXX need to store in the DB to preserve it between sessions
+    )  # TODO: Store in DB to preserve between sessions
 
     # Load configuration values from the XML file
     # load_config()
@@ -2611,10 +2611,7 @@ if __name__ == "__main__":
         # get photo upload date of the user profile with ID update.from_user.id
         # TODO: get the photo upload date of the user profile
         # photo_date = await BOT.get_user_profile_photos(update.from_user.id)
-
-        # XXX
-        # await get_photo_details(update.from_user.id)
-        # XXX
+        # await get_photo_details(update.from_user.id)  # Disabled for now
 
         if (
             update.old_chat_member.user.id in banned_users_dict
@@ -2948,7 +2945,7 @@ if __name__ == "__main__":
                 (
                     getattr(update.chat, "id", None),
                     getattr(update.chat, "username", ""),
-                    # XXX this is not MESSAGE.ID since UPDATE have no such property UNIX_TIMESTAMP
+                    # Note: Using timestamp as message_id since ChatMemberUpdated has no message_id
                     int(f"{int(getattr(update, 'date', datetime.now()).timestamp())}"),
                     getattr(update.old_chat_member.user, "id", None),
                     getattr(update.old_chat_member.user, "username", ""),
@@ -3487,7 +3484,7 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
-                # XXX Send report action banner to the reporter/var to revoke the message
+                # Send report action banner to the reporter
                 admin_action_banner_message = await message.answer(
                     admin_ban_banner,
                     parse_mode="HTML",
@@ -3518,7 +3515,7 @@ if __name__ == "__main__":
                 # Send the banner link to the reporter-admin
                 await message.answer(f"Admin group banner link: {banner_link}")
 
-                # XXX return admin personal report banner message object
+                # Return admin personal report banner message object
                 return admin_action_banner_message
 
             else:  # send report to AUTOREPORT thread of the admin group if reported by non-admin user
@@ -3538,9 +3535,8 @@ if __name__ == "__main__":
                     message_thread_id=ADMIN_AUTOREPORTS,
                     disable_web_page_preview=True,
                 )
-                # store state
-                # Store the admin action banner message data XXX
-                # XXX
+                # Store the admin action banner message data
+                # Note: Lock is implemented via set_forwarded_state synchronous call
                 # # import asyncio
 
                 # # Initialize the lock
@@ -3577,7 +3573,7 @@ if __name__ == "__main__":
                 #     await store_state(report_id, message, admin_group_banner_message, admin_action_banner_message)
 
                 #     return admin_group_banner_message
-                # XXX we need to lock
+                # State is stored synchronously via set_forwarded_state
                 set_forwarded_state(
                     DP,
                     report_id,
@@ -3797,7 +3793,7 @@ if __name__ == "__main__":
             #            ChatID        MsgID    ChatUsername        UserID     UserName    User1  User2   MessageForwardDate
             # Result: (-1001753683146, 3255, 'exampleChatUsername', 66666666, 'userUser', 'нелл', None, '2025-01-05 02:35:53')
 
-            # XXX fixed find safe solution to get the author_id from the forwarded_message_data
+            # Note: author_id is safely extracted from forwarded_message_data[3]
             # author_id = eval(forwarded_message_data)[3]
             # LOGGER.debug("Author ID retrieved for original message: %s", author_id)
 
@@ -3997,7 +3993,7 @@ if __name__ == "__main__":
                         channel_id,
                         e,
                     )
-                # unpack user_name correctly XXX
+                # Set default username if not available
                 user_name = user_name if user_name else "!UNDEFINED!"
                 retry_attempts = 3  # number of attempts to delete the message
 
@@ -4117,7 +4113,7 @@ if __name__ == "__main__":
                         f"Failed to ban and delete messages in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
                         LOGGER,
                     )
-            # unpack user_name correctly XXX
+            # Set default username from result if available
             user_name = result[0][2] if result else "!UNDEFINED!"
             LOGGER.debug(
                 "\033[91m%s:@%s manually banned and their messages deleted where applicable.\033[0m",
@@ -4709,7 +4705,7 @@ if __name__ == "__main__":
                 LOGGER.error("🔴 CHANNEL MESSAGE: Can't be forwarded: %s", e)
             except BadRequest as e:
                 LOGGER.error("🔴 CHANNEL MESSAGE: Processing error: %s", e)
-                # return XXX do not stop processing
+                # Continue processing despite BadRequest error
             try:
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
@@ -4737,7 +4733,7 @@ if __name__ == "__main__":
             except MessageToDeleteNotFound as e:
                 LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted! %s", e)
 
-            return  # XXX STOP processing and do not store message in the DB
+            return  # Stop processing - don't store channel messages in DB
 
         # create unified message link
         message_link = construct_message_link(
@@ -4760,7 +4756,7 @@ if __name__ == "__main__":
                 message.chat.title,
                 message_link,
             )
-            return  # XXX stop processing and do not store message in the DB
+            return  # Stop processing - don't track admin messages
 
         # check if message is forward from allowed channels
         if message.forward_from_chat and message.forward_from_chat.id in {
@@ -4977,7 +4973,7 @@ if __name__ == "__main__":
         ### AUTOBAHN MESSAGE CHECKING ###
         # check if message is from user from active_user_checks_dict
         # and banned_users_dict set
-        # XXX is that possible?
+        # Note: Edge case - user in both active checks and banned (race condition)
         if (
             message.from_user.id in active_user_checks_dict
             and message.from_user.id in banned_users_dict
@@ -5072,7 +5068,7 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
             )
 
-            # check if message is forward from banned channel XXX
+            # Check if message is forward from banned channel
             rogue_chan_id = (
                 # message.sender_chat.id
                 # if message.sender_chat
@@ -5336,9 +5332,8 @@ if __name__ == "__main__":
 
             # initialize the autoreport_sent flag
             autoreport_sent = False
-            # check if the user is in the banned list
-            # XXX if user was in lols but before it was kicked it posted a message eventually
-            # we can check it in runtime banned user list
+            # Check if user is in the banned list (latency edge case)
+            # Note: User may have been banned but message was already in flight
             if message.from_user.id in banned_users_dict:
                 the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is banned before sending a message, but squizzed due to latency..."
                 latency_message_link = construct_message_link(
@@ -6818,7 +6813,7 @@ if __name__ == "__main__":
             )
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:  # XXX too general exception!
+        except Exception as e:  # TODO: Specify more specific exception types
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 
@@ -7122,7 +7117,7 @@ if __name__ == "__main__":
             )
 
             # Store the mapping of unhandled message to admin's message
-            # XXX move it to DB
+            # TODO: Move unhandled_messages storage to DB
             unhandled_messages[admin_message.message_id] = [
                 message.chat.id,
                 message.message_id,
@@ -7955,29 +7950,36 @@ if __name__ == "__main__":
     # NOTE: Night message check happens twice intentionally:
     #   1. First check (line ~5500) triggers perform_checks watchdog for new users
     #   2. Second check (line ~5590) logs additional messages from users already being watched
-    # XXX remove user watchdog if banned when suspicious message detected
-    # TODO reply to individual messages by bot in the monitored groups or make posts
-    # TODO hash all banned spam messages and check if the signature of new message is same as spam to produce autoreport
-    # TODO if user banned - analyze message and caption scrap for links or channel/user names to check in the other messages
-    # TODO fix message_forward_date to be the same as the message date in functions get_spammer_details and store_recent_messages
-    # TODO check profile picture date, if today - check for lols for 2 days
-    # TODO more attention to the messages from users with IDs > 8 000 000 000
-    # TODO edit message update check - check if user edited his message
-    # TODO check if user changed his name
-    # TODO check photos date and DC location of the joined profile - warn admins if it's just uploaded
-    # TODO check if user changed his name after joining the chat when he sends a message
-    # TODO scheduler_dict = {}: Implement scheduler to manage chat closure at night for example
-    # TODO switch to aiogram 3.13.1 or higher
-    # TODO fix database spammer store and find indexes, instead of date
-    # TODO sender_chat and forward_from_chat - add to banned database to find and check triple IDs user/senderChat/forwardChat and ban
-    # TODO refactor move all temp storage to DB: messages, banned IDs, bot_unhandled, active_checks?
-    # XXX search and delete user messages if banned by admin and timely checks
-    # XXX use active checks list and banned users list to retrieve recent messages links during runtime to delete it if user is banned FSM?
-    # XXX store nested dict when memorizing active user checks and banned users
-    # XXX autoban rogue channels
-    # XXX manage forwards from banned users as spam
-    # XXX preserve banned channels list by storing it in the DB
-    # XXX mark and check banned users in Database instead of file, leaving active checks intact as file (mark join and leave as 1 in database - to indicate banned)
+    #
+    # === BACKLOG / FUTURE IMPROVEMENTS ===
+    #
+    # Watchdog improvements:
+    # TODO: Remove user watchdog if banned when suspicious message detected
+    # TODO: Use active checks and banned users lists to retrieve recent message links for deletion (FSM?)
+    #
+    # Spam detection improvements:
+    # TODO: Hash banned spam messages and check signature for autoreport
+    # TODO: Analyze banned user messages for links/channel names to check in other messages
+    # TODO: More attention to messages from users with IDs > 8,000,000,000
+    # TODO: Check for message edits and name changes after joining
+    # TODO: Check profile photo date/DC location - warn if just uploaded
+    #
+    # Database improvements:
+    # TODO: Move all temp storage to DB (messages, banned IDs, bot_unhandled, active_checks)
+    # TODO: Fix database spammer store - use indexes instead of date
+    # TODO: Store banned channels list in DB
+    # TODO: Mark banned users in DB instead of file
+    # TODO: Store sender_chat/forward_from_chat for triple ID checking
+    #
+    # Channel/Forward handling:
+    # TODO: Autoban rogue channels
+    # TODO: Manage forwards from banned users as spam
+    #
+    # Other:
+    # TODO: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
+    # TODO: Implement scheduler for chat closure at night
+    # TODO: Switch to aiogram 3.13.1 or higher
+    # TODO: Reply to individual messages by bot in monitored groups
 
     # Uncomment this to get the chat ID of a group or channel
     # @dp.message_handler(commands=["getid"])

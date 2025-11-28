@@ -6953,8 +6953,25 @@ if __name__ == "__main__":
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "When users send messages to the bot in private chat,\n"
             "they are forwarded to you here.\n\n"
-            "<b>To reply:</b> Simply <b>reply to the forwarded message</b>\n"
-            "with your text. The bot will send it back to the original user.\n\n"
+            "<b>Reply as threaded reply:</b>\n"
+            "  Simply <b>reply to the forwarded message</b> with your text.\n"
+            "  The bot will send it as a reply to the user's original message.\n\n"
+            "<b>Reply as standalone message:</b>\n"
+            "  Start your reply with <code>/</code> or <code>\\</code>\n"
+            "  The prefix is stripped and message is sent WITHOUT threading.\n"
+            "  Example: <code>/Hello there!</code> → sends \"Hello there!\"\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ <b>Common Errors</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• <b>\"Failed to send message\"</b> - Bot is not a member of the\n"
+            "  target chat, or lacks permission to post messages\n"
+            "• <b>\"Invalid message link\"</b> - Wrong link format or message\n"
+            "  doesn't exist. Use links from \"Copy Message Link\"\n"
+            "• <b>\"Invalid chat ID\"</b> - Use numeric ID (e.g., -1001234567890)\n"
+            "  or public @username. Private chat links won't work\n"
+            "• <b>\"BadRequest\"</b> - Usually malformed HTML or the target\n"
+            "  message was deleted\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "💡 <b>Tips &amp; Notes</b>\n"
@@ -6963,7 +6980,7 @@ if __name__ == "__main__":
             "• <b>Privacy:</b> All commands work ONLY in this private chat\n"
             "• <b>Bot permissions:</b> Bot must be a member of target chat\n"
             "• <b>Rate limits:</b> Telegram limits apply (~30 msg/sec)\n"
-            "• <b>Errors:</b> Failed sends will be reported with reason\n"
+            "• <b>Get chat ID:</b> Forward a message from target chat to @userinfobot\n"
         )
         await message.reply(help_text, parse_mode="HTML")
 

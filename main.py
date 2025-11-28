@@ -6915,7 +6915,8 @@ if __name__ == "__main__":
             "<code>/broadcast -list chat1,chat2 message</code> - Specific chats\n"
             "Examples:\n"
             "  • <code>/broadcast Hello everyone!</code>\n"
-            "  • <code>/broadcast -list -1001234,-1005678 Hello!</code>\n\n"
+            "  • <code>/broadcast -list -1001234,-1005678 Hello!</code>\n"
+            "⚠️ Requires two-step confirmation (button + type CONFIRM BROADCAST)\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "💬 <b>Replying to User Messages</b>\n\n"
@@ -6925,7 +6926,7 @@ if __name__ == "__main__":
             
             "💡 <b>Tips:</b>\n"
             "• Use HTML formatting in messages\n"
-            "• Broadcast asks for confirmation if sending to many chats\n"
+            "• Broadcast requires two-step confirmation for safety\n"
             "• All commands work only in this private chat\n"
         )
         await message.reply(help_text, parse_mode="HTML")
@@ -7235,7 +7236,7 @@ if __name__ == "__main__":
         """Handle broadcast confirmation/cancellation."""
         try:
             parts = callback_query.data.split("_")
-            action = parts[1]  # confirm or cancel
+            action = parts[1]  # confirm, final, or cancel
             broadcast_id = int(parts[2])
 
             if not hasattr(DP, 'pending_broadcasts') or broadcast_id not in DP.pending_broadcasts:
@@ -7243,7 +7244,7 @@ if __name__ == "__main__":
                 await callback_query.message.edit_reply_markup(reply_markup=None)
                 return
 
-            broadcast_data = DP.pending_broadcasts.pop(broadcast_id)
+            broadcast_data = DP.pending_broadcasts.get(broadcast_id)
 
             # Verify admin
             if callback_query.from_user.id != broadcast_data["admin_id"]:
@@ -7251,16 +7252,81 @@ if __name__ == "__main__":
                 return
 
             if action == "cancel":
+                DP.pending_broadcasts.pop(broadcast_id, None)
                 await callback_query.message.edit_text("❌ Broadcast cancelled.")
                 await callback_query.answer("Cancelled.")
+                return
+
+            if action == "confirm":
+                # First level confirmation passed - now require text confirmation
+                target_chats = broadcast_data["chats"]
+                broadcast_text = broadcast_data["text"]
+                
+                # Mark as awaiting final confirmation
+                broadcast_data["awaiting_text_confirm"] = True
+                
+                cancel_kb = InlineKeyboardMarkup()
+                cancel_kb.add(
+                    InlineKeyboardButton("❌ Cancel Broadcast", callback_data=f"broadcast_cancel_{broadcast_id}")
+                )
+                
+                await callback_query.message.edit_text(
+                    f"⚠️ <b>FINAL CONFIRMATION REQUIRED</b>\n\n"
+                    f"You are about to send a message to <b>{len(target_chats)}</b> chats.\n\n"
+                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⚠️ To confirm, type exactly:\n"
+                    f"<code>CONFIRM BROADCAST {broadcast_id}</code>\n\n"
+                    f"Or click Cancel below.",
+                    parse_mode="HTML",
+                    reply_markup=cancel_kb,
+                )
+                await callback_query.answer("Type confirmation phrase to proceed.")
+                return
+
+            # action == "final" - this shouldn't be hit via callback anymore
+            await callback_query.answer("Use text confirmation.", show_alert=True)
+
+        except Exception as e:
+            LOGGER.error("Error in handle_broadcast_callback: %s", e)
+            await callback_query.answer(f"Error: {e}", show_alert=True)
+
+    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID and m.text and m.text.startswith("CONFIRM BROADCAST"))
+    async def handle_broadcast_text_confirm(message: types.Message):
+        """Handle text confirmation for broadcast."""
+        try:
+            # Parse: CONFIRM BROADCAST <broadcast_id>
+            parts = message.text.split()
+            if len(parts) != 3:
+                await message.reply("Invalid confirmation format.")
+                return
+            
+            try:
+                broadcast_id = int(parts[2])
+            except ValueError:
+                await message.reply("Invalid broadcast ID.")
+                return
+
+            if not hasattr(DP, 'pending_broadcasts') or broadcast_id not in DP.pending_broadcasts:
+                await message.reply("Broadcast expired or not found. Start a new /broadcast command.")
+                return
+
+            broadcast_data = DP.pending_broadcasts.pop(broadcast_id)
+
+            # Verify admin and that text confirmation was requested
+            if message.from_user.id != broadcast_data["admin_id"]:
+                await message.reply("You are not authorized to confirm this broadcast.")
+                return
+
+            if not broadcast_data.get("awaiting_text_confirm"):
+                await message.reply("This broadcast was not awaiting text confirmation.")
                 return
 
             # Execute broadcast
             target_chats = broadcast_data["chats"]
             broadcast_text = broadcast_data["text"]
 
-            await callback_query.message.edit_text(f"📤 Broadcasting to {len(target_chats)} chats...")
-            await callback_query.answer("Broadcasting...")
+            status_msg = await message.reply(f"📤 Broadcasting to {len(target_chats)} chats...")
 
             success_count = 0
             fail_count = 0
@@ -7290,21 +7356,23 @@ if __name__ == "__main__":
             )
             if failed_chats and len(failed_chats) <= 5:
                 result_text += "\n\nFailed chats:\n" + "\n".join([f"  • {fc}" for fc in failed_chats])
+            elif failed_chats:
+                result_text += f"\n\nFailed chats: {len(failed_chats)} (check logs)"
 
-            await callback_query.message.edit_text(result_text, parse_mode="HTML")
+            await status_msg.edit_text(result_text, parse_mode="HTML")
 
             LOGGER.info(
-                "Admin %s:@%s broadcast confirmed to %d chats (success: %d, failed: %d)",
-                callback_query.from_user.id,
-                callback_query.from_user.username or "!UNDEFINED!",
+                "Admin %s:@%s broadcast CONFIRMED via text to %d chats (success: %d, failed: %d)",
+                message.from_user.id,
+                message.from_user.username or "!UNDEFINED!",
                 len(target_chats),
                 success_count,
                 fail_count,
             )
 
         except Exception as e:
-            LOGGER.error("Error in handle_broadcast_callback: %s", e)
-            await callback_query.answer(f"Error: {e}", show_alert=True)
+            LOGGER.error("Error in handle_broadcast_text_confirm: %s", e)
+            await message.reply(f"Error: {e}")
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
     async def unban_user(message: types.Message):

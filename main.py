@@ -261,6 +261,10 @@ bot_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 active_user_checks_dict = dict()
 banned_users_dict = dict()
 
+# Cache for chat usernames (chat_id -> username)
+# Populated when processing messages, used for constructing public links
+chat_username_cache: dict[int, str | None] = {}
+
 # Dictionary to store running tasks by user ID
 running_watchdogs = {}
 
@@ -271,6 +275,66 @@ shutdown_event = asyncio.Event()
 CONN = sqlite3.connect("messages.db")
 CURSOR = CONN.cursor()
 db_init(CURSOR, CONN)
+
+
+def update_chat_username_cache(chat_id: int, username: str | None):
+    """Update the chat username cache when we learn a chat's username."""
+    if username:
+        chat_username_cache[chat_id] = username
+    elif chat_id not in chat_username_cache:
+        chat_username_cache[chat_id] = None
+
+
+def get_cached_chat_username(chat_id: int) -> str | None:
+    """Get cached chat username, returns None if not cached or no username."""
+    return chat_username_cache.get(chat_id)
+
+
+def build_message_link(chat_id: int, message_id: int, chat_username: str | None = None) -> str:
+    """Build a message link using chat username if available, falling back to cache or /c/ format.
+    
+    Args:
+        chat_id: The chat ID
+        message_id: The message ID
+        chat_username: Optional chat username (if already known from message object)
+    
+    Returns:
+        Message link in t.me/username/msgid or t.me/c/id/msgid format
+    """
+    # Use provided username, or check cache
+    username = chat_username or get_cached_chat_username(chat_id)
+    
+    if username:
+        return f"https://t.me/{username}/{message_id}"
+    else:
+        # Fallback to /c/ format for private/internal links
+        chat_id_str = str(chat_id)
+        if chat_id_str.startswith("-100"):
+            chat_id_str = chat_id_str[4:]
+        return f"https://t.me/c/{chat_id_str}/{message_id}"
+
+
+def build_chat_link(chat_id: int, chat_username: str | None = None, chat_title: str | None = None) -> str:
+    """Build a clickable HTML chat link using username if available.
+    
+    Args:
+        chat_id: The chat ID
+        chat_username: Optional chat username
+        chat_title: Optional chat title for display text
+    
+    Returns:
+        HTML link to chat
+    """
+    username = chat_username or get_cached_chat_username(chat_id)
+    title = html.escape(chat_title or "Chat")
+    
+    if username:
+        return f"<a href='https://t.me/{username}'>{title}</a>"
+    else:
+        chat_id_str = str(chat_id)
+        if chat_id_str.startswith("-100"):
+            chat_id_str = chat_id_str[4:]
+        return f"<a href='https://t.me/c/{chat_id_str}'>{title}</a>"
 
 
 def get_spammer_details(
@@ -450,6 +514,18 @@ async def submit_autoreport(message: types.Message, reason):
 async def on_startup(_dp: Dispatcher):
     """Function to handle the bot startup."""
     _commit_info = get_latest_commit_info(LOGGER)
+
+    # Pre-populate chat username cache for monitored channels
+    LOGGER.info("Populating chat username cache for %d monitored channels...", len(CHANNEL_IDS))
+    for chat_id in CHANNEL_IDS:
+        try:
+            chat = await BOT.get_chat(chat_id)
+            update_chat_username_cache(chat_id, chat.username)
+            if chat.username:
+                LOGGER.debug("Cached username for %s: @%s", chat.title, chat.username)
+        except Exception as e:
+            LOGGER.warning("Could not get chat info for %s: %s", chat_id, e)
+    LOGGER.info("Chat username cache populated with %d entries", len(chat_username_cache))
 
     bot_start_log_message = (
         f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
@@ -2611,6 +2687,9 @@ if __name__ == "__main__":
     @DP.chat_member_handler(is_not_bot_action)  # exclude bot's own actions
     async def greet_chat_members(update: types.ChatMemberUpdated):
         """Checks for change in the chat members statuses and check if they are spammers."""
+        # Update chat username cache
+        update_chat_username_cache(update.chat.id, update.chat.username)
+
         # Who did the action
         by_user = None
         # get photo upload date of the user profile with ID update.from_user.id
@@ -4739,6 +4818,9 @@ if __name__ == "__main__":
                 LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted! %s", e)
 
             return  # Stop processing - don't store channel messages in DB
+
+        # Update chat username cache for future link construction
+        update_chat_username_cache(message.chat.id, message.chat.username)
 
         # create unified message link
         message_link = construct_message_link(

@@ -19,6 +19,7 @@ TECHNO_RESTART = None
 TECHNO_IN = None
 TECHNO_OUT = None
 ADMIN_USER_ID = None
+SUPERADMIN_GROUP_ID = None
 TECHNO_NAMES = None
 CHANNEL_NAMES = []
 SPAM_TRIGGERS = []
@@ -46,7 +47,7 @@ def load_config():
     global CHANNEL_IDS, ADMIN_AUTOREPORTS, TECHNO_LOGGING, TECHNO_ORIGINALS, TECHNO_UNHANDLED
     global ADMIN_AUTOBAN, ADMIN_MANBAN, TECHNO_RESTART, TECHNO_IN, TECHNO_OUT, ADMIN_USER_ID, TECHNO_NAMES
     global CHANNEL_NAMES, SPAM_TRIGGERS, ADMIN_SUSPICIOUS, TECHNO_ADMIN
-    global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID
+    global ALLOWED_FORWARD_CHANNELS, ADMIN_GROUP_ID, TECHNOLOG_GROUP_ID, SUPERADMIN_GROUP_ID
     global ALLOWED_FORWARD_CHANNEL_IDS, MAX_TELEGRAM_MESSAGE_LENGTH
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNOLOG_GROUP, TECHNOLOG_GROUP_NAME
     global DP, BOT, LOGGER, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
@@ -101,6 +102,11 @@ def load_config():
         TELEGRAM_CHANNEL_BOT_ID = 136817688  # Telegram @Channel_bot ID
 
         ADMIN_USER_ID = int(config_XML_root.find("admin_id").text)
+        
+        # Superadmin private group for /copy, /forward commands (optional)
+        superadmin_group_elem = config_XML_root.find("superadmin_group_id")
+        SUPERADMIN_GROUP_ID = int(superadmin_group_elem.text) if superadmin_group_elem is not None else None
+        
         CHANNEL_IDS = [
             int(group.find("id").text) for group in channels_root.findall("group")
         ]

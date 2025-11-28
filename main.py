@@ -207,6 +207,7 @@ from utils.utils_config import (
     TECHNO_IN,
     TECHNO_OUT,
     ADMIN_USER_ID,
+    SUPERADMIN_GROUP_ID,
     TECHNO_NAMES,
     CHANNEL_NAMES,
     SPAM_TRIGGERS,
@@ -3352,18 +3353,16 @@ if __name__ == "__main__":
         # store spam text and caption to the daily_spam file
         await save_report_file("daily_spam_", reported_spam)
 
-        # Check if this is superadmin in private chat - they may be forwarding for /copy or /forward
+        # Check if this is superadmin in private chat or superadmin group - they may be forwarding for /copy or /forward
         # We'll only respond after we verify we can process the report
-        is_superadmin_private = (
-            message.chat.type == "private" and message.from_user.id == ADMIN_USER_ID
-        )
+        is_superadmin_context = superadmin_filter(message)
 
         # LOGGER.debug("############################################################")
         # LOGGER.debug("                                                            ")
         # LOGGER.debug("------------------------------------------------------------")
         # LOGGER.debug("Received forwarded message for the investigation: %s", message)
-        # Send a thank you note to the user (but not to superadmin in private - wait until we verify)
-        if not is_superadmin_private:
+        # Send a thank you note to the user (but not to superadmin - wait until we verify)
+        if not is_superadmin_context:
             await message.answer("Thank you for the report. We will investigate it.")
         # Forward the message to the admin group
         technnolog_spam_message_copy = await BOT.forward_message(
@@ -3480,8 +3479,8 @@ if __name__ == "__main__":
                 # Message forwarded from chat without bot, or sender data hidden
                 # Different behavior based on who forwarded the message:
                 
-                # 1. Superadmin in private chat - stay silent (they may use /copy or /forward)
-                if is_superadmin_private:
+                # 1. Superadmin in private chat or superadmin group - stay silent (they may use /copy or /forward)
+                if is_superadmin_context:
                     LOGGER.debug(
                         "Superadmin forwarded message from unknown source - staying silent for potential /copy or /forward use"
                     )
@@ -3546,8 +3545,8 @@ if __name__ == "__main__":
 
         if report_id:
             # send report ID to the reporter
-            # For superadmin in private chat, also send "Thank you" since we successfully found the data
-            if is_superadmin_private:
+            # For superadmin in private chat or group, also send "Thank you" since we successfully found the data
+            if is_superadmin_context:
                 await message.answer(f"Thank you for the report. Report ID: {report_id}")
             else:
                 await message.answer(f"Report ID: {report_id}")
@@ -6935,15 +6934,31 @@ if __name__ == "__main__":
         """Function to log active checks and banned users dict."""
         await log_lists(message.chat.id, message.message_thread_id)
 
-    # Helper to check if message is from superadmin in private chat
-    def is_superadmin_private(message: types.Message) -> bool:
-        """Check if message is from superadmin in private chat."""
-        return (
-            message.chat.type == "private"
-            and message.from_user.id == ADMIN_USER_ID
-        )
+    # Helper to check if message is from superadmin in allowed location
+    def is_superadmin_context(message: types.Message) -> bool:
+        """Check if message is from superadmin in private chat or superadmin group."""
+        if message.from_user.id != ADMIN_USER_ID:
+            return False
+        # Allow in private chat
+        if message.chat.type == "private":
+            return True
+        # Allow in superadmin group (if configured)
+        if SUPERADMIN_GROUP_ID and message.chat.id == SUPERADMIN_GROUP_ID:
+            return True
+        return False
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["help", "adminhelp"])
+    # Lambda for handlers - checks superadmin in private chat OR superadmin group
+    def superadmin_filter(m: types.Message) -> bool:
+        """Filter for superadmin commands - private chat or superadmin group."""
+        if m.from_user.id != ADMIN_USER_ID:
+            return False
+        if m.chat.type == "private":
+            return True
+        if SUPERADMIN_GROUP_ID and m.chat.id == SUPERADMIN_GROUP_ID:
+            return True
+        return False
+
+    @DP.message_handler(superadmin_filter, commands=["help", "adminhelp"])
     async def superadmin_help(message: types.Message):
         """Show help for superadmin communication commands.
         
@@ -7003,7 +7018,7 @@ if __name__ == "__main__":
         await message.reply(help_text_1, parse_mode="HTML")
         await message.reply(help_text_2, parse_mode="HTML")
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["say"])
+    @DP.message_handler(superadmin_filter, commands=["say"])
     async def say_to_chat(message: types.Message):
         """Send a message to a specific chat as the bot.
         
@@ -7011,7 +7026,7 @@ if __name__ == "__main__":
         Example: /say -1001234567890 Hello everyone!
         Example: /say @chatusername Hello everyone!
         
-        NOTE: Only available to superadmin in private chat.
+        NOTE: Only available to superadmin in private chat or superadmin group.
         """
         try:
             # Parse command: /say <target> <message>
@@ -7135,14 +7150,14 @@ if __name__ == "__main__":
             LOGGER.error("Error in say_to_chat: %s", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["reply"])
+    @DP.message_handler(superadmin_filter, commands=["reply"])
     async def reply_to_message(message: types.Message):
         """Reply to a specific message in a chat as the bot.
         
         Usage: /reply <message_link> <reply_text>
         Example: /reply https://t.me/chatname/123 Thanks for your message!
         
-        NOTE: Only available to superadmin in private chat.
+        NOTE: Only available to superadmin in private chat or superadmin group.
         """
         try:
             # Parse command: /reply <link> <text>
@@ -7251,14 +7266,14 @@ if __name__ == "__main__":
         
         return chat_id, thread_id
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["forward"])
+    @DP.message_handler(superadmin_filter, commands=["forward"])
     async def forward_message_cmd(message: types.Message):
         """Forward a message to a target chat (shows 'Forwarded from' header).
         
         Usage: /forward <message_link> <target>
         Example: /forward https://t.me/source/123 -1001234567890
         
-        NOTE: Only available to superadmin in private chat.
+        NOTE: Only available to superadmin in private chat or superadmin group.
         """
         try:
             parts = message.text.split(maxsplit=2)
@@ -7353,14 +7368,14 @@ if __name__ == "__main__":
             LOGGER.error("Error in forward_message_cmd: %s", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["copy"])
+    @DP.message_handler(superadmin_filter, commands=["copy"])
     async def copy_message_cmd(message: types.Message):
         """Copy a message to a target chat (no 'Forwarded from' header).
         
         Usage: /copy <message_link> <target>
         Example: /copy https://t.me/source/123 -1001234567890
         
-        NOTE: Only available to superadmin in private chat.
+        NOTE: Only available to superadmin in private chat or superadmin group.
         """
         try:
             parts = message.text.split(maxsplit=2)
@@ -7455,7 +7470,7 @@ if __name__ == "__main__":
             LOGGER.error("Error in copy_message_cmd: %s", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID, commands=["broadcast"])
+    @DP.message_handler(superadmin_filter, commands=["broadcast"])
     async def broadcast_message(message: types.Message):
         """Broadcast a message to all or selected monitored chats.
         
@@ -7464,7 +7479,7 @@ if __name__ == "__main__":
         Example: /broadcast Hello everyone!
         Example: /broadcast -list -1001234,-1005678 Hello!
         
-        NOTE: Only available to superadmin in private chat.
+        NOTE: Only available to superadmin in private chat or superadmin group.
         """
         try:
             text = message.text
@@ -7665,7 +7680,7 @@ if __name__ == "__main__":
             LOGGER.error("Error in handle_broadcast_callback: %s", e)
             await callback_query.answer(f"Error: {e}", show_alert=True)
 
-    @DP.message_handler(lambda m: m.chat.type == "private" and m.from_user.id == ADMIN_USER_ID and m.text and m.text.startswith("CONFIRM BROADCAST"))
+    @DP.message_handler(lambda m: superadmin_filter(m) and m.text and m.text.startswith("CONFIRM BROADCAST"))
     async def handle_broadcast_text_confirm(message: types.Message):
         """Handle text confirmation for broadcast."""
         try:

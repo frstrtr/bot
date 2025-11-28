@@ -3352,12 +3352,19 @@ if __name__ == "__main__":
         # store spam text and caption to the daily_spam file
         await save_report_file("daily_spam_", reported_spam)
 
+        # Check if this is superadmin in private chat - they may be forwarding for /copy or /forward
+        # We'll only respond after we verify we can process the report
+        is_superadmin_private = (
+            message.chat.type == "private" and message.from_user.id == ADMIN_USER_ID
+        )
+
         # LOGGER.debug("############################################################")
         # LOGGER.debug("                                                            ")
         # LOGGER.debug("------------------------------------------------------------")
         # LOGGER.debug("Received forwarded message for the investigation: %s", message)
-        # Send a thank you note to the user
-        await message.answer("Thank you for the report. We will investigate it.")
+        # Send a thank you note to the user (but not to superadmin in private - wait until we verify)
+        if not is_superadmin_private:
+            await message.answer("Thank you for the report. We will investigate it.")
         # Forward the message to the admin group
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
@@ -3470,14 +3477,57 @@ if __name__ == "__main__":
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
                 )
             else:
-                e = "Renamed Account or wrong chat?"
-                LOGGER.debug(
-                    "Could not retrieve the author's user ID. Please ensure you're reporting recent messages. %s",
-                    e,
+                # Message forwarded from chat without bot, or sender data hidden
+                # Different behavior based on who forwarded the message:
+                
+                # 1. Superadmin in private chat - stay silent (they may use /copy or /forward)
+                if is_superadmin_private:
+                    LOGGER.debug(
+                        "Superadmin forwarded message from unknown source - staying silent for potential /copy or /forward use"
+                    )
+                    return
+                
+                # 2. Admins from admin group - inform them bot can't help
+                if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+                    await message.answer(
+                        "⚠️ This message is forwarded from a chat where the bot is not present, "
+                        "or sender data was hidden.\n\n"
+                        "The bot cannot retrieve the original message details.\n"
+                        "Please ensure the message is from a monitored chat and "
+                        "sender information is preserved when forwarding."
+                    )
+                    LOGGER.debug(
+                        "Admin %s forwarded message from unknown source - informed them",
+                        message.from_user.id,
+                    )
+                    return
+                
+                # 3. Regular users - stay silent, but log and optionally notify admin group
+                LOGGER.info(
+                    "User %s:@%s forwarded message from unknown source - staying silent",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
                 )
-                await message.answer(
-                    f"Could not retrieve the author's user ID. Please ensure you're reporting recent messages. {e}"
-                )
+                # Optionally forward to admin group for review (without response to user)
+                try:
+                    await BOT.forward_message(
+                        TECHNOLOG_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                        message_thread_id=TECHNO_UNHANDLED,
+                    )
+                    await safe_send_message(
+                        BOT,
+                        TECHNOLOG_GROUP_ID,
+                        f"⚠️ User {message.from_user.id}:@{message.from_user.username or '!UNDEFINED!'} "
+                        f"forwarded message from unknown source (bot not present or sender hidden). "
+                        f"No response sent to user.",
+                        LOGGER,
+                        message_thread_id=TECHNO_UNHANDLED,
+                    )
+                except Exception as log_err:
+                    LOGGER.warning("Failed to log unknown forward to technolog: %s", log_err)
+                return
 
         if not found_message_data:  # Last resort. Give up.
             LOGGER.info("           Could not retrieve the author's user ID.")
@@ -3496,7 +3546,11 @@ if __name__ == "__main__":
 
         if report_id:
             # send report ID to the reporter
-            await message.answer(f"Report ID: {report_id}")
+            # For superadmin in private chat, also send "Thank you" since we successfully found the data
+            if is_superadmin_private:
+                await message.answer(f"Thank you for the report. Report ID: {report_id}")
+            else:
+                await message.answer(f"Report ID: {report_id}")
         CURSOR.execute(
             """
             INSERT OR REPLACE INTO recent_messages 

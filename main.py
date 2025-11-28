@@ -1843,6 +1843,40 @@ async def check_n_ban(message: types.Message, reason: str):
             )
         )
 
+        # Add LOLS check buttons for mentioned users in the spam message (up to 3)
+        if message.entities and message.text:
+            max_mention_buttons = 3
+            mention_buttons_added = 0
+            for entity in message.entities:
+                if mention_buttons_added >= max_mention_buttons:
+                    break
+                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                if entity_type == "mention":
+                    # @username mention
+                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                    mention = message.text[offset:offset + length]
+                    if mention.startswith("@"):
+                        username_clean = mention.lstrip("@")
+                        mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                        inline_kb.add(
+                            InlineKeyboardButton(f"🔍 Check {mention}", url=mention_lols_link)
+                        )
+                        mention_buttons_added += 1
+                elif entity_type == "text_mention":
+                    # Direct user mention by ID
+                    user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
+                    if user:
+                        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                        if user_id:
+                            mention_lols_link = f"https://t.me/oLolsBot?start={user_id}"
+                            first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
+                            display = first_name[:15] + "..." if len(first_name) > 15 else first_name
+                            inline_kb.add(
+                                InlineKeyboardButton(f"🔍 Check ID:{user_id} ({display})", url=mention_lols_link)
+                            )
+                            mention_buttons_added += 1
+
         chat_link = (
             f"https://t.me/{message.chat.username}"
             if message.chat.username
@@ -5124,6 +5158,47 @@ if __name__ == "__main__":
                 f"@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
                 f"In chat: {chat_link_html} (<code>{message.chat.id}</code>)"
             )
+            
+            # Build keyboard with LOLS check for banned user and any mentioned users
+            autoban_kb = InlineKeyboardMarkup()
+            autoban_kb.add(
+                InlineKeyboardButton(
+                    "ℹ️ Check Spam Data ℹ️",
+                    url=f"https://t.me/oLolsBot?start={message.from_user.id}",
+                )
+            )
+            # Add LOLS check buttons for mentioned users in the spam message (up to 3)
+            if message.entities and message.text:
+                max_mention_buttons = 3
+                mention_buttons_added = 0
+                for entity in message.entities:
+                    if mention_buttons_added >= max_mention_buttons:
+                        break
+                    entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                    if entity_type == "mention":
+                        offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                        length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                        mention = message.text[offset:offset + length]
+                        if mention.startswith("@"):
+                            username_clean = mention.lstrip("@")
+                            mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                            autoban_kb.add(
+                                InlineKeyboardButton(f"🔍 Check {mention}", url=mention_lols_link)
+                            )
+                            mention_buttons_added += 1
+                    elif entity_type == "text_mention":
+                        user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
+                        if user:
+                            user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                            if user_id:
+                                mention_lols_link = f"https://t.me/oLolsBot?start={user_id}"
+                                first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
+                                display = first_name[:15] + "..." if len(first_name) > 15 else first_name
+                                autoban_kb.add(
+                                    InlineKeyboardButton(f"🔍 Check ID:{user_id} ({display})", url=mention_lols_link)
+                                )
+                                mention_buttons_added += 1
+
             await safe_send_message(
                 BOT,
                 ADMIN_GROUP_ID,
@@ -5132,6 +5207,7 @@ if __name__ == "__main__":
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
+                reply_markup=autoban_kb,
             )
 
             # Check if message is forward from banned channel
@@ -7672,8 +7748,7 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
                 message_thread_id=TECHNO_ADMIN,
             )
-            # TODO add cancel_watchdog() for designated cases
-            # cancel_named_watchdog()
+            # Cancel watchdog and update tracking dicts
             await cancel_named_watchdog(susp_user_id)
             
             # Update tracking dicts
@@ -8001,15 +8076,13 @@ if __name__ == "__main__":
     #   1. First check (line ~5500) triggers perform_checks watchdog for new users
     #   2. Second check (line ~5590) logs additional messages from users already being watched
     #
-    # === BACKLOG / FUTURE IMPROVEMENTS ===
+    # NOTE: Message deletion on ban uses recent_messages DB + active_user_checks_dict entries
     #
-    # Watchdog improvements:
-    # TODO: Remove user watchdog if banned when suspicious message detected
-    # TODO: Use active checks and banned users lists to retrieve recent message links for deletion (FSM?)
+    # === BACKLOG / FUTURE IMPROVEMENTS ===
     #
     # Spam detection improvements:
     # TODO: Hash banned spam messages and check signature for autoreport
-    # TODO: Analyze banned user messages for links/channel names to check in other messages
+    # TODO: Extract and store links/channels from banned messages for auto-blacklist matching
     # TODO: More attention to messages from users with IDs > 8,000,000,000
     # TODO: Check for message edits and name changes after joining
     # TODO: Check profile photo date/DC location - warn if just uploaded

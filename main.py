@@ -7903,10 +7903,11 @@ if __name__ == "__main__":
                 )
                 return
 
-            # Forward the message - try with thread first, retry without if thread not found
+            # Forward the message - try with thread first, fallback to reply-to or plain forward
             try:
                 forwarded = None
                 used_thread_id = thread_id
+                used_as_reply = False  # Track if we used reply_to instead of thread
                 try:
                     if thread_id:
                         forwarded = await BOT.forward_message(
@@ -7924,13 +7925,38 @@ if __name__ == "__main__":
                 except Exception as fwd_error:
                     error_str = str(fwd_error).lower()
                     if thread_id and ("thread not found" in error_str or "message thread" in error_str):
-                        LOGGER.info("Thread %s not found, retrying without thread", thread_id)
-                        used_thread_id = None
-                        forwarded = await BOT.forward_message(
-                            chat_id=target_chat,
-                            from_chat_id=source_chat,
-                            message_id=source_msg_id,
+                        # Thread not found - this might be a non-forum group where the ID is a message to reply to
+                        # Try copy_message with reply_to_message_id instead (forward doesn't support reply_to)
+                        LOGGER.info(
+                            "Thread %s not found, trying as reply_to_message_id using copy_message",
+                            thread_id,
                         )
+                        try:
+                            forwarded = await BOT.copy_message(
+                                chat_id=target_chat,
+                                from_chat_id=source_chat,
+                                message_id=source_msg_id,
+                                reply_to_message_id=thread_id,
+                            )
+                            used_thread_id = None
+                            used_as_reply = True
+                            LOGGER.info(
+                                "Successfully sent as reply to message %s (used copy_message)",
+                                thread_id,
+                            )
+                        except Exception as reply_error:
+                            # Reply also failed, try plain forward without thread
+                            LOGGER.info(
+                                "Reply to %s also failed (%s), falling back to plain forward",
+                                thread_id,
+                                reply_error,
+                            )
+                            used_thread_id = None
+                            forwarded = await BOT.forward_message(
+                                chat_id=target_chat,
+                                from_chat_id=source_chat,
+                                message_id=source_msg_id,
+                            )
                     else:
                         raise fwd_error
 
@@ -7938,6 +7964,8 @@ if __name__ == "__main__":
                 target_desc = f"<code>{target_chat}</code>"
                 if used_thread_id:
                     target_desc += f" (topic {used_thread_id})"
+                elif used_as_reply:
+                    target_desc += f" (reply to msg {thread_id})"
 
                 # Build link to forwarded message
                 if isinstance(target_chat, str) and target_chat.startswith("@"):
@@ -7976,13 +8004,14 @@ if __name__ == "__main__":
                     asyncio.create_task(delete_forwarded_later())
 
                 LOGGER.info(
-                    "%s:@%s forwarded message %s from %s to %s (thread=%s, delete_after=%s)",
+                    "%s:@%s forwarded message %s from %s to %s (thread=%s, reply_to=%s, delete_after=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
                     used_thread_id,
+                    thread_id if used_as_reply else None,
                     delete_after,
                 )
 
@@ -8058,6 +8087,8 @@ if __name__ == "__main__":
 
             # Copy the message (no forwarded header)
             copied = None
+            used_thread_id = thread_id
+            used_as_reply = False
             try:
                 if thread_id:
                     copied = await BOT.copy_message(
@@ -8073,15 +8104,39 @@ if __name__ == "__main__":
                         message_id=source_msg_id,
                     )
             except Exception as copy_err:
-                # If thread not found, retry without thread_id
-                if "thread not found" in str(copy_err).lower() and thread_id:
-                    LOGGER.warning("Thread %s not found in %s, retrying without thread_id", thread_id, target_chat)
-                    thread_id = None
-                    copied = await BOT.copy_message(
-                        chat_id=target_chat,
-                        from_chat_id=source_chat,
-                        message_id=source_msg_id,
+                error_str = str(copy_err).lower()
+                # If thread not found, try as reply_to_message_id instead
+                if thread_id and ("thread not found" in error_str or "message thread" in error_str):
+                    LOGGER.info(
+                        "Thread %s not found, trying as reply_to_message_id",
+                        thread_id,
                     )
+                    try:
+                        copied = await BOT.copy_message(
+                            chat_id=target_chat,
+                            from_chat_id=source_chat,
+                            message_id=source_msg_id,
+                            reply_to_message_id=thread_id,
+                        )
+                        used_thread_id = None
+                        used_as_reply = True
+                        LOGGER.info(
+                            "Successfully copied as reply to message %s",
+                            thread_id,
+                        )
+                    except Exception as reply_err:
+                        # Reply also failed, try plain copy
+                        LOGGER.info(
+                            "Reply to %s also failed (%s), falling back to plain copy",
+                            thread_id,
+                            reply_err,
+                        )
+                        used_thread_id = None
+                        copied = await BOT.copy_message(
+                            chat_id=target_chat,
+                            from_chat_id=source_chat,
+                            message_id=source_msg_id,
+                        )
                 else:
                     raise
 
@@ -8099,19 +8154,21 @@ if __name__ == "__main__":
 
                 # Build success message
                 target_desc = f"<code>{target_chat}</code>"
-                if thread_id:
-                    target_desc += f" (topic {thread_id})"
+                if used_thread_id:
+                    target_desc += f" (topic {used_thread_id})"
+                elif used_as_reply:
+                    target_desc += f" (reply to msg {thread_id})"
 
                 # Build link to copied message
                 if isinstance(target_chat, str) and target_chat.startswith("@"):
-                    if thread_id:
-                        msg_link = f"https://t.me/{target_chat[1:]}/{thread_id}/{copied.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{used_thread_id}/{copied.message_id}"
                     else:
                         msg_link = f"https://t.me/{target_chat[1:]}/{copied.message_id}"
                 else:
                     chat_id_str = str(target_chat)[4:] if str(target_chat).startswith("-100") else str(target_chat)
-                    if thread_id:
-                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{copied.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{used_thread_id}/{copied.message_id}"
                     else:
                         msg_link = f"https://t.me/c/{chat_id_str}/{copied.message_id}"
 
@@ -8123,13 +8180,14 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "%s:@%s copied message %s from %s to %s (thread=%s, timeout=%s)",
+                    "%s:@%s copied message %s from %s to %s (thread=%s, reply_to=%s, timeout=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
-                    thread_id,
+                    used_thread_id,
+                    thread_id if used_as_reply else None,
                     delete_timeout,
                 )
 

@@ -7140,33 +7140,53 @@ if __name__ == "__main__":
             if reply_to_msg_id:
                 send_kwargs["reply_to_message_id"] = reply_to_msg_id
 
-            # Send the message
-            sent_msg = await safe_send_message(
-                BOT,
-                chat_id,
-                text_to_send,
-                LOGGER,
-                **send_kwargs,
-            )
+            # Send the message - try with thread first, retry without if thread not found
+            sent_msg = None
+            used_thread_id = thread_id  # Track what we actually used
+            try:
+                sent_msg = await BOT.send_message(
+                    chat_id,
+                    text_to_send,
+                    **send_kwargs,
+                )
+            except Exception as send_error:
+                error_str = str(send_error).lower()
+                # If thread not found, retry without thread_id
+                if thread_id and ("thread not found" in error_str or "message thread" in error_str):
+                    LOGGER.info("Thread %s not found in %s, retrying without thread", thread_id, chat_id)
+                    send_kwargs.pop("message_thread_id", None)
+                    used_thread_id = None
+                    try:
+                        sent_msg = await BOT.send_message(
+                            chat_id,
+                            text_to_send,
+                            **send_kwargs,
+                        )
+                    except Exception as retry_error:
+                        await message.reply(f"❌ Failed to send message: {retry_error}")
+                        return
+                else:
+                    await message.reply(f"❌ Failed to send message: {send_error}")
+                    return
 
             if sent_msg:
                 # Build link to sent message (include thread in link if applicable)
                 if isinstance(chat_id, str) and chat_id.startswith("@"):
-                    if thread_id:
-                        msg_link = f"https://t.me/{chat_id[1:]}/{thread_id}/{sent_msg.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/{chat_id[1:]}/{used_thread_id}/{sent_msg.message_id}"
                     else:
                         msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
                 else:
                     chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
-                    if thread_id:
-                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{sent_msg.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{used_thread_id}/{sent_msg.message_id}"
                     else:
                         msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
                 
                 # Build target description
                 target_desc = f"<code>{chat_id}</code>"
-                if thread_id:
-                    target_desc += f" (topic {thread_id})"
+                if used_thread_id:
+                    target_desc += f" (topic {used_thread_id})"
                 
                 # Build action description
                 if reply_to_msg_id:
@@ -7180,18 +7200,13 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
-            else:
-                target_desc = str(chat_id)
-                if thread_id:
-                    target_desc += f" (topic {thread_id})"
-                await message.reply(f"❌ Failed to send message to {target_desc}")
 
             LOGGER.info(
                 "%s:@%s sent message to chat %s (thread=%s, reply_to=%s)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 chat_id,
-                thread_id,
+                used_thread_id,
                 reply_to_msg_id,
             )
 

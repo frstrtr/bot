@@ -2666,7 +2666,7 @@ async def perform_intensive_checks(
             
             color_code = color_map.get(lols_spam, "\033[93m")
             LOGGER.debug(
-                "%s%s:@%s INTENSIVE check %d/14 (phase1 @10s): spam=%s\033[0m",
+                "%s%s:%s INTENSIVE check %d/14 (phase1 @10s): spam=%s\033[0m",
                 color_code,
                 user_id,
                 format_username_for_log(user_name),
@@ -2709,7 +2709,7 @@ async def perform_intensive_checks(
             
             color_code = color_map.get(lols_spam, "\033[93m")
             LOGGER.debug(
-                "%s%s:@%s INTENSIVE check %d/14 (phase2 @30s): spam=%s\033[0m",
+                "%s%s:%s INTENSIVE check %d/14 (phase2 @30s): spam=%s\033[0m",
                 color_code,
                 user_id,
                 format_username_for_log(user_name),

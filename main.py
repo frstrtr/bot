@@ -7601,9 +7601,10 @@ if __name__ == "__main__":
             if reply_to_msg_id:
                 send_kwargs["reply_to_message_id"] = reply_to_msg_id
 
-            # Send the message - try with thread first, retry without if thread not found
+            # Send the message - try with thread first, then as reply_to, then plain
             sent_msg = None
             used_thread_id = thread_id  # Track what we actually used
+            used_as_reply = False  # Track if we used reply_to instead of thread
             try:
                 sent_msg = await BOT.send_message(
                     chat_id,
@@ -7612,10 +7613,14 @@ if __name__ == "__main__":
                 )
             except Exception as send_error:
                 error_str = str(send_error).lower()
-                # If thread not found, retry without thread_id
+                # If thread not found, try as reply_to_message_id (non-forum group)
                 if thread_id and ("thread not found" in error_str or "message thread" in error_str):
-                    LOGGER.info("Thread %s not found in %s, retrying without thread", thread_id, chat_id)
+                    LOGGER.info(
+                        "Thread %s not found in %s, trying as reply_to_message_id",
+                        thread_id, chat_id,
+                    )
                     send_kwargs.pop("message_thread_id", None)
+                    send_kwargs["reply_to_message_id"] = thread_id
                     used_thread_id = None
                     try:
                         sent_msg = await BOT.send_message(
@@ -7623,9 +7628,27 @@ if __name__ == "__main__":
                             text_to_send,
                             **send_kwargs,
                         )
-                    except Exception as retry_error:
-                        await message.reply(f"❌ Failed to send message: {retry_error}")
-                        return
+                        used_as_reply = True
+                        LOGGER.info(
+                            "Successfully sent as reply to message %s",
+                            thread_id,
+                        )
+                    except Exception as reply_error:
+                        # Reply also failed, try plain send without thread/reply
+                        LOGGER.info(
+                            "Reply to %s also failed (%s), falling back to plain send",
+                            thread_id, reply_error,
+                        )
+                        send_kwargs.pop("reply_to_message_id", None)
+                        try:
+                            sent_msg = await BOT.send_message(
+                                chat_id,
+                                text_to_send,
+                                **send_kwargs,
+                            )
+                        except Exception as plain_error:
+                            await message.reply(f"❌ Failed to send message: {plain_error}")
+                            return
                 else:
                     await message.reply(f"❌ Failed to send message: {send_error}")
                     return
@@ -7648,9 +7671,11 @@ if __name__ == "__main__":
                 target_desc = f"<code>{chat_id}</code>"
                 if used_thread_id:
                     target_desc += f" (topic {used_thread_id})"
+                elif used_as_reply:
+                    target_desc += f" (reply to msg {thread_id})"
                 
                 # Build action description
-                if reply_to_msg_id:
+                if reply_to_msg_id and not used_as_reply:
                     action_desc = f"✅ Reply sent to message {reply_to_msg_id} in {target_desc}"
                 else:
                     action_desc = f"✅ Message sent to {target_desc}"
@@ -7686,12 +7711,13 @@ if __name__ == "__main__":
                     asyncio.create_task(delete_message_later())
 
                 LOGGER.info(
-                    "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, delete_after=%s)",
+                    "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, used_as_reply=%s, delete_after=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     chat_id,
                     used_thread_id,
-                    reply_to_msg_id,
+                    reply_to_msg_id if not used_as_reply else thread_id,
+                    used_as_reply,
                     delete_after,
                 )
 

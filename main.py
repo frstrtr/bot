@@ -1413,6 +1413,17 @@ async def autoban(_id, user_name="!UNDEFINED!"):
                 user_name,
             )
 
+    # Delete ALL stored messages for this user BEFORE removing from active_user_checks_dict
+    if _id in active_user_checks_dict:
+        deleted_count, failed_count = await delete_all_user_messages(_id, user_name)
+        if deleted_count > 0:
+            LOGGER.info(
+                "%s:@%s Deleted %d spam messages during autoban",
+                _id,
+                user_name,
+                deleted_count,
+            )
+
     if _id in active_user_checks_dict:
         banned_users_dict[_id] = active_user_checks_dict.pop(
             _id, None
@@ -1489,6 +1500,126 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     )
 
 
+async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!"):
+    """Delete ALL stored messages for a user from active_user_checks_dict.
+    
+    Messages are stored with keys like 'chat_id_message_id' in the user's dict entry.
+    This function finds all such message keys and deletes each message.
+    
+    Returns:
+        tuple: (deleted_count, failed_count)
+    """
+    deleted_count = 0
+    failed_count = 0
+    
+    if user_id not in active_user_checks_dict:
+        return deleted_count, failed_count
+    
+    user_data = active_user_checks_dict.get(user_id, {})
+    if not isinstance(user_data, dict):
+        return deleted_count, failed_count
+    
+    # Find all message keys (format: chat_id_message_id)
+    message_keys = [
+        k for k, v in user_data.items()
+        if isinstance(k, str)
+        and "_" in k
+        and k not in ("username", "baseline", "notified_profile_change")
+    ]
+    
+    if not message_keys:
+        return deleted_count, failed_count
+    
+    LOGGER.info(
+        "%s:@%s Found %d messages to delete: %s",
+        user_id,
+        user_name,
+        len(message_keys),
+        message_keys,
+    )
+    
+    for msg_key in message_keys:
+        try:
+            parts = msg_key.split("_")
+            if len(parts) >= 2:
+                chat_id_str = parts[0]
+                message_id_str = parts[1]
+                
+                # Convert chat_id - add -100 prefix if needed
+                chat_id = int(chat_id_str)
+                if chat_id > 0:
+                    chat_id = int(f"-100{chat_id}")
+                elif not str(chat_id).startswith("-100"):
+                    chat_id = int(f"-100{str(chat_id).replace('-', '', 1)}")
+                
+                message_id = int(message_id_str)
+                
+                try:
+                    await BOT.delete_message(chat_id, message_id)
+                    deleted_count += 1
+                    LOGGER.debug(
+                        "%s:@%s Deleted message %s in chat %s",
+                        user_id,
+                        user_name,
+                        message_id,
+                        chat_id,
+                    )
+                except MessageToDeleteNotFound:
+                    LOGGER.debug(
+                        "%s:@%s Message %s not found (already deleted?)",
+                        user_id,
+                        user_name,
+                        message_id,
+                    )
+                    failed_count += 1
+                except ChatNotFound:
+                    LOGGER.warning(
+                        "%s:@%s Chat %s not found for message deletion",
+                        user_id,
+                        user_name,
+                        chat_id,
+                    )
+                    failed_count += 1
+                except MessageCantBeDeleted:
+                    LOGGER.warning(
+                        "%s:@%s Cannot delete message %s (no permission?)",
+                        user_id,
+                        user_name,
+                        message_id,
+                    )
+                    failed_count += 1
+                except Exception as e:
+                    LOGGER.warning(
+                        "%s:@%s Failed to delete message %s: %s",
+                        user_id,
+                        user_name,
+                        message_id,
+                        e,
+                    )
+                    failed_count += 1
+        except (ValueError, IndexError) as e:
+            LOGGER.warning(
+                "%s:@%s Invalid message key format '%s': %s",
+                user_id,
+                user_name,
+                msg_key,
+                e,
+            )
+            failed_count += 1
+    
+    if deleted_count > 0 or failed_count > 0:
+        LOGGER.info(
+            "\033[91m%s:@%s Deleted %d/%d messages (failed: %d)\033[0m",
+            user_id,
+            user_name,
+            deleted_count,
+            deleted_count + failed_count,
+            failed_count,
+        )
+    
+    return deleted_count, failed_count
+
+
 async def check_and_autoban(
     event_record: str,
     user_id: int,
@@ -1548,6 +1679,17 @@ async def check_and_autoban(
         if action == "is already added to":
             return True
 
+        # Delete ALL stored messages for this user (not just one)
+        _del_count, _fail_count = await delete_all_user_messages(user_id, user_name)
+        LOGGER.debug(
+            "%s:@%s check_and_autoban deleted %d messages (failed: %d)",
+            user_id,
+            user_name,
+            _del_count,
+            _fail_count,
+        )
+        
+        # Also try to delete the specific message passed as parameter (fallback/legacy)
         if message_to_delete:
             LOGGER.debug("%s message to delete list (#CNAB)", message_to_delete)
             origin_chat_id = (
@@ -1565,12 +1707,14 @@ async def check_and_autoban(
                     message_to_delete[0],
                 )
             except MessageToDeleteNotFound:
-                LOGGER.error(
-                    "%s:@%s Message to delete not found: %s",
+                LOGGER.debug(
+                    "%s:@%s Message to delete not found (maybe already deleted): %s",
                     user_id,
                     user_name,
                     message_to_delete[1],
                 )
+            except Exception:
+                pass  # Already handled by delete_all_user_messages
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
             await safe_send_message(

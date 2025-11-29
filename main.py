@@ -7253,15 +7253,15 @@ if __name__ == "__main__":
                     
                     asyncio.create_task(delete_message_later())
 
-            LOGGER.info(
-                "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, delete_after=%s)",
-                message.from_user.id,
-                message.from_user.username or "!UNDEFINED!",
-                chat_id,
-                used_thread_id,
-                reply_to_msg_id,
-                delete_after,
-            )
+                LOGGER.info(
+                    "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, delete_after=%s)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    chat_id,
+                    used_thread_id,
+                    reply_to_msg_id,
+                    delete_after,
+                )
 
         except Exception as e:
             LOGGER.error("%s:@%s Error in say_to_chat: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
@@ -7336,16 +7336,16 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
+
+                LOGGER.info(
+                    "%s:@%s replied to message %s in chat %s",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    target_message_id,
+                    chat_id,
+                )
             else:
                 await message.reply(f"❌ Failed to reply to message in {chat_id}")
-
-            LOGGER.info(
-                "%s:@%s replied to message %s in chat %s",
-                message.from_user.id,
-                message.from_user.username or "!UNDEFINED!",
-                target_message_id,
-                chat_id,
-            )
 
         except Exception as e:
             LOGGER.error("%s:@%s Error in reply_to_message: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)

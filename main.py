@@ -1506,6 +1506,11 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
     Messages are stored with keys like 'chat_id_message_id' in the user's dict entry.
     This function finds all such message keys and deletes each message.
     
+    Rate limiting: Telegram allows ~30 API calls/second for bulk operations.
+    We add a small delay (0.05s = 50ms) between deletions to stay well under the limit
+    (max ~20 deletions/second). For typical spam cases (1-10 messages), this adds
+    only 50-500ms total delay which is acceptable.
+    
     Returns:
         tuple: (deleted_count, failed_count)
     """
@@ -1538,7 +1543,12 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
         message_keys,
     )
     
-    for msg_key in message_keys:
+    for i, msg_key in enumerate(message_keys):
+        # Rate limiting: add small delay between deletions to avoid hitting Telegram limits
+        # Skip delay for the first message
+        if i > 0:
+            await asyncio.sleep(0.05)  # 50ms delay = max 20 requests/second (well under 30/s limit)
+        
         try:
             parts = msg_key.split("_")
             if len(parts) >= 2:
@@ -1588,6 +1598,20 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                         message_id,
                     )
                     failed_count += 1
+                except RetryAfter as e:
+                    # Telegram rate limit hit - wait and retry
+                    LOGGER.warning(
+                        "%s:@%s Rate limit hit, waiting %s seconds...",
+                        user_id,
+                        user_name,
+                        e.timeout,
+                    )
+                    await asyncio.sleep(e.timeout)
+                    try:
+                        await BOT.delete_message(chat_id, message_id)
+                        deleted_count += 1
+                    except Exception:
+                        failed_count += 1
                 except Exception as e:
                     LOGGER.warning(
                         "%s:@%s Failed to delete message %s: %s",

@@ -272,6 +272,9 @@ chat_username_cache: dict[int, str | None] = {}
 # Dictionary to store running tasks by user ID
 running_watchdogs = {}
 
+# Dictionary to store running intensive watchdog tasks (triggered when user in active_checks posts a message)
+running_intensive_watchdogs = {}
+
 # Initialize the event
 shutdown_event = asyncio.Event()
 
@@ -1399,6 +1402,17 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
 
+    # Cancel intensive watchdog if running (user is being banned)
+    if _id in running_intensive_watchdogs:
+        intensive_task = running_intensive_watchdogs.pop(_id, None)
+        if intensive_task:
+            intensive_task.cancel()
+            LOGGER.info(
+                "%s:@%s Intensive watchdog cancelled during autoban",
+                _id,
+                user_name,
+            )
+
     if _id in active_user_checks_dict:
         banned_users_dict[_id] = active_user_checks_dict.pop(
             _id, None
@@ -2360,7 +2374,23 @@ async def perform_checks(
 
 
 async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
-    """Cancels a running watchdog task for a given user ID."""
+    """Cancels a running watchdog task for a given user ID (also cancels intensive watchdog if running)."""
+    # Also cancel intensive watchdog if running
+    if user_id in running_intensive_watchdogs:
+        intensive_task = running_intensive_watchdogs.pop(user_id, None)
+        if intensive_task:
+            intensive_task.cancel()
+            try:
+                await intensive_task
+            except asyncio.CancelledError:
+                LOGGER.info(
+                    "%s:@%s Intensive watchdog also cancelled.",
+                    user_id,
+                    user_name,
+                )
+            except Exception:
+                pass
+    
     if user_id in running_watchdogs:
         # Try to remove from active_checks dict and add to banned_users_dict
         try:
@@ -2407,6 +2437,221 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
             user_id,
             user_name,
         )
+
+
+async def perform_intensive_checks(
+    user_id: int,
+    user_name: str = "!UNDEFINED!",
+    message_chat_id: int = None,
+    message_id: int = None,
+    message_link: str = None,
+):
+    """Perform intensive spam checks when a user from active_checks posts a message.
+    
+    This function checks external APIs (CAS/LOLS/P2P) very frequently in the first 5 minutes
+    to catch spammers as soon as they get reported by other groups/bots.
+    
+    Schedule:
+    - First 60 seconds: check every 10 seconds (6 checks)
+    - Next 4 minutes: check every 30 seconds (8 checks)
+    - Total: 14 checks in 5 minutes
+    
+    If spam is detected, the user is auto-banned. If admin legitimizes the user,
+    the intensive watchdog is cancelled via cancel_intensive_watchdog().
+    
+    Args:
+        user_id: The user ID to check
+        user_name: Username for logging
+        message_chat_id: Chat ID where the suspicious message was sent
+        message_id: Message ID of the suspicious message
+        message_link: Link to the suspicious message
+    """
+    color_map = {
+        False: "\033[92m",  # Green for False (not spam)
+        True: "\033[91m",   # Red for True (spam)
+        None: "\033[93m",   # Yellow for None/unknown
+    }
+    
+    message_to_delete = None
+    if message_chat_id and message_id:
+        message_to_delete = [message_chat_id, message_id]
+    
+    LOGGER.info(
+        "\033[95m%s:@%s INTENSIVE watchdog started (message posted while in active_checks)\033[0m",
+        user_id,
+        user_name,
+    )
+    
+    try:
+        # Phase 1: First 60 seconds - check every 10 seconds (6 checks)
+        for i in range(6):
+            if user_id not in active_user_checks_dict:
+                LOGGER.info(
+                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    user_id,
+                    user_name,
+                )
+                return
+            
+            await asyncio.sleep(10)
+            lols_spam = await spam_check(user_id)
+            
+            color_code = color_map.get(lols_spam, "\033[93m")
+            LOGGER.debug(
+                "%s%s:@%s INTENSIVE check %d/14 (phase1 @10s): spam=%s\033[0m",
+                color_code,
+                user_id,
+                format_username_for_log(user_name),
+                i + 1,
+                lols_spam,
+            )
+            
+            if lols_spam is True:
+                LOGGER.warning(
+                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    user_id,
+                    user_name,
+                )
+                # Build event record and inout log message
+                event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
+                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                
+                if await check_and_autoban(
+                    event_record,
+                    user_id,
+                    inout_logmessage,
+                    user_name,
+                    lols_spam=lols_spam,
+                    message_to_delete=message_to_delete,
+                ):
+                    return
+        
+        # Phase 2: Next 4 minutes - check every 30 seconds (8 checks)
+        for i in range(8):
+            if user_id not in active_user_checks_dict:
+                LOGGER.info(
+                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    user_id,
+                    user_name,
+                )
+                return
+            
+            await asyncio.sleep(30)
+            lols_spam = await spam_check(user_id)
+            
+            color_code = color_map.get(lols_spam, "\033[93m")
+            LOGGER.debug(
+                "%s%s:@%s INTENSIVE check %d/14 (phase2 @30s): spam=%s\033[0m",
+                color_code,
+                user_id,
+                format_username_for_log(user_name),
+                i + 7,  # 7-14
+                lols_spam,
+            )
+            
+            if lols_spam is True:
+                LOGGER.warning(
+                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    user_id,
+                    user_name,
+                )
+                event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
+                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                
+                if await check_and_autoban(
+                    event_record,
+                    user_id,
+                    inout_logmessage,
+                    user_name,
+                    lols_spam=lols_spam,
+                    message_to_delete=message_to_delete,
+                ):
+                    return
+        
+        LOGGER.info(
+            "\033[92m%s:@%s INTENSIVE checks completed (5 min) - no spam detected, regular watchdog continues\033[0m",
+            user_id,
+            user_name,
+        )
+    
+    except asyncio.CancelledError:
+        LOGGER.info(
+            "\033[93m%s:@%s INTENSIVE watchdog cancelled (user legitimized or banned elsewhere)\033[0m",
+            user_id,
+            user_name,
+        )
+    except Exception as e:
+        LOGGER.error(
+            "%s:@%s Error during INTENSIVE checks: %s",
+            user_id,
+            user_name,
+            e,
+        )
+
+
+async def cancel_intensive_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
+    """Cancel an intensive watchdog for a user (called when admin legitimizes user or user is banned)."""
+    if user_id in running_intensive_watchdogs:
+        task = running_intensive_watchdogs.pop(user_id)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            LOGGER.info(
+                "%s:@%s Intensive watchdog cancelled.",
+                user_id,
+                user_name,
+            )
+        except Exception as e:
+            LOGGER.warning(
+                "%s:@%s Error cancelling intensive watchdog: %s",
+                user_id,
+                user_name,
+                e,
+            )
+
+
+async def start_intensive_watchdog(
+    user_id: int,
+    user_name: str = "!UNDEFINED!",
+    message_chat_id: int = None,
+    message_id: int = None,
+    message_link: str = None,
+):
+    """Start an intensive watchdog for a user who posted a message while in active_checks.
+    
+    If an intensive watchdog is already running for this user, it will NOT restart it
+    to avoid excessive API calls for users who post multiple messages.
+    """
+    if user_id in running_intensive_watchdogs:
+        existing_task = running_intensive_watchdogs[user_id]
+        if not existing_task.done():
+            LOGGER.debug(
+                "%s:@%s Intensive watchdog already running, skipping restart",
+                user_id,
+                user_name,
+            )
+            return
+    
+    # Create and start the intensive watchdog task
+    task = asyncio.create_task(
+        perform_intensive_checks(
+            user_id=user_id,
+            user_name=user_name,
+            message_chat_id=message_chat_id,
+            message_id=message_id,
+            message_link=message_link,
+        ),
+        name=f"intensive_{user_id}",
+    )
+    running_intensive_watchdogs[user_id] = task
+    
+    # Cleanup callback when task completes
+    def _cleanup(t: asyncio.Task, _uid=user_id):
+        if running_intensive_watchdogs.get(_uid) is t:
+            running_intensive_watchdogs.pop(_uid, None)
+    
+    task.add_done_callback(_cleanup)
 
 
 async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
@@ -5801,6 +6046,25 @@ if __name__ == "__main__":
                 active_user_checks_dict[message.from_user.id][
                     message_key
                 ] = message_link
+                
+                # START INTENSIVE WATCHDOG: User from active_checks posted a message!
+                # This triggers aggressive spam checking (every 10s for 1min, then every 30s for 4min)
+                # to catch spammers as soon as they get reported by external APIs
+                if message.from_user.id in active_user_checks_dict:
+                    asyncio.create_task(
+                        start_intensive_watchdog(
+                            user_id=message.from_user.id,
+                            user_name=(
+                                message.from_user.username
+                                if message.from_user.username
+                                else "!UNDEFINED!"
+                            ),
+                            message_chat_id=message.chat.id,
+                            message_id=message.message_id,
+                            message_link=message_link,
+                        )
+                    )
+                
                 time_passed = message.date - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:

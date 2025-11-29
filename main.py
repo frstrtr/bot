@@ -6972,7 +6972,8 @@ if __name__ == "__main__":
             "📤 <b>/say</b> <code>&lt;target&gt; &lt;message&gt;</code>\n"
             "Send a message to a specific chat.\n"
             "  • Target: chat ID, <code>@username</code>, or <code>t.me/chat</code>\n"
-            "  • Topic support: <code>-100123:456</code> or <code>t.me/chat/456</code>\n\n"
+            "  • Topic support: <code>-100123:456</code> or <code>t.me/chat/456</code>\n"
+            "  • Auto-delete: <code>/say -t 60 @chat Message</code> (deletes in 60s)\n\n"
             
             "↩️ <b>/reply</b> <code>&lt;message_link&gt; &lt;text&gt;</code>\n"
             "Reply to a specific message in a chat.\n"
@@ -6980,11 +6981,13 @@ if __name__ == "__main__":
             
             "📩 <b>/forward</b> <code>&lt;message_link&gt; &lt;target&gt;</code>\n"
             "Forward message (shows \"Forwarded from\" header).\n"
-            "  • Source must be accessible by bot\n\n"
+            "  • Source must be accessible by bot\n"
+            "  • Auto-delete: <code>/forward -t 60 link target</code>\n\n"
             
             "📋 <b>/copy</b> <code>&lt;message_link&gt; &lt;target&gt;</code>\n"
             "Copy message (appears as bot's own message).\n"
-            "  • No forwarding attribution shown\n\n"
+            "  • No forwarding attribution shown\n"
+            "  • Auto-delete: <code>/copy -t 60 link target</code>\n\n"
             
             "📢 <b>/broadcast</b> <code>&lt;message&gt;</code>\n"
             "Send to ALL monitored chats.\n"
@@ -7023,8 +7026,10 @@ if __name__ == "__main__":
         """Send a message to a specific chat as the bot.
         
         Usage: /say <chat_id_or_link> <message>
+        Usage: /say -t <seconds> <chat_id_or_link> <message>  (auto-delete after timeout)
         Example: /say -1001234567890 Hello everyone!
         Example: /say @chatusername Hello everyone!
+        Example: /say -t 30 @chatusername This disappears in 30 seconds!
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
@@ -7035,24 +7040,48 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            # Parse command: /say <target> <message>
-            parts = message.text.split(maxsplit=2)
-            if len(parts) < 3:
-                await message.reply(
-                    "Usage: <code>/say &lt;target&gt; message</code>\n"
-                    "Examples:\n"
-                    "  <code>/say -1001234567890 Hello!</code>\n"
-                    "  <code>/say -1001234567890:123 Hello to topic!</code>\n"
-                    "  <code>/say @chatusername Hello!</code>\n"
-                    "  <code>/say t.me/chatname Hello!</code>\n"
-                    "  <code>/say t.me/chatname/456 Hello to topic!</code>\n"
-                    "  <code>/say t.me/chatname/1/9221 Reply to message!</code>",
-                    parse_mode="HTML",
-                )
-                return
-
-            target = parts[1]
-            text_to_send = parts[2]
+            # Parse command: /say [-t <seconds>] <target> <message>
+            parts = message.text.split()
+            
+            # Check for timeout flag
+            delete_after = None
+            if len(parts) >= 4 and parts[1] == "-t":
+                try:
+                    delete_after = int(parts[2])
+                    if delete_after < 1 or delete_after > 86400:  # Max 24 hours
+                        await message.reply("Timeout must be between 1 and 86400 seconds (24 hours).")
+                        return
+                    # Re-parse with timeout removed
+                    remaining = message.text.split(maxsplit=3)
+                    if len(remaining) < 4:
+                        await message.reply("Please provide target and message after timeout.")
+                        return
+                    target = remaining[3].split(maxsplit=1)[0]
+                    text_to_send = remaining[3].split(maxsplit=1)[1] if len(remaining[3].split(maxsplit=1)) > 1 else ""
+                except (ValueError, IndexError):
+                    await message.reply("Invalid timeout format. Use: <code>/say -t &lt;seconds&gt; &lt;target&gt; message</code>", parse_mode="HTML")
+                    return
+            else:
+                # Standard parsing without timeout
+                parts = message.text.split(maxsplit=2)
+                if len(parts) < 3:
+                    await message.reply(
+                        "Usage: <code>/say &lt;target&gt; message</code>\n"
+                        "Usage: <code>/say -t &lt;seconds&gt; &lt;target&gt; message</code> (auto-delete)\n"
+                        "Examples:\n"
+                        "  <code>/say -1001234567890 Hello!</code>\n"
+                        "  <code>/say -1001234567890:123 Hello to topic!</code>\n"
+                        "  <code>/say @chatusername Hello!</code>\n"
+                        "  <code>/say t.me/chatname Hello!</code>\n"
+                        "  <code>/say t.me/chatname/456 Hello to topic!</code>\n"
+                        "  <code>/say t.me/chatname/1/9221 Reply to message!</code>\n"
+                        "  <code>/say -t 60 @chat Message deleted in 60s!</code>",
+                        parse_mode="HTML",
+                    )
+                    return
+                target = parts[1]
+                text_to_send = parts[2]
+            
             thread_id = None  # For forum topics
             reply_to_msg_id = None  # For replying to specific message
 
@@ -7194,20 +7223,44 @@ if __name__ == "__main__":
                 else:
                     action_desc = f"✅ Message sent to {target_desc}"
                 
+                # Add timeout info if set
+                if delete_after:
+                    action_desc += f"\n⏱ Auto-delete in {delete_after} seconds"
+                
                 await message.reply(
                     f"{action_desc}\n"
                     f"🔗 <a href='{msg_link}'>View message</a>",
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
+                
+                # Schedule message deletion if timeout is set
+                if delete_after:
+                    async def delete_message_later():
+                        await asyncio.sleep(delete_after)
+                        try:
+                            await BOT.delete_message(sent_msg.chat.id, sent_msg.message_id)
+                            LOGGER.info(
+                                "%s:@%s auto-deleted message %s in chat %s after %ds",
+                                message.from_user.id,
+                                message.from_user.username or "!UNDEFINED!",
+                                sent_msg.message_id,
+                                chat_id,
+                                delete_after,
+                            )
+                        except Exception as del_e:
+                            LOGGER.warning("Failed to auto-delete message: %s", del_e)
+                    
+                    asyncio.create_task(delete_message_later())
 
             LOGGER.info(
-                "%s:@%s sent message to chat %s (thread=%s, reply_to=%s)",
+                "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, delete_after=%s)",
                 message.from_user.id,
                 message.from_user.username or "!UNDEFINED!",
                 chat_id,
                 used_thread_id,
                 reply_to_msg_id,
+                delete_after,
             )
 
         except Exception as e:
@@ -7357,6 +7410,7 @@ if __name__ == "__main__":
         """Forward a message to a target chat (shows 'Forwarded from' header).
         
         Usage: /forward <message_link> <target>
+        Usage: /forward -t <seconds> <message_link> <target>  (auto-delete)
         Example: /forward https://t.me/source/123 -1001234567890
         
         NOTE: Only available to superadmin in private chat or superadmin group.
@@ -7368,19 +7422,34 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            parts = message.text.split(maxsplit=2)
-            if len(parts) < 3:
-                await message.reply(
-                    "Usage: <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n"
-                    "Example: <code>/forward https://t.me/source/123 -1001234567890</code>\n"
-                    "Example: <code>/forward https://t.me/source/123 @targetgroup</code>\n"
-                    "Example: <code>/forward https://t.me/source/123 t.me/target/456</code>",
-                    parse_mode="HTML",
-                )
-                return
-
-            message_link = parts[1]
-            target = parts[2]
+            # Check for timeout flag
+            parts = message.text.split()
+            delete_after = None
+            
+            if len(parts) >= 5 and parts[1] == "-t":
+                try:
+                    delete_after = int(parts[2])
+                    if delete_after < 1 or delete_after > 86400:
+                        await message.reply("Timeout must be between 1 and 86400 seconds.")
+                        return
+                    message_link = parts[3]
+                    target = parts[4]
+                except (ValueError, IndexError):
+                    await message.reply("Invalid timeout format. Use: <code>/forward -t &lt;seconds&gt; &lt;link&gt; &lt;target&gt;</code>", parse_mode="HTML")
+                    return
+            else:
+                parts = message.text.split(maxsplit=2)
+                if len(parts) < 3:
+                    await message.reply(
+                        "Usage: <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n"
+                        "Usage: <code>/forward -t &lt;seconds&gt; &lt;link&gt; &lt;target&gt;</code> (auto-delete)\n"
+                        "Example: <code>/forward https://t.me/source/123 -1001234567890</code>\n"
+                        "Example: <code>/forward -t 60 https://t.me/source/123 @chat</code>",
+                        parse_mode="HTML",
+                    )
+                    return
+                message_link = parts[1]
+                target = parts[2]
 
             # Extract source chat and message ID
             try:
@@ -7402,55 +7471,87 @@ if __name__ == "__main__":
                 )
                 return
 
-            # Forward the message
+            # Forward the message - try with thread first, retry without if thread not found
             try:
-                if thread_id:
-                    forwarded = await BOT.forward_message(
-                        chat_id=target_chat,
-                        from_chat_id=source_chat,
-                        message_id=source_msg_id,
-                        message_thread_id=thread_id,
-                    )
-                else:
-                    forwarded = await BOT.forward_message(
-                        chat_id=target_chat,
-                        from_chat_id=source_chat,
-                        message_id=source_msg_id,
-                    )
+                forwarded = None
+                used_thread_id = thread_id
+                try:
+                    if thread_id:
+                        forwarded = await BOT.forward_message(
+                            chat_id=target_chat,
+                            from_chat_id=source_chat,
+                            message_id=source_msg_id,
+                            message_thread_id=thread_id,
+                        )
+                    else:
+                        forwarded = await BOT.forward_message(
+                            chat_id=target_chat,
+                            from_chat_id=source_chat,
+                            message_id=source_msg_id,
+                        )
+                except Exception as fwd_error:
+                    error_str = str(fwd_error).lower()
+                    if thread_id and ("thread not found" in error_str or "message thread" in error_str):
+                        LOGGER.info("Thread %s not found, retrying without thread", thread_id)
+                        used_thread_id = None
+                        forwarded = await BOT.forward_message(
+                            chat_id=target_chat,
+                            from_chat_id=source_chat,
+                            message_id=source_msg_id,
+                        )
+                    else:
+                        raise fwd_error
 
                 # Build success message
                 target_desc = f"<code>{target_chat}</code>"
-                if thread_id:
-                    target_desc += f" (topic {thread_id})"
+                if used_thread_id:
+                    target_desc += f" (topic {used_thread_id})"
 
                 # Build link to forwarded message
                 if isinstance(target_chat, str) and target_chat.startswith("@"):
-                    if thread_id:
-                        msg_link = f"https://t.me/{target_chat[1:]}/{thread_id}/{forwarded.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/{target_chat[1:]}/{used_thread_id}/{forwarded.message_id}"
                     else:
                         msg_link = f"https://t.me/{target_chat[1:]}/{forwarded.message_id}"
                 else:
                     chat_id_str = str(target_chat)[4:] if str(target_chat).startswith("-100") else str(target_chat)
-                    if thread_id:
-                        msg_link = f"https://t.me/c/{chat_id_str}/{thread_id}/{forwarded.message_id}"
+                    if used_thread_id:
+                        msg_link = f"https://t.me/c/{chat_id_str}/{used_thread_id}/{forwarded.message_id}"
                     else:
                         msg_link = f"https://t.me/c/{chat_id_str}/{forwarded.message_id}"
 
+                # Build action description
+                action_desc = f"✅ Message forwarded to {target_desc}"
+                if delete_after:
+                    action_desc += f"\n⏱ Auto-delete in {delete_after} seconds"
+
                 await message.reply(
-                    f"✅ Message forwarded to {target_desc}\n"
+                    f"{action_desc}\n"
                     f"🔗 <a href='{msg_link}'>View message</a>",
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
 
+                # Schedule message deletion if timeout is set
+                if delete_after:
+                    async def delete_forwarded_later():
+                        await asyncio.sleep(delete_after)
+                        try:
+                            await BOT.delete_message(forwarded.chat.id, forwarded.message_id)
+                            LOGGER.info("%s:@%s auto-deleted forwarded message after %ds", message.from_user.id, message.from_user.username or "!UNDEFINED!", delete_after)
+                        except Exception as del_e:
+                            LOGGER.warning("Failed to auto-delete forwarded message: %s", del_e)
+                    asyncio.create_task(delete_forwarded_later())
+
                 LOGGER.info(
-                    "%s:@%s forwarded message %s from %s to %s (thread=%s)",
+                    "%s:@%s forwarded message %s from %s to %s (thread=%s, delete_after=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
-                    thread_id,
+                    used_thread_id,
+                    delete_after,
                 )
 
             except Exception as e:
@@ -7465,7 +7566,9 @@ if __name__ == "__main__":
         """Copy a message to a target chat (no 'Forwarded from' header).
         
         Usage: /copy <message_link> <target>
+        Usage: /copy -t <seconds> <message_link> <target>  (auto-delete after timeout)
         Example: /copy https://t.me/source/123 -1001234567890
+        Example: /copy -t 60 https://t.me/source/123 @targetgroup
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
@@ -7476,13 +7579,24 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            parts = message.text.split(maxsplit=2)
+            # Parse optional -t timeout for auto-delete
+            delete_timeout = None
+            remaining_text = message.text
+            if " -t " in remaining_text:
+                match = re.search(r'-t\s+(\d+)', remaining_text)
+                if match:
+                    delete_timeout = int(match.group(1))
+                    remaining_text = re.sub(r'-t\s+\d+\s*', '', remaining_text)
+
+            parts = remaining_text.split(maxsplit=2)
             if len(parts) < 3:
                 await message.reply(
                     "Usage: <code>/copy &lt;message_link&gt; &lt;target&gt;</code>\n"
+                    "Usage: <code>/copy -t &lt;seconds&gt; &lt;message_link&gt; &lt;target&gt;</code>\n"
                     "Example: <code>/copy https://t.me/source/123 -1001234567890</code>\n"
-                    "Example: <code>/copy https://t.me/source/123 @targetgroup</code>\n"
-                    "💡 No 'Forwarded from' header - appears as bot's message",
+                    "Example: <code>/copy -t 60 https://t.me/source/123 @targetgroup</code>\n"
+                    "💡 No 'Forwarded from' header - appears as bot's message\n"
+                    "💡 Use <code>-t &lt;seconds&gt;</code> to auto-delete after timeout",
                     parse_mode="HTML",
                 )
                 return
@@ -7511,6 +7625,7 @@ if __name__ == "__main__":
                 return
 
             # Copy the message (no forwarded header)
+            copied = None
             try:
                 if thread_id:
                     copied = await BOT.copy_message(
@@ -7525,6 +7640,30 @@ if __name__ == "__main__":
                         from_chat_id=source_chat,
                         message_id=source_msg_id,
                     )
+            except Exception as copy_err:
+                # If thread not found, retry without thread_id
+                if "thread not found" in str(copy_err).lower() and thread_id:
+                    LOGGER.warning("Thread %s not found in %s, retrying without thread_id", thread_id, target_chat)
+                    thread_id = None
+                    copied = await BOT.copy_message(
+                        chat_id=target_chat,
+                        from_chat_id=source_chat,
+                        message_id=source_msg_id,
+                    )
+                else:
+                    raise
+
+            if copied:
+                # Schedule auto-delete if timeout specified
+                if delete_timeout and delete_timeout > 0:
+                    async def auto_delete():
+                        await asyncio.sleep(delete_timeout)
+                        try:
+                            await BOT.delete_message(target_chat, copied.message_id)
+                            LOGGER.info("Auto-deleted copied message %s in %s after %ds", copied.message_id, target_chat, delete_timeout)
+                        except Exception as del_err:
+                            LOGGER.warning("Failed to auto-delete copied message %s in %s: %s", copied.message_id, target_chat, del_err)
+                    asyncio.create_task(auto_delete())
 
                 # Build success message
                 target_desc = f"<code>{target_chat}</code>"
@@ -7552,17 +7691,15 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "%s:@%s copied message %s from %s to %s (thread=%s)",
+                    "%s:@%s copied message %s from %s to %s (thread=%s, timeout=%s)",
                     message.from_user.id,
                     message.from_user.username or "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
                     thread_id,
+                    delete_timeout,
                 )
-
-            except Exception as e:
-                await message.reply(f"❌ Failed to copy message: {e}")
 
         except Exception as e:
             LOGGER.error("%s:@%s Error in copy_message_cmd: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)

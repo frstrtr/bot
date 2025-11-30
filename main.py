@@ -4787,9 +4787,10 @@ if __name__ == "__main__":
             result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
             spam_messages_count = len(result)
-            user_name = forwarded_message_data[4] or "!UNDEFINED!"
+            _raw_name = forwarded_message_data[4]
+            user_name = _raw_name if _raw_name and str(_raw_name) not in ["None", "0"] else None
             bot_info_message = (
-                f"Attempting to delete all messages <b>({spam_messages_count})</b> from @{user_name} (<code>{author_id}</code>)\n"
+                f"Attempting to delete all messages <b>({spam_messages_count})</b> from {f'@{user_name}' if user_name else '!UNDEFINED!'} (<code>{author_id}</code>)\n"
                 f"action taken by @{button_pressed_by if button_pressed_by else '!UNDEFINED!'}):"
             )
             await safe_send_message(
@@ -4958,9 +4959,9 @@ if __name__ == "__main__":
                     # )
                 except Exception as inner_e:
                     LOGGER.error(
-                        "%s:@%s Failed to ban and delete messages in chat %s (%s). Error: %s",
+                        "%s:%s Failed to ban and delete messages in chat %s (%s). Error: %s",
                         author_id,
-                        user_name,
+                        f"@{user_name}" if user_name else "!UNDEFINED!",
                         CHANNEL_DICT[channel_id],
                         channel_id,
                         inner_e,
@@ -4972,11 +4973,12 @@ if __name__ == "__main__":
                         LOGGER,
                     )
             # Set default username from result if available
-            user_name = result[0][2] if result else "!UNDEFINED!"
+            _raw_result_name = result[0][2] if result else None
+            user_name = _raw_result_name if _raw_result_name and str(_raw_result_name) not in ["None", "0"] else None
             LOGGER.debug(
-                "\033[91m%s:@%s manually banned and their messages deleted where applicable.\033[0m",
+                "\033[91m%s:%s manually banned and their messages deleted where applicable.\033[0m",
                 author_id,
-                user_name,
+                f"@{user_name}" if user_name else "!UNDEFINED!",
             )
             # Take actions to ban channels
             channel_id_to_ban = (
@@ -5005,10 +5007,11 @@ if __name__ == "__main__":
             # button_timestamp = datetime.now()
 
             lols_check_kb = make_lols_kb(author_id)
+            _display_user = f"@{user_name}" if user_name else "!UNDEFINED!"
             await safe_send_message(
                 BOT,
                 ADMIN_GROUP_ID,
-                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 LOGGER,
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
@@ -5018,7 +5021,7 @@ if __name__ == "__main__":
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
-                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 LOGGER,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
@@ -5068,11 +5071,11 @@ if __name__ == "__main__":
 
         # report spam to the P2P spamcheck server
         await report_spam_2p2p(author_id, LOGGER)
-
+        _display_name = user_name if user_name and str(user_name) not in ["None", "0", "!UNDEFINED!"] else None
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
-            f"{author_id}:@{user_name} reported to P2P spamcheck server.",
+            f"{author_id}:{f'@{_display_name}' if _display_name else '!UNDEFINED!'} reported to P2P spamcheck server.",
             LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -7400,9 +7403,9 @@ if __name__ == "__main__":
             lols_check_kb = InlineKeyboardMarkup().add(
                 InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
-
+            _display_user = f"@{user_name}" if user_name and str(user_name) not in ["None", "0"] else "!UNDEFINED!"
             await message.reply(
-                f"Action taken: User @{user_name} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
+                f"Action taken: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
             )
@@ -7415,14 +7418,14 @@ if __name__ == "__main__":
         await report_spam_2p2p(author_id, LOGGER)
         user_name = (
             forwarded_message_data[4]
-            if forwarded_message_data[4] not in [0, "0", None]
-            else "!UNDEFINED!"
+            if forwarded_message_data[4] not in [0, "0", None, "None"]
+            else None
         )
         lols_check_kb = make_lols_kb(author_id)
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
-            f"{author_id}:@{user_name} reported to P2P spamcheck server.",
+            f"{author_id}:{f'@{user_name}' if user_name else '!UNDEFINED!'} reported to P2P spamcheck server.",
             LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
@@ -9609,9 +9612,10 @@ if __name__ == "__main__":
         susp_user_name_dict = active_user_checks_dict.get(susp_user_id, "!UNDEFINED!")
         # check if user_name_dict is a dict
         if isinstance(susp_user_name_dict, dict):
-            susp_user_name = str(susp_user_name_dict["username"]).lstrip("@")
+            _uname = susp_user_name_dict.get("username")
+            susp_user_name = str(_uname).lstrip("@") if _uname and str(_uname) not in ["None", "0"] else "!UNDEFINED!"
         else:
-            susp_user_name = susp_user_name_dict
+            susp_user_name = susp_user_name_dict if susp_user_name_dict and str(susp_user_name_dict) not in ["None", "0"] else "!UNDEFINED!"
 
         # create unified message link (used in action confirmation message)
         message_link = construct_message_link([susp_chat_id, susp_message_id, None])
@@ -9852,10 +9856,11 @@ if __name__ == "__main__":
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
             await report_spam_2p2p(susp_user_id, LOGGER)
+            _display_name = susp_user_name if susp_user_name and str(susp_user_name) not in ["None", "0", "!UNDEFINED!"] else None
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
-                f"{susp_user_id}:@{susp_user_name} reported to P2P spamcheck server.",
+                f"{susp_user_id}:{f'@{_display_name}' if _display_name else '!UNDEFINED!'} reported to P2P spamcheck server.",
                 LOGGER,
                 parse_mode="HTML",
                 disable_web_page_preview=True,

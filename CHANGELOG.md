@@ -32,3 +32,26 @@
   - **Synthetic join event**: First message from unknown user now saves a join record to DB
     - Future messages from the same user will have accurate "first seen" date
     - Prevents repeated "first time seen" processing
+
+### UI Improvements
+- **Removed duplicate "View Original Message" buttons** from action keyboards
+  - Expanded action menu (ban/delete options) - removed duplicate
+  - Collapsed action menu - removed duplicate
+  - Stop checks/legitimization handler - removed duplicate
+  - Confirmation keyboards - removed duplicate
+  - Link remains in message text, no need for button duplication
+
+- **Enhanced autoreport keyboard**: Added "Check Spam Data" and "Legitimization" buttons
+  - Admins can now legitimize users directly from autoreport notifications
+  - Quick access to LOLS spam data check
+
+- **Action confirmations now reply to notification message**
+  - Ban, delete, legitimization confirmations are threaded as replies
+  - Easier to track which notification triggered which action
+  - Applied to all callback action handlers (5 locations)
+
+- **Leave events logged to OUT thread**: Spam checks for users leaving the group
+  - Previously: All spam check logs went to TECHNO_IN regardless of join/leave
+  - Now: Users leaving (LEFT, KICKED, RESTRICTED) logged to TECHNO_OUT
+  - Only clean users joining logged to TECHNO_IN
+  - Ban button only shown for non-spammers joining

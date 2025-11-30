@@ -3423,6 +3423,14 @@ if __name__ == "__main__":
         # Check if leaving user is still in other monitored chats
         other_chats_info = ""
         if is_leaving:
+            # Always add ban button for leaving users (admin can decide if suspicious)
+            if lols_spam is not True:  # Don't duplicate if already detected as spammer
+                inline_kb.add(
+                    InlineKeyboardButton(
+                        "🚫 Ban User", callback_data=f"banuser_{inout_userid}"
+                    )
+                )
+            
             other_chats = await get_user_other_chats(
                 inout_userid, update.chat.id, CHANNEL_IDS, CHANNEL_DICT
             )
@@ -3444,13 +3452,6 @@ if __name__ == "__main__":
                 other_chats_list = "\n   • ".join(other_chats_links)
                 other_chats_info = (
                     f"\n⚠️ <b>Still in {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}"
-                )
-                # Add ban button if user left but is still in other chats
-                # (useful if spammer left one chat but still lurking in others)
-                inline_kb.add(
-                    InlineKeyboardButton(
-                        "🚫 Ban from All Chats", callback_data=f"banuser_{inout_userid}"
-                    )
                 )
 
         await safe_send_message(

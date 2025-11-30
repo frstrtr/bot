@@ -9071,6 +9071,7 @@ if __name__ == "__main__":
                     "How Are You Holding Up? Because I’m A Potato.\n"
                     "If You Become Light Headed From Thirst, Feel Free To Pass Out.\n"
                     "Any Feelings You Think It Has For You Are Simply By-Products Of Your Sad, Empty Life.\n"
+                    "-Не шалю, никого не трогаю, починяю примус,- недружелюбно насупившись, проговорил бот, - и еще считаю своим долгом предупредить, что бот древнее и неприкосновенное животное.\n"
                 )
                 # Split the motd string into individual lines
                 motd_lines = motd.split("\n")

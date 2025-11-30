@@ -45,6 +45,15 @@
   - Fixed in: P2P spamcheck reports, ban action confirmations, suspicious user handling
   - Now shows: `8279862148:!UNDEFINED!` instead of `8279862148:@None`
 
+- **Admin username display**: Unified all admin username placeholders to `!UNDEFINED!`
+  - Replaced inconsistent `!NoName!`, `!NoAdminName!` with `!UNDEFINED!`
+  - Fixed in: ban actions, cancel actions, channel bans, stop_checks, manual bans
+  - Properly handles admins without @ username in all notification messages
+
+- **TECHNO_NAMES duplicate fix**: Use consistent `normalize_username()` function
+  - Replaced local `_extract_username()` with shared `normalize_username()` from utils
+  - Ensures both 1156 and 1526 codes use identical normalization for duplicate detection
+
 ## [2025-11-30]
 
 ### Added

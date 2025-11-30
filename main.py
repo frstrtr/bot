@@ -3405,7 +3405,15 @@ if __name__ == "__main__":
             inout_thread = TECHNO_OUT
         else:
             inout_thread = TECHNO_IN
-            # Add ban button only for non-spammers joining
+            # Add buttons for non-spammers joining
+            # Generate report_id for callbacks
+            _join_report_id = int(datetime.now().timestamp())
+            inline_kb.add(
+                InlineKeyboardButton(
+                    "✅ Mark as Legit",
+                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_{_join_report_id}",
+                )
+            )
             inline_kb.add(
                 InlineKeyboardButton(
                     "🚫 Ban User", callback_data=f"banuser_{inout_userid}"

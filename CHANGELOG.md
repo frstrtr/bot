@@ -62,3 +62,8 @@
   - Each chat on separate line with bullet points for readability
   - Adds "Ban from All Chats" button if user left but is still in other chats
   - Useful for detecting spammers who leave after posting but lurk elsewhere
+
+- **Fixed `@None` username in startup/shutdown logs**
+  - Use `format_username_for_log()` helper function consistently
+  - Handle both `None` value and `"None"` string cases
+  - Logs now show `@username` or `!UNDEFINED!` (never `@None`)

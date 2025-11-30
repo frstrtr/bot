@@ -815,9 +815,9 @@ async def load_active_user_checks():
             )
             # Start the check NON-BLOCKING
             if isinstance(user_name, dict):
-                user_name = user_name.get("username", "!UNDEFINED!")
+                user_name = user_name.get("username") or "!UNDEFINED!"
             else:
-                user_name = user_name if user_name != "None" else "!UNDEFINED!"
+                user_name = user_name if user_name and user_name != "None" else "!UNDEFINED!"
             asyncio.create_task(
                 perform_checks(
                     user_id=user_id,
@@ -826,10 +826,11 @@ async def load_active_user_checks():
                     inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
                 )
             )
+            # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
             LOGGER.info(
-                "%s:@%s loaded from file & 3hr monitoring started ...",
+                "%s:%s loaded from file & 3hr monitoring started ...",
                 user_id,
-                user_name if user_name != "None" else "!UNDEFINED!",
+                format_username_for_log(user_name),
             )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
@@ -879,14 +880,14 @@ async def on_shutdown(_dp):
 
     # Iterate over active user checks and create a task for each check
     for _id, _uname in active_user_checks_dict.items():
+        # Extract username from dict or use string value
+        _username_str = (
+            _uname.get("username") if isinstance(_uname, dict) else _uname
+        )
         LOGGER.info(
-            "%s:@%s shutdown check for spam...",
+            "%s:%s shutdown check for spam...",
             _id,
-            (
-                _uname["username"]
-                if isinstance(_uname, dict)
-                else (_uname if _uname else "!UNDEFINED!")
-            ),
+            format_username_for_log(_username_str),
         )
 
         # Create the task for the sequential coroutine without awaiting it immediately

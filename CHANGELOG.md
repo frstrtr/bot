@@ -1,5 +1,45 @@
 # Changelog
 
+## [2025-12-01]
+
+### Added
+- **Mention analysis in ban reports**: Autoreport and autoban banners now show mention statistics
+  - Total mention count in message
+  - Hidden mentions detection (mentions disguised with invisible characters)
+  - Adds warning "⚠️ HIDDEN MENTIONS DETECTED" when spammers use invisible chars
+
+- **Missed join notification**: Users with no join record (bot was offline) now trigger suspicious alert
+  - Notification sent to ADMIN_SUSPICIOUS thread
+  - Includes LOLS check, Ban, and Mark as Legit buttons
+  - Message: "Possible missed join event - user joined while bot was offline"
+
+- **Mark as Legit button in IN thread**: Join notifications now have legitimization button
+  - Quick access to mark users as legitimate from technolog IN thread
+
+- **Ban User button in OUT thread**: Users leaving chats can now be banned directly
+  - Shows ban button for users who left voluntarily (not already detected as spam)
+
+- **LOLS check button for channel messages**: Channel message detection in originals thread
+  - Added "ℹ️ Check Channel in LOLS" button before "🚫 Ban Channel" button
+
+### Improved
+- **Simplified high ID account alerts**: Replaced Actions dropdown with direct "🚫 Ban User" button
+  - Faster access to ban suspicious new accounts
+
+- **Detailed channel ban failure reporting**: When channel ban fails, now shows per-chat details
+  - Lists each chat where ban failed with specific error message
+  - Helps diagnose permission issues across different chats
+
+### Fixed
+- **Duplicate usernames in TECHNO_NAMES**: Added tracking set to prevent duplicate posts
+  - Four posting locations now check `POSTED_USERNAMES` before sending
+  - Codes 1156 (banned), 1526 (spammer), 1962 (autoban), etc. no longer duplicate
+
+- **COMM logs showing `@!UNDEFINED!`**: Fixed command logs for users without username
+  - Changed format to only include `@` when username exists
+  - Affects: /say, /reply, /forward, /copy, /broadcast commands
+  - Now shows: `44816530:!UNDEFINED!` instead of `44816530:@!UNDEFINED!`
+
 ## [2025-11-30]
 
 ### Added

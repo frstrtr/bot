@@ -762,6 +762,111 @@ async def get_user_other_chats(
     return other_chats
 
 
+def analyze_mentions_in_message(message) -> dict:
+    """
+    Analyze mentions in a message to detect:
+    - All @username and text_mention entities
+    - Hidden/invisible characters around mentions (used by spammers to obfuscate)
+    - Total count of mentions
+    
+    Args:
+        message: Telegram message object
+        
+    Returns:
+        dict with keys:
+            - mentions: list of tuples (type, value, display_name) for buttons
+            - total_count: total number of mention entities found
+            - hidden_mentions: list of mentions with suspicious invisible chars
+            - has_more: True if more than max_buttons mentions exist
+    """
+    # Invisible/zero-width characters commonly used by spammers
+    INVISIBLE_CHARS = {
+        '\u200b',  # Zero-width space
+        '\u200c',  # Zero-width non-joiner
+        '\u200d',  # Zero-width joiner
+        '\u200e',  # Left-to-right mark
+        '\u200f',  # Right-to-left mark
+        '\u2060',  # Word joiner
+        '\u2061',  # Function application
+        '\u2062',  # Invisible times
+        '\u2063',  # Invisible separator
+        '\u2064',  # Invisible plus
+        '\ufeff',  # Zero-width no-break space (BOM)
+        '\u034f',  # Combining grapheme joiner
+        '\u00ad',  # Soft hyphen
+        '\u180e',  # Mongolian vowel separator
+        '\u061c',  # Arabic letter mark
+    }
+    
+    result = {
+        "mentions": [],
+        "total_count": 0,
+        "hidden_mentions": [],
+        "has_more": False,
+    }
+    
+    # Get entities and text (support both text and caption)
+    entities_to_check = []
+    text_to_check = None
+    if message.entities and message.text:
+        entities_to_check = message.entities
+        text_to_check = message.text
+    elif message.caption_entities and message.caption:
+        entities_to_check = message.caption_entities
+        text_to_check = message.caption
+    
+    if not entities_to_check or not text_to_check:
+        return result
+    
+    max_buttons = 3
+    
+    for entity in entities_to_check:
+        entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+        
+        if entity_type == "mention":
+            result["total_count"] += 1
+            offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+            length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+            mention = text_to_check[offset:offset + length]
+            
+            # Check for invisible characters around the mention
+            context_start = max(0, offset - 3)
+            context_end = min(len(text_to_check), offset + length + 3)
+            context = text_to_check[context_start:context_end]
+            has_invisible = any(char in context for char in INVISIBLE_CHARS)
+            
+            if mention.startswith("@"):
+                username_clean = mention.lstrip("@")
+                if len(result["mentions"]) < max_buttons:
+                    result["mentions"].append(("username", username_clean, mention))
+                if has_invisible:
+                    result["hidden_mentions"].append(mention)
+                    
+        elif entity_type == "text_mention":
+            result["total_count"] += 1
+            user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
+            if user:
+                user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
+                if user_id:
+                    display = first_name[:15] + "..." if len(first_name) > 15 else first_name
+                    if len(result["mentions"]) < max_buttons:
+                        result["mentions"].append(("user_id", str(user_id), display))
+                    
+                    # Check for invisible characters around the text_mention
+                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                    context_start = max(0, offset - 3)
+                    context_end = min(len(text_to_check), offset + length + 3)
+                    context = text_to_check[context_start:context_end]
+                    has_invisible = any(char in context for char in INVISIBLE_CHARS)
+                    if has_invisible:
+                        result["hidden_mentions"].append(f"ID:{user_id}")
+    
+    result["has_more"] = result["total_count"] > max_buttons
+    return result
+
+
 async def load_banned_users():
     """Coroutine to load banned users from file"""
     banned_users_filename = "banned_users.txt"
@@ -1206,6 +1311,20 @@ async def handle_autoreports(
         f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
     )
 
+    # Analyze mentions in the message
+    mention_analysis = analyze_mentions_in_message(message)
+    
+    # Add mention info to banner if there are mentions
+    if mention_analysis["total_count"] > 0:
+        mention_info_parts = []
+        if mention_analysis["has_more"]:
+            mention_info_parts.append(f"⚠️ <b>{mention_analysis['total_count']} mentions found</b> (showing first 3 buttons)")
+        if mention_analysis["hidden_mentions"]:
+            hidden_list = ", ".join(mention_analysis["hidden_mentions"][:5])
+            mention_info_parts.append(f"🕵️ <b>Hidden/obfuscated mentions detected:</b> {hidden_list}")
+        if mention_info_parts:
+            admin_ban_banner += "\n" + "\n".join(mention_info_parts)
+
     # construct lols check link button
     inline_kb = make_lols_kb(user_id)
     # Send the banner to the technolog group
@@ -1237,49 +1356,18 @@ async def handle_autoreports(
     )
     keyboard.add(actions_btn)
 
-    # Add LOLS check buttons for mentioned users in the spam message (up to 3)
-    # Check message.entities (text messages)
-    entities_to_check = []
-    text_to_check = None
-    if message.entities and message.text:
-        entities_to_check = message.entities
-        text_to_check = message.text
-    elif message.caption_entities and message.caption:
-        entities_to_check = message.caption_entities
-        text_to_check = message.caption
-
-    if entities_to_check and text_to_check:
-        max_mention_buttons = 3
-        mention_buttons_added = 0
-        for entity in entities_to_check:
-            if mention_buttons_added >= max_mention_buttons:
-                break
-            entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
-            if entity_type == "mention":
-                # @username mention
-                offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
-                length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
-                mention = text_to_check[offset:offset + length]
-                if mention.startswith("@"):
-                    username_clean = mention.lstrip("@")
-                    mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
-                    keyboard.add(
-                        InlineKeyboardButton(f"🔍 Check mentioned {mention}", url=mention_lols_link)
-                    )
-                    mention_buttons_added += 1
-            elif entity_type == "text_mention":
-                # Direct user mention by ID (users without username)
-                user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
-                if user:
-                    user_id_mentioned = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
-                    if user_id_mentioned:
-                        mention_lols_link = f"https://t.me/oLolsBot?start={user_id_mentioned}"
-                        first_name_mentioned = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
-                        display = first_name_mentioned[:15] + "..." if len(first_name_mentioned) > 15 else first_name_mentioned
-                        keyboard.add(
-                            InlineKeyboardButton(f"🔍 Check mentioned ID:{user_id_mentioned} ({display})", url=mention_lols_link)
-                        )
-                        mention_buttons_added += 1
+    # Add LOLS check buttons for mentioned users in the spam message (using pre-analyzed data)
+    for mention_type, mention_value, display_name in mention_analysis["mentions"]:
+        if mention_type == "username":
+            mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
+            keyboard.add(
+                InlineKeyboardButton(f"🔍 Check mentioned @{mention_value}", url=mention_lols_link)
+            )
+        elif mention_type == "user_id":
+            mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
+            keyboard.add(
+                InlineKeyboardButton(f"🔍 Check mentioned ID:{mention_value} ({display_name})", url=mention_lols_link)
+            )
 
     try:
         # Forward original message to the admin group
@@ -2124,39 +2212,21 @@ async def check_n_ban(message: types.Message, reason: str):
             )
         )
 
-        # Add LOLS check buttons for mentioned users in the spam message (up to 3)
-        if message.entities and message.text:
-            max_mention_buttons = 3
-            mention_buttons_added = 0
-            for entity in message.entities:
-                if mention_buttons_added >= max_mention_buttons:
-                    break
-                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
-                if entity_type == "mention":
-                    # @username mention
-                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
-                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
-                    mention = message.text[offset:offset + length]
-                    if mention.startswith("@"):
-                        username_clean = mention.lstrip("@")
-                        mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
-                        inline_kb.add(
-                            InlineKeyboardButton(f"🔍 Check {mention}", url=mention_lols_link)
-                        )
-                        mention_buttons_added += 1
-                elif entity_type == "text_mention":
-                    # Direct user mention by ID
-                    user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
-                    if user:
-                        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
-                        if user_id:
-                            mention_lols_link = f"https://t.me/oLolsBot?start={user_id}"
-                            first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
-                            display = first_name[:15] + "..." if len(first_name) > 15 else first_name
-                            inline_kb.add(
-                                InlineKeyboardButton(f"🔍 Check ID:{user_id} ({display})", url=mention_lols_link)
-                            )
-                            mention_buttons_added += 1
+        # Analyze mentions in the spam message using helper function
+        mention_analysis = analyze_mentions_in_message(message)
+        
+        # Add LOLS check buttons for mentioned users (up to 3)
+        for mention_type, mention_value, display_name in mention_analysis["mentions"]:
+            if mention_type == "username":
+                mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
+                inline_kb.add(
+                    InlineKeyboardButton(f"🔍 Check @{mention_value}", url=mention_lols_link)
+                )
+            elif mention_type == "user_id":
+                mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
+                inline_kb.add(
+                    InlineKeyboardButton(f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
+                )
 
         chat_link = (
             f"https://t.me/{message.chat.username}"
@@ -2168,10 +2238,25 @@ async def check_n_ban(message: types.Message, reason: str):
             if message.chat.username
             else message.chat.title
         )
+        
+        # Build autoban banner with mention info if present
+        autoban_banner_text = f"Alert! 🚨 User @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>) has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}..."
+        
+        # Add mention info if there are mentions
+        if mention_analysis["total_count"] > 0:
+            mention_info_parts = []
+            if mention_analysis["has_more"]:
+                mention_info_parts.append(f"\n⚠️ <b>{mention_analysis['total_count']} mentions found</b> (showing first 3 buttons)")
+            if mention_analysis["hidden_mentions"]:
+                hidden_list = ", ".join(mention_analysis["hidden_mentions"][:5])
+                mention_info_parts.append(f"\n🕵️ <b>Hidden/obfuscated mentions detected:</b> {hidden_list}")
+            if mention_info_parts:
+                autoban_banner_text += "".join(mention_info_parts)
+        
         admin_autoban_banner = await safe_send_message(
             BOT,
             ADMIN_GROUP_ID,
-            f"Alert! 🚨 User @{message.from_user.username if message.from_user.username else '!UNDEFINED!'}:(<code>{message.from_user.id}</code>) has been caught red-handed spamming in <a href='{chat_link}'>{chat_link_name}</a>! Telefragged in {time_passed}...",
+            autoban_banner_text,
             LOGGER,
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",

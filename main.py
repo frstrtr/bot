@@ -934,7 +934,7 @@ async def load_active_user_checks():
             )
             # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
             LOGGER.info(
-                "%s:%s loaded from file & 3hr monitoring started ...",
+                "%s:%s loaded from file & 24hr monitoring started ...",
                 user_id,
                 format_username_for_log(user_name),
             )
@@ -2646,7 +2646,7 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error(
-            "\033[93m%s:@%s 3hrs spam checking cancelled. %s\033[0m",
+            "\033[93m%s:@%s 24hr spam checking cancelled. %s\033[0m",
             user_id,
             user_name,
             e,
@@ -3531,7 +3531,7 @@ if __name__ == "__main__":
                 inout_username,
             )
 
-        # Check lols after user join/leave event in 3hr and ban if spam
+        # Check lols after user join/leave event in 24hr and ban if spam
         if (
             inout_status == ChatMemberStatus.KICKED
             or inout_status == ChatMemberStatus.RESTRICTED
@@ -7419,7 +7419,7 @@ if __name__ == "__main__":
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
-        """Function to start lols_cas check 3hrs corutine check the user for spam."""
+        """Function to start lols_cas check 24hr corutine check the user for spam."""
         try:
             command_args = message.text.split()
             # LOGGER.debug("Command arguments received: %s", command_args)
@@ -7467,7 +7467,7 @@ if __name__ == "__main__":
             )
 
             await message.reply(
-                f"User {user_id} 3hrs monitoring activity check started."
+                f"User {user_id} 24hr monitoring activity check started."
             )
         except ValueError as ve:
             await message.reply(str(ve))

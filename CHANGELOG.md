@@ -67,3 +67,9 @@
   - Use `format_username_for_log()` helper function consistently
   - Handle both `None` value and `"None"` string cases
   - Logs now show `@username` or `!UNDEFINED!` (never `@None`)
+
+- **Fixed missing buttons in suspicious action cancel handlers**
+  - `suspiciouscancel`: Added "Mark as Legit" button to collapsed keyboard
+  - `cancelban/cancelglobalban/canceldelmsg`: Now restore full collapsed keyboard
+  - All cancel actions restore: Check Spam Data, Actions, Mark as Legit buttons
+  - Legitimization (final action) correctly shows only Check Spam Data button

@@ -9240,6 +9240,12 @@ if __name__ == "__main__":
                     callback_data=f"suspiciousactions_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 )
             )
+            collapsed_kb.add(
+                InlineKeyboardButton(
+                    "✅ Mark as Legit",
+                    callback_data=f"stopchecks_{susp_user_id}_{susp_chat_id}_{susp_message_id}",
+                )
+            )
             try:
                 await BOT.edit_message_reply_markup(
                     chat_id=callback_query.message.chat.id,
@@ -9793,6 +9799,29 @@ if __name__ == "__main__":
         elif comand in ["canceldelmsg", "cancelban", "cancelglobalban"]:
             LOGGER.info("Action cancelled by admin: @%s(%s)", admin_username, admin_id)
             callback_answer = "Action cancelled."
+            # Restore the collapsed keyboard with all buttons
+            collapsed_kb = InlineKeyboardMarkup()
+            collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+            collapsed_kb.add(
+                InlineKeyboardButton(
+                    "⚙️ Actions (Ban / Delete) ⚙️",
+                    callback_data=f"suspiciousactions_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                )
+            )
+            collapsed_kb.add(
+                InlineKeyboardButton(
+                    "✅ Mark as Legit",
+                    callback_data=f"stopchecks_{susp_user_id}_{susp_chat_id}_{susp_message_id}",
+                )
+            )
+            try:
+                await BOT.edit_message_reply_markup(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=collapsed_kb,
+                )
+            except Exception as e:
+                LOGGER.debug("Failed to restore collapsed keyboard after cancel: %s", e)
 
         await callback_query.answer(
             callback_answer,

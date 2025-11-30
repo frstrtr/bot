@@ -40,6 +40,11 @@
   - Affects: /say, /reply, /forward, /copy, /broadcast commands
   - Now shows: `44816530:!UNDEFINED!` instead of `44816530:@!UNDEFINED!`
 
+- **Admin reports showing `@None`**: Fixed P2P spamcheck and ban reports for users without username
+  - Handle `"None"` string (not just Python `None`) in username checks
+  - Fixed in: P2P spamcheck reports, ban action confirmations, suspicious user handling
+  - Now shows: `8279862148:!UNDEFINED!` instead of `8279862148:@None`
+
 ## [2025-11-30]
 
 ### Added

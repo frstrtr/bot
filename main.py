@@ -5530,8 +5530,13 @@ if __name__ == "__main__":
                         message.chat.username if message.chat.username else None,
                     ]
                 )
-                # Create keyboard with Ban Channel button
+                # Create keyboard with LOLS check and Ban Channel buttons
                 channel_ban_kb = InlineKeyboardMarkup()
+                # Add LOLS check button for the channel
+                lols_url = f"https://t.me/oLolsBot?start={message.sender_chat.id}"
+                channel_ban_kb.add(
+                    InlineKeyboardButton("ℹ️ Check Channel Data ℹ️", url=lols_url)
+                )
                 channel_ban_kb.add(
                     InlineKeyboardButton(
                         "🚫 Ban Channel",

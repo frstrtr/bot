@@ -55,3 +55,10 @@
   - Now: Users leaving (LEFT, KICKED, RESTRICTED) logged to TECHNO_OUT
   - Only clean users joining logged to TECHNO_IN
   - Ban button only shown for non-spammers joining
+
+- **Other chats detection on user leave**: Shows which other monitored chats user is still in
+  - When user leaves one chat, bot checks membership in all other monitored chats
+  - Displays clickable links: `@chatusername (ChatName)` format
+  - Each chat on separate line with bullet points for readability
+  - Adds "Ban from All Chats" button if user left but is still in other chats
+  - Useful for detecting spammers who leave after posting but lurk elsewhere

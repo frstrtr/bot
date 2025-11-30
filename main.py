@@ -736,7 +736,7 @@ async def get_user_other_chats(
         channel_dict: Dictionary mapping channel IDs to names
     
     Returns:
-        List of tuples (chat_id, chat_name) where user is still a member
+        List of tuples (chat_id, chat_name, chat_username) where user is still a member
     """
     other_chats = []
     for chat_id in channel_ids:
@@ -751,7 +751,8 @@ async def get_user_other_chats(
                 ChatMemberStatus.CREATOR,
             ):
                 chat_name = channel_dict.get(chat_id, str(chat_id))
-                other_chats.append((chat_id, chat_name))
+                chat_username = get_cached_chat_username(chat_id)
+                other_chats.append((chat_id, chat_name, chat_username))
         except Exception as e:
             # User not in chat or bot can't access - skip silently
             LOGGER.debug(
@@ -3287,11 +3288,23 @@ if __name__ == "__main__":
                 inout_userid, update.chat.id, CHANNEL_IDS, CHANNEL_DICT
             )
             if other_chats:
-                other_chats_list = ", ".join(
-                    [f"{name}" for _, name in other_chats]
-                )
+                # Build clickable chat links with @username format
+                other_chats_links = []
+                for chat_id, chat_name, chat_username in other_chats:
+                    if chat_username:
+                        # @username (ChatName) with clickable link
+                        other_chats_links.append(
+                            f"<a href='https://t.me/{chat_username}'>@{chat_username}</a> ({html.escape(chat_name)})"
+                        )
+                    else:
+                        # Fallback to private link if no username
+                        chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+                        other_chats_links.append(
+                            f"<a href='https://t.me/c/{chat_id_str}'>{html.escape(chat_name)}</a>"
+                        )
+                other_chats_list = "\n   • ".join(other_chats_links)
                 other_chats_info = (
-                    f"\n⚠️ <b>Still in {len(other_chats)} other chat(s):</b> {other_chats_list}"
+                    f"\n⚠️ <b>Still in {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}"
                 )
                 # Add ban button if user left but is still in other chats
                 # (useful if spammer left one chat but still lurking in others)

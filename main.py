@@ -1180,6 +1180,16 @@ async def handle_autoreports(
 
     # Keyboard ban/cancel/confirm buttons
     keyboard = InlineKeyboardMarkup()
+    # Add LOLS check button
+    lols_link = f"https://t.me/oLolsBot?start={user_id}"
+    keyboard.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
+    # Add legitimization button to stop further checks
+    keyboard.add(
+        InlineKeyboardButton(
+            "🟢 Seems legit, STOP checks 🟢",
+            callback_data=f"stopchecks_{spammer_id}_{message.chat.id}_{report_id}",
+        )
+    )
     # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
     actions_btn = InlineKeyboardButton(
         "⚙️ Actions (Ban / Delete) ⚙️",

@@ -9141,12 +9141,8 @@ if __name__ == "__main__":
 
         # If user pressed global cancel/close in expanded actions menu, collapse back to original single Actions button layout
         if action_prefix == "suspiciouscancel":
-            message_link = construct_message_link([susp_chat_id, susp_message_id, None])
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             collapsed_kb = InlineKeyboardMarkup()
-            collapsed_kb.add(
-                InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-            )
             collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             collapsed_kb.add(
                 InlineKeyboardButton(
@@ -9170,12 +9166,8 @@ if __name__ == "__main__":
             susp_user_id = int(susp_user_id_str)
             susp_message_id = int(susp_message_id_str)
             susp_chat_id = int(susp_chat_id_str)
-            message_link = construct_message_link([susp_chat_id, susp_message_id, None])
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             expand_kb = InlineKeyboardMarkup()
-            expand_kb.add(
-                InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-            )
             expand_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             expand_kb.add(
                 InlineKeyboardButton(

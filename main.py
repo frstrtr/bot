@@ -1674,6 +1674,11 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             "%s username undefined; skipping TECHNO_NAMES notification line", _id
         )
         return
+    # Check if already posted to avoid duplicates
+    if norm_username in POSTED_USERNAMES:
+        LOGGER.debug("%s @%s already posted to TECHNO_NAMES, skipping (1156)", _id, norm_username)
+        return
+    POSTED_USERNAMES.add(norm_username)
     await safe_send_message(
         BOT,
         TECHNOLOG_GROUP_ID,
@@ -1960,7 +1965,8 @@ async def check_and_autoban(
                 reply_markup=inline_kb,
             )
             _norm_username_990 = normalize_username(user_name)
-            if _norm_username_990:
+            if _norm_username_990 and _norm_username_990 not in POSTED_USERNAMES:
+                POSTED_USERNAMES.add(_norm_username_990)
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
@@ -1969,7 +1975,7 @@ async def check_and_autoban(
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
-            else:
+            elif not _norm_username_990:
                 LOGGER.debug(
                     "%s username undefined; skipping 990 notification line", user_id
                 )
@@ -2016,7 +2022,8 @@ async def check_and_autoban(
                 reply_markup=inline_kb,
             )
             _norm_username = normalize_username(user_name)
-            if _norm_username:
+            if _norm_username and _norm_username not in POSTED_USERNAMES:
+                POSTED_USERNAMES.add(_norm_username)
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
@@ -2025,7 +2032,7 @@ async def check_and_autoban(
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
-            else:
+            elif not _norm_username:
                 LOGGER.debug(
                     "%s username undefined; skipping 1526 notification line", user_id
                 )
@@ -2079,7 +2086,8 @@ async def check_and_autoban(
         )
         if user_name and user_name != "!UNDEFINED!":
             _norm_username_1054 = normalize_username(user_name)
-            if _norm_username_1054:
+            if _norm_username_1054 and _norm_username_1054 not in POSTED_USERNAMES:
+                POSTED_USERNAMES.add(_norm_username_1054)
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
@@ -2088,7 +2096,7 @@ async def check_and_autoban(
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
-            else:
+            elif not _norm_username_1054:
                 LOGGER.debug(
                     "%s username undefined; skipping 1054 notification line", user_id
                 )

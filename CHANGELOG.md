@@ -48,6 +48,10 @@
 - **Admin username display**: Unified all admin username placeholders to `!UNDEFINED!`
   - Replaced inconsistent `!NoName!`, `!NoAdminName!` with `!UNDEFINED!`
   - Fixed in: ban actions, cancel actions, channel bans, stop_checks, manual bans
+
+- **Monitoring duration logs**: Updated from "3hr" to "24hr" to match actual duration
+  - Sleep times array goes up to 86405 seconds (24 hours)
+  - Fixed in: startup logs, cancellation messages, coroutine names
   - Properly handles admins without @ username in all notification messages
 
 - **TECHNO_NAMES duplicate fix**: Use consistent `normalize_username()` function

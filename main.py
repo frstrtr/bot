@@ -8736,13 +8736,9 @@ if __name__ == "__main__":
                 else "!UNDEFINED!"
             )
 
-        message_link = construct_message_link([orig_chat_id, orig_message_id, None])
         lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
 
         inline_kb = InlineKeyboardMarkup()
-        inline_kb.add(
-            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-        )
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         try:

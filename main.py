@@ -9579,11 +9579,7 @@ if __name__ == "__main__":
 
         susp_chat_title = CHANNEL_DICT.get(susp_chat_id, "!UNKNOWN!")
         admin_id = callback_query.from_user.id
-        admin_username = (
-            callback_query.from_user.username
-            if callback_query.from_user.username
-            else "!NoName!"
-        )
+        admin_username = callback_query.from_user.username if callback_query.from_user.username else None
         callback_answer = None
 
         # Unpack user_name
@@ -10084,9 +10080,9 @@ if __name__ == "__main__":
 
         bot_reply_action_message = (
             f"{callback_answer}\n"
-            f"Suspicious user @{susp_user_name} (<code>{susp_user_id}</code>) "
+            f"Suspicious user {f'@{susp_user_name}' if susp_user_name and susp_user_name != '!UNDEFINED!' else '!UNDEFINED!'} (<code>{susp_user_id}</code>) "
             f"Message origin: <a href='{message_link}'>{message_link}</a>\n"
-            f"Action done by Admin @{admin_username}"
+            f"Action done by Admin {f'@{admin_username}' if admin_username else '!UNDEFINED!'}"
         )
 
         await safe_send_message(

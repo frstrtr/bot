@@ -593,9 +593,18 @@ async def on_startup(_dp: Dispatcher):
 
 async def ban_rogue_chat_everywhere(
     rogue_chat_id: int, chan_list: list
-) -> tuple[bool, str, str]:
-    """ban chat sender chat for Rogue channels"""
-    ban_rogue_chat_everywhere_error = None
+) -> tuple[bool, str, str, list]:
+    """ban chat sender chat for Rogue channels
+    
+    Returns:
+        tuple: (success, channel_name, channel_username, failed_chats)
+        - success: True if banned in all chats, False if any failures
+        - channel_name: Name of the rogue channel
+        - channel_username: Username of the rogue channel
+        - failed_chats: List of (chat_id, error_message) tuples for failed bans
+    """
+    failed_chats = []  # List of (chat_id, error) tuples
+    success_count = 0
 
     # Try to get chat information, handle case where bot is not a member
     try:
@@ -615,26 +624,16 @@ async def ban_rogue_chat_everywhere(
     for chat_id in chan_list:
         try:
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
-            # LOGGER.debug("%s  CHANNEL successfully banned in %s", rogue_chat_id, chat_id)
+            success_count += 1
             await asyncio.sleep(1)  # pause 1 sec
-
-            # May be None if the chat has no username
-            # LOGGER.debug(
-            #     "Banned %s @%s(<code>%s</code>) in chat %s",
-            #     rogue_chat_name,
-            #     rogue_chat_username,
-            #     rogue_chat_id,
-            #     chat_id,
-            # )
         except BadRequest as e:  # if user were Deleted Account while banning
-            # chat_name = get_channel_id_by_name(channel_dict, chat_id)
             LOGGER.error(
                 "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
                 rogue_chat_id,
                 chat_id,
                 e,
             )
-            ban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
+            failed_chats.append((chat_id, str(e)))
             continue
 
     # report rogue chat to the p2p server
@@ -649,24 +648,26 @@ async def ban_rogue_chat_everywhere(
         message_thread_id=TECHNO_ADMIN,
     )
 
-    if ban_rogue_chat_everywhere_error:
+    if failed_chats:
         LOGGER.error(
-            "Failed to ban rogue channel %s @%s(%s): %s",
+            "Failed to ban rogue channel %s @%s(%s) in %d chats: %s",
             rogue_chat_name,
             rogue_chat_username,
             rogue_chat_id,
-            ban_rogue_chat_everywhere_error,
+            len(failed_chats),
+            failed_chats,
         )
-        return False, rogue_chat_name, rogue_chat_username
+        return False, rogue_chat_name, rogue_chat_username, failed_chats
     else:
         LOGGER.info(
-            "%s @%s(%s)  CHANNEL successfully banned where it was possible",
+            "%s @%s(%s)  CHANNEL successfully banned in all %d chats",
             rogue_chat_name,
             rogue_chat_username,
             rogue_chat_id,
+            success_count,
         )
         banned_users_dict[rogue_chat_id] = rogue_chat_username
-        return True, rogue_chat_name, rogue_chat_username
+        return True, rogue_chat_name, rogue_chat_username, []
 
 
 async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
@@ -5382,7 +5383,7 @@ if __name__ == "__main__":
 
         try:
             # Ban channel from all monitored chats
-            success, channel_name, channel_username = await ban_rogue_chat_everywhere(
+            success, channel_name, channel_username, failed_chats = await ban_rogue_chat_everywhere(
                 channel_id, CHANNEL_IDS
             )
 
@@ -5400,7 +5401,7 @@ if __name__ == "__main__":
             if success:
                 result_message = (
                     f"✅ Channel {channel_name} {channel_username} "
-                    f"(<code>{channel_id}</code>) banned from all monitored chats "
+                    f"(<code>{channel_id}</code>) banned from all {len(CHANNEL_IDS)} monitored chats "
                     f"by admin @{admin_username} (<code>{admin_id}</code>)"
                 )
                 LOGGER.info(
@@ -5412,10 +5413,20 @@ if __name__ == "__main__":
                     admin_id,
                 )
             else:
+                # Build detailed failure report
+                success_count = len(CHANNEL_IDS) - len(failed_chats)
+                failed_details = []
+                for failed_chat_id, error_msg in failed_chats:
+                    # Try to get chat name for better readability
+                    chat_name = CHANNEL_DICT.get(failed_chat_id, str(failed_chat_id))
+                    failed_details.append(f"   • {chat_name} (<code>{failed_chat_id}</code>): {html.escape(error_msg)}")
+                
+                failed_list = "\n".join(failed_details)
                 result_message = (
                     f"⚠️ Channel {channel_name} {channel_username} "
-                    f"(<code>{channel_id}</code>) ban failed or partially completed. "
-                    f"Check logs for details."
+                    f"(<code>{channel_id}</code>) ban partially completed.\n"
+                    f"✅ Success: {success_count}/{len(CHANNEL_IDS)} chats\n"
+                    f"❌ Failed in {len(failed_chats)} chat(s):\n{failed_list}"
                 )
 
             # Send result to admin thread

@@ -9243,18 +9243,13 @@ if __name__ == "__main__":
         else:
             susp_user_name = susp_user_name_dict
 
-        # create unified message link
+        # create unified message link (used in action confirmation message)
         message_link = construct_message_link([susp_chat_id, susp_message_id, None])
         # create lols check link
         lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
 
         # Create the inline keyboard
         inline_kb = InlineKeyboardMarkup()
-
-        # # Add buttons to the keyboard, each in a new row
-        inline_kb.add(
-            InlineKeyboardButton("🔗 View Original Message 🔗", url=message_link)
-        )
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         if comand == "globalban":

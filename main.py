@@ -9731,7 +9731,7 @@ if __name__ == "__main__":
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=callback_query.message.message_thread_id,
-            # reply_to_message_id=callback_query.message.message_id,
+            reply_to_message_id=callback_query.message.message_id,
         )
 
         return

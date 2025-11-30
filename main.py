@@ -4392,6 +4392,7 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     reply_markup=lols_check_kb,
                     message_thread_id=callback_query.message.message_thread_id,
+                    reply_to_message_id=callback_query.message.message_id,
                 )
                 return
 
@@ -4785,6 +4786,7 @@ if __name__ == "__main__":
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
+                reply_to_message_id=callback_query.message.message_id,
             )
             await safe_send_message(
                 BOT,
@@ -4896,6 +4898,7 @@ if __name__ == "__main__":
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=inline_kb,
+            reply_to_message_id=callback_query.message.message_id,
         )
         await safe_send_message(
             BOT,
@@ -8783,6 +8786,7 @@ if __name__ == "__main__":
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
+                reply_to_message_id=callback_query.message.message_id,
             )
             await safe_send_message(
                 BOT,

@@ -1236,6 +1236,51 @@ async def handle_autoreports(
         callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{spammer_id}",
     )
     keyboard.add(actions_btn)
+
+    # Add LOLS check buttons for mentioned users in the spam message (up to 3)
+    # Check message.entities (text messages)
+    entities_to_check = []
+    text_to_check = None
+    if message.entities and message.text:
+        entities_to_check = message.entities
+        text_to_check = message.text
+    elif message.caption_entities and message.caption:
+        entities_to_check = message.caption_entities
+        text_to_check = message.caption
+
+    if entities_to_check and text_to_check:
+        max_mention_buttons = 3
+        mention_buttons_added = 0
+        for entity in entities_to_check:
+            if mention_buttons_added >= max_mention_buttons:
+                break
+            entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+            if entity_type == "mention":
+                # @username mention
+                offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                mention = text_to_check[offset:offset + length]
+                if mention.startswith("@"):
+                    username_clean = mention.lstrip("@")
+                    mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
+                    keyboard.add(
+                        InlineKeyboardButton(f"🔍 Check mentioned {mention}", url=mention_lols_link)
+                    )
+                    mention_buttons_added += 1
+            elif entity_type == "text_mention":
+                # Direct user mention by ID (users without username)
+                user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
+                if user:
+                    user_id_mentioned = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                    if user_id_mentioned:
+                        mention_lols_link = f"https://t.me/oLolsBot?start={user_id_mentioned}"
+                        first_name_mentioned = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
+                        display = first_name_mentioned[:15] + "..." if len(first_name_mentioned) > 15 else first_name_mentioned
+                        keyboard.add(
+                            InlineKeyboardButton(f"🔍 Check mentioned ID:{user_id_mentioned} ({display})", url=mention_lols_link)
+                        )
+                        mention_buttons_added += 1
+
     try:
         # Forward original message to the admin group
         await BOT.forward_message(

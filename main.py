@@ -5943,11 +5943,71 @@ if __name__ == "__main__":
                 "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1 ORDER BY received_date DESC LIMIT 1",
                 (message.from_user.id,),
             ).fetchone()
-            # if there is no such data assume user joined the chat 3 years ago in seconds
+            
+            # If no join record, bot may have been offline when user joined
+            # Check for earliest message from this user as fallback "first seen" date
+            user_first_seen_unknown = False
+            if not user_join_chat_date_str:
+                user_first_message_date = CURSOR.execute(
+                    "SELECT received_date FROM recent_messages WHERE user_id = ? ORDER BY received_date ASC LIMIT 1",
+                    (message.from_user.id,),
+                ).fetchone()
+                if user_first_message_date:
+                    # Use first message date as proxy for join date
+                    user_join_chat_date_str = user_first_message_date
+                    LOGGER.debug(
+                        "No join record for %s, using first message date: %s",
+                        message.from_user.id,
+                        user_first_message_date[0],
+                    )
+                else:
+                    # No records at all - this is their first interaction we've seen
+                    # Treat as unknown (new) - safer to check them
+                    user_first_seen_unknown = True
+                    user_join_chat_date_str = (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),)
+                    LOGGER.info(
+                        "No records for user %s - first time seen, treating as new",
+                        message.from_user.id,
+                    )
+                    
+                    # Save synthetic join event to DB so future messages know when we first saw them
+                    try:
+                        CURSOR.execute(
+                            """
+                            INSERT INTO recent_messages
+                            (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, received_date, new_chat_member, left_chat_member)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                message.chat.id,
+                                int(datetime.now().timestamp()),  # synthetic message_id from timestamp
+                                message.from_user.id,
+                                message.from_user.username if message.from_user.username else None,
+                                message.from_user.first_name if message.from_user.first_name else None,
+                                message.from_user.last_name if message.from_user.last_name else None,
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                1,  # new_chat_member = 1 (synthetic join)
+                                None,  # left_chat_member = NULL
+                            ),
+                        )
+                        CONN.commit()
+                        LOGGER.info(
+                            "Saved synthetic join event for user %s:%s (first message seen)",
+                            message.from_user.id,
+                            message.from_user.username or "!NO_USERNAME!",
+                        )
+                    except Exception as db_err:
+                        LOGGER.warning(
+                            "Failed to save synthetic join event for %s: %s",
+                            message.from_user.id,
+                            db_err,
+                        )
+            
+            # Extract string from tuple
             user_join_chat_date_str = (
                 user_join_chat_date_str[0]
                 if user_join_chat_date_str
-                else "2020-01-01 00:00:00"  # datetime(2020, 1, 1, 0, 0, 0)
+                else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
 
             # Convert the string to a datetime object
@@ -5956,7 +6016,11 @@ if __name__ == "__main__":
             )
 
             # flag true if user joined the chat more than 1 week ago
-            user_is_old = (message.date - user_join_chat_date).total_seconds() > 604805
+            # BUT: if user_first_seen_unknown, treat as NOT old (do checks)
+            user_is_old = (
+                not user_first_seen_unknown
+                and (message.date - user_join_chat_date).total_seconds() > 604805
+            )
             # user_is_between_3hours_and_1week_old = (
             #     10805  # 3 hours in seconds
             #     <= (message.date - user_join_chat_date).total_seconds()

@@ -25,3 +25,10 @@
 ### Fixed
 - Double `@` in intensive watchdog logs (was showing `@@username`)
 - `/say` thread fallback now tries reply-to before plain send
+- **Missed joins detection**: Users who joined while bot was offline are now properly checked
+  - Previously: No join record → default to 2020 → user appears 5 years old → NO checks
+  - Now: No join record → check first message date → if nothing, treat as NEW user
+  - Unknown users get spam checks and intensive watchdog assigned
+  - **Synthetic join event**: First message from unknown user now saves a join record to DB
+    - Future messages from the same user will have accurate "first seen" date
+    - Prevents repeated "first time seen" processing

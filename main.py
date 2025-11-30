@@ -104,6 +104,9 @@ from utils.utils import (
 
 # Track usernames already posted to TECHNO_NAMES to avoid duplicates in runtime
 POSTED_USERNAMES = set()  # stores normalized usernames without '@'
+
+# Duration in hours for user monitoring after join/leave events
+MONITORING_DURATION_HOURS = 24
 from utils.utils_decorators import (
     is_not_bot_action,
     is_forwarded_from_unknown_channel_message,
@@ -934,9 +937,10 @@ async def load_active_user_checks():
             )
             # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
             LOGGER.info(
-                "%s:%s loaded from file & 24hr monitoring started ...",
+                "%s:%s loaded from file & %dhr monitoring started ...",
                 user_id,
                 format_username_for_log(user_name),
+                MONITORING_DURATION_HOURS,
             )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
@@ -2388,7 +2392,7 @@ async def perform_checks(
             10805,  # 3 hr
             21605,  # 6 hr
             43205,  # 12 hr
-            86405,  # 1 day
+            MONITORING_DURATION_HOURS * 3600 + 5,  # final check
         ]
 
         for sleep_time in sleep_times:
@@ -2646,9 +2650,10 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error(
-            "\033[93m%s:@%s 24hr spam checking cancelled. %s\033[0m",
+            "\033[93m%s:@%s %dhr spam checking cancelled. %s\033[0m",
             user_id,
             user_name,
+            MONITORING_DURATION_HOURS,
             e,
         )
         if user_id in active_user_checks_dict:
@@ -3531,7 +3536,7 @@ if __name__ == "__main__":
                 inout_username,
             )
 
-        # Check lols after user join/leave event in 24hr and ban if spam
+        # Check lols after user join/leave event and ban if spam
         if (
             inout_status == ChatMemberStatus.KICKED
             or inout_status == ChatMemberStatus.RESTRICTED
@@ -7419,7 +7424,7 @@ if __name__ == "__main__":
 
     @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
     async def check_user(message: types.Message):
-        """Function to start lols_cas check 24hr corutine check the user for spam."""
+        """Function to start lols_cas check coroutine to monitor user for spam."""
         try:
             command_args = message.text.split()
             # LOGGER.debug("Command arguments received: %s", command_args)
@@ -7467,7 +7472,7 @@ if __name__ == "__main__":
             )
 
             await message.reply(
-                f"User {user_id} 24hr monitoring activity check started."
+                f"User {user_id} {MONITORING_DURATION_HOURS}hr monitoring activity check started."
             )
         except ValueError as ve:
             await message.reply(str(ve))

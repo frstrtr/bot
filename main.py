@@ -7892,9 +7892,9 @@ if __name__ == "__main__":
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
         LOGGER.info(
-            "%s:@%s COMM /say in chat %s",
+            "%s:%s COMM /say in chat %s",
             message.from_user.id,
-            message.from_user.username or "!UNDEFINED!",
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
             message.chat.id,
         )
         try:
@@ -8124,9 +8124,9 @@ if __name__ == "__main__":
                         try:
                             await BOT.delete_message(sent_msg.chat.id, sent_msg.message_id)
                             LOGGER.info(
-                                "%s:@%s auto-deleted message %s in chat %s after %ds",
+                                "%s:%s auto-deleted message %s in chat %s after %ds",
                                 message.from_user.id,
-                                message.from_user.username or "!UNDEFINED!",
+                                f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                                 sent_msg.message_id,
                                 chat_id,
                                 delete_after,
@@ -8137,9 +8137,9 @@ if __name__ == "__main__":
                     asyncio.create_task(delete_message_later())
 
                 LOGGER.info(
-                    "%s:@%s sent message to chat %s (thread=%s, reply_to=%s, used_as_reply=%s, delete_after=%s)",
+                    "%s:%s sent message to chat %s (thread=%s, reply_to=%s, used_as_reply=%s, delete_after=%s)",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     chat_id,
                     used_thread_id,
                     reply_to_msg_id if not used_as_reply else thread_id,
@@ -8148,7 +8148,7 @@ if __name__ == "__main__":
                 )
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in say_to_chat: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in say_to_chat: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["reply"])
@@ -8161,9 +8161,9 @@ if __name__ == "__main__":
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
         LOGGER.info(
-            "%s:@%s COMM /reply in chat %s",
+            "%s:%s COMM /reply in chat %s",
             message.from_user.id,
-            message.from_user.username or "!UNDEFINED!",
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
             message.chat.id,
         )
         try:
@@ -8222,9 +8222,9 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "%s:@%s replied to message %s in chat %s",
+                    "%s:%s replied to message %s in chat %s",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     target_message_id,
                     chat_id,
                 )
@@ -8232,7 +8232,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to reply to message in {chat_id}")
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in reply_to_message: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in reply_to_message: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     def parse_target_with_thread(target: str):
@@ -8300,9 +8300,9 @@ if __name__ == "__main__":
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
         LOGGER.info(
-            "%s:@%s COMM /forward in chat %s",
+            "%s:%s COMM /forward in chat %s",
             message.from_user.id,
-            message.from_user.username or "!UNDEFINED!",
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
             message.chat.id,
         )
         try:
@@ -8450,15 +8450,15 @@ if __name__ == "__main__":
                         await asyncio.sleep(delete_after)
                         try:
                             await BOT.delete_message(forwarded.chat.id, forwarded.message_id)
-                            LOGGER.info("%s:@%s auto-deleted forwarded message after %ds", message.from_user.id, message.from_user.username or "!UNDEFINED!", delete_after)
+                            LOGGER.info("%s:%s auto-deleted forwarded message after %ds", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", delete_after)
                         except Exception as del_e:
                             LOGGER.warning("Failed to auto-delete forwarded message: %s", del_e)
                     asyncio.create_task(delete_forwarded_later())
 
                 LOGGER.info(
-                    "%s:@%s forwarded message %s from %s to %s (thread=%s, reply_to=%s, delete_after=%s)",
+                    "%s:%s forwarded message %s from %s to %s (thread=%s, reply_to=%s, delete_after=%s)",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
@@ -8471,7 +8471,7 @@ if __name__ == "__main__":
                 await message.reply(f"❌ Failed to forward message: {e}")
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in forward_message_cmd: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in forward_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["copy"])
@@ -8486,9 +8486,9 @@ if __name__ == "__main__":
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
         LOGGER.info(
-            "%s:@%s COMM /copy in chat %s",
+            "%s:%s COMM /copy in chat %s",
             message.from_user.id,
-            message.from_user.username or "!UNDEFINED!",
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
             message.chat.id,
         )
         try:
@@ -8632,9 +8632,9 @@ if __name__ == "__main__":
                 )
 
                 LOGGER.info(
-                    "%s:@%s copied message %s from %s to %s (thread=%s, reply_to=%s, timeout=%s)",
+                    "%s:%s copied message %s from %s to %s (thread=%s, reply_to=%s, timeout=%s)",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     source_msg_id,
                     source_chat,
                     target_chat,
@@ -8644,7 +8644,7 @@ if __name__ == "__main__":
                 )
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in copy_message_cmd: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in copy_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(superadmin_filter, commands=["broadcast"])
@@ -8659,9 +8659,9 @@ if __name__ == "__main__":
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
         LOGGER.info(
-            "%s:@%s COMM /broadcast in chat %s",
+            "%s:%s COMM /broadcast in chat %s",
             message.from_user.id,
-            message.from_user.username or "!UNDEFINED!",
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
             message.chat.id,
         )
         try:
@@ -8791,16 +8791,16 @@ if __name__ == "__main__":
             await status_msg.edit_text(result_text, parse_mode="HTML")
 
             LOGGER.info(
-                "%s:@%s broadcast message to %d chats (success: %d, failed: %d)",
+                "%s:%s broadcast message to %d chats (success: %d, failed: %d)",
                 message.from_user.id,
-                message.from_user.username or "!UNDEFINED!",
+                f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                 len(target_chats),
                 success_count,
                 fail_count,
             )
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in broadcast_message: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in broadcast_message: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.callback_query_handler(lambda c: c.data.startswith("broadcast_"))
@@ -8934,16 +8934,16 @@ if __name__ == "__main__":
             await status_msg.edit_text(result_text, parse_mode="HTML")
 
             LOGGER.info(
-                "%s:@%s broadcast CONFIRMED via text to %d chats (success: %d, failed: %d)",
+                "%s:%s broadcast CONFIRMED via text to %d chats (success: %d, failed: %d)",
                 message.from_user.id,
-                message.from_user.username or "!UNDEFINED!",
+                f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                 len(target_chats),
                 success_count,
                 fail_count,
             )
 
         except Exception as e:
-            LOGGER.error("%s:@%s Error in handle_broadcast_text_confirm: %s", message.from_user.id, message.from_user.username or "!UNDEFINED!", e)
+            LOGGER.error("%s:%s Error in handle_broadcast_text_confirm: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
     @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)

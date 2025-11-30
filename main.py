@@ -3568,15 +3568,15 @@ if __name__ == "__main__":
                 try:
                     is_admin_in_chat = await is_admin(update.from_user.id, update.chat.id)
                     if is_admin_in_chat:
-                        admin_username = update.from_user.username or "!NoAdminName!"
+                        admin_username = update.from_user.username
                         admin_id = update.from_user.id
                         
                         LOGGER.info(
-                            "\033[95m%s:@%s manually re-added by admin %s:@%s - cancelling checks and marking as legit\033[0m",
+                            "\033[95m%s:@%s manually re-added by admin %s:%s - cancelling checks and marking as legit\033[0m",
                             inout_userid,
                             inout_username,
                             admin_id,
-                            admin_username,
+                            f"@{admin_username}" if admin_username else "!UNDEFINED!",
                         )
                         
                         # Cancel watchdog
@@ -4592,7 +4592,7 @@ if __name__ == "__main__":
                 await safe_send_message(
                     BOT,
                     ADMIN_GROUP_ID,
-                    f"Ad-hoc ban executed by @{button_pressed_by}: User (<code>{author_id}</code>) banned across monitored chats.",
+                    f"Ad-hoc ban executed by {f'@{button_pressed_by}' if button_pressed_by else '!UNDEFINED!'}: User (<code>{author_id}</code>) banned across monitored chats.",
                     LOGGER,
                     parse_mode="HTML",
                     reply_markup=lols_check_kb,
@@ -4725,12 +4725,13 @@ if __name__ == "__main__":
                         task.cancel()
 
             # save event to the ban file
+            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
                 f"{author_id:<10} "
                 f"❌  {' '.join('@' + forwarded_message_data[4] if forwarded_message_data[4] is not None else forwarded_message_data[5]+' '+forwarded_message_data[6]):<32}"
                 f" member          --> kicked          in "
-                f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by @{button_pressed_by}\n"
+                f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by {_admin_for_record}\n"
             )
             LOGGER.debug(
                 "%s:@%s (#HBN) forwared_message_data: %s",
@@ -4986,10 +4987,11 @@ if __name__ == "__main__":
 
             lols_check_kb = make_lols_kb(author_id)
             _display_user = f"@{user_name}" if user_name else "!UNDEFINED!"
+            _admin_display = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
             await safe_send_message(
                 BOT,
                 ADMIN_GROUP_ID,
-                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by {_admin_display}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 LOGGER,
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
@@ -4999,7 +5001,7 @@ if __name__ == "__main__":
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
-                f"Report <code>{report_id_to_ban}</code> action taken by @{button_pressed_by}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
+                f"Report <code>{report_id_to_ban}</code> action taken by {_admin_display}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 LOGGER,
                 parse_mode="HTML",
                 reply_markup=lols_check_kb,
@@ -5087,19 +5089,20 @@ if __name__ == "__main__":
         # logger.debug("Button pressed by the admin: @%s", button_pressed_by)
 
         LOGGER.info(
-            "\033[95m%s Report %s button ACTION CANCELLED by @%s !!! (User ID for LOLS: %s)\033[0m",
+            "\033[95m%s Report %s button ACTION CANCELLED by %s !!! (User ID for LOLS: %s)\033[0m",
             admin_id,
             original_report_id_str,  # Log the original report identifier
-            button_pressed_by,
+            f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!",
             actual_user_id,
         )
 
         # FIXED BUG: Use actual_user_id for the LOLS bot link
         inline_kb = make_lols_kb(actual_user_id)
+        _admin_display = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
         await safe_send_message(
             BOT,
             ADMIN_GROUP_ID,
-            f"Button ACTION CANCELLED by @{button_pressed_by}: Report WAS NOT PROCESSED!!! "
+            f"Button ACTION CANCELLED by {_admin_display}: Report WAS NOT PROCESSED!!! "
             f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
             LOGGER,
             message_thread_id=callback_query.message.message_thread_id,
@@ -5111,7 +5114,7 @@ if __name__ == "__main__":
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
-            f"CANCEL button pressed by @{button_pressed_by}. "
+            f"CANCEL button pressed by {_admin_display}. "
             f"Button ACTION CANCELLED: Report WAS NOT PROCESSED. "
             f"Report them again if needed or use <code>/ban {original_report_id_str}</code> command.",
             LOGGER,
@@ -5215,12 +5218,14 @@ if __name__ == "__main__":
             banned_users_dict[user_id] = username
 
             # Create event record
+            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
+            _user_for_record = f"@{username}" if username else "!UNDEFINED!"
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
                 f"{user_id:<10} "
-                f"❌  @{username} {first_name} {last_name}            "
+                f"❌  {_user_for_record} {first_name} {last_name}            "
                 f" member          --> kicked          in "
-                f"ALL_CHATS                          by @{button_pressed_by}\n"
+                f"ALL_CHATS                          by {_admin_for_record}\n"
             )
             await save_report_file("inout_", "mbn" + event_record)
 
@@ -5228,8 +5233,8 @@ if __name__ == "__main__":
             await report_spam_2p2p(user_id, LOGGER)
 
             ban_message = (
-                f"Manual ban completed by @{button_pressed_by}:\n"
-                f"User @{username} ({first_name} {last_name}) <code>{user_id}</code> "
+                f"Manual ban completed by {_admin_for_record}:\n"
+                f"User {_user_for_record} ({first_name} {last_name}) <code>{user_id}</code> "
                 f"banned from all monitored chats and reported to spam servers."
             )
 
@@ -5360,7 +5365,7 @@ if __name__ == "__main__":
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
 
-        admin_username = callback_query.from_user.username or "!NoName!"
+        admin_username = callback_query.from_user.username
         admin_id = callback_query.from_user.id
 
         # Answer callback immediately to prevent timeout (no popup alert)
@@ -5388,17 +5393,18 @@ if __name__ == "__main__":
                 LOGGER.debug("Could not remove buttons: %s", edit_error)
 
             if success:
+                _admin_display = f"@{admin_username}" if admin_username else "!UNDEFINED!"
                 result_message = (
                     f"✅ Channel {channel_name} {channel_username} "
                     f"(<code>{channel_id}</code>) banned from all {len(CHANNEL_IDS)} monitored chats "
-                    f"by admin @{admin_username} (<code>{admin_id}</code>)"
+                    f"by admin {_admin_display} (<code>{admin_id}</code>)"
                 )
                 LOGGER.info(
-                    "Channel %s %s (%s) banned by admin @%s(%s)",
+                    "Channel %s %s (%s) banned by admin %s(%s)",
                     channel_name,
                     channel_username,
                     channel_id,
-                    admin_username,
+                    _admin_display,
                     admin_id,
                 )
             else:
@@ -8963,7 +8969,7 @@ if __name__ == "__main__":
 
             # Mark user as legit in database
             admin_id = message.from_user.id
-            admin_username = message.from_user.username or "!NoAdminName!"
+            admin_username = message.from_user.username
             try:
                 CURSOR.execute(
                     """
@@ -9065,7 +9071,7 @@ if __name__ == "__main__":
             )
             return
 
-        button_pressed_by = callback_query.from_user.username or "!NoAdminName!"
+        button_pressed_by = callback_query.from_user.username
         admin_id = callback_query.from_user.id
 
         user_name_data = active_user_checks_dict.get(user_id_legit)
@@ -9095,16 +9101,18 @@ if __name__ == "__main__":
                 f"Error editing message markup in stop_checks for user {user_id_legit}: {e_edit}"
             )
 
+        _admin_display = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
+        _user_display = f"@{user_name}" if user_name and user_name != "!UNDEFINED!" else "!UNDEFINED!"
         LOGGER.info(
-            "\033[95m%s:@%s Identified as a legit user by admin %s:@%s!!! Future checks cancelled...\033[0m",
+            "\033[95m%s:%s Identified as a legit user by admin %s:%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
-            user_name,
+            _user_display,
             admin_id,
-            button_pressed_by,
+            _admin_display,
         )
 
         common_message_text = (
-            f"Future checks for @{user_name} (<code>{user_id_legit}</code>) cancelled by Admin @{button_pressed_by}. "
+            f"Future checks for {_user_display} (<code>{user_id_legit}</code>) cancelled by Admin {_admin_display}. "
             f"User marked as legitimate. To re-check, use <code>/check {user_id_legit}</code>."
         )
         try:

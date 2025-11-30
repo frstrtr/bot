@@ -723,6 +723,44 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
         return True, rogue_chat_name, rogue_chat_username
 
 
+async def get_user_other_chats(
+    user_id: int, exclude_chat_id: int, channel_ids: list, channel_dict: dict
+) -> list:
+    """
+    Check which other monitored chats a user is still a member of.
+    
+    Args:
+        user_id: The user ID to check
+        exclude_chat_id: The chat ID to exclude (the chat user just left)
+        channel_ids: List of all monitored channel IDs
+        channel_dict: Dictionary mapping channel IDs to names
+    
+    Returns:
+        List of tuples (chat_id, chat_name) where user is still a member
+    """
+    other_chats = []
+    for chat_id in channel_ids:
+        if chat_id == exclude_chat_id:
+            continue
+        try:
+            member = await BOT.get_chat_member(chat_id, user_id)
+            # Check if user is actually a member (not left/kicked/restricted)
+            if member.status in (
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.ADMINISTRATOR,
+                ChatMemberStatus.CREATOR,
+            ):
+                chat_name = channel_dict.get(chat_id, str(chat_id))
+                other_chats.append((chat_id, chat_name))
+        except Exception as e:
+            # User not in chat or bot can't access - skip silently
+            LOGGER.debug(
+                "Cannot check user %s in chat %s: %s", user_id, chat_id, e
+            )
+            continue
+    return other_chats
+
+
 async def load_banned_users():
     """Coroutine to load banned users from file"""
     banned_users_filename = "banned_users.txt"
@@ -3226,11 +3264,12 @@ if __name__ == "__main__":
 
         inout_thread = None  # initialize
         # Determine thread: OUT for spammers or users leaving, IN for clean users joining
-        if lols_spam is True or inout_status in (
+        is_leaving = inout_status in (
             ChatMemberStatus.LEFT,
             ChatMemberStatus.KICKED,
             ChatMemberStatus.RESTRICTED,
-        ):
+        )
+        if lols_spam is True or is_leaving:
             inout_thread = TECHNO_OUT
         else:
             inout_thread = TECHNO_IN
@@ -3241,10 +3280,31 @@ if __name__ == "__main__":
                 )
             )
 
+        # Check if leaving user is still in other monitored chats
+        other_chats_info = ""
+        if is_leaving:
+            other_chats = await get_user_other_chats(
+                inout_userid, update.chat.id, CHANNEL_IDS, CHANNEL_DICT
+            )
+            if other_chats:
+                other_chats_list = ", ".join(
+                    [f"{name}" for _, name in other_chats]
+                )
+                other_chats_info = (
+                    f"\n⚠️ <b>Still in {len(other_chats)} other chat(s):</b> {other_chats_list}"
+                )
+                # Add ban button if user left but is still in other chats
+                # (useful if spammer left one chat but still lurking in others)
+                inline_kb.add(
+                    InlineKeyboardButton(
+                        "🚫 Ban from All Chats", callback_data=f"banuser_{inout_userid}"
+                    )
+                )
+
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP,
-            inout_logmessage,
+            inout_logmessage + other_chats_info,
             LOGGER,
             message_thread_id=inout_thread,
             parse_mode="HTML",

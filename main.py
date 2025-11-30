@@ -1645,33 +1645,11 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             len(banned_users_dict),  # Number of elements left
         )
 
-    # Normalize username for logging / notification (may be dict with nested baseline)
-    def _extract_username(u):
-        if isinstance(u, dict):
-            # Direct 'username' key first
-            val = u.get("username")
-            if val:
-                return str(val).strip()
-            # Check possible nested 'baseline' structure
-            baseline = u.get("baseline")
-            if isinstance(baseline, dict):
-                val = baseline.get("username") or baseline.get("user_name")
-                if val:
-                    return str(val).strip()
-            # Fallback: nothing usable
-            return ""
-        # Primitive / string cases
-        return str(u or "").strip()
-
-    norm_username = _extract_username(user_name).lstrip("@")
+    # Normalize username for logging / notification using consistent normalize_username function
+    norm_username = normalize_username(user_name)
     if not norm_username:
-        norm_username = "!UNDEFINED!"
-
-    # Only send if we have something (we still show !UNDEFINED! explicitly per requirement)
-    # If username is undefined, skip sending this line (requested behavior change)
-    if norm_username == "!UNDEFINED!":
         LOGGER.debug(
-            "%s username undefined; skipping TECHNO_NAMES notification line", _id
+            "%s username undefined; skipping TECHNO_NAMES notification line (1156)", _id
         )
         return
     # Check if already posted to avoid duplicates

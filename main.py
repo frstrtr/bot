@@ -3224,17 +3224,22 @@ if __name__ == "__main__":
 
         inline_kb = make_lols_kb(inout_userid)
 
-        inoout_thread = None # initialize
-        # Add buttons for the user actions only if the user is not a spammer
-        if lols_spam is not True:
+        inout_thread = None  # initialize
+        # Determine thread: OUT for spammers or users leaving, IN for clean users joining
+        if lols_spam is True or inout_status in (
+            ChatMemberStatus.LEFT,
+            ChatMemberStatus.KICKED,
+            ChatMemberStatus.RESTRICTED,
+        ):
+            inout_thread = TECHNO_OUT
+        else:
+            inout_thread = TECHNO_IN
+            # Add ban button only for non-spammers joining
             inline_kb.add(
                 InlineKeyboardButton(
                     "🚫 Ban User", callback_data=f"banuser_{inout_userid}"
                 )
             )
-            inout_thread = TECHNO_IN
-        else:
-            inout_thread = TECHNO_OUT
 
         await safe_send_message(
             BOT,

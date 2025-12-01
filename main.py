@@ -7769,14 +7769,16 @@ if __name__ == "__main__":
     async def whois_user(message: types.Message):
         """Lookup comprehensive user data from database.
         
-        Only available in ADMIN_GROUP orders thread (TECHNO_ADMIN).
+        Available in:
+        - ADMIN_GROUP orders thread (TECHNO_ADMIN)
+        - Direct messages with superadmin (ADMIN_USER_ID)
         
         Usage:
             /whois 123456789  - lookup by user ID
             /whois @username  - lookup by username
         """
         try:
-            # Restrict to orders thread (TECHNO_ADMIN)
+            # Restrict to orders thread (TECHNO_ADMIN) in admin group
             if message.message_thread_id != TECHNO_ADMIN:
                 await message.reply(
                     "⚠️ This command is only available in the Orders thread.",
@@ -7784,122 +7786,141 @@ if __name__ == "__main__":
                 )
                 return
             
-            command_args = message.text.split()
-            
-            if len(command_args) < 2:
-                await message.reply(
-                    "Usage:\n"
-                    "<code>/whois 123456789</code> - lookup by user ID\n"
-                    "<code>/whois @username</code> - lookup by username",
-                    parse_mode="HTML",
-                )
-                return
-            
-            lookup_value = command_args[1].strip()
-            user_id = None
-            username = None
-            
-            # Determine if lookup is by ID or username
-            if lookup_value.startswith("@"):
-                username = lookup_value.lstrip("@")
-                LOGGER.info(
-                    "Whois lookup by username @%s requested by admin @%s",
-                    username,
-                    message.from_user.username or message.from_user.id,
-                )
-            else:
-                try:
-                    user_id = int(lookup_value)
-                    LOGGER.info(
-                        "Whois lookup by ID %d requested by admin @%s",
-                        user_id,
-                        message.from_user.username or message.from_user.id,
-                    )
-                except ValueError:
-                    # Might be username without @
-                    username = lookup_value
-                    LOGGER.info(
-                        "Whois lookup by username %s requested by admin @%s",
-                        username,
-                        message.from_user.username or message.from_user.id,
-                    )
-            
-            # Perform the lookup
-            whois_data = get_user_whois(CONN, user_id=user_id, username=username)
-            found_user_id = whois_data.get("user_id")
-            
-            # Check if user is admin in any monitored chat
-            admin_in_chats = []
-            if found_user_id:
-                for chat_id in CHANNEL_IDS:
-                    try:
-                        is_admin_there = await is_admin(found_user_id, chat_id)
-                        if is_admin_there:
-                            chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
-                            admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name})
-                    except Exception:
-                        pass  # User might not be in chat or bot has no access
-            
-            # Add admin info to whois_data
-            whois_data["admin_in_chats"] = admin_in_chats
-            
-            # Format and send response
-            response_text = format_whois_response(whois_data)
-            
-            # Create keyboard with action buttons if user found
-            keyboard = None
-            if whois_data.get("found") and found_user_id:
-                keyboard = make_lols_kb(found_user_id)
-                # Add check button if not already monitoring
-                if not whois_data.get("baseline", {}).get("monitoring_active"):
-                    keyboard.add(
-                        InlineKeyboardButton(
-                            "👁 Start Monitoring",
-                            callback_data=f"startcheck_{found_user_id}",
-                        )
-                    )
-                # Add ban button if not banned
-                if not whois_data.get("baseline", {}).get("is_banned"):
-                    report_id = int(datetime.now().timestamp())
-                    keyboard.add(
-                        InlineKeyboardButton(
-                            "⚙️ Actions (Ban / Delete)",
-                            callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{found_user_id}",
-                        )
-                    )
-            elif not whois_data.get("found"):
-                # User not in DB - add LOLS check button
-                keyboard = InlineKeyboardMarkup()
-                if user_id:
-                    keyboard.add(
-                        InlineKeyboardButton(
-                            "🔍 Check on LOLS",
-                            url=f"https://t.me/oLolsBot?start={user_id}",
-                        )
-                    )
-                elif username:
-                    keyboard.add(
-                        InlineKeyboardButton(
-                            "🔍 Check on LOLS",
-                            url=f"https://t.me/oLolsBot?start=u-{username}",
-                        )
-                    )
-            
-            await safe_send_message(
-                BOT,
-                message.chat.id,
-                response_text,
-                LOGGER,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-                reply_markup=keyboard,
-                reply_to_message_id=message.message_id,
-                message_thread_id=TECHNO_ADMIN,
-            )
+            await _perform_whois_lookup(message, thread_id=TECHNO_ADMIN)
             
         except Exception as e:
             LOGGER.error("Error in whois_user: %s", e)
             await message.reply("An error occurred while looking up user data.")
+
+    @DP.message_handler(commands=["whois"], chat_type=types.ChatType.PRIVATE, user_id=ADMIN_USER_ID)
+    async def whois_user_superadmin(message: types.Message):
+        """Lookup comprehensive user data - superadmin private chat version."""
+        try:
+            await _perform_whois_lookup(message, thread_id=None)
+        except Exception as e:
+            LOGGER.error("Error in whois_user_superadmin: %s", e)
+            await message.reply("An error occurred while looking up user data.")
+
+    async def _perform_whois_lookup(message: types.Message, thread_id: int = None):
+        """Shared whois lookup logic for both admin group and superadmin DM.
+        
+        Args:
+            message: The command message
+            thread_id: Thread ID to reply in (None for private chats)
+        """
+        command_args = message.text.split()
+        
+        if len(command_args) < 2:
+            await message.reply(
+                "Usage:\n"
+                "<code>/whois 123456789</code> - lookup by user ID\n"
+                "<code>/whois @username</code> - lookup by username",
+                parse_mode="HTML",
+            )
+            return
+        
+        lookup_value = command_args[1].strip()
+        user_id = None
+        username = None
+        
+        # Determine if lookup is by ID or username
+        if lookup_value.startswith("@"):
+            username = lookup_value.lstrip("@")
+            LOGGER.info(
+                "Whois lookup by username @%s requested by admin @%s",
+                username,
+                message.from_user.username or message.from_user.id,
+            )
+        else:
+            try:
+                user_id = int(lookup_value)
+                LOGGER.info(
+                    "Whois lookup by ID %d requested by admin @%s",
+                    user_id,
+                    message.from_user.username or message.from_user.id,
+                )
+            except ValueError:
+                # Might be username without @
+                username = lookup_value
+                LOGGER.info(
+                    "Whois lookup by username %s requested by admin @%s",
+                    username,
+                    message.from_user.username or message.from_user.id,
+                )
+        
+        # Perform the lookup
+        whois_data = get_user_whois(CONN, user_id=user_id, username=username)
+        found_user_id = whois_data.get("user_id")
+        
+        # Check if user is admin in any monitored chat
+        admin_in_chats = []
+        if found_user_id:
+            for chat_id in CHANNEL_IDS:
+                try:
+                    is_admin_there = await is_admin(found_user_id, chat_id)
+                    if is_admin_there:
+                        chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
+                        admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name})
+                except Exception:
+                    pass  # User might not be in chat or bot has no access
+        
+        # Add admin info to whois_data
+        whois_data["admin_in_chats"] = admin_in_chats
+        
+        # Format and send response
+        response_text = format_whois_response(whois_data)
+        
+        # Create keyboard with action buttons if user found
+        keyboard = None
+        if whois_data.get("found") and found_user_id:
+            keyboard = make_lols_kb(found_user_id)
+            # Add check button if not already monitoring
+            if not whois_data.get("baseline", {}).get("monitoring_active"):
+                keyboard.add(
+                    InlineKeyboardButton(
+                        "👁 Start Monitoring",
+                        callback_data=f"startcheck_{found_user_id}",
+                    )
+                )
+            # Add ban button if not banned
+            if not whois_data.get("baseline", {}).get("is_banned"):
+                report_id = int(datetime.now().timestamp())
+                keyboard.add(
+                    InlineKeyboardButton(
+                        "⚙️ Actions (Ban / Delete)",
+                        callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{found_user_id}",
+                    )
+                )
+        elif not whois_data.get("found"):
+            # User not in DB - add LOLS check button
+            keyboard = InlineKeyboardMarkup()
+            if user_id:
+                keyboard.add(
+                    InlineKeyboardButton(
+                        "🔍 Check on LOLS",
+                        url=f"https://t.me/oLolsBot?start={user_id}",
+                    )
+                )
+            elif username:
+                keyboard.add(
+                    InlineKeyboardButton(
+                        "🔍 Check on LOLS",
+                        url=f"https://t.me/oLolsBot?start=u-{username}",
+                    )
+                )
+        
+        # Send response - use thread_id if provided (admin group), otherwise no thread (private chat)
+        await safe_send_message(
+            BOT,
+            message.chat.id,
+            response_text,
+            LOGGER,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=keyboard,
+            reply_to_message_id=message.message_id,
+            message_thread_id=thread_id,
+        )
 
     @DP.message_handler(commands=["delmsg"], chat_id=ADMIN_GROUP_ID)
     async def delete_message(message: types.Message):

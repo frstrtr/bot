@@ -6340,36 +6340,31 @@ if __name__ == "__main__":
                                 message.from_user.username or "!NO_USERNAME!",
                             )
                         
-                        # After sending notification (either autoreport or suspicious), create synthetic join record
+                        # After sending notification (either autoreport or suspicious), mark first message as join event
                         # This prevents duplicate notifications for the same user
                         if missed_join_notification_sent:
                             try:
+                                # Update the first message record to mark it as a join event
                                 CURSOR.execute(
                                     """
-                                    INSERT INTO recent_messages
-                                    (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, received_date, new_chat_member, left_chat_member)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    UPDATE recent_messages 
+                                    SET new_chat_member = 1 
+                                    WHERE user_id = ? AND received_date = ?
                                     """,
                                     (
-                                        message.chat.id,
-                                        int(datetime.now().timestamp()),  # synthetic message_id
                                         message.from_user.id,
-                                        message.from_user.username if message.from_user.username else None,
-                                        message.from_user.first_name if message.from_user.first_name else None,
-                                        message.from_user.last_name if message.from_user.last_name else None,
                                         user_first_message_date[0],  # Use original first seen date
-                                        1,  # new_chat_member = 1 (synthetic join)
-                                        None,  # left_chat_member = NULL
                                     ),
                                 )
                                 CONN.commit()
                                 LOGGER.info(
-                                    "Created synthetic join record for %s to prevent duplicate notifications",
+                                    "Marked first message as join event for %s (date: %s) to prevent duplicate notifications",
                                     message.from_user.id,
+                                    user_first_message_date[0],
                                 )
                             except Exception as db_err:
                                 LOGGER.warning(
-                                    "Failed to create synthetic join record for %s: %s",
+                                    "Failed to mark first message as join event for %s: %s",
                                     message.from_user.id,
                                     db_err,
                                 )

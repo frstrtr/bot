@@ -3,6 +3,14 @@
 ## [2025-12-01]
 
 ### Added
+- **User baselines database table**: New `user_baselines` table for persistent user monitoring
+  - Stores profile snapshot at join time (username, first_name, last_name, photo_count)
+  - Tracks monitoring state (active, ended_at, is_legit, is_banned)
+  - Join context (chat_id, chat_username, chat_title)
+  - Reserved fields for future extensions (bio, premium, verified, language_code)
+  - Flexible JSON `metadata` field for arbitrary data
+  - Helper functions: `save_user_baseline()`, `get_user_baseline()`, `get_active_user_baselines()`, `update_user_baseline_status()`, `delete_user_baseline()`
+
 - **Persistent monitoring across restarts**: Monitoring timers now persist across bot restarts
   - Extracts `joined_at` timestamp from stored baseline data
   - Calculates elapsed time and skips past check intervals

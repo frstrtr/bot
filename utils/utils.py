@@ -586,6 +586,317 @@ def db_init(cursor: Cursor, conn: Connection):
     )
     conn.commit()
 
+    # User baselines table - stores monitoring state and profile snapshots
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS user_baselines (
+        user_id INTEGER PRIMARY KEY,
+        -- Current profile info
+        username TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        photo_count INTEGER DEFAULT 0,
+        -- Monitoring state
+        monitoring_active INTEGER DEFAULT 1,
+        joined_at TEXT,
+        monitoring_ended_at TEXT,
+        -- Join context
+        join_chat_id INTEGER,
+        join_chat_username TEXT,
+        join_chat_title TEXT,
+        -- Status flags
+        is_legit INTEGER DEFAULT 0,
+        is_banned INTEGER DEFAULT 0,
+        ban_reason TEXT,
+        banned_by_admin_id INTEGER,
+        -- Reserved fields for future use
+        bio TEXT,
+        premium INTEGER,
+        verified INTEGER,
+        restriction_reason TEXT,
+        language_code TEXT,
+        -- Flexible metadata (JSON) for future extensions
+        metadata TEXT,
+        -- Reserved integer fields
+        reserved_int1 INTEGER,
+        reserved_int2 INTEGER,
+        reserved_int3 INTEGER,
+        -- Reserved text fields
+        reserved_text1 TEXT,
+        reserved_text2 TEXT,
+        reserved_text3 TEXT,
+        -- Timestamps
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """
+    )
+    conn.commit()
+
+
+# ============================================================================
+# User Baselines Helper Functions
+# ============================================================================
+
+def save_user_baseline(
+    conn: Connection,
+    user_id: int,
+    username: str = None,
+    first_name: str = None,
+    last_name: str = None,
+    photo_count: int = 0,
+    join_chat_id: int = None,
+    join_chat_username: str = None,
+    join_chat_title: str = None,
+    metadata: dict = None,
+) -> bool:
+    """Save or update a user baseline record.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+        username: Telegram username (without @)
+        first_name: User's first name
+        last_name: User's last name
+        photo_count: Number of profile photos at join time
+        join_chat_id: Chat ID where user joined
+        join_chat_username: Chat username where user joined
+        join_chat_title: Chat title where user joined
+        metadata: Additional JSON metadata
+    
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    import json
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    metadata_json = json.dumps(metadata) if metadata else None
+    
+    try:
+        cursor.execute(
+            """
+            INSERT INTO user_baselines (
+                user_id, username, first_name, last_name, photo_count,
+                monitoring_active, joined_at,
+                join_chat_id, join_chat_username, join_chat_title,
+                metadata, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username = excluded.username,
+                first_name = excluded.first_name,
+                last_name = excluded.last_name,
+                photo_count = excluded.photo_count,
+                monitoring_active = 1,
+                joined_at = excluded.joined_at,
+                join_chat_id = excluded.join_chat_id,
+                join_chat_username = excluded.join_chat_username,
+                join_chat_title = excluded.join_chat_title,
+                metadata = excluded.metadata,
+                updated_at = excluded.updated_at
+            """,
+            (
+                user_id, username, first_name, last_name, photo_count,
+                now, join_chat_id, join_chat_username, join_chat_title,
+                metadata_json, now, now,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logging.getLogger(__name__).error(
+            "Error saving user baseline for %s: %s", user_id, e
+        )
+        return False
+
+
+def get_user_baseline(conn: Connection, user_id: int) -> dict:
+    """Get a user baseline record.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+    
+    Returns:
+        Dictionary with baseline data or None if not found
+    """
+    import json
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT user_id, username, first_name, last_name, photo_count,
+               monitoring_active, joined_at, monitoring_ended_at,
+               join_chat_id, join_chat_username, join_chat_title,
+               is_legit, is_banned, ban_reason, banned_by_admin_id,
+               bio, premium, verified, restriction_reason, language_code,
+               metadata, created_at, updated_at
+        FROM user_baselines WHERE user_id = ?
+        """,
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    
+    return {
+        "user_id": row[0],
+        "username": row[1],
+        "first_name": row[2],
+        "last_name": row[3],
+        "photo_count": row[4],
+        "monitoring_active": bool(row[5]),
+        "joined_at": row[6],
+        "monitoring_ended_at": row[7],
+        "join_chat_id": row[8],
+        "join_chat_username": row[9],
+        "join_chat_title": row[10],
+        "is_legit": bool(row[11]),
+        "is_banned": bool(row[12]),
+        "ban_reason": row[13],
+        "banned_by_admin_id": row[14],
+        "bio": row[15],
+        "premium": bool(row[16]) if row[16] is not None else None,
+        "verified": bool(row[17]) if row[17] is not None else None,
+        "restriction_reason": row[18],
+        "language_code": row[19],
+        "metadata": json.loads(row[20]) if row[20] else None,
+        "created_at": row[21],
+        "updated_at": row[22],
+    }
+
+
+def get_active_user_baselines(conn: Connection) -> list:
+    """Get all user baselines with active monitoring.
+    
+    Args:
+        conn: Database connection
+    
+    Returns:
+        List of dictionaries with baseline data
+    """
+    import json
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT user_id, username, first_name, last_name, photo_count,
+               monitoring_active, joined_at, monitoring_ended_at,
+               join_chat_id, join_chat_username, join_chat_title,
+               is_legit, is_banned, metadata, created_at, updated_at
+        FROM user_baselines WHERE monitoring_active = 1
+        """
+    )
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        results.append({
+            "user_id": row[0],
+            "username": row[1],
+            "first_name": row[2],
+            "last_name": row[3],
+            "photo_count": row[4],
+            "monitoring_active": bool(row[5]),
+            "joined_at": row[6],
+            "monitoring_ended_at": row[7],
+            "join_chat_id": row[8],
+            "join_chat_username": row[9],
+            "join_chat_title": row[10],
+            "is_legit": bool(row[11]),
+            "is_banned": bool(row[12]),
+            "metadata": json.loads(row[13]) if row[13] else None,
+            "created_at": row[14],
+            "updated_at": row[15],
+        })
+    return results
+
+
+def update_user_baseline_status(
+    conn: Connection,
+    user_id: int,
+    monitoring_active: bool = None,
+    is_legit: bool = None,
+    is_banned: bool = None,
+    ban_reason: str = None,
+    banned_by_admin_id: int = None,
+) -> bool:
+    """Update monitoring/ban status for a user.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+        monitoring_active: Set monitoring state
+        is_legit: Mark user as legitimate
+        is_banned: Mark user as banned
+        ban_reason: Reason for ban
+        banned_by_admin_id: Admin who banned the user
+    
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    updates = ["updated_at = ?"]
+    params = [now]
+    
+    if monitoring_active is not None:
+        updates.append("monitoring_active = ?")
+        params.append(1 if monitoring_active else 0)
+        if not monitoring_active:
+            updates.append("monitoring_ended_at = ?")
+            params.append(now)
+    
+    if is_legit is not None:
+        updates.append("is_legit = ?")
+        params.append(1 if is_legit else 0)
+    
+    if is_banned is not None:
+        updates.append("is_banned = ?")
+        params.append(1 if is_banned else 0)
+    
+    if ban_reason is not None:
+        updates.append("ban_reason = ?")
+        params.append(ban_reason)
+    
+    if banned_by_admin_id is not None:
+        updates.append("banned_by_admin_id = ?")
+        params.append(banned_by_admin_id)
+    
+    params.append(user_id)
+    
+    try:
+        cursor.execute(
+            f"UPDATE user_baselines SET {', '.join(updates)} WHERE user_id = ?",
+            params,
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logging.getLogger(__name__).error(
+            "Error updating user baseline status for %s: %s", user_id, e
+        )
+        return False
+
+
+def delete_user_baseline(conn: Connection, user_id: int) -> bool:
+    """Delete a user baseline record.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+    
+    Returns:
+        True if deleted successfully, False otherwise
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM user_baselines WHERE user_id = ?", (user_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logging.getLogger(__name__).error(
+            "Error deleting user baseline for %s: %s", user_id, e
+        )
+        return False
+
 
 def create_inline_keyboard(message_link, lols_link, message: types.Message):
     """Create the inline keyboard for a suspicious forwarded / monitored message.

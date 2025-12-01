@@ -53,7 +53,22 @@
   - Duration is no longer hardcoded in log messages
   - Single source of truth: change constant to adjust all logs and sleep times
   - Fixed in: startup logs, cancellation messages, check command replies
-  - Properly handles admins without @ username in all notification messages
+
+- **Stop checks confirmation showing `@None`**: Fixed username display in legitimization messages
+  - Handle `"None"` string when extracting username from active_user_checks_dict
+  - Now shows: `!UNDEFINED!` instead of `@None`
+
+- **Auto-report monitored users with bot mentions**: Users in active monitoring who mention bots
+  - If message contains `@...bot` mention, sends to AUTOREPORT instead of SUSPICIOUS
+  - Faster spam detection for users promoting bot services
+
+- **Duplicate missed join notifications**: Fixed repeated notifications for same user
+  - After first notification, marks user's first message as join event in DB
+  - Prevents duplicate "Missed Join Detected" alerts on every message
+
+- **MessageEntity attribute access error**: Fixed `'MessageEntity' object has no attribute 'get'`
+  - Entity objects in aiogram are objects, not dicts
+  - Use `getattr()` with fallback for object attribute access
 
 - **TECHNO_NAMES duplicate fix**: Use consistent `normalize_username()` function
   - Replaced local `_extract_username()` with shared `normalize_username()` from utils

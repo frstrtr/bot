@@ -7,7 +7,7 @@
   - Extracts `joined_at` timestamp from stored baseline data
   - Calculates elapsed time and skips past check intervals
   - Resumes monitoring from correct position (not from beginning)
-  - Shows "resuming from X min elapsed" in startup logs
+  - Shows "resuming from X min, skipped: 1min, 3min, ..." in single log line
   - Handles edge case: users monitored >24hrs are removed immediately with log message
 
 - **Mention analysis in ban reports**: Autoreport and autoban banners now show mention statistics

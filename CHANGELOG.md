@@ -3,6 +3,14 @@
 ## [2025-12-01]
 
 ### Added
+- **User baselines database integration**: Full integration of `user_baselines` table
+  - Loads active monitoring from database on startup (with legacy file migration)
+  - Saves baseline to DB when user joins chat
+  - Updates DB status on: monitoring complete, user marked legit, user banned
+  - Helper function `move_user_to_banned()` for consistent ban handling
+  - No more file-based persistence for active checks (uses SQLite)
+  - Legacy `active_user_checks.txt` automatically migrated to DB and renamed to `.bak`
+
 - **User baselines database table**: New `user_baselines` table for persistent user monitoring
   - Stores profile snapshot at join time (username, first_name, last_name, photo_count)
   - Tracks monitoring state (active, ended_at, is_legit, is_banned)

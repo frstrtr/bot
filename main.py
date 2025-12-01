@@ -100,6 +100,12 @@ from utils.utils import (
     get_forwarded_state,
     safe_send_message,
     normalize_username,
+    # User baselines DB functions
+    save_user_baseline,
+    get_user_baseline,
+    get_active_user_baselines,
+    update_user_baseline_status,
+    delete_user_baseline,
 )
 
 # Track usernames already posted to TECHNO_NAMES to avoid duplicates in runtime
@@ -271,6 +277,26 @@ HIGH_USER_ID_THRESHOLD = 8_200_000_000
 # Cache for chat usernames (chat_id -> username)
 # Populated when processing messages, used for constructing public links
 chat_username_cache: dict[int, str | None] = {}
+
+
+def move_user_to_banned(user_id: int, ban_reason: str = None, banned_by_admin_id: int = None):
+    """Move user from active checks to banned dict and update database.
+    
+    Args:
+        user_id: The user ID to move
+        ban_reason: Optional reason for the ban
+        banned_by_admin_id: Optional admin ID who performed the ban
+    """
+    if user_id in active_user_checks_dict:
+        banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+    # Update database
+    update_user_baseline_status(
+        CONN, user_id,
+        monitoring_active=False,
+        is_banned=True,
+        ban_reason=ban_reason,
+        banned_by_admin_id=banned_by_admin_id,
+    )
 
 # Dictionary to store running tasks by user ID
 running_watchdogs = {}
@@ -895,72 +921,131 @@ async def load_banned_users():
 
 
 async def load_active_user_checks():
-    """Coroutine to load checks non-blockingly from file"""
-    active_checks_filename = "active_user_checks.txt"
+    """Coroutine to load checks non-blockingly from database"""
+    # Load from database
+    baselines = get_active_user_baselines(CONN)
+    
+    if not baselines:
+        LOGGER.info("No active user baselines found in database")
+        # Fallback: try loading from legacy file if exists
+        active_checks_filename = "active_user_checks.txt"
+        if os.path.exists(active_checks_filename):
+            LOGGER.info("Found legacy file %s, migrating to database...", active_checks_filename)
+            await _migrate_legacy_active_checks(active_checks_filename)
+            # Re-load from database after migration
+            baselines = get_active_user_baselines(CONN)
+    
+    for baseline in baselines:
+        user_id = baseline["user_id"]
+        username = baseline.get("username") or "!UNDEFINED!"
+        
+        # Reconstruct the dict format for active_user_checks_dict
+        active_user_checks_dict[user_id] = {
+            "username": baseline.get("username"),
+            "baseline": {
+                "first_name": baseline.get("first_name") or "",
+                "last_name": baseline.get("last_name") or "",
+                "username": baseline.get("username") or "",
+                "photo_count": baseline.get("photo_count") or 0,
+                "joined_at": baseline.get("joined_at"),
+                "chat": {
+                    "id": baseline.get("join_chat_id"),
+                    "username": baseline.get("join_chat_username"),
+                    "title": baseline.get("join_chat_title") or "",
+                },
+            },
+        }
+        
+        event_message = (
+            f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
+            + str(user_id)
+            + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
+        )
+        
+        # Extract start_time for resuming after restart
+        start_time = None
+        joined_at_str = baseline.get("joined_at")
+        if joined_at_str:
+            try:
+                start_time = datetime.strptime(joined_at_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                LOGGER.warning(
+                    "%s: Could not parse joined_at: %s", user_id, joined_at_str
+                )
+        
+        user_name_display = username if username and username != "None" else "!UNDEFINED!"
+        
+        # Start the check NON-BLOCKING
+        asyncio.create_task(
+            perform_checks(
+                user_id=user_id,
+                user_name=user_name_display,
+                event_record=event_message,
+                inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
+                start_time=start_time,
+            )
+        )
+        
+        LOGGER.info(
+            "%s:%s loaded from DB%s",
+            user_id,
+            format_username_for_log(user_name_display),
+            "" if start_time else f", {MONITORING_DURATION_HOURS}hr monitoring started",
+        )
+        # Insert a 1-second interval between task creations
+        await asyncio.sleep(1)
+    
+    LOGGER.info(
+        "\033[93mActive users checks dict (%s) loaded from database\033[0m",
+        len(active_user_checks_dict),
+    )
 
-    if not os.path.exists(active_checks_filename):
-        LOGGER.error("File not found: %s", active_checks_filename)
-        return
 
-    with open(active_checks_filename, "r", encoding="utf-8") as file:
+async def _migrate_legacy_active_checks(filename: str):
+    """Migrate legacy active_user_checks.txt to database"""
+    migrated = 0
+    with open(filename, "r", encoding="utf-8") as file:
         for line in file:
+            if not line.strip():
+                continue
             user_id = int(line.strip().split(":")[0])
             user_name = line.strip().split(":", 1)[1]
             try:
-                # Attempt to parse user_name as a dictionary if it looks like a dict
                 user_name = (
                     ast.literal_eval(user_name)
                     if user_name.startswith("{") and user_name.endswith("}")
                     else user_name
                 )
             except (ValueError, SyntaxError):
-                # If parsing fails, keep user_name as a string
                 pass
-            active_user_checks_dict[user_id] = user_name
-            event_message = (
-                f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
-                + str(user_id)
-                + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
-            )
-            # Extract start_time from baseline if available (for resuming after restart)
-            start_time = None
+            
             if isinstance(user_name, dict):
                 baseline = user_name.get("baseline", {})
-                joined_at_str = baseline.get("joined_at")
-                if joined_at_str:
-                    try:
-                        start_time = datetime.strptime(joined_at_str, "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        LOGGER.warning(
-                            "%s: Could not parse joined_at: %s", user_id, joined_at_str
-                        )
-                user_name_display = user_name.get("username") or "!UNDEFINED!"
-            else:
-                user_name_display = user_name if user_name and user_name != "None" else "!UNDEFINED!"
-            # Start the check NON-BLOCKING
-            asyncio.create_task(
-                perform_checks(
+                chat = baseline.get("chat", {})
+                save_user_baseline(
+                    conn=CONN,
                     user_id=user_id,
-                    user_name=user_name_display,
-                    event_record=event_message,
-                    inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
-                    start_time=start_time,
+                    username=user_name.get("username"),
+                    first_name=baseline.get("first_name"),
+                    last_name=baseline.get("last_name"),
+                    photo_count=baseline.get("photo_count", 0),
+                    join_chat_id=chat.get("id"),
+                    join_chat_username=chat.get("username"),
+                    join_chat_title=chat.get("title"),
                 )
-            )
-            # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
-            LOGGER.info(
-                "%s:%s loaded from file%s",
-                user_id,
-                format_username_for_log(user_name_display),
-                "" if start_time else f", {MONITORING_DURATION_HOURS}hr monitoring started",
-            )
-            # Insert a 1-second interval between task creations
-            await asyncio.sleep(1)
-        LOGGER.info(
-            "\033[93mActive users checks dict (%s) loaded from file: %s\033[0m",
-            len(active_user_checks_dict),
-            active_user_checks_dict,
-        )
+            else:
+                # Simple username string - minimal baseline
+                save_user_baseline(
+                    conn=CONN,
+                    user_id=user_id,
+                    username=user_name if user_name != "None" else None,
+                )
+            migrated += 1
+    
+    LOGGER.info("Migrated %d users from legacy file to database", migrated)
+    # Rename legacy file to .bak
+    os.rename(filename, filename + ".bak")
+    LOGGER.info("Renamed %s to %s.bak", filename, filename)
 
 
 async def load_and_start_checks():
@@ -1033,24 +1118,12 @@ async def on_shutdown(_dp):
     # except Exception as e:
     #     LOGGER.error("Unexpected error during shutdown tasks: %s", e)
 
-    # save all unbanned checks to temp file to restart checks after bot restart
-    # Check if active_user_checks_dict is not empty
-    if active_user_checks_dict:
-        LOGGER.debug(
-            "Saving active user checks to file...\n\033[93m%s\033[0m",
-            active_user_checks_dict,
-        )
-        with open("active_user_checks.txt", "w", encoding="utf-8") as file:
-            for _id, _uname in active_user_checks_dict.items():
-                # Persist dicts as repr for round-trip; loader already supports dict/string
-                if isinstance(_uname, dict):
-                    file.write(f"{_id}:{repr(_uname)}\n")
-                else:
-                    file.write(f"{_id}:{_uname}\n")
-    else:
-        # clear the file if no active checks
-        with open("active_user_checks.txt", "w", encoding="utf-8") as file:
-            file.write("")
+    # Database already has the current state - no need to save on shutdown
+    # (baselines are saved on join, updated on ban/legit actions)
+    LOGGER.info(
+        "Shutdown: %d active users in monitoring (persisted in database)",
+        len(active_user_checks_dict),
+    )
 
     # save all banned users to temp file to preserve list after bot restart
     banned_users_filename = "banned_users.txt"
@@ -2428,6 +2501,8 @@ async def perform_checks(
                 )
                 if user_id in active_user_checks_dict:
                     del active_user_checks_dict[user_id]
+                # Mark monitoring as ended in database
+                update_user_baseline_status(CONN, user_id, monitoring_active=False)
                 return
             # Collect skipped intervals for single log line
             for st in sleep_times:
@@ -2748,6 +2823,8 @@ async def perform_checks(
                 del active_user_checks_dict[user_id]
             except Exception:
                 active_user_checks_dict.pop(user_id, None)
+            # Mark monitoring as ended (completed without ban = legit)
+            update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
             if len(active_user_checks_dict) > 3:
                 active_user_checks_dict_last3_list = list(
                     active_user_checks_dict.items()
@@ -3749,6 +3826,19 @@ if __name__ == "__main__":
                             inout_username,
                             _e,
                         )
+
+                    # Save baseline to database
+                    save_user_baseline(
+                        conn=CONN,
+                        user_id=inout_userid,
+                        username=update.old_chat_member.user.username,
+                        first_name=update.old_chat_member.user.first_name or "",
+                        last_name=update.old_chat_member.user.last_name or "",
+                        photo_count=_photo_count,
+                        join_chat_id=update.chat.id,
+                        join_chat_username=getattr(update.chat, "username", None),
+                        join_chat_title=getattr(update.chat, "title", "") or "",
+                    )
 
                     active_user_checks_dict[inout_userid] = {
                         "username": update.old_chat_member.user.username,
@@ -9091,6 +9181,9 @@ if __name__ == "__main__":
             if user_id in banned_users_dict:
                 del banned_users_dict[user_id]
 
+            # Mark monitoring as ended and user as legit in baselines DB
+            update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
+
             # Mark user as legit in database
             admin_id = message.from_user.id
             admin_username = message.from_user.username
@@ -9268,6 +9361,8 @@ if __name__ == "__main__":
 
         if user_id_legit in active_user_checks_dict:
             del active_user_checks_dict[user_id_legit]
+            # Mark monitoring as ended and user as legit in baselines DB
+            update_user_baseline_status(CONN, user_id_legit, monitoring_active=False, is_legit=True)
             task_cancelled = False
             for task in asyncio.all_tasks():
                 if task.get_name() == str(user_id_legit):

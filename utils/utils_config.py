@@ -43,6 +43,8 @@ ALLOWED_UPDATES = []
 CHANNEL_DICT = {}
 ALLOWED_CONTENT_TYPES = []
 API_TOKEN = None  # Initialize API_TOKEN at the module level
+TECHNO_ADMIN = None  # Initialize TECHNO_ADMIN at the module level
+TELEGRAM_CHANNEL_BOT_ID = 136817688  # Telegram @Channel_bot ID
 
 
 def load_config():

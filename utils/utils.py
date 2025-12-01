@@ -607,8 +607,25 @@ def db_init(cursor: Cursor, conn: Connection):
         -- Status flags
         is_legit INTEGER DEFAULT 0,
         is_banned INTEGER DEFAULT 0,
+        -- Ban details
         ban_reason TEXT,
+        ban_source TEXT,
+        banned_at TEXT,
         banned_by_admin_id INTEGER,
+        banned_by_admin_username TEXT,
+        banned_in_chat_id INTEGER,
+        banned_in_chat_title TEXT,
+        -- Offense details (JSON for flexibility)
+        offense_type TEXT,
+        offense_details TEXT,
+        time_to_first_message INTEGER,
+        first_message_text TEXT,
+        -- Detection flags
+        detected_by_lols INTEGER DEFAULT 0,
+        detected_by_cas INTEGER DEFAULT 0,
+        detected_by_p2p INTEGER DEFAULT 0,
+        detected_by_local INTEGER DEFAULT 0,
+        detected_by_admin INTEGER DEFAULT 0,
         -- Reserved fields for future use
         bio TEXT,
         premium INTEGER,
@@ -815,7 +832,20 @@ def update_user_baseline_status(
     is_legit: bool = None,
     is_banned: bool = None,
     ban_reason: str = None,
+    ban_source: str = None,
     banned_by_admin_id: int = None,
+    banned_by_admin_username: str = None,
+    banned_in_chat_id: int = None,
+    banned_in_chat_title: str = None,
+    offense_type: str = None,
+    offense_details: str = None,
+    time_to_first_message: int = None,
+    first_message_text: str = None,
+    detected_by_lols: bool = None,
+    detected_by_cas: bool = None,
+    detected_by_p2p: bool = None,
+    detected_by_local: bool = None,
+    detected_by_admin: bool = None,
 ) -> bool:
     """Update monitoring/ban status for a user.
     
@@ -825,8 +855,17 @@ def update_user_baseline_status(
         monitoring_active: Set monitoring state
         is_legit: Mark user as legitimate
         is_banned: Mark user as banned
-        ban_reason: Reason for ban
-        banned_by_admin_id: Admin who banned the user
+        ban_reason: Human-readable reason for ban
+        ban_source: Source of ban detection (lols/cas/p2p/local/admin/autoreport)
+        banned_by_admin_id: Admin who banned the user (if manual)
+        banned_by_admin_username: Admin username
+        banned_in_chat_id: Chat where offense occurred
+        banned_in_chat_title: Chat title where offense occurred
+        offense_type: Type of offense (fast_message, spam_pattern, bot_mention, etc.)
+        offense_details: JSON with additional offense details
+        time_to_first_message: Seconds between join and first message
+        first_message_text: The offending message text (truncated)
+        detected_by_*: Which detection systems flagged the user
     
     Returns:
         True if updated successfully, False otherwise
@@ -851,14 +890,70 @@ def update_user_baseline_status(
     if is_banned is not None:
         updates.append("is_banned = ?")
         params.append(1 if is_banned else 0)
+        if is_banned:
+            updates.append("banned_at = ?")
+            params.append(now)
     
     if ban_reason is not None:
         updates.append("ban_reason = ?")
         params.append(ban_reason)
     
+    if ban_source is not None:
+        updates.append("ban_source = ?")
+        params.append(ban_source)
+    
     if banned_by_admin_id is not None:
         updates.append("banned_by_admin_id = ?")
         params.append(banned_by_admin_id)
+    
+    if banned_by_admin_username is not None:
+        updates.append("banned_by_admin_username = ?")
+        params.append(banned_by_admin_username)
+    
+    if banned_in_chat_id is not None:
+        updates.append("banned_in_chat_id = ?")
+        params.append(banned_in_chat_id)
+    
+    if banned_in_chat_title is not None:
+        updates.append("banned_in_chat_title = ?")
+        params.append(banned_in_chat_title)
+    
+    if offense_type is not None:
+        updates.append("offense_type = ?")
+        params.append(offense_type)
+    
+    if offense_details is not None:
+        updates.append("offense_details = ?")
+        params.append(offense_details)
+    
+    if time_to_first_message is not None:
+        updates.append("time_to_first_message = ?")
+        params.append(time_to_first_message)
+    
+    if first_message_text is not None:
+        # Truncate to 500 chars to avoid bloating DB
+        updates.append("first_message_text = ?")
+        params.append(first_message_text[:500] if len(first_message_text) > 500 else first_message_text)
+    
+    if detected_by_lols is not None:
+        updates.append("detected_by_lols = ?")
+        params.append(1 if detected_by_lols else 0)
+    
+    if detected_by_cas is not None:
+        updates.append("detected_by_cas = ?")
+        params.append(1 if detected_by_cas else 0)
+    
+    if detected_by_p2p is not None:
+        updates.append("detected_by_p2p = ?")
+        params.append(1 if detected_by_p2p else 0)
+    
+    if detected_by_local is not None:
+        updates.append("detected_by_local = ?")
+        params.append(1 if detected_by_local else 0)
+    
+    if detected_by_admin is not None:
+        updates.append("detected_by_admin = ?")
+        params.append(1 if detected_by_admin else 0)
     
     params.append(user_id)
     

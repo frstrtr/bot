@@ -279,23 +279,69 @@ HIGH_USER_ID_THRESHOLD = 8_200_000_000
 chat_username_cache: dict[int, str | None] = {}
 
 
-def move_user_to_banned(user_id: int, ban_reason: str = None, banned_by_admin_id: int = None):
+def move_user_to_banned(
+    user_id: int,
+    ban_reason: str = None,
+    ban_source: str = None,
+    banned_by_admin_id: int = None,
+    banned_by_admin_username: str = None,
+    banned_in_chat_id: int = None,
+    banned_in_chat_title: str = None,
+    offense_type: str = None,
+    offense_details: str = None,
+    time_to_first_message: int = None,
+    first_message_text: str = None,
+    detected_by_lols: bool = None,
+    detected_by_cas: bool = None,
+    detected_by_p2p: bool = None,
+    detected_by_local: bool = None,
+    detected_by_admin: bool = None,
+):
     """Move user from active checks to banned dict and update database.
     
     Args:
         user_id: The user ID to move
-        ban_reason: Optional reason for the ban
-        banned_by_admin_id: Optional admin ID who performed the ban
+        ban_reason: Human-readable reason for the ban
+        ban_source: Source of detection (lols/cas/p2p/local/admin/autoreport)
+        banned_by_admin_id: Admin ID who performed the ban (if manual)
+        banned_by_admin_username: Admin username
+        banned_in_chat_id: Chat where offense occurred
+        banned_in_chat_title: Chat title
+        offense_type: Type of offense:
+            - fast_message: Message within 10s of join
+            - spam_pattern: Matched spam dictionary
+            - bot_mention: Mentioned @...bot in message
+            - hidden_mentions: Used invisible chars in mentions
+            - forwarded_spam: Forwarded spam content
+            - channel_spam: Spam via linked channel
+            - high_id_spam: Very new account + spam indicators
+        offense_details: JSON with additional details
+        time_to_first_message: Seconds between join and first message
+        first_message_text: The offending message (truncated)
+        detected_by_*: Which systems flagged the user
     """
     if user_id in active_user_checks_dict:
         banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
-    # Update database
+    # Update database with full ban details
     update_user_baseline_status(
         CONN, user_id,
         monitoring_active=False,
         is_banned=True,
         ban_reason=ban_reason,
+        ban_source=ban_source,
         banned_by_admin_id=banned_by_admin_id,
+        banned_by_admin_username=banned_by_admin_username,
+        banned_in_chat_id=banned_in_chat_id,
+        banned_in_chat_title=banned_in_chat_title,
+        offense_type=offense_type,
+        offense_details=offense_details,
+        time_to_first_message=time_to_first_message,
+        first_message_text=first_message_text,
+        detected_by_lols=detected_by_lols,
+        detected_by_cas=detected_by_cas,
+        detected_by_p2p=detected_by_p2p,
+        detected_by_local=detected_by_local,
+        detected_by_admin=detected_by_admin,
     )
 
 # Dictionary to store running tasks by user ID

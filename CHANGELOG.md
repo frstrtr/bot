@@ -3,6 +3,15 @@
 ## [2025-12-01]
 
 ### Added
+- **Extended ban tracking in database**: Comprehensive ban details stored in `user_baselines`
+  - Ban source tracking: `lols`, `cas`, `p2p`, `local`, `admin`, `autoreport`
+  - Admin details: `banned_by_admin_id`, `banned_by_admin_username`
+  - Chat context: `banned_in_chat_id`, `banned_in_chat_title`
+  - Offense details: `offense_type`, `offense_details` (JSON), `first_message_text`
+  - Timing: `time_to_first_message` (seconds from join to first message)
+  - Detection flags: `detected_by_lols`, `detected_by_cas`, `detected_by_p2p`, `detected_by_local`, `detected_by_admin`
+  - Offense types: `fast_message`, `spam_pattern`, `bot_mention`, `hidden_mentions`, `forwarded_spam`, `channel_spam`, `high_id_spam`
+
 - **User baselines database integration**: Full integration of `user_baselines` table
   - Loads active monitoring from database on startup (with legacy file migration)
   - Saves baseline to DB when user joins chat

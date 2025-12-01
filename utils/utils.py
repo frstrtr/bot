@@ -476,7 +476,12 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-from aiogram.utils.exceptions import Unauthorized, BadRequest, RetryAfter
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+
+# Backward-compatible exception aliases
+Unauthorized = TelegramForbiddenError
+BadRequest = TelegramBadRequest
+RetryAfter = TelegramRetryAfter
 
 def initialize_logger(log_level="INFO"):
     """Initialize the logger."""

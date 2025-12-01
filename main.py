@@ -66,6 +66,29 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+
+class KeyboardBuilder(InlineKeyboardBuilder):
+    """Backward-compatible keyboard builder that mimics aiogram 2.x InlineKeyboardMarkup.
+    
+    In aiogram 2.x: KeyboardBuilder().add(btn1).add(btn2)
+    In aiogram 3.x: InlineKeyboardBuilder().add(btn1).add(btn2).as_markup()
+    
+    This class allows existing code using InlineKeyboardMarkup() with .add() to work
+    by returning self from add() and providing a way to get the final markup.
+    """
+    
+    def add(self, *buttons: InlineKeyboardButton) -> "KeyboardBuilder":
+        """Add buttons to a new row each. Returns self for chaining."""
+        for button in buttons:
+            super().row(button)
+        return self
+    
+    def row(self, *buttons: InlineKeyboardButton) -> "KeyboardBuilder":
+        """Add multiple buttons in the same row. Returns self for chaining."""
+        super().row(*buttons)
+        return self
+
+
 # load utilities
 from utils.utils import (
     initialize_logger,
@@ -1498,11 +1521,11 @@ async def handle_autoreports(
         log_info,
         LOGGER,
         parse_mode="HTML",
-        reply_markup=inline_kb,
+        reply_markup=inline_kb.as_markup(),
     )
 
     # Keyboard ban/cancel/confirm buttons
-    keyboard = InlineKeyboardMarkup()
+    keyboard = KeyboardBuilder()
     # Add LOLS check button
     lols_link = f"https://t.me/oLolsBot?start={user_id}"
     keyboard.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
@@ -1553,7 +1576,7 @@ async def handle_autoreports(
         ADMIN_GROUP_ID,
         admin_ban_banner,
         LOGGER,
-        reply_markup=keyboard,
+        reply_markup=keyboard.as_markup(),
         parse_mode="HTML",
         message_thread_id=ADMIN_AUTOREPORTS,
         disable_web_page_preview=True,
@@ -2081,7 +2104,7 @@ async def check_and_autoban(
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
@@ -2103,7 +2126,7 @@ async def check_and_autoban(
                 message_thread_id=ADMIN_MANBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             _norm_username_990 = normalize_username(user_name)
             if _norm_username_990 and _norm_username_990 not in POSTED_USERNAMES:
@@ -2160,7 +2183,7 @@ async def check_and_autoban(
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             _norm_username = normalize_username(user_name)
             if _norm_username and _norm_username not in POSTED_USERNAMES:
@@ -2223,7 +2246,7 @@ async def check_and_autoban(
             message_thread_id=ADMIN_MANBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
         if user_name and user_name != "!UNDEFINED!":
             _norm_username_1054 = normalize_username(user_name)
@@ -2342,7 +2365,7 @@ async def check_n_ban(message: Message, reason: str):
             )
         # send the telefrag log message to the admin group
         # Create keyboard with both LOLS check and Actions button
-        inline_kb = InlineKeyboardMarkup()
+        inline_kb = KeyboardBuilder()
         inline_kb.add(
             InlineKeyboardButton(
                 "ℹ️ Check Spam Data ℹ️",
@@ -2411,7 +2434,7 @@ async def check_n_ban(message: Message, reason: str):
             message_thread_id=ADMIN_AUTOBAN,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
         # Store the autoban state for Actions button to work
@@ -3662,7 +3685,7 @@ if __name__ == "__main__":
             message_thread_id=inout_thread,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
         # different colors for inout status
@@ -4145,7 +4168,7 @@ if __name__ == "__main__":
                         )
                     )
                     lols_url = build_lols_url(inout_userid)
-                    inline_kb = InlineKeyboardMarkup().add(
+                    inline_kb = KeyboardBuilder().add(
                         InlineKeyboardButton("Check user profile", url=lols_url)
                     )
                     joinleft_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -4156,7 +4179,7 @@ if __name__ == "__main__":
                         LOGGER,
                         message_thread_id=ADMIN_AUTOBAN,
                         parse_mode="HTML",
-                        reply_markup=inline_kb,
+                        reply_markup=inline_kb.as_markup(),
                         disable_web_page_preview=True,
                     )
                     _uname_1790 = normalize_username(
@@ -4511,11 +4534,11 @@ if __name__ == "__main__":
             technolog_info,
             LOGGER,
             parse_mode="HTML",
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
         # Keyboard ban/cancel/confirm buttons
-        keyboard = InlineKeyboardMarkup()
+        keyboard = KeyboardBuilder()
         # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
         actions_btn = InlineKeyboardButton(
             "⚙️ Actions (Ban / Delete) ⚙️",
@@ -4542,7 +4565,7 @@ if __name__ == "__main__":
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
                     LOGGER,
-                    reply_markup=keyboard,
+                    reply_markup=keyboard.as_markup(),
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
@@ -4554,7 +4577,7 @@ if __name__ == "__main__":
                     protect_content=True,
                     allow_sending_without_reply=True,
                     disable_web_page_preview=False,
-                    reply_markup=keyboard,
+                    reply_markup=keyboard.as_markup(),
                 )
 
                 # Store the admin action banner message data
@@ -4592,7 +4615,7 @@ if __name__ == "__main__":
                     ADMIN_GROUP_ID,
                     admin_ban_banner,
                     LOGGER,
-                    reply_markup=keyboard,
+                    reply_markup=keyboard.as_markup(),
                     parse_mode="HTML",
                     message_thread_id=ADMIN_AUTOREPORTS,
                     disable_web_page_preview=True,
@@ -4625,7 +4648,7 @@ if __name__ == "__main__":
                 #     await BOT.send_message(
                 #         ADMIN_GROUP_ID,
                 #         admin_ban_banner,
-                #         reply_markup=keyboard,
+                #         reply_markup=keyboard.as_markup(),
                 #         parse_mode="HTML",
                 #         message_thread_id=ADMIN_AUTOREPORTS,
                 #         disable_web_page_preview=True,
@@ -4722,7 +4745,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=keyboard,
+                reply_markup=keyboard.as_markup(),
             )
 
             if admin_group_banner_message:
@@ -4822,7 +4845,7 @@ if __name__ == "__main__":
                     f"Ad-hoc ban executed by {f'@{button_pressed_by}' if button_pressed_by else '!UNDEFINED!'}: User (<code>{author_id}</code>) banned across monitored chats.",
                     LOGGER,
                     parse_mode="HTML",
-                    reply_markup=lols_check_kb,
+                    reply_markup=lols_check_kb.as_markup(),
                     message_thread_id=callback_query.message.message_thread_id,
                     reply_to_message_id=callback_query.message.message_id,
                 )
@@ -5222,7 +5245,7 @@ if __name__ == "__main__":
                 LOGGER,
                 message_thread_id=callback_query.message.message_thread_id,
                 parse_mode="HTML",
-                reply_markup=lols_check_kb,
+                reply_markup=lols_check_kb.as_markup(),
                 reply_to_message_id=callback_query.message.message_id,
             )
             await safe_send_message(
@@ -5231,7 +5254,7 @@ if __name__ == "__main__":
                 f"Report <code>{report_id_to_ban}</code> action taken by {_admin_display}: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.\n{chan_ban_msg}",
                 LOGGER,
                 parse_mode="HTML",
-                reply_markup=lols_check_kb,
+                reply_markup=lols_check_kb.as_markup(),
             )
             _uname_3088 = normalize_username(forwarded_message_data[4])
             if _uname_3088 and _uname_3088 not in POSTED_USERNAMES:
@@ -5335,7 +5358,7 @@ if __name__ == "__main__":
             message_thread_id=callback_query.message.message_thread_id,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
             reply_to_message_id=callback_query.message.message_id,
         )
         await safe_send_message(
@@ -5347,7 +5370,7 @@ if __name__ == "__main__":
             LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
     @DP.callback_query(lambda c: c.data.startswith("banuser_"))
@@ -5382,7 +5405,7 @@ if __name__ == "__main__":
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=keyboard,
+            reply_markup=keyboard.as_markup(),
         )
 
         # Send confirmation message
@@ -5533,7 +5556,7 @@ if __name__ == "__main__":
 
         # Restore original buttons
         lols_url = f"https://t.me/oLolsBot?start={user_id}"
-        inline_kb = InlineKeyboardMarkup()
+        inline_kb = KeyboardBuilder()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
         inline_kb.add(
             InlineKeyboardButton("🚫 Ban User", callback_data=f"banuser_{user_id_str}")
@@ -5542,7 +5565,7 @@ if __name__ == "__main__":
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
         await callback_query.answer("Ban cancelled.", show_alert=False)
@@ -5562,7 +5585,7 @@ if __name__ == "__main__":
             LOGGER.debug("Could not answer callback: %s", answer_error)
 
         # Create confirmation keyboard
-        confirm_kb = InlineKeyboardMarkup()
+        confirm_kb = KeyboardBuilder()
         confirm_kb.row(
             InlineKeyboardButton(
                 "✅ Confirm Ban",
@@ -5579,7 +5602,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=confirm_kb,
+                reply_markup=confirm_kb.as_markup(),
             )
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not update buttons: %s", e)
@@ -5679,7 +5702,7 @@ if __name__ == "__main__":
             LOGGER.debug("Could not answer callback: %s", answer_error)
 
         # Restore original button
-        channel_ban_kb = InlineKeyboardMarkup()
+        channel_ban_kb = KeyboardBuilder()
         channel_ban_kb.add(
             InlineKeyboardButton(
                 "🚫 Ban Channel",
@@ -5691,7 +5714,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=channel_ban_kb,
+                reply_markup=channel_ban_kb.as_markup(),
             )
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not restore buttons: %s", e)
@@ -5742,7 +5765,7 @@ if __name__ == "__main__":
                     ]
                 )
                 # Create keyboard with LOLS check and Ban Channel buttons
-                channel_ban_kb = InlineKeyboardMarkup()
+                channel_ban_kb = KeyboardBuilder()
                 # Add LOLS check button for the channel
                 lols_url = f"https://t.me/oLolsBot?start={message.sender_chat.id}"
                 channel_ban_kb.add(
@@ -5777,7 +5800,7 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     message_thread_id=TECHNO_ORIGINALS,
                     disable_notification=True,
-                    reply_markup=channel_ban_kb,
+                    reply_markup=channel_ban_kb.as_markup(),
                 )
             except MessageIdInvalid as e:
                 LOGGER.error(
@@ -6141,7 +6164,7 @@ if __name__ == "__main__":
             )
             
             # Build keyboard with LOLS check for banned user and any mentioned users
-            autoban_kb = InlineKeyboardMarkup()
+            autoban_kb = KeyboardBuilder()
             autoban_kb.add(
                 InlineKeyboardButton(
                     "ℹ️ Check Spam Data ℹ️",
@@ -6188,7 +6211,7 @@ if __name__ == "__main__":
                 message_thread_id=ADMIN_AUTOBAN,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=autoban_kb,
+                reply_markup=autoban_kb.as_markup(),
             )
 
             # Check if message is forward from banned channel
@@ -7009,7 +7032,7 @@ if __name__ == "__main__":
                             f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}.\n🔗 <a href='{message_link}'>Original message</a>\nPlease check it out!",
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
-                            reply_markup=inline_kb,
+                            reply_markup=inline_kb.as_markup(),
                             parse_mode="HTML",
                             disable_web_page_preview=True,
                         )
@@ -7459,7 +7482,7 @@ if __name__ == "__main__":
                         full_message,
                         LOGGER,
                         message_thread_id=ADMIN_SUSPICIOUS,
-                        reply_markup=inline_kb,
+                        reply_markup=inline_kb.as_markup(),
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
@@ -7672,14 +7695,14 @@ if __name__ == "__main__":
             )
 
             lols_url = f"https://t.me/oLolsBot?start={author_id}"
-            lols_check_kb = InlineKeyboardMarkup().add(
+            lols_check_kb = KeyboardBuilder().add(
                 InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
             _display_user = f"@{user_name}" if user_name and str(user_name) not in ["None", "0"] else "!UNDEFINED!"
             await message.reply(
                 f"Action taken: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
-                reply_markup=lols_check_kb,
+                reply_markup=lols_check_kb.as_markup(),
             )
 
         except (sqlite3.Error, ValueError, TypeError) as e:
@@ -7702,7 +7725,7 @@ if __name__ == "__main__":
             parse_mode="HTML",
             disable_web_page_preview=True,
             message_thread_id=TECHNO_ADMIN,
-            reply_markup=lols_check_kb,
+            reply_markup=lols_check_kb.as_markup(),
         )
 
     @DP.message(Command("check"), F.chat.id == ADMIN_GROUP_ID)
@@ -7891,7 +7914,7 @@ if __name__ == "__main__":
                 )
         elif not whois_data.get("found"):
             # User not in DB - add LOLS check button
-            keyboard = InlineKeyboardMarkup()
+            keyboard = KeyboardBuilder()
             if user_id:
                 keyboard.add(
                     InlineKeyboardButton(
@@ -7915,7 +7938,7 @@ if __name__ == "__main__":
             LOGGER,
             parse_mode="HTML",
             disable_web_page_preview=True,
-            reply_markup=keyboard,
+            reply_markup=keyboard.as_markup(),
             reply_to_message_id=message.message_id,
             message_thread_id=thread_id,
         )
@@ -9147,7 +9170,7 @@ if __name__ == "__main__":
 
             # Confirm before broadcasting to all
             if len(target_chats) == len(CHANNEL_IDS) and len(target_chats) > 3:
-                confirm_kb = InlineKeyboardMarkup()
+                confirm_kb = KeyboardBuilder()
                 # Store broadcast text temporarily in callback data (limited to 64 bytes)
                 # For longer messages, we'll need a different approach
                 if len(broadcast_text) > 40:
@@ -9184,7 +9207,7 @@ if __name__ == "__main__":
                     f"You are about to send a message to <b>{len(target_chats)}</b> chats.\n\n"
                     f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>",
                     parse_mode="HTML",
-                    reply_markup=confirm_kb,
+                    reply_markup=confirm_kb.as_markup(),
                 )
                 return
 
@@ -9271,7 +9294,7 @@ if __name__ == "__main__":
                 # Mark as awaiting final confirmation
                 broadcast_data["awaiting_text_confirm"] = True
                 
-                cancel_kb = InlineKeyboardMarkup()
+                cancel_kb = KeyboardBuilder()
                 cancel_kb.add(
                     InlineKeyboardButton("❌ Cancel Broadcast", callback_data=f"broadcast_cancel_{broadcast_id}")
                 )
@@ -9285,7 +9308,7 @@ if __name__ == "__main__":
                     f"<code>CONFIRM BROADCAST {broadcast_id}</code>\n\n"
                     f"Or click Cancel below.",
                     parse_mode="HTML",
-                    reply_markup=cancel_kb,
+                    reply_markup=cancel_kb.as_markup(),
                 )
                 await callback_query.answer("Type confirmation phrase to proceed.")
                 return
@@ -9539,14 +9562,14 @@ if __name__ == "__main__":
 
         lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
 
-        inline_kb = InlineKeyboardMarkup()
+        inline_kb = KeyboardBuilder()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
         except Exception as e_edit:
             LOGGER.error(
@@ -9795,7 +9818,7 @@ if __name__ == "__main__":
                 ADMIN_USER_ID,
                 _reply_message,
                 LOGGER,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
                 parse_mode="HTML",
                 disable_web_page_preview=True,
             )
@@ -9945,7 +9968,7 @@ if __name__ == "__main__":
         # If user pressed global cancel/close in expanded actions menu, collapse back to original single Actions button layout
         if action_prefix == "suspiciouscancel":
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
-            collapsed_kb = InlineKeyboardMarkup()
+            collapsed_kb = KeyboardBuilder()
             collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             collapsed_kb.add(
                 InlineKeyboardButton(
@@ -9963,7 +9986,7 @@ if __name__ == "__main__":
                 await BOT.edit_message_reply_markup(
                     chat_id=callback_query.message.chat.id,
                     message_id=callback_query.message.message_id,
-                    reply_markup=collapsed_kb,
+                    reply_markup=collapsed_kb.as_markup(),
                 )
             except Exception as e:  # noqa
                 LOGGER.debug("Failed to collapse suspicious actions menu: %s", e)
@@ -9976,7 +9999,7 @@ if __name__ == "__main__":
             susp_message_id = int(susp_message_id_str)
             susp_chat_id = int(susp_chat_id_str)
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
-            expand_kb = InlineKeyboardMarkup()
+            expand_kb = KeyboardBuilder()
             expand_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             expand_kb.add(
                 InlineKeyboardButton(
@@ -10005,7 +10028,7 @@ if __name__ == "__main__":
                 await BOT.edit_message_reply_markup(
                     chat_id=callback_query.message.chat.id,
                     message_id=callback_query.message.message_id,
-                    reply_markup=expand_kb,
+                    reply_markup=expand_kb.as_markup(),
                 )
             except Exception as e:  # noqa
                 LOGGER.error("Failed to expand suspicious actions keyboard: %s", e)
@@ -10059,7 +10082,7 @@ if __name__ == "__main__":
         lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
 
         # Create the inline keyboard
-        inline_kb = InlineKeyboardMarkup()
+        inline_kb = KeyboardBuilder()
         inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         if comand == "globalban":
@@ -10077,7 +10100,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             return
         elif comand == "ban":
@@ -10095,7 +10118,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             return
         elif comand == "delmsg":
@@ -10113,7 +10136,7 @@ if __name__ == "__main__":
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=inline_kb,
+                reply_markup=inline_kb.as_markup(),
             )
             return
 
@@ -10121,7 +10144,7 @@ if __name__ == "__main__":
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=inline_kb,
+            reply_markup=inline_kb.as_markup(),
         )
 
         if comand == "confirmglobalban":
@@ -10511,7 +10534,7 @@ if __name__ == "__main__":
             LOGGER.info("Action cancelled by admin: @%s(%s)", admin_username, admin_id)
             callback_answer = "Action cancelled."
             # Restore the collapsed keyboard with all buttons
-            collapsed_kb = InlineKeyboardMarkup()
+            collapsed_kb = KeyboardBuilder()
             collapsed_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_link))
             collapsed_kb.add(
                 InlineKeyboardButton(
@@ -10529,7 +10552,7 @@ if __name__ == "__main__":
                 await BOT.edit_message_reply_markup(
                     chat_id=callback_query.message.chat.id,
                     message_id=callback_query.message.message_id,
-                    reply_markup=collapsed_kb,
+                    reply_markup=collapsed_kb.as_markup(),
                 )
             except Exception as e:
                 LOGGER.debug("Failed to restore collapsed keyboard after cancel: %s", e)

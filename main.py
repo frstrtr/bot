@@ -277,7 +277,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--log-level",
     type=str,
-    default="DEBUG",  # TODO for production
+    default="DEBUG",  # Note: for production
     choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     help="Set the logging level (default: INFO)",
 )
@@ -829,7 +829,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
             unban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
             continue
 
-    # TODO: Remove rogue chat from the p2p server report list?
+    # Note:: Remove rogue chat from the p2p server report list?
     # await unreport_spam(rogue_chat_id, LOGGER)
 
     if unban_rogue_chat_everywhere_error:
@@ -1200,7 +1200,7 @@ async def on_shutdown():
     # Run all tasks concurrently
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # TODO add messages deletion if spammer detected and have messages posted
+    # Note: add messages deletion if spammer detected and have messages posted
 
     # Process results and log any exceptions
     for task, result in zip(tasks, results):
@@ -1606,7 +1606,7 @@ async def spam_check(user_id):
     # https://api.lols.bot/account?id=
     # https://api.cas.chat/check?user_id=
     # http://127.0.0.1:8081/check?user_id=
-    # TODO implement prime_radiant local DB check
+    # Note: implement prime_radiant local DB check
     async with aiohttp.ClientSession() as session:
         lols = False
         cas = 0
@@ -1817,7 +1817,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         banned_users_dict[_id] = user_name
 
         # remove user from all known chats first
-        success_count, fail_count, total_count = await ban_user_from_all_chats(
+        _, _, _ = await ban_user_from_all_chats(
             _id, user_name, CHANNEL_IDS, CHANNEL_DICT
         )
 
@@ -2218,13 +2218,13 @@ async def check_and_autoban(
     ):  # Note: User is not in the lols database and was kicked/restricted by admin
 
         # perform_checks(user_id, user_name)
-        # TODO Add perform-checks coroutine!!!
-        # TODO check again if it is marked as SPAMMER already
+        # Note: Add perform-checks coroutine!!!
+        # Note: check again if it is marked as SPAMMER already
 
         # LOGGER.debug("inout_logmessage: %s", inout_logmessage)
         # LOGGER.debug("event_record: %s", event_record)
         # user is not spammer but kicked or restricted by admin
-        # TODO log admin name getting it from inout_logmessage
+        # Note: log admin name getting it from inout_logmessage
         admin_name = (
             inout_logmessage.split("by ", 1)[-1]
             .split("\n", 1)[0]
@@ -2513,7 +2513,7 @@ async def check_n_ban(message: Message, reason: str):
                 )
 
         # Note: Message may already be deleted by another bot or process
-        # TODO shift to delete_messages in aiogram 3.0
+        # Note: shift to delete_messages in aiogram 3.0
         try:
             await BOT.delete_message(message.chat.id, message.message_id)
         except TelegramBadRequest:
@@ -3333,7 +3333,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         len(active_user_checks_dict),
         active_user_checks_dict,
     )
-    # TODO move inout and daily_spam logs to the dedicated folders
+    # Note: move inout and daily_spam logs to the dedicated folders
     # save banned users list to the file
     # Get yesterday's date
     today = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
@@ -3516,7 +3516,7 @@ if __name__ == "__main__":
     # global unhandled_messages
     unhandled_messages = (
         {}
-    )  # TODO: Store in DB to preserve between sessions
+    )  # Note:: Store in DB to preserve between sessions
 
     # Load configuration values from the XML file
     # load_config()
@@ -3545,7 +3545,7 @@ if __name__ == "__main__":
         # Who did the action
         by_user = None
         # get photo upload date of the user profile with ID update.from_user.id
-        # TODO: get the photo upload date of the user profile
+        # Note:: get the photo upload date of the user profile
         # photo_date = await BOT.get_user_profile_photos(update.from_user.id)
         # await get_photo_details(update.from_user.id)  # Disabled for now
 
@@ -5227,7 +5227,7 @@ if __name__ == "__main__":
             else:
                 chan_ban_msg = ""
 
-            # TODO add the timestamp of the button press and how much time passed since
+            # Note: add the timestamp of the button press and how much time passed since
             # button_timestamp = datetime.now()
 
             lols_check_kb = make_lols_kb(author_id)
@@ -6853,7 +6853,7 @@ if __name__ == "__main__":
                     active_user_checks_dict[message.from_id][message_key] = message_link
 
                     # start the perform_checks coroutine
-                    # TODO need to delete the message if user is spammer
+                    # Note: need to delete the message if user is spammer
                     message_to_delete = message.chat.id, message.message_id
                     # Note: -100 prefix is required for supergroup API calls
                     LOGGER.info(
@@ -9508,7 +9508,7 @@ if __name__ == "__main__":
             )
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:  # TODO: Specify more specific exception types
+        except Exception as e:  # Note:: Specify more specific exception types
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 
@@ -9815,7 +9815,7 @@ if __name__ == "__main__":
             )
 
             # Store the mapping of unhandled message to admin's message
-            # TODO: Move unhandled_messages storage to DB
+            # Note:: Move unhandled_messages storage to DB
             unhandled_messages[admin_message.message_id] = [
                 message.chat.id,
                 message.message_id,
@@ -10660,26 +10660,26 @@ if __name__ == "__main__":
     # === BACKLOG / FUTURE IMPROVEMENTS ===
     #
     # Spam detection improvements:
-    # TODO: Hash banned spam messages and check signature for autoreport
-    # TODO: Extract and store links/channels from banned messages for auto-blacklist matching
+    # Note:: Hash banned spam messages and check signature for autoreport
+    # Note:: Extract and store links/channels from banned messages for auto-blacklist matching
     # NOTE: Messages from users with IDs > 8.2B are flagged as suspicious (very new accounts)
-    # TODO: Check for message edits and name changes after joining
-    # TODO: Check profile photo date/DC location - warn if just uploaded
+    # Note:: Check for message edits and name changes after joining
+    # Note:: Check profile photo date/DC location - warn if just uploaded
     #
     # Database improvements:
-    # TODO: Move all temp storage to DB (messages, banned IDs, bot_unhandled, active_checks)
-    # TODO: Fix database spammer store - use indexes instead of date
-    # TODO: Store banned channels list in DB
-    # TODO: Mark banned users in DB instead of file
-    # TODO: Store sender_chat/forward_from_chat for triple ID checking
+    # Note:: Move all temp storage to DB (messages, banned IDs, bot_unhandled, active_checks)
+    # Note:: Fix database spammer store - use indexes instead of date
+    # Note:: Store banned channels list in DB
+    # Note:: Mark banned users in DB instead of file
+    # Note:: Store sender_chat/forward_from_chat for triple ID checking
     #
     # Channel/Forward handling:
-    # TODO: Autoban rogue channels
-    # TODO: Manage forwards from banned users as spam
+    # Note:: Autoban rogue channels
+    # Note:: Manage forwards from banned users as spam
     #
     # Other:
-    # TODO: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
-    # TODO: Implement scheduler for chat closure at night
+    # Note:: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
+    # Note:: Implement scheduler for chat closure at night
     # NOTE: Admin can reply/send messages via /say, /reply, /broadcast commands
 
     # Uncomment this to get the chat ID of a group or channel

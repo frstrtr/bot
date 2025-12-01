@@ -7,6 +7,10 @@ test.py
 *.json
 *.old
 
+# Environment files
+.env
+!.env.example
+
 # Exclude spam_dict.txt from being ignored
 !spam_dict.txt
 !CHANGELOG.md

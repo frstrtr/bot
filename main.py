@@ -252,6 +252,7 @@ from utils.utils_config import (
     CHANNEL_DICT,
     ALLOWED_CONTENT_TYPES,
     TELEGRAM_CHANNEL_BOT_ID,
+    P2P_SERVER_URL,
 )
 
 # Parse command line arguments
@@ -1623,7 +1624,7 @@ async def spam_check(user_id):
     # Check if the user is in the lols bot database
     # https://api.lols.bot/account?id=
     # https://api.cas.chat/check?user_id=
-    # http://127.0.0.1:8081/check?user_id=
+    # P2P_SERVER_URL/check?user_id=
     # Note: implement prime_radiant local DB check
     session = get_http_session()
     lols = False
@@ -1633,7 +1634,7 @@ async def spam_check(user_id):
     async def check_local():
         try:
             async with session.get(
-                f"http://127.0.0.1:8081/check?user_id={user_id}", timeout=10
+                f"{P2P_SERVER_URL}/check?user_id={user_id}", timeout=10
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -6923,10 +6924,14 @@ if __name__ == "__main__":
 
             # FINALLY:
             ### SUSPICIOUS MESSAGE CHECKING ###
+            # Skip if we already sent a missed join notification for this message
             if (
                 not autoreport_sent
-                and message.from_user.id in active_user_checks_dict
-                or not (user_is_old or user_flagged_legit)
+                and not missed_join_notification_sent
+                and (
+                    message.from_user.id in active_user_checks_dict
+                    or not (user_is_old or user_flagged_legit)
+                )
             ):
                 # Ensure active_user_checks_dict[message.from_user.id] is a dictionary
                 if not isinstance(

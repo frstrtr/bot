@@ -9082,7 +9082,9 @@ if __name__ == "__main__":
         user_name_data = active_user_checks_dict.get(user_id_legit)
         user_name = "!UNDEFINED!"
         if isinstance(user_name_data, dict):
-            user_name = str(user_name_data.get("username", "!UNDEFINED!")).lstrip("@")
+            raw_username = user_name_data.get("username")
+            if raw_username and raw_username != "None" and str(raw_username) != "None":
+                user_name = str(raw_username).lstrip("@")
         elif isinstance(user_name_data, str):
             user_name = (
                 user_name_data.lstrip("@")
@@ -9107,7 +9109,7 @@ if __name__ == "__main__":
             )
 
         _admin_display = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
-        _user_display = f"@{user_name}" if user_name and user_name != "!UNDEFINED!" else "!UNDEFINED!"
+        _user_display = f"@{user_name}" if user_name and user_name not in ("!UNDEFINED!", "None") else "!UNDEFINED!"
         LOGGER.info(
             "\033[95m%s:%s Identified as a legit user by admin %s:%s!!! Future checks cancelled...\033[0m",
             user_id_legit,
@@ -9153,12 +9155,12 @@ if __name__ == "__main__":
                     task.cancel()
                     task_cancelled = True
                     LOGGER.info(
-                        f"Watchdog task for user {user_id_legit} (@{user_name}) cancelled by admin {admin_id}."
+                        f"Watchdog task for user {user_id_legit} ({_user_display}) cancelled by admin {admin_id}."
                     )
                     break
             if not task_cancelled:
                 LOGGER.warning(
-                    f"Watchdog task for user {user_id_legit} (@{user_name}) not found for cancellation, though user was in active_user_checks_dict."
+                    f"Watchdog task for user {user_id_legit} ({_user_display}) not found for cancellation, though user was in active_user_checks_dict."
                 )
 
             if len(active_user_checks_dict) > 3:

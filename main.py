@@ -7769,11 +7769,21 @@ if __name__ == "__main__":
     async def whois_user(message: types.Message):
         """Lookup comprehensive user data from database.
         
+        Only available in ADMIN_GROUP orders thread (TECHNO_ADMIN).
+        
         Usage:
             /whois 123456789  - lookup by user ID
             /whois @username  - lookup by username
         """
         try:
+            # Restrict to orders thread (TECHNO_ADMIN)
+            if message.message_thread_id != TECHNO_ADMIN:
+                await message.reply(
+                    "⚠️ This command is only available in the Orders thread.",
+                    parse_mode="HTML",
+                )
+                return
+            
             command_args = message.text.split()
             
             if len(command_args) < 2:
@@ -7816,13 +7826,28 @@ if __name__ == "__main__":
             
             # Perform the lookup
             whois_data = get_user_whois(CONN, user_id=user_id, username=username)
+            found_user_id = whois_data.get("user_id")
+            
+            # Check if user is admin in any monitored chat
+            admin_in_chats = []
+            if found_user_id:
+                for chat_id in CHANNEL_IDS:
+                    try:
+                        is_admin_there = await is_admin(found_user_id, chat_id)
+                        if is_admin_there:
+                            chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
+                            admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name})
+                    except Exception:
+                        pass  # User might not be in chat or bot has no access
+            
+            # Add admin info to whois_data
+            whois_data["admin_in_chats"] = admin_in_chats
             
             # Format and send response
             response_text = format_whois_response(whois_data)
             
             # Create keyboard with action buttons if user found
             keyboard = None
-            found_user_id = whois_data.get("user_id")
             if whois_data.get("found") and found_user_id:
                 keyboard = make_lols_kb(found_user_id)
                 # Add check button if not already monitoring
@@ -7869,6 +7894,7 @@ if __name__ == "__main__":
                 disable_web_page_preview=True,
                 reply_markup=keyboard,
                 reply_to_message_id=message.message_id,
+                message_thread_id=TECHNO_ADMIN,
             )
             
         except Exception as e:

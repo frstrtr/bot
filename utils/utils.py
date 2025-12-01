@@ -1706,11 +1706,47 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
         if len(chats) > 5:
             msg += f"   ... and {len(chats) - 5} more\n"
     
-    # Join/Leave events
+    # Admin status in monitored chats
+    admin_in_chats = data.get("admin_in_chats", [])
+    if admin_in_chats:
+        msg += f"\n👑 <b>Admin in {len(admin_in_chats)} chat(s):</b>\n"
+        for i, chat in enumerate(admin_in_chats[:5]):
+            prefix = "└" if i == len(admin_in_chats[:5]) - 1 else "├"
+            chat_disp = chat.get("chat_name") or str(chat.get("chat_id"))
+            msg += f"   {prefix} {html.escape(str(chat_disp))}\n"
+        if len(admin_in_chats) > 5:
+            msg += f"   ... and {len(admin_in_chats) - 5} more\n"
+    
+    # Join/Leave roaming history
     joins = data.get("join_events", [])
     leaves = data.get("leave_events", [])
     if joins or leaves:
-        msg += f"\n🚪 <b>Activity:</b> {len(joins)} join(s), {len(leaves)} leave(s)\n"
+        msg += f"\n🚪 <b>Roaming History:</b> ({len(joins)} join, {len(leaves)} leave)\n"
+        
+        # Combine and sort events by date
+        all_events = []
+        for j in joins:
+            all_events.append({"type": "➡️ JOIN", "date": j.get("date"), "chat": j.get("chat_title") or j.get("chat_username") or str(j.get("chat_id"))})
+        for l in leaves:
+            all_events.append({"type": "⬅️ LEFT", "date": l.get("date"), "chat": l.get("chat_title") or l.get("chat_username") or str(l.get("chat_id"))})
+        
+        # Sort by date descending (most recent first)
+        all_events.sort(key=lambda x: x.get("date") or "", reverse=True)
+        
+        # Show up to 10 most recent events
+        for i, event in enumerate(all_events[:10]):
+            prefix = "└" if i == len(all_events[:10]) - 1 else "├"
+            date_str = event.get("date", "?")
+            # Format date if it's a full datetime string
+            if date_str and len(str(date_str)) > 10:
+                try:
+                    date_str = str(date_str)[:16]  # "YYYY-MM-DD HH:MM"
+                except:
+                    pass
+            msg += f"   {prefix} {event['type']} {html.escape(str(event['chat']))} <i>({date_str})</i>\n"
+        
+        if len(all_events) > 10:
+            msg += f"   ... and {len(all_events) - 10} more events\n"
     
     # Ban details
     if baseline.get("is_banned"):

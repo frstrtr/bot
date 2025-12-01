@@ -4,11 +4,14 @@
 
 ### Added
 - **`/whois` command**: Comprehensive user lookup from database
+  - **Restricted to Orders thread (TECHNO_ADMIN)** in admin group only
   - Usage: `/whois 123456789` (by ID) or `/whois @username` (by username)
   - Shows: user ID, username, name, status badges (BANNED/LEGIT/MONITORING/PREMIUM)
   - Timeline: first seen, last seen, joined date, monitoring end date
   - Chats: list of chats where user was seen (up to 5 shown)
-  - Activity: join/leave event counts
+  - **Admin status**: Shows if user is admin in any monitored chats (👑 badge)
+  - **Roaming history**: Chronological join/leave events across monitored chats (up to 10 shown)
+    - Format: `➡️ JOIN ChatName (2025-12-01 14:30)` / `⬅️ LEFT ChatName (2025-12-01 15:00)`
   - Ban details (if banned): date, source (lols/cas/p2p/admin), offense type, reason, who banned, detection sources, time to first message
   - Profile links: ID-based, Android, iOS
   - External check: LOLS bot link

@@ -922,26 +922,47 @@ async def load_active_user_checks():
                 + str(user_id)
                 + " ❌ \t\t\tbanned everywhere during initial checks on_startup"
             )
-            # Start the check NON-BLOCKING
+            # Extract start_time from baseline if available (for resuming after restart)
+            start_time = None
             if isinstance(user_name, dict):
-                user_name = user_name.get("username") or "!UNDEFINED!"
+                baseline = user_name.get("baseline", {})
+                joined_at_str = baseline.get("joined_at")
+                if joined_at_str:
+                    try:
+                        start_time = datetime.strptime(joined_at_str, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        LOGGER.warning(
+                            "%s: Could not parse joined_at: %s", user_id, joined_at_str
+                        )
+                user_name_display = user_name.get("username") or "!UNDEFINED!"
             else:
-                user_name = user_name if user_name and user_name != "None" else "!UNDEFINED!"
+                user_name_display = user_name if user_name and user_name != "None" else "!UNDEFINED!"
+            # Start the check NON-BLOCKING
             asyncio.create_task(
                 perform_checks(
                     user_id=user_id,
-                    user_name=user_name,
+                    user_name=user_name_display,
                     event_record=event_message,
                     inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
+                    start_time=start_time,
                 )
             )
             # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
-            LOGGER.info(
-                "%s:%s loaded from file & %dhr monitoring started ...",
-                user_id,
-                format_username_for_log(user_name),
-                MONITORING_DURATION_HOURS,
-            )
+            if start_time:
+                elapsed_min = (datetime.now() - start_time).total_seconds() / 60
+                LOGGER.info(
+                    "%s:%s loaded from file, resuming from %.1f min elapsed ...",
+                    user_id,
+                    format_username_for_log(user_name_display),
+                    elapsed_min,
+                )
+            else:
+                LOGGER.info(
+                    "%s:%s loaded from file & %dhr monitoring started ...",
+                    user_id,
+                    format_username_for_log(user_name_display),
+                    MONITORING_DURATION_HOURS,
+                )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
         LOGGER.info(
@@ -2361,12 +2382,14 @@ async def perform_checks(
     user_id=None,
     inout_logmessage="",
     user_name="!UNDEFINED!",
+    start_time=None,  # Optional: when monitoring started (for resuming after restart)
 ):
     """Corutine to perform checks for spam and take action if necessary.
     param message_to_delete: tuple: chat_id, message_id: The message to delete.
     param event_record: str: The event record to log to inout file.
     param user_id: int: The ID of the user to check for spam.
     param inout_logmessage: str: The log message for the user's activity.
+    param start_time: datetime: When monitoring started (to resume after bot restart).
     """
 
     # immediate check
@@ -2383,7 +2406,7 @@ async def perform_checks(
 
     try:
 
-        # List of sleep times in seconds
+        # List of sleep times in seconds (cumulative from start)
         sleep_times = [
             65,  # 1 min
             185,  # 3 min
@@ -2399,12 +2422,47 @@ async def perform_checks(
             MONITORING_DURATION_HOURS * 3600 + 5,  # final check
         ]
 
+        # Calculate elapsed time if resuming after restart
+        elapsed_seconds = 0
+        if start_time:
+            elapsed_seconds = (datetime.now() - start_time).total_seconds()
+            if elapsed_seconds >= sleep_times[-1]:
+                # Monitoring period already completed
+                LOGGER.info(
+                    "%s:%s monitoring period already completed (%.1f hrs elapsed), removing from checks",
+                    user_id,
+                    format_username_for_log(user_name),
+                    elapsed_seconds / 3600,
+                )
+                if user_id in active_user_checks_dict:
+                    del active_user_checks_dict[user_id]
+                return
+            LOGGER.info(
+                "%s:%s resuming monitoring from %.1f min elapsed",
+                user_id,
+                format_username_for_log(user_name),
+                elapsed_seconds / 60,
+            )
+
         for sleep_time in sleep_times:
+            # Skip intervals that have already passed (when resuming)
+            if elapsed_seconds > 0 and sleep_time <= elapsed_seconds:
+                LOGGER.debug(
+                    "%s:%s skipping %02dmin check (already elapsed)",
+                    user_id,
+                    format_username_for_log(user_name),
+                    sleep_time // 60,
+                )
+                continue
+
+            # Calculate adjusted sleep time (subtract already elapsed time for first remaining interval)
+            adjusted_sleep = sleep_time - elapsed_seconds if elapsed_seconds > 0 else sleep_time
+            elapsed_seconds = 0  # Reset after first adjusted sleep
 
             if user_id not in active_user_checks_dict:  # if user banned somewhere else
                 return
 
-            await asyncio.sleep(sleep_time)
+            await asyncio.sleep(adjusted_sleep)
             lols_spam = await spam_check(user_id)
 
             # Get the color code based on the value of lols_spam

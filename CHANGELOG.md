@@ -3,6 +3,12 @@
 ## [2025-12-01]
 
 ### Added
+- **Persistent monitoring across restarts**: Monitoring timers now persist across bot restarts
+  - Extracts `joined_at` timestamp from stored baseline data
+  - Calculates elapsed time and skips past check intervals
+  - Resumes monitoring from correct position (not from beginning)
+  - Shows "resuming from X min elapsed" in startup logs
+
 - **Mention analysis in ban reports**: Autoreport and autoban banners now show mention statistics
   - Total mention count in message
   - Hidden mentions detection (mentions disguised with invisible characters)

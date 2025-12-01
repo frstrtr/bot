@@ -6226,94 +6226,119 @@ if __name__ == "__main__":
                     # This user might be a spammer who joined while bot wasn't watching
                     # Only send notification once per user (when first detected)
                     if should_notify_missed_join:
-                        _report_id = int(datetime.now().timestamp())
-                        _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
-                        _first_seen_date = user_first_message_date[0]
+                        # Check if user is in active monitoring AND message contains bot mention
+                        # If so, treat as autoreport instead of suspicious notification
+                        _has_bot_mention = False
+                        if message.entities and message.text:
+                            for entity in message.entities:
+                                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                                if entity_type == "mention":
+                                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                                    mention = message.text[offset:offset + length].lower()
+                                    if mention.endswith("bot"):
+                                        _has_bot_mention = True
+                                        break
                         
-                        # Build message link
-                        if message.chat.username:
-                            _msg_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                        # If user is being monitored and mentions a bot, send to autoreport instead
+                        if message.from_user.id in active_user_checks_dict and _has_bot_mention:
+                            LOGGER.info(
+                                "User %s:@%s is in active checks and mentioned a bot - sending to AUTOREPORT instead of SUSPICIOUS",
+                                message.from_user.id,
+                                message.from_user.username or "!UNDEFINED!",
+                            )
+                            await submit_autoreport(message, "Bot mention by monitored user (missed join)")
+                            missed_join_notification_sent = True
                         else:
-                            _chat_id_str = str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)
-                            _msg_link = f"https://t.me/c/{_chat_id_str}/{message.message_id}"
+                            # Regular missed join notification to ADMIN_SUSPICIOUS
+                            _report_id = int(datetime.now().timestamp())
+                            _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                            _first_seen_date = user_first_message_date[0]
                         
-                        _missed_join_message = (
-                            f"⚠️ <b>Missed Join Detected</b>\n"
-                            f"User: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} "
-                            f"(<code>{message.from_user.id}</code>)\n"
-                            f"Name: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
-                            f"Chat: {_chat_link_html}\n\n"
-                            f"📅 <b>First message seen:</b> {_first_seen_date}\n"
-                            f"ℹ️ Bot was offline when user joined - no join event recorded\n"
-                            f"🔗 <a href='{_msg_link}'>Current message</a>\n\n"
-                            f"🔗 <b>Profile links:</b>\n"
-                            f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
-                            f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
-                            f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
-                        )
-                        
-                        _missed_join_kb = make_lols_kb(message.from_user.id)
-                        _missed_join_kb.add(
-                            InlineKeyboardButton(
-                                "⚙️ Actions (Ban / Delete) ⚙️",
-                                callback_data=f"suspiciousactions_{message.chat.id}_{_report_id}_{message.from_user.id}",
+                            # Build message link
+                            if message.chat.username:
+                                _msg_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                            else:
+                                _chat_id_str = str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)
+                                _msg_link = f"https://t.me/c/{_chat_id_str}/{message.message_id}"
+                            
+                            _missed_join_message = (
+                                f"⚠️ <b>Missed Join Detected</b>\n"
+                                f"User: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} "
+                                f"(<code>{message.from_user.id}</code>)\n"
+                                f"Name: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                                f"Chat: {_chat_link_html}\n\n"
+                                f"📅 <b>First message seen:</b> {_first_seen_date}\n"
+                                f"ℹ️ Bot was offline when user joined - no join event recorded\n"
+                                f"🔗 <a href='{_msg_link}'>Current message</a>\n\n"
+                                f"🔗 <b>Profile links:</b>\n"
+                                f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
+                                f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
+                                f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
                             )
-                        )
-                        _missed_join_kb.add(
-                            InlineKeyboardButton(
-                                "✅ Mark as Legit",
-                                callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{_report_id}",
+                            
+                            _missed_join_kb = make_lols_kb(message.from_user.id)
+                            _missed_join_kb.add(
+                                InlineKeyboardButton(
+                                    "⚙️ Actions (Ban / Delete) ⚙️",
+                                    callback_data=f"suspiciousactions_{message.chat.id}_{_report_id}_{message.from_user.id}",
+                                )
                             )
-                        )
-                        
-                        # Add mention check buttons if message has mentions
-                        mention_analysis = analyze_mentions_in_message(message)
-                        for mention_type, mention_value, display_name in mention_analysis["mentions"]:
-                            if mention_type == "username":
-                                mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
-                                _missed_join_kb.add(
-                                    InlineKeyboardButton(f"🔍 Check @{mention_value}", url=mention_lols_link)
+                            _missed_join_kb.add(
+                                InlineKeyboardButton(
+                                    "✅ Mark as Legit",
+                                    callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{_report_id}",
                                 )
-                            elif mention_type == "user_id":
-                                mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
-                                _missed_join_kb.add(
-                                    InlineKeyboardButton(f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
+                            )
+                            
+                            # Add mention check buttons if message has mentions
+                            mention_analysis = analyze_mentions_in_message(message)
+                            for mention_type, mention_value, display_name in mention_analysis["mentions"]:
+                                if mention_type == "username":
+                                    mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
+                                    _missed_join_kb.add(
+                                        InlineKeyboardButton(f"🔍 Check @{mention_value}", url=mention_lols_link)
+                                    )
+                                elif mention_type == "user_id":
+                                    mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
+                                    _missed_join_kb.add(
+                                        InlineKeyboardButton(f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
+                                    )
+                            
+                            # Add mention info to message if needed
+                            if mention_analysis["has_more"] or mention_analysis["hidden_mentions"]:
+                                if mention_analysis["has_more"]:
+                                    _missed_join_message += f"\n⚠️ <b>{mention_analysis['total_count']} mentions found</b> (showing first 3)"
+                                if mention_analysis["hidden_mentions"]:
+                                    hidden_list = ", ".join(mention_analysis["hidden_mentions"][:5])
+                                    _missed_join_message += f"\n🕵️ <b>Hidden mentions:</b> {hidden_list}"
+                            
+                            # Forward the message first
+                            try:
+                                await message.forward(
+                                    ADMIN_GROUP_ID,
+                                    ADMIN_SUSPICIOUS,
+                                    disable_notification=True,
                                 )
-                        
-                        # Add mention info to message if needed
-                        if mention_analysis["has_more"] or mention_analysis["hidden_mentions"]:
-                            if mention_analysis["has_more"]:
-                                _missed_join_message += f"\n⚠️ <b>{mention_analysis['total_count']} mentions found</b> (showing first 3)"
-                            if mention_analysis["hidden_mentions"]:
-                                hidden_list = ", ".join(mention_analysis["hidden_mentions"][:5])
-                                _missed_join_message += f"\n🕵️ <b>Hidden mentions:</b> {hidden_list}"
-                        
-                        # Forward the message first
-                        try:
-                            await message.forward(
+                            except Exception as fwd_err:
+                                LOGGER.warning("Failed to forward message for missed join: %s", fwd_err)
+                            
+                            await safe_send_message(
+                                BOT,
                                 ADMIN_GROUP_ID,
-                                ADMIN_SUSPICIOUS,
-                                disable_notification=True,
+                                _missed_join_message,
+                                LOGGER,
+                                message_thread_id=ADMIN_SUSPICIOUS,
+                                parse_mode="HTML",
+                                disable_web_page_preview=True,
+                                reply_markup=_missed_join_kb,
                             )
-                        except Exception as fwd_err:
-                            LOGGER.warning("Failed to forward message for missed join: %s", fwd_err)
-                        
-                        await safe_send_message(
-                            BOT,
-                            ADMIN_GROUP_ID,
-                            _missed_join_message,
-                            LOGGER,
-                            message_thread_id=ADMIN_SUSPICIOUS,
-                            parse_mode="HTML",
-                            disable_web_page_preview=True,
-                            reply_markup=_missed_join_kb,
-                        )
-                        missed_join_notification_sent = True
-                        LOGGER.info(
-                            "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
-                            message.from_user.id,
-                            message.from_user.username or "!NO_USERNAME!",
-                        )
+                            missed_join_notification_sent = True
+                            LOGGER.info(
+                                "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
+                                message.from_user.id,
+                                message.from_user.username or "!NO_USERNAME!",
+                            )
                 else:
                     # No records at all - this is their first interaction we've seen
                     # Treat as unknown (new) - safer to check them

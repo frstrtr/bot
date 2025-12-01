@@ -948,21 +948,12 @@ async def load_active_user_checks():
                 )
             )
             # Format username for logging: @username or !UNDEFINED! (no @ for undefined)
-            if start_time:
-                elapsed_min = (datetime.now() - start_time).total_seconds() / 60
-                LOGGER.info(
-                    "%s:%s loaded from file, resuming from %.1f min elapsed ...",
-                    user_id,
-                    format_username_for_log(user_name_display),
-                    elapsed_min,
-                )
-            else:
-                LOGGER.info(
-                    "%s:%s loaded from file & %dhr monitoring started ...",
-                    user_id,
-                    format_username_for_log(user_name_display),
-                    MONITORING_DURATION_HOURS,
-                )
+            LOGGER.info(
+                "%s:%s loaded from file%s",
+                user_id,
+                format_username_for_log(user_name_display),
+                "" if start_time else f", {MONITORING_DURATION_HOURS}hr monitoring started",
+            )
             # Insert a 1-second interval between task creations
             await asyncio.sleep(1)
         LOGGER.info(
@@ -2424,6 +2415,7 @@ async def perform_checks(
 
         # Calculate elapsed time if resuming after restart
         elapsed_seconds = 0
+        skipped_intervals = []
         if start_time:
             elapsed_seconds = (datetime.now() - start_time).total_seconds()
             if elapsed_seconds >= sleep_times[-1]:
@@ -2437,22 +2429,29 @@ async def perform_checks(
                 if user_id in active_user_checks_dict:
                     del active_user_checks_dict[user_id]
                 return
-            LOGGER.info(
-                "%s:%s resuming monitoring from %.1f min elapsed",
-                user_id,
-                format_username_for_log(user_name),
-                elapsed_seconds / 60,
-            )
+            # Collect skipped intervals for single log line
+            for st in sleep_times:
+                if st <= elapsed_seconds:
+                    skipped_intervals.append(f"{st // 60}min")
+            if skipped_intervals:
+                LOGGER.info(
+                    "%s:%s resuming from %.1f min, skipped: %s",
+                    user_id,
+                    format_username_for_log(user_name),
+                    elapsed_seconds / 60,
+                    ", ".join(skipped_intervals),
+                )
+            else:
+                LOGGER.info(
+                    "%s:%s resuming monitoring from %.1f min elapsed",
+                    user_id,
+                    format_username_for_log(user_name),
+                    elapsed_seconds / 60,
+                )
 
         for sleep_time in sleep_times:
             # Skip intervals that have already passed (when resuming)
             if elapsed_seconds > 0 and sleep_time <= elapsed_seconds:
-                LOGGER.debug(
-                    "%s:%s skipping %02dmin check (already elapsed)",
-                    user_id,
-                    format_username_for_log(user_name),
-                    sleep_time // 60,
-                )
                 continue
 
             # Calculate adjusted sleep time (subtract already elapsed time for first remaining interval)

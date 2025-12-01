@@ -1,6 +1,9 @@
 import xml.etree.ElementTree as ET
 import os
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ContentType
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 import logging
 
 # Initialize logger
@@ -54,25 +57,25 @@ def load_config():
     global API_TOKEN, TELEGRAM_CHANNEL_BOT_ID
 
     ALLOWED_CONTENT_TYPES = [
-        types.ContentType.TEXT,
-        types.ContentType.AUDIO,
-        types.ContentType.DOCUMENT,
-        types.ContentType.GAME,
-        types.ContentType.PHOTO,
-        types.ContentType.STICKER,
-        types.ContentType.VIDEO,
-        types.ContentType.VIDEO_NOTE,
-        types.ContentType.VOICE,
-        types.ContentType.CONTACT,
-        types.ContentType.LOCATION,
-        types.ContentType.VENUE,
-        types.ContentType.POLL,
-        types.ContentType.DICE,
-        types.ContentType.INVOICE,
-        types.ContentType.SUCCESSFUL_PAYMENT,
-        types.ContentType.CONNECTED_WEBSITE,
-        types.ContentType.MIGRATE_TO_CHAT_ID,
-        types.ContentType.MIGRATE_FROM_CHAT_ID,
+        ContentType.TEXT,
+        ContentType.AUDIO,
+        ContentType.DOCUMENT,
+        ContentType.GAME,
+        ContentType.PHOTO,
+        ContentType.STICKER,
+        ContentType.VIDEO,
+        ContentType.VIDEO_NOTE,
+        ContentType.VOICE,
+        ContentType.CONTACT,
+        ContentType.LOCATION,
+        ContentType.VENUE,
+        ContentType.POLL,
+        ContentType.DICE,
+        ContentType.INVOICE,
+        ContentType.SUCCESSFUL_PAYMENT,
+        ContentType.CONNECTED_WEBSITE,
+        ContentType.MIGRATE_TO_CHAT_ID,
+        ContentType.MIGRATE_FROM_CHAT_ID,
     ]
 
     try:
@@ -148,8 +151,11 @@ def load_config():
         TECHNOLOG_GROUP = config_XML_root.find("techno_log_group").text
         TECHNOLOG_GROUP_NAME = config_XML_root.find("techno_log_group_name").text
 
-        BOT = Bot(token=API_TOKEN)
-        DP = Dispatcher(BOT)
+        BOT = Bot(
+            token=API_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+        DP = Dispatcher()
         DP["forwarded_reports_states"] = {}
         ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 

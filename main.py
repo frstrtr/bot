@@ -29,7 +29,32 @@ import aiocron
 from zoneinfo import ZoneInfo
 
 import aiohttp
-from aiogram import Dispatcher, types
+from aiogram import Dispatcher, Router, F
+from aiogram import types
+from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
+from aiogram.enums import ChatMemberStatus, ChatType
+from aiogram.filters import Command, CommandStart
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramRetryAfter,
+    TelegramNotFound,
+)
+
+# Backward compatible exception aliases for aiogram 2.x -> 3.x migration
+# In aiogram 3.x, exceptions are classified by HTTP status code, not by message
+BadRequest = TelegramBadRequest
+MessageToDeleteNotFound = TelegramBadRequest
+MessageCantBeDeleted = TelegramBadRequest
+MessageCantBeForwarded = TelegramBadRequest
+MessageToForwardNotFound = TelegramBadRequest
+MessageIdInvalid = TelegramBadRequest
+MessageNotModified = TelegramBadRequest
+InvalidQueryID = TelegramBadRequest
+ChatNotFound = TelegramNotFound
+Unauthorized = TelegramForbiddenError
+ChatAdminRequired = TelegramForbiddenError
+RetryAfter = TelegramRetryAfter
 
 # import requests
 # from PIL import Image
@@ -38,29 +63,8 @@ from aiogram import Dispatcher, types
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    CallbackQuery,
-    ChatMemberStatus,
-    # ChatActions,  # for banchan actions
 )
-
-from aiogram import executor
-
-# from aiogram.types import Message
-from aiogram.utils.exceptions import (
-    MessageToDeleteNotFound,
-    MessageCantBeDeleted,
-    MessageCantBeForwarded,
-    RetryAfter,
-    BadRequest,
-    ChatNotFound,
-    MessageToForwardNotFound,
-    MessageIdInvalid,
-    ChatAdminRequired,
-    Unauthorized,
-    MessageNotModified,
-    InvalidQueryID,
-    # BotKicked,
-)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # load utilities
 from utils.utils import (
@@ -286,12 +290,12 @@ chat_username_cache: dict[int, str | None] = {}
 autoreported_messages: set[tuple[int, int]] = set()
 
 
-def was_autoreported(message: types.Message) -> bool:
+def was_autoreported(message: Message) -> bool:
     """Check if a message was already sent to autoreport thread."""
     return (message.chat.id, message.message_id) in autoreported_messages
 
 
-def clear_autoreport_tracking(message: types.Message):
+def clear_autoreport_tracking(message: Message):
     """Clear autoreport tracking for a message after processing is complete."""
     autoreported_messages.discard((message.chat.id, message.message_id))
 
@@ -561,7 +565,7 @@ def get_spammer_details(
     return result
 
 
-async def submit_autoreport(message: types.Message, reason):
+async def submit_autoreport(message: Message, reason):
     """Function to take heuristically invoked action on the message."""
 
     LOGGER.info(
@@ -613,7 +617,7 @@ async def submit_autoreport(message: types.Message, reason):
     return True
 
 
-async def on_startup(_dp: Dispatcher):
+async def on_startup():
     """Function to handle the bot startup."""
     _commit_info = get_latest_commit_info(LOGGER)
 
@@ -1142,7 +1146,7 @@ async def sequential_shutdown_tasks(_id, _uname):
     )
 
 
-async def on_shutdown(_dp):
+async def on_shutdown():
     """Function to handle the bot shutdown."""
     LOGGER.info(
         "\033[95mBot is shutting down... Performing final spammer check...\033[0m"
@@ -1275,7 +1279,7 @@ async def is_admin(reporter_user_id: int, admin_group_id_check: int) -> bool:
 
 
 async def handle_autoreports(
-    message: types.Message,
+    message: Message,
     spammer_id: int,
     spammer_first_name: str,
     spammer_last_name: str,
@@ -2242,10 +2246,10 @@ async def check_and_autoban(
     return False
 
 
-async def check_n_ban(message: types.Message, reason: str):
+async def check_n_ban(message: Message, reason: str):
     """ "Helper function to check for spam and take action if necessary if heuristics check finds it suspicious.
 
-    message: types.Message: The message to check for spam.
+    message: Message: The message to check for spam.
 
     reason: str: The reason for the check.
     """
@@ -3507,8 +3511,8 @@ if __name__ == "__main__":
     )
     LOGGER.info("\n")
 
-    @DP.chat_member_handler(is_not_bot_action)  # exclude bot's own actions
-    async def greet_chat_members(update: types.ChatMemberUpdated):
+    @DP.chat_member(is_not_bot_action)  # exclude bot's own actions
+    async def greet_chat_members(update: ChatMemberUpdated):
         """Checks for change in the chat members statuses and check if they are spammers."""
         # Update chat username cache
         update_chat_username_cache(update.chat.id, update.chat.username)
@@ -4192,11 +4196,8 @@ if __name__ == "__main__":
                         _e,
                     )
 
-    @DP.message_handler(
-        is_forwarded_from_unknown_channel_message,
-        content_types=types.ContentTypes.ANY,
-    )
-    async def handle_forwarded_reports(message: types.Message):
+    @DP.message(is_forwarded_from_unknown_channel_message)
+    async def handle_forwarded_reports(message: Message):
         """Function to handle forwarded messages."""
 
         reported_spam = format_spam_report(message)
@@ -4654,7 +4655,7 @@ if __name__ == "__main__":
                 "Error while sending the banner to the admin group. Please check the logs."
             )
 
-    @DP.callback_query_handler(
+    @DP.callback_query(
         lambda c: c.data.startswith("confirmban_")
     )  # MODIFIED: Renamed callback prefix
     async def ask_confirmation(callback_query: CallbackQuery):
@@ -4764,7 +4765,7 @@ if __name__ == "__main__":
                 e,
             )
 
-    @DP.callback_query_handler(
+    @DP.callback_query(
         lambda c: c.data.startswith("doban_")
     )  # MODIFIED: Renamed callback prefix
     async def handle_ban(callback_query: CallbackQuery):
@@ -4827,7 +4828,7 @@ if __name__ == "__main__":
                 )
                 return
 
-            original_spam_message: types.Message = forwarded_report_state.get(
+            original_spam_message: Message = forwarded_report_state.get(
                 "original_forwarded_message"
             )
             CURSOR.execute(
@@ -5288,7 +5289,7 @@ if __name__ == "__main__":
             message_thread_id=TECHNO_ADMIN,
         )
 
-    @DP.callback_query_handler(
+    @DP.callback_query(
         lambda c: c.data.startswith("resetban_")
     )  # MODIFIED: Renamed callback prefix
     async def reset_ban(callback_query: CallbackQuery):
@@ -5349,7 +5350,7 @@ if __name__ == "__main__":
             reply_markup=inline_kb,
         )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("banuser_"))
+    @DP.callback_query(lambda c: c.data.startswith("banuser_"))
     async def ask_ban_confirmation(callback_query: CallbackQuery):
         """Function to ask for confirmation before banning the user from all chats."""
         # Parse user_id from callback data
@@ -5389,7 +5390,7 @@ if __name__ == "__main__":
         #     f"Confirm ban for {display_name} (@{username})?", show_alert=True
         # )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("confirmbanuser_"))
+    @DP.callback_query(lambda c: c.data.startswith("confirmbanuser_"))
     async def handle_user_inout_ban(callback_query: CallbackQuery):
         """Function to ban the user from all chats."""
         # Parse user_id from callback data
@@ -5522,7 +5523,7 @@ if __name__ == "__main__":
                 message_thread_id=TECHNO_ADMIN,
             )
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("cancelbanuser_"))
+    @DP.callback_query(lambda c: c.data.startswith("cancelbanuser_"))
     async def cancel_user_ban(callback_query: CallbackQuery):
         """Function to cancel the ban and restore original buttons."""
         # Parse user_id from callback data
@@ -5546,7 +5547,7 @@ if __name__ == "__main__":
 
         await callback_query.answer("Ban cancelled.", show_alert=False)
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelconfirm_"))
+    @DP.callback_query(lambda c: c.data.startswith("banchannelconfirm_"))
     async def ban_channel_confirm(callback_query: CallbackQuery):
         """Function to show confirmation buttons for channel ban."""
         # Parse channel_id and source_chat_id from callback data
@@ -5583,7 +5584,7 @@ if __name__ == "__main__":
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not update buttons: %s", e)
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelexecute_"))
+    @DP.callback_query(lambda c: c.data.startswith("banchannelexecute_"))
     async def ban_channel_execute(callback_query: CallbackQuery):
         """Function to execute the channel ban."""
         # Parse channel_id from callback data
@@ -5663,7 +5664,7 @@ if __name__ == "__main__":
         except Exception as e:
             LOGGER.error("Failed to execute channel ban for %s: %s", channel_id, e)
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("banchannelcancel_"))
+    @DP.callback_query(lambda c: c.data.startswith("banchannelcancel_"))
     async def ban_channel_cancel(callback_query: CallbackQuery):
         """Function to cancel the channel ban."""
         # Parse channel_id from callback data
@@ -5695,11 +5696,8 @@ if __name__ == "__main__":
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not restore buttons: %s", e)
 
-    @DP.message_handler(
-        is_in_monitored_channel,
-        content_types=ALLOWED_CONTENT_TYPES,
-    )
-    async def store_recent_messages(message: types.Message):
+    @DP.message(is_in_monitored_channel)
+    async def store_recent_messages(message: Message):
         """Function to store recent messages in the database.
         And check senders for spam records."""
 
@@ -7476,9 +7474,9 @@ if __name__ == "__main__":
                 e,
             )
 
-    @DP.message_handler(commands=["ban"], chat_id=ADMIN_GROUP_ID)
+    @DP.message(Command("ban"), F.chat.id == ADMIN_GROUP_ID)
     # NOTE: Manual typing command ban - useful if ban were postponed
-    async def ban(message: types.Message):
+    async def ban(message: Message):
         """Function to ban the user and delete all known to bot messages using '/ban reportID' text command."""
         try:
             # logger.debug("ban triggered.")
@@ -7707,8 +7705,8 @@ if __name__ == "__main__":
             reply_markup=lols_check_kb,
         )
 
-    @DP.message_handler(commands=["check"], chat_id=ADMIN_GROUP_ID)
-    async def check_user(message: types.Message):
+    @DP.message(Command("check"), F.chat.id == ADMIN_GROUP_ID)
+    async def check_user(message: Message):
         """Function to start lols_cas check coroutine to monitor user for spam."""
         try:
             command_args = message.text.split()
@@ -7765,8 +7763,8 @@ if __name__ == "__main__":
             LOGGER.error("Error in check_user: %s", e)
             await message.reply("An error occurred while trying to check the user.")
 
-    @DP.message_handler(commands=["whois"], chat_id=ADMIN_GROUP_ID)
-    async def whois_user(message: types.Message):
+    @DP.message(Command("whois"), F.chat.id == ADMIN_GROUP_ID)
+    async def whois_user(message: Message):
         """Lookup comprehensive user data from database.
         
         Available in:
@@ -7792,8 +7790,8 @@ if __name__ == "__main__":
             LOGGER.error("Error in whois_user: %s", e)
             await message.reply("An error occurred while looking up user data.")
 
-    @DP.message_handler(commands=["whois"], chat_type=types.ChatType.PRIVATE, user_id=ADMIN_USER_ID)
-    async def whois_user_superadmin(message: types.Message):
+    @DP.message(Command("whois"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def whois_user_superadmin(message: Message):
         """Lookup comprehensive user data - superadmin private chat version."""
         try:
             await _perform_whois_lookup(message, thread_id=None)
@@ -7801,7 +7799,7 @@ if __name__ == "__main__":
             LOGGER.error("Error in whois_user_superadmin: %s", e)
             await message.reply("An error occurred while looking up user data.")
 
-    async def _perform_whois_lookup(message: types.Message, thread_id: int = None):
+    async def _perform_whois_lookup(message: Message, thread_id: int = None):
         """Shared whois lookup logic for both admin group and superadmin DM.
         
         Args:
@@ -7922,8 +7920,8 @@ if __name__ == "__main__":
             message_thread_id=thread_id,
         )
 
-    @DP.message_handler(commands=["delmsg"], chat_id=ADMIN_GROUP_ID)
-    async def delete_message(message: types.Message):
+    @DP.message(Command("delmsg"), F.chat.id == ADMIN_GROUP_ID)
+    async def delete_message(message: Message):
         """Function to delete the message by its link."""
         try:
             command_args = message.text.split()
@@ -8047,8 +8045,9 @@ if __name__ == "__main__":
             LOGGER.error("Error in delete_message: %s", e)
             await message.reply("An error occurred while trying to delete the message.")
 
-    @DP.message_handler(commands=["banchan", "unbanchan"], chat_id=ADMIN_GROUP_ID)
-    async def manage_channel(message: types.Message):
+    @DP.message(Command("banchan"), F.chat.id == ADMIN_GROUP_ID)
+    @DP.message(Command("unbanchan"), F.chat.id == ADMIN_GROUP_ID)
+    async def manage_channel(message: Message):
         """Function to ban or unban a channel by its id."""
         command = message.text.split()[0].lower()
         action = "ban" if command == "/banchan" else "unban"
@@ -8221,13 +8220,13 @@ if __name__ == "__main__":
             await message.reply(str(ve))
             LOGGER.error("No channel ID provided!")
 
-    @DP.message_handler(commands=["loglists"], chat_id=ADMIN_GROUP_ID)
-    async def log_lists_handler(message: types.Message):
+    @DP.message(Command("loglists"), F.chat.id == ADMIN_GROUP_ID)
+    async def log_lists_handler(message: Message):
         """Function to log active checks and banned users dict."""
         await log_lists(message.chat.id, message.message_thread_id)
 
     # Helper to check if message is from superadmin in allowed location
-    def is_superadmin_context(message: types.Message) -> bool:
+    def is_superadmin_context(message: Message) -> bool:
         """Check if message is from superadmin in private chat or superadmin group."""
         if message.from_user.id != ADMIN_USER_ID:
             return False
@@ -8240,7 +8239,7 @@ if __name__ == "__main__":
         return False
 
     # Lambda for handlers - checks superadmin in private chat OR superadmin group
-    def superadmin_filter(m: types.Message) -> bool:
+    def superadmin_filter(m: Message) -> bool:
         """Filter for superadmin commands - private chat or superadmin group."""
         if m.from_user.id != ADMIN_USER_ID:
             return False
@@ -8250,8 +8249,9 @@ if __name__ == "__main__":
             return True
         return False
 
-    @DP.message_handler(superadmin_filter, commands=["help", "adminhelp"])
-    async def superadmin_help(message: types.Message):
+    @DP.message(superadmin_filter, Command("help"))
+    @DP.message(superadmin_filter, Command("adminhelp"))
+    async def superadmin_help(message: Message):
         """Show help for superadmin communication commands.
         
         NOTE: Only available to superadmin in private chat.
@@ -8313,8 +8313,8 @@ if __name__ == "__main__":
         await message.reply(help_text_1, parse_mode="HTML")
         await message.reply(help_text_2, parse_mode="HTML")
 
-    @DP.message_handler(superadmin_filter, commands=["say"])
-    async def say_to_chat(message: types.Message):
+    @DP.message(superadmin_filter, Command("say"))
+    async def say_to_chat(message: Message):
         """Send a message to a specific chat as the bot.
         
         Usage: /say <chat_id_or_link> <message>
@@ -8585,8 +8585,8 @@ if __name__ == "__main__":
             LOGGER.error("%s:%s Error in say_to_chat: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(superadmin_filter, commands=["reply"])
-    async def reply_to_message(message: types.Message):
+    @DP.message(superadmin_filter, Command("reply"))
+    async def reply_to_message(message: Message):
         """Reply to a specific message in a chat as the bot.
         
         Usage: /reply <message_link> <reply_text>
@@ -8723,8 +8723,8 @@ if __name__ == "__main__":
         
         return chat_id, thread_id
 
-    @DP.message_handler(superadmin_filter, commands=["forward"])
-    async def forward_message_cmd(message: types.Message):
+    @DP.message(superadmin_filter, Command("forward"))
+    async def forward_message_cmd(message: Message):
         """Forward a message to a target chat (shows 'Forwarded from' header).
         
         Usage: /forward <message_link> <target>
@@ -8908,8 +8908,8 @@ if __name__ == "__main__":
             LOGGER.error("%s:%s Error in forward_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(superadmin_filter, commands=["copy"])
-    async def copy_message_cmd(message: types.Message):
+    @DP.message(superadmin_filter, Command("copy"))
+    async def copy_message_cmd(message: Message):
         """Copy a message to a target chat (no 'Forwarded from' header).
         
         Usage: /copy <message_link> <target>
@@ -9081,8 +9081,8 @@ if __name__ == "__main__":
             LOGGER.error("%s:%s Error in copy_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(superadmin_filter, commands=["broadcast"])
-    async def broadcast_message(message: types.Message):
+    @DP.message(superadmin_filter, Command("broadcast"))
+    async def broadcast_message(message: Message):
         """Broadcast a message to all or selected monitored chats.
         
         Usage: /broadcast <message>              - Send to ALL monitored chats
@@ -9237,7 +9237,7 @@ if __name__ == "__main__":
             LOGGER.error("%s:%s Error in broadcast_message: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("broadcast_"))
+    @DP.callback_query(lambda c: c.data.startswith("broadcast_"))
     async def handle_broadcast_callback(callback_query: CallbackQuery):
         """Handle broadcast confirmation/cancellation."""
         try:
@@ -9297,8 +9297,8 @@ if __name__ == "__main__":
             LOGGER.error("Error in handle_broadcast_callback: %s", e)
             await callback_query.answer(f"Error: {e}", show_alert=True)
 
-    @DP.message_handler(lambda m: superadmin_filter(m) and m.text and m.text.startswith("CONFIRM BROADCAST"))
-    async def handle_broadcast_text_confirm(message: types.Message):
+    @DP.message(lambda m: superadmin_filter(m) and m.text and m.text.startswith("CONFIRM BROADCAST"))
+    async def handle_broadcast_text_confirm(message: Message):
         """Handle text confirmation for broadcast."""
         try:
             # Parse: CONFIRM BROADCAST <broadcast_id>
@@ -9380,8 +9380,8 @@ if __name__ == "__main__":
             LOGGER.error("%s:%s Error in handle_broadcast_text_confirm: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(commands=["unban"], chat_id=ADMIN_GROUP_ID)
-    async def unban_user(message: types.Message):
+    @DP.message(Command("unban"), F.chat.id == ADMIN_GROUP_ID)
+    async def unban_user(message: Message):
         """Function to unban the user with userid in all channels listed in CHANNEL_NAMES."""
         try:
             command_args = message.text.split()
@@ -9502,7 +9502,7 @@ if __name__ == "__main__":
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 
-    @DP.callback_query_handler(lambda c: c.data.startswith("stopchecks_"))
+    @DP.callback_query(lambda c: c.data.startswith("stopchecks_"))
     async def stop_checks(callback_query: CallbackQuery):
         """Function to stop checks for the user and mark them as legit."""
         try:
@@ -9677,11 +9677,11 @@ if __name__ == "__main__":
             "Checks stopped. User marked as legit.", show_alert=False
         )
 
-    @DP.message_handler(
+    @DP.message(
         is_valid_message,
         content_types=ALLOWED_CONTENT_TYPES,
     )  # exclude admins and technolog group, exclude join/left messages
-    async def log_all_unhandled_messages(message: types.Message):
+    async def log_all_unhandled_messages(message: Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
             # Convert the Message object to a dictionary
@@ -9830,7 +9830,7 @@ if __name__ == "__main__":
             reply_to_message_id=original_message_chat_reply_id,
         )
 
-    @DP.callback_query_handler(
+    @DP.callback_query(
         # lambda c: c.data in ["button_sry", "button_end", "button_rnd"]
         lambda c: c.data.startswith("button_")
     )
@@ -9913,7 +9913,7 @@ if __name__ == "__main__":
         # Acknowledge the callback query
         await callback_query.answer()
 
-    @DP.callback_query_handler(
+    @DP.callback_query(
         # MODIFIED: Renamed callback prefixes and adjusted lambda
         lambda c: c.data.startswith("suspiciousglobalban_")
         or c.data.startswith("suspiciousban_")
@@ -10560,11 +10560,8 @@ if __name__ == "__main__":
 
         return
 
-    @DP.message_handler(
-        is_admin_user_message,
-        content_types=types.ContentTypes.TEXT,
-    )
-    async def handle_admin_reply(message: types.Message):
+    @DP.message(is_admin_user_message, F.text)
+    async def handle_admin_reply(message: Message):
         """Function to handle replies from the admin to unhandled messages."""
         try:
             # Check if the message is a reply to an unhandled message
@@ -10603,13 +10600,8 @@ if __name__ == "__main__":
             LOGGER.error("Error in handle_admin_reply function: %s", e)
             await message.reply(f"Error: {e}")
 
-    @DP.message_handler(
-        content_types=[
-            types.ContentType.NEW_CHAT_MEMBERS,
-            types.ContentType.LEFT_CHAT_MEMBER,
-        ]
-    )
-    async def user_changed_message(message: types.Message):
+    @DP.message(F.new_chat_members | F.left_chat_member)
+    async def user_changed_message(message: Message):
         """Function to handle users joining or leaving the chat."""
 
         # handle user join/left events
@@ -10678,21 +10670,27 @@ if __name__ == "__main__":
     # Other:
     # TODO: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
     # TODO: Implement scheduler for chat closure at night
-    # TODO: Switch to aiogram 3.13.1 or higher
     # NOTE: Admin can reply/send messages via /say, /reply, /broadcast commands
 
     # Uncomment this to get the chat ID of a group or channel
-    # @dp.message_handler(commands=["getid"])
-    # async def cmd_getid(message: types.Message):
+    # @dp.message(Command("getid"))
+    # async def cmd_getid(message: Message):
     #     await message.answer(f"This chat's ID is: {message.chat.id}")
 
-    executor.start_polling(
-        DP,
-        skip_updates=True,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        allowed_updates=ALLOWED_UPDATES,
-    )
-
-    # Close SQLite connection
-    CONN.close()
+    async def main():
+        """Main function to start the bot."""
+        # Register startup and shutdown callbacks
+        DP.startup.register(on_startup)
+        DP.shutdown.register(on_shutdown)
+        
+        # Delete webhook and skip pending updates before polling
+        await BOT.delete_webhook(drop_pending_updates=True)
+        
+        # Start polling
+        await DP.start_polling(BOT, allowed_updates=ALLOWED_UPDATES)
+    
+    try:
+        asyncio.run(main())
+    finally:
+        # Close SQLite connection
+        CONN.close()

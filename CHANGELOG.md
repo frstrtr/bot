@@ -4,7 +4,8 @@
 
 ### Added
 - **`/whois` command**: Comprehensive user lookup from database
-  - **Restricted to Orders thread (TECHNO_ADMIN)** in admin group only
+  - **Available in Orders thread (TECHNO_ADMIN)** in admin group
+  - **Available for superadmin in direct messages** with bot (ADMIN_USER_ID)
   - Usage: `/whois 123456789` (by ID) or `/whois @username` (by username)
   - Shows: user ID, username, name, status badges (BANNED/LEGIT/MONITORING/PREMIUM)
   - Timeline: first seen, last seen, joined date, monitoring end date

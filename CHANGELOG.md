@@ -12,6 +12,12 @@
   - Detection flags: `detected_by_lols`, `detected_by_cas`, `detected_by_p2p`, `detected_by_local`, `detected_by_admin`
   - Offense types: `fast_message`, `spam_pattern`, `bot_mention`, `hidden_mentions`, `forwarded_spam`, `channel_spam`, `high_id_spam`
 
+### Fixed
+- **Prevent duplicate autoreport/suspicious notifications**: Messages sent to AUTOREPORT thread are now tracked
+  - Added `autoreported_messages` set to track (chat_id, message_id) pairs
+  - All ADMIN_SUSPICIOUS notifications now check `was_autoreported()` before sending
+  - Prevents same message from appearing in both AUTOREPORT and SUSPICIOUS threads
+
 - **User baselines database integration**: Full integration of `user_baselines` table
   - Loads active monitoring from database on startup (with legacy file migration)
   - Saves baseline to DB when user joins chat

@@ -278,6 +278,20 @@ HIGH_USER_ID_THRESHOLD = 8_200_000_000
 # Populated when processing messages, used for constructing public links
 chat_username_cache: dict[int, str | None] = {}
 
+# Track messages that have been sent to autoreport to prevent duplicate suspicious notifications
+# Key: (chat_id, message_id) - cleared periodically or on message processing completion
+autoreported_messages: set[tuple[int, int]] = set()
+
+
+def was_autoreported(message: types.Message) -> bool:
+    """Check if a message was already sent to autoreport thread."""
+    return (message.chat.id, message.message_id) in autoreported_messages
+
+
+def clear_autoreport_tracking(message: types.Message):
+    """Clear autoreport tracking for a message after processing is complete."""
+    autoreported_messages.discard((message.chat.id, message.message_id))
+
 
 def move_user_to_banned(
     user_id: int,
@@ -553,6 +567,9 @@ async def submit_autoreport(message: types.Message, reason):
         # f"{message.from_id:10}",
         reason,
     )
+
+    # Track this message as autoreported to prevent duplicate suspicious notifications
+    autoreported_messages.add((message.chat.id, message.message_id))
 
     # Use the current date if message.forward_date is None
     # forward_date = message.forward_date if message.forward_date else datetime.now()
@@ -5905,17 +5922,18 @@ if __name__ == "__main__":
                         diffs.append("profile photo: none -> set")
 
                     if changed:
-                        # Forward the triggering message
-                        try:
-                            await message.forward(
-                                ADMIN_GROUP_ID,
-                                ADMIN_SUSPICIOUS,
-                                disable_notification=True,
-                            )
-                        except Exception as _e:
-                            LOGGER.debug(
-                                "%s:@%s forward to admin/suspicious failed: %s",
-                                _uid,
+                        # Forward the triggering message (skip if already autoreported)
+                        if not was_autoreported(message):
+                            try:
+                                await message.forward(
+                                    ADMIN_GROUP_ID,
+                                    ADMIN_SUSPICIOUS,
+                                    disable_notification=True,
+                                )
+                            except Exception as _e:
+                                LOGGER.debug(
+                                    "%s:@%s forward to admin/suspicious failed: %s",
+                                    _uid,
                                 new_usern or "!UNDEFINED!",
                                 _e,
                             )
@@ -6967,6 +6985,14 @@ if __name__ == "__main__":
                         return
                     else:
                         # If lols check False - mark as suspicious and send to admin group
+                        # Skip if message was already sent to autoreport thread
+                        if was_autoreported(message):
+                            LOGGER.debug(
+                                "%s:@%s skipping suspicious notification - already autoreported",
+                                message.from_user.id,
+                                message.from_user.username or "!UNDEFINED!",
+                            )
+                            return
                         await message.forward(
                             ADMIN_GROUP_ID,
                             ADMIN_SUSPICIOUS,
@@ -7217,7 +7243,8 @@ if __name__ == "__main__":
                             suspicious_items["phones"].append(cleaned_phone)
 
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
-            if has_suspicious_content:
+            # Skip if message was already sent to autoreport thread
+            if has_suspicious_content and not was_autoreported(message):
                 try:
                     # Forward the message to suspicious thread
                     await message.forward(

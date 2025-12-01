@@ -3,6 +3,18 @@
 ## [2025-12-01]
 
 ### Added
+- **`/whois` command**: Comprehensive user lookup from database
+  - Usage: `/whois 123456789` (by ID) or `/whois @username` (by username)
+  - Shows: user ID, username, name, status badges (BANNED/LEGIT/MONITORING/PREMIUM)
+  - Timeline: first seen, last seen, joined date, monitoring end date
+  - Chats: list of chats where user was seen (up to 5 shown)
+  - Activity: join/leave event counts
+  - Ban details (if banned): date, source (lols/cas/p2p/admin), offense type, reason, who banned, detection sources, time to first message
+  - Profile links: ID-based, Android, iOS
+  - External check: LOLS bot link
+  - Action buttons: Start Monitoring, Actions (Ban/Delete), Check on LOLS
+  - For unknown users: shows "Not Found" with LOLS check link
+
 - **Ban source tracking with combinations**: `BanSource` enum and helpers for detailed ban origin tracking
   - Sources: `lols`, `cas`, `p2p`, `local`, `admin`, `autoreport`, `autoban`
   - `build_ban_source()`: Create combined sources (e.g., `"cas+lols+p2p"` when detected by multiple APIs)

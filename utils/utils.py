@@ -1415,6 +1415,365 @@ def delete_user_baseline(conn: Connection, user_id: int) -> bool:
         return False
 
 
+def get_user_whois(conn: Connection, user_id: int = None, username: str = None) -> dict:
+    """Get comprehensive user data for /whois command.
+    
+    Searches both user_baselines and recent_messages tables to build
+    a complete picture of the user's history with the bot.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID (optional if username provided)
+        username: Telegram username without @ (optional if user_id provided)
+    
+    Returns:
+        Dictionary with all available user data or None if not found
+    """
+    import json
+    cursor = conn.cursor()
+    result = {
+        "found": False,
+        "user_id": user_id,
+        "username": username,
+        "first_name": None,
+        "last_name": None,
+        "baseline": None,
+        "messages": [],
+        "chats_seen": set(),
+        "join_events": [],
+        "leave_events": [],
+        "first_seen": None,
+        "last_seen": None,
+    }
+    
+    # If we only have username, try to find user_id from recent_messages
+    if not user_id and username:
+        clean_username = username.lstrip("@").lower()
+        cursor.execute(
+            """
+            SELECT DISTINCT user_id, user_name, user_first_name, user_last_name
+            FROM recent_messages 
+            WHERE LOWER(user_name) = ?
+            ORDER BY received_date DESC
+            LIMIT 1
+            """,
+            (clean_username,),
+        )
+        row = cursor.fetchone()
+        if row:
+            user_id = row[0]
+            result["user_id"] = user_id
+            result["username"] = row[1]
+            result["first_name"] = row[2]
+            result["last_name"] = row[3]
+    
+    if not user_id:
+        return result  # Not found
+    
+    # Get baseline data
+    cursor.execute(
+        """
+        SELECT user_id, username, first_name, last_name, photo_count,
+               monitoring_active, joined_at, monitoring_ended_at,
+               join_chat_id, join_chat_username, join_chat_title,
+               is_legit, is_banned, ban_reason, ban_source, banned_at,
+               banned_by_admin_id, banned_by_admin_username,
+               banned_in_chat_id, banned_in_chat_title,
+               offense_type, offense_details, time_to_first_message, first_message_text,
+               detected_by_lols, detected_by_cas, detected_by_p2p, detected_by_local, detected_by_admin,
+               bio, premium, verified, restriction_reason, language_code,
+               metadata, created_at, updated_at
+        FROM user_baselines WHERE user_id = ?
+        """,
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    if row:
+        result["found"] = True
+        result["baseline"] = {
+            "user_id": row[0],
+            "username": row[1],
+            "first_name": row[2],
+            "last_name": row[3],
+            "photo_count": row[4],
+            "monitoring_active": bool(row[5]),
+            "joined_at": row[6],
+            "monitoring_ended_at": row[7],
+            "join_chat_id": row[8],
+            "join_chat_username": row[9],
+            "join_chat_title": row[10],
+            "is_legit": bool(row[11]),
+            "is_banned": bool(row[12]),
+            "ban_reason": row[13],
+            "ban_source": row[14],
+            "banned_at": row[15],
+            "banned_by_admin_id": row[16],
+            "banned_by_admin_username": row[17],
+            "banned_in_chat_id": row[18],
+            "banned_in_chat_title": row[19],
+            "offense_type": row[20],
+            "offense_details": json.loads(row[21]) if row[21] else None,
+            "time_to_first_message": row[22],
+            "first_message_text": row[23],
+            "detected_by_lols": bool(row[24]),
+            "detected_by_cas": bool(row[25]),
+            "detected_by_p2p": bool(row[26]),
+            "detected_by_local": bool(row[27]),
+            "detected_by_admin": bool(row[28]),
+            "bio": row[29],
+            "premium": bool(row[30]) if row[30] is not None else None,
+            "verified": bool(row[31]) if row[31] is not None else None,
+            "restriction_reason": row[32],
+            "language_code": row[33],
+            "metadata": json.loads(row[34]) if row[34] else None,
+            "created_at": row[35],
+            "updated_at": row[36],
+        }
+        result["username"] = result["baseline"]["username"] or result["username"]
+        result["first_name"] = result["baseline"]["first_name"]
+        result["last_name"] = result["baseline"]["last_name"]
+    
+    # Get message history from recent_messages
+    cursor.execute(
+        """
+        SELECT chat_id, chat_username, message_id, user_name, user_first_name, user_last_name,
+               received_date, from_chat_title, new_chat_member, left_chat_member
+        FROM recent_messages 
+        WHERE user_id = ?
+        ORDER BY received_date DESC
+        LIMIT 50
+        """,
+        (user_id,),
+    )
+    rows = cursor.fetchall()
+    
+    for row in rows:
+        result["found"] = True
+        chat_id = row[0]
+        chat_username = row[1]
+        chat_title = row[7]
+        received_date = row[6]
+        new_chat_member = bool(row[8])
+        left_chat_member = bool(row[9])
+        
+        # Update user info if not set
+        if not result["username"] and row[3]:
+            result["username"] = row[3]
+        if not result["first_name"] and row[4]:
+            result["first_name"] = row[4]
+        if not result["last_name"] and row[5]:
+            result["last_name"] = row[5]
+        
+        # Track chats
+        chat_info = {
+            "chat_id": chat_id,
+            "chat_username": chat_username,
+            "chat_title": chat_title,
+        }
+        result["chats_seen"].add((chat_id, chat_username or "", chat_title or ""))
+        
+        # Track dates
+        if received_date:
+            if not result["first_seen"] or received_date < result["first_seen"]:
+                result["first_seen"] = received_date
+            if not result["last_seen"] or received_date > result["last_seen"]:
+                result["last_seen"] = received_date
+        
+        # Track join/leave events
+        if new_chat_member:
+            result["join_events"].append({
+                "date": received_date,
+                "chat_id": chat_id,
+                "chat_username": chat_username,
+                "chat_title": chat_title,
+            })
+        if left_chat_member:
+            result["leave_events"].append({
+                "date": received_date,
+                "chat_id": chat_id,
+                "chat_username": chat_username,
+                "chat_title": chat_title,
+            })
+        
+        result["messages"].append({
+            "chat_id": chat_id,
+            "chat_username": chat_username,
+            "chat_title": chat_title,
+            "message_id": row[2],
+            "received_date": received_date,
+            "new_chat_member": new_chat_member,
+            "left_chat_member": left_chat_member,
+        })
+    
+    # Convert set to list for JSON serialization
+    result["chats_seen"] = [
+        {"chat_id": c[0], "chat_username": c[1], "chat_title": c[2]}
+        for c in result["chats_seen"]
+    ]
+    
+    return result
+
+
+def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
+    """Format whois data into a human-readable HTML message.
+    
+    Args:
+        data: Dictionary from get_user_whois()
+        include_lols_link: Whether to include LOLS check link
+        
+    Returns:
+        HTML formatted string for Telegram message
+    """
+    import html
+    
+    if not data.get("found"):
+        # User not found in database
+        user_id = data.get("user_id")
+        username = data.get("username")
+        
+        msg = "❓ <b>User Not Found</b>\n\n"
+        msg += "User has not been seen by this bot.\n\n"
+        
+        if user_id:
+            msg += f"🆔 User ID: <code>{user_id}</code>\n"
+            msg += f"\n🔗 <b>External checks:</b>\n"
+            msg += f"   └ <a href='https://t.me/oLolsBot?start={user_id}'>Check on LOLS</a>\n"
+            msg += f"\n📱 <b>Profile links:</b>\n"
+            msg += f"   ├ <a href='tg://user?id={user_id}'>ID based profile</a>\n"
+            msg += f"   └ <a href='https://t.me/@id{user_id}'>iOS link</a>"
+        elif username:
+            clean_name = username.lstrip("@")
+            msg += f"👤 Username: @{html.escape(clean_name)}\n"
+            msg += f"\n🔗 <b>External checks:</b>\n"
+            msg += f"   └ <a href='https://t.me/oLolsBot?start=u-{clean_name}'>Check on LOLS</a>"
+        
+        return msg
+    
+    # User found
+    user_id = data.get("user_id")
+    username = data.get("username")
+    first_name = data.get("first_name") or ""
+    last_name = data.get("last_name") or ""
+    baseline = data.get("baseline") or {}
+    
+    # Header
+    msg = "👤 <b>User Information</b>\n"
+    msg += "─" * 25 + "\n"
+    
+    # Basic info
+    msg += f"🆔 ID: <code>{user_id}</code>\n"
+    if username:
+        msg += f"👤 Username: @{html.escape(username)}\n"
+    full_name = f"{html.escape(first_name)} {html.escape(last_name)}".strip()
+    if full_name:
+        msg += f"📛 Name: {full_name}\n"
+    
+    # Status badges
+    status_parts = []
+    if baseline.get("is_banned"):
+        status_parts.append("🚫 BANNED")
+    if baseline.get("is_legit"):
+        status_parts.append("✅ LEGIT")
+    if baseline.get("monitoring_active"):
+        status_parts.append("👁 MONITORING")
+    if baseline.get("premium"):
+        status_parts.append("⭐ PREMIUM")
+    if baseline.get("verified"):
+        status_parts.append("✓ VERIFIED")
+    
+    if status_parts:
+        msg += f"📌 Status: {' | '.join(status_parts)}\n"
+    
+    # Timestamps
+    msg += "\n📅 <b>Timeline:</b>\n"
+    if data.get("first_seen"):
+        msg += f"   ├ First seen: {data['first_seen']}\n"
+    if data.get("last_seen"):
+        msg += f"   └ Last seen: {data['last_seen']}\n"
+    if baseline.get("joined_at"):
+        msg += f"   ├ Joined (monitored): {baseline['joined_at']}\n"
+    if baseline.get("monitoring_ended_at"):
+        msg += f"   └ Monitoring ended: {baseline['monitoring_ended_at']}\n"
+    
+    # Chats
+    chats = data.get("chats_seen", [])
+    if chats:
+        msg += f"\n💬 <b>Seen in {len(chats)} chat(s):</b>\n"
+        for i, chat in enumerate(chats[:5]):  # Limit to 5
+            prefix = "└" if i == len(chats[:5]) - 1 else "├"
+            chat_disp = chat.get("chat_title") or chat.get("chat_username") or str(chat.get("chat_id"))
+            msg += f"   {prefix} {html.escape(str(chat_disp))}\n"
+        if len(chats) > 5:
+            msg += f"   ... and {len(chats) - 5} more\n"
+    
+    # Join/Leave events
+    joins = data.get("join_events", [])
+    leaves = data.get("leave_events", [])
+    if joins or leaves:
+        msg += f"\n🚪 <b>Activity:</b> {len(joins)} join(s), {len(leaves)} leave(s)\n"
+    
+    # Ban details
+    if baseline.get("is_banned"):
+        msg += "\n🚫 <b>Ban Details:</b>\n"
+        if baseline.get("banned_at"):
+            msg += f"   ├ Banned at: {baseline['banned_at']}\n"
+        if baseline.get("ban_source"):
+            msg += f"   ├ Source: <code>{baseline['ban_source']}</code>\n"
+        if baseline.get("offense_type"):
+            msg += f"   ├ Offense: <code>{baseline['offense_type']}</code>\n"
+        if baseline.get("ban_reason"):
+            reason = baseline['ban_reason'][:100] + "..." if len(baseline.get('ban_reason', '')) > 100 else baseline['ban_reason']
+            msg += f"   ├ Reason: {html.escape(reason)}\n"
+        
+        # Admin who banned
+        if baseline.get("banned_by_admin_id"):
+            admin_disp = f"@{baseline['banned_by_admin_username']}" if baseline.get("banned_by_admin_username") else str(baseline['banned_by_admin_id'])
+            msg += f"   ├ Banned by: {html.escape(admin_disp)}\n"
+        
+        # Chat where banned
+        if baseline.get("banned_in_chat_title"):
+            msg += f"   ├ In chat: {html.escape(baseline['banned_in_chat_title'])}\n"
+        
+        # Detection sources
+        detection = []
+        if baseline.get("detected_by_lols"):
+            detection.append("LOLS")
+        if baseline.get("detected_by_cas"):
+            detection.append("CAS")
+        if baseline.get("detected_by_p2p"):
+            detection.append("P2P")
+        if baseline.get("detected_by_local"):
+            detection.append("LOCAL")
+        if baseline.get("detected_by_admin"):
+            detection.append("ADMIN")
+        if detection:
+            msg += f"   ├ Detected by: {', '.join(detection)}\n"
+        
+        # Time to first message
+        if baseline.get("time_to_first_message") is not None:
+            ttfm = baseline['time_to_first_message']
+            if ttfm < 60:
+                ttfm_str = f"{ttfm}s"
+            elif ttfm < 3600:
+                ttfm_str = f"{ttfm // 60}m {ttfm % 60}s"
+            else:
+                ttfm_str = f"{ttfm // 3600}h {(ttfm % 3600) // 60}m"
+            msg += f"   └ Time to first msg: {ttfm_str}\n"
+    
+    # Profile links
+    msg += f"\n🔗 <b>Profile links:</b>\n"
+    msg += f"   ├ <a href='tg://user?id={user_id}'>ID based profile</a>\n"
+    msg += f"   ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
+    msg += f"   └ <a href='https://t.me/@id{user_id}'>iOS</a>\n"
+    
+    # External check links
+    if include_lols_link:
+        msg += f"\n🔍 <b>External checks:</b>\n"
+        msg += f"   └ <a href='https://t.me/oLolsBot?start={user_id}'>Check on LOLS</a>"
+    
+    return msg
+
+
 def create_inline_keyboard(message_link, lols_link, message: types.Message):
     """Create the inline keyboard for a suspicious forwarded / monitored message.
 

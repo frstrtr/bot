@@ -476,7 +476,31 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.enums import ChatMemberStatus
+
+
+class KeyboardBuilder(InlineKeyboardBuilder):
+    """Backward-compatible keyboard builder that mimics aiogram 2.x InlineKeyboardMarkup.
+    
+    In aiogram 2.x: KeyboardBuilder().add(btn1).add(btn2)
+    In aiogram 3.x: InlineKeyboardBuilder().add(btn1).add(btn2).as_markup()
+    
+    This class allows existing code using InlineKeyboardMarkup() with .add() to work
+    by returning self from add() and providing a way to get the final markup.
+    """
+    
+    def add(self, *buttons: InlineKeyboardButton) -> "KeyboardBuilder":
+        """Add buttons to a new row each. Returns self for chaining."""
+        for button in buttons:
+            super().row(button)
+        return self
+    
+    def row(self, *buttons: InlineKeyboardButton, width: int | None = None) -> "KeyboardBuilder":  # type: ignore[override]
+        """Add multiple buttons in the same row. Returns self for chaining."""
+        super().row(*buttons, width=width)
+        return self
 
 # Backward-compatible exception aliases
 Unauthorized = TelegramForbiddenError
@@ -544,15 +568,17 @@ def build_lols_url(user_id: int) -> str:
     return f"https://t.me/oLolsBot?start={user_id}"
 
 
-def make_lols_kb(user_id: int) -> InlineKeyboardMarkup:
-    """Create a one-button keyboard with the LOLS check link.
+def make_lols_kb(user_id: int) -> KeyboardBuilder:
+    """Create a keyboard builder with the LOLS check link button.
 
+    Returns KeyboardBuilder so caller can add more buttons with .add().
+    Use .as_markup() to get the final InlineKeyboardMarkup.
     Button text must remain exactly as used elsewhere to preserve UX.
     """
     lols_url = build_lols_url(user_id)
-    inline_kb = InlineKeyboardMarkup()
-    inline_kb.add(InlineKeyboardButton("ℹ️ Check Spam Data ℹ️", url=lols_url))
-    return inline_kb
+    builder = KeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
+    return builder
 
 
 async def safe_get_chat_name_username(bot, chat_id: int, logger=None):
@@ -696,6 +722,8 @@ def get_latest_commit_info(logger):
         _commit_info = (
             subprocess.check_output(["git", "show", "-s"]).decode("utf-8").strip()
         )
+        # Replace angle brackets to avoid HTML parsing issues
+        _commit_info = _commit_info.replace("<", "[").replace(">", "]")
         return _commit_info
     except subprocess.CalledProcessError as e:
         logger.info("Error getting git commit info: %s", e)
@@ -753,16 +781,16 @@ def extract_status_change(
         return None
 
     was_member = old_status in [
-        types.ChatMemberStatus.MEMBER,
-        types.ChatMemberStatus.OWNER,
-        types.ChatMemberStatus.ADMINISTRATOR,
-        types.ChatMemberStatus.RESTRICTED,
+        ChatMemberStatus.MEMBER,
+        ChatMemberStatus.CREATOR,
+        ChatMemberStatus.ADMINISTRATOR,
+        ChatMemberStatus.RESTRICTED,
     ]
     is_member = new_status in [
-        types.ChatMemberStatus.MEMBER,
-        types.ChatMemberStatus.OWNER,
-        types.ChatMemberStatus.ADMINISTRATOR,
-        types.ChatMemberStatus.RESTRICTED,
+        ChatMemberStatus.MEMBER,
+        ChatMemberStatus.CREATOR,
+        ChatMemberStatus.ADMINISTRATOR,
+        ChatMemberStatus.RESTRICTED,
     ]
 
     return was_member, is_member
@@ -830,8 +858,8 @@ def check_message_for_capital_letters(message: types.Message):
 
 def has_custom_emoji_spam(message):
     """Function to check if a message contains spammy custom emojis."""
-    message_dict = message.to_python()
-    entities = message_dict.get("entities", [])
+    message_dict = message.model_dump()
+    entities = message_dict.get("entities") or []
     custom_emoji_count = sum(
         1 for entity in entities if entity.get("type") == "custom_emoji"
     )
@@ -1832,21 +1860,16 @@ def create_inline_keyboard(message_link, lols_link, message: types.Message):
     Note: "View Original Message" button removed since the original message is always
     forwarded above this notification, and buttons don't work when forwarding reports.
     """
-    inline_kb = InlineKeyboardMarkup()
-    inline_kb.add(InlineKeyboardButton("ℹ️ Check LOLS Data ℹ️", url=lols_link))
-    inline_kb.add(
-        InlineKeyboardButton(
-            "🟢 Seems legit, STOP checks 🟢",
-            callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
-        )
-    )
-    # Single actions button to open ban/delete choices (handled separately)
-    inline_kb.add(
-        InlineKeyboardButton(
-            "⚙️ Actions (Ban / Delete) ⚙️",
-            callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
-        )
-    )
+    inline_kb = KeyboardBuilder()
+    inline_kb.add(InlineKeyboardButton(text="ℹ️ Check LOLS Data ℹ️", url=lols_link))
+    inline_kb.add(InlineKeyboardButton(
+        text="🟢 Seems legit, STOP checks 🟢",
+        callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+    ))
+    inline_kb.add(InlineKeyboardButton(
+        text="⚙️ Actions (Ban / Delete) ⚙️",
+        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+    ))
     return inline_kb
 
 

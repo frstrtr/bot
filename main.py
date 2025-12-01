@@ -27,6 +27,8 @@ import ast  # evaluate dictionaries safely
 
 import aiocron
 from zoneinfo import ZoneInfo
+import ssl
+import certifi
 
 import aiohttp
 from aiogram import Dispatcher, Router, F
@@ -67,26 +69,8 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-class KeyboardBuilder(InlineKeyboardBuilder):
-    """Backward-compatible keyboard builder that mimics aiogram 2.x InlineKeyboardMarkup.
-    
-    In aiogram 2.x: KeyboardBuilder().add(btn1).add(btn2)
-    In aiogram 3.x: InlineKeyboardBuilder().add(btn1).add(btn2).as_markup()
-    
-    This class allows existing code using InlineKeyboardMarkup() with .add() to work
-    by returning self from add() and providing a way to get the final markup.
-    """
-    
-    def add(self, *buttons: InlineKeyboardButton) -> "KeyboardBuilder":
-        """Add buttons to a new row each. Returns self for chaining."""
-        for button in buttons:
-            super().row(button)
-        return self
-    
-    def row(self, *buttons: InlineKeyboardButton, width: int | None = None) -> "KeyboardBuilder":  # type: ignore[override]
-        """Add multiple buttons in the same row. Returns self for chaining."""
-        super().row(*buttons, width=width)
-        return self
+# Import KeyboardBuilder from utils
+from utils.utils import KeyboardBuilder
 
 
 # load utilities
@@ -397,6 +381,32 @@ running_intensive_watchdogs = {}
 # Initialize the event
 shutdown_event = asyncio.Event()
 
+# Global aiohttp session for spam checks (initialized on startup, closed on shutdown)
+_http_session: aiohttp.ClientSession | None = None
+_http_connector: aiohttp.TCPConnector | None = None
+
+
+def get_http_session() -> aiohttp.ClientSession:
+    """Get or create the global HTTP session for spam checks."""
+    global _http_session, _http_connector
+    if _http_session is None or _http_session.closed:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        _http_connector = aiohttp.TCPConnector(ssl=ssl_context)
+        _http_session = aiohttp.ClientSession(connector=_http_connector)
+    return _http_session
+
+
+async def close_http_session():
+    """Close the global HTTP session."""
+    global _http_session, _http_connector
+    if _http_session is not None and not _http_session.closed:
+        await _http_session.close()
+        _http_session = None
+    if _http_connector is not None and not _http_connector.closed:
+        _http_connector.close()
+        _http_connector = None
+
+
 # Setting up SQLite Database
 CONN = sqlite3.connect("messages.db")
 CURSOR = CONN.cursor()
@@ -594,7 +604,7 @@ async def submit_autoreport(message: Message, reason):
     LOGGER.info(
         # "%-10s : %s. Sending automated report to the admin group for review...",
         "%s. Sending automated report to the admin group for review...",
-        # f"{message.from_id:10}",
+        # f"{message.from_user.id:10}",
         reason,
     )
 
@@ -1257,18 +1267,22 @@ async def on_shutdown():
     # number of the messages with spam not detected and deleted by admins
     # number of active user checks forwarded to the next session
 
-    await safe_send_message(
-        BOT,
-        TECHNOLOG_GROUP,
-        (
-            "Runtime session shutdown stats:\n"
-            f"Bot started at: {bot_start_time}\n"
-            f"Current active user checks: {len(active_user_checks_dict)}\n"
-            f"Spammers detected: {len(banned_users_dict)}\n"
-        ),
-        LOGGER,
-        message_thread_id=TECHNO_RESTART,
-    )
+    try:
+        await safe_send_message(
+            BOT,
+            TECHNOLOG_GROUP,
+            (
+                "Runtime session shutdown stats:\n"
+                f"Bot started at: {bot_start_time}\n"
+                f"Current active user checks: {len(active_user_checks_dict)}\n"
+                f"Spammers detected: {len(banned_users_dict)}\n"
+            ),
+            LOGGER,
+            message_thread_id=TECHNO_RESTART,
+        )
+    except Exception as e:
+        LOGGER.warning("Could not send shutdown stats message: %s", e)
+        
     LOGGER.info(
         "\033[93m\nRuntime session shutdown stats:\n"
         "Bot started at: %s\n"
@@ -1278,8 +1292,12 @@ async def on_shutdown():
         len(active_user_checks_dict),
         len(banned_users_dict),
     )
-    # Close the bot
-    await BOT.close()
+    
+    # Close the global HTTP session used for spam checks
+    await close_http_session()
+    
+    # Note: Don't call BOT.close() here - aiogram 3.x dispatcher handles it automatically
+    # Calling it manually causes "Flood control exceeded on method 'Close'" errors
 
     # for _id in active_user_checks_dict:
     #     LOGGER.info("%s shutdown check for spam...", _id)
@@ -1334,7 +1352,7 @@ async def handle_autoreports(
         )
         return
 
-    message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
+    message_as_json = json.dumps(message.model_dump(), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -1378,7 +1396,7 @@ async def handle_autoreports(
     if not found_message_data:  # Last resort. Give up.
         LOGGER.warning(
             "%s:%s spammer data not found in DB. I giveup :(",
-            message.from_id,
+            message.from_user.id,
             (
                 message.from_user.username
                 if message.from_user.username
@@ -1607,77 +1625,77 @@ async def spam_check(user_id):
     # https://api.cas.chat/check?user_id=
     # http://127.0.0.1:8081/check?user_id=
     # Note: implement prime_radiant local DB check
-    async with aiohttp.ClientSession() as session:
-        lols = False
-        cas = 0
-        is_spammer = False
+    session = get_http_session()
+    lols = False
+    cas = 0
+    is_spammer = False
 
-        async def check_local():
-            try:
-                async with session.get(
-                    f"http://127.0.0.1:8081/check?user_id={user_id}", timeout=10
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return data.get("is_spammer", False)
-            except aiohttp.ClientConnectorError as e:
-                LOGGER.warning(
-                    "Local endpoint check error (ClientConnectorError): %s", e
-                )
-                return False
-            except asyncio.TimeoutError as e:
-                LOGGER.warning("Local endpoint check error (TimeoutError): %s", e)
-                return False
-
-        async def check_lols():
-            try:
-                async with session.get(
-                    f"https://api.lols.bot/account?id={user_id}", timeout=10
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return data.get("banned", False)
-            except aiohttp.ClientConnectorError as e:
-                LOGGER.warning(
-                    "LOLS endpoint check error (ClientConnectorError): %s", e
-                )
-                return False
-            except asyncio.TimeoutError as e:
-                LOGGER.warning("LOLS endpoint check error (TimeoutError): %s", e)
-                return False
-
-        async def check_cas():
-            try:
-                async with session.get(
-                    f"https://api.cas.chat/check?user_id={user_id}", timeout=10
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if data.get("ok", False):
-                            return data["result"].get("offenses", 0)
-            except aiohttp.ClientConnectorError as e:
-                LOGGER.warning("CAS endpoint check error (ClientConnectorError): %s", e)
-                return 0
-            except asyncio.TimeoutError as e:
-                LOGGER.warning("CAS endpoint check error (TimeoutError): %s", e)
-                return 0
-
+    async def check_local():
         try:
-            results = await asyncio.gather(
-                check_local(), check_lols(), check_cas(), return_exceptions=True
+            async with session.get(
+                f"http://127.0.0.1:8081/check?user_id={user_id}", timeout=10
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("is_spammer", False)
+        except aiohttp.ClientConnectorError as e:
+            LOGGER.warning(
+                "Local endpoint check error (ClientConnectorError): %s", e
             )
+            return False
+        except asyncio.TimeoutError as e:
+            LOGGER.warning("Local endpoint check error (TimeoutError): %s", e)
+            return False
 
-            is_spammer = results[0]
-            lols = results[1]
-            cas = results[2] if results[2] is not None else 0
+    async def check_lols():
+        try:
+            async with session.get(
+                f"https://api.lols.bot/account?id={user_id}", timeout=10
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("banned", False)
+        except aiohttp.ClientConnectorError as e:
+            LOGGER.warning(
+                "LOLS endpoint check error (ClientConnectorError): %s", e
+            )
+            return False
+        except asyncio.TimeoutError as e:
+            LOGGER.warning("LOLS endpoint check error (TimeoutError): %s", e)
+            return False
 
-            if lols or is_spammer or cas > 0:
-                return True
-            else:
-                return False
-        except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-            LOGGER.error("Unexpected error: %s", e)
-            return None
+    async def check_cas():
+        try:
+            async with session.get(
+                f"https://api.cas.chat/check?user_id={user_id}", timeout=10
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("ok", False):
+                        return data["result"].get("offenses", 0)
+        except aiohttp.ClientConnectorError as e:
+            LOGGER.warning("CAS endpoint check error (ClientConnectorError): %s", e)
+            return 0
+        except asyncio.TimeoutError as e:
+            LOGGER.warning("CAS endpoint check error (TimeoutError): %s", e)
+            return 0
+
+    try:
+        results = await asyncio.gather(
+            check_local(), check_lols(), check_cas(), return_exceptions=True
+        )
+
+        is_spammer = results[0]
+        lols = results[1]
+        cas = results[2] if results[2] is not None else 0
+
+        if lols or is_spammer or cas > 0:
+            return True
+        else:
+            return False
+    except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+        LOGGER.error("Unexpected error: %s", e)
+        return None
 
 
 async def save_report_file(file_type, data):
@@ -2467,7 +2485,7 @@ async def check_n_ban(message: Message, reason: str):
         await autoban(message.from_user.id, message.from_user.username)
         event_record = (
             f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "  # Date and time with milliseconds
-            f"{message.from_id:<10} "
+            f"{message.from_user.id:<10} "
             f"❌  {' '.join('@' + getattr(message.from_user, attr) if attr == 'username' else str(getattr(message.from_user, attr, '')) for attr in ('username', 'first_name', 'last_name') if getattr(message.from_user, attr, '')):<32}"
             f" member          --> kicked          in "
             f"{'@' + message.chat.username + ': ' if message.chat.username else '':<24}{message.chat.title:<30} by Хранитель Порядков\n"
@@ -2818,7 +2836,7 @@ async def perform_checks(
                                 message_thread_id=ADMIN_SUSPICIOUS,
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
-                                reply_markup=kb,
+                                reply_markup=kb.as_markup(),
                             )
                             # Log periodic profile change
                             await log_profile_change(
@@ -3761,7 +3779,7 @@ if __name__ == "__main__":
                 message_thread_id=ADMIN_SUSPICIOUS,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=_high_id_kb,
+                reply_markup=_high_id_kb.as_markup(),
             )
             LOGGER.warning(
                 "\033[93m%s:@%s has very high user ID (>8.2B) - flagged as suspicious on join\033[0m",
@@ -4107,7 +4125,7 @@ if __name__ == "__main__":
                             message_thread_id=ADMIN_SUSPICIOUS,
                             parse_mode="HTML",
                             disable_web_page_preview=True,
-                            reply_markup=_kb,
+                            reply_markup=_kb.as_markup(),
                         )
                         # Log profile change on leave
                         await log_profile_change(
@@ -4244,7 +4262,7 @@ if __name__ == "__main__":
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
-        message_as_json = json.dumps(message.to_python(), indent=4, ensure_ascii=False)
+        message_as_json = json.dumps(message.model_dump(), indent=4, ensure_ascii=False)
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
             message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -5430,7 +5448,7 @@ if __name__ == "__main__":
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=lols_check_and_banned_kb,
+            reply_markup=lols_check_and_banned_kb.as_markup(),
         )
 
         try:
@@ -5490,7 +5508,7 @@ if __name__ == "__main__":
                 ban_message,
                 LOGGER,
                 parse_mode="HTML",
-                reply_markup=lols_check_and_banned_kb,
+                reply_markup=lols_check_and_banned_kb.as_markup(),
                 message_thread_id=TECHNO_ADMIN,
             )
 
@@ -5501,7 +5519,7 @@ if __name__ == "__main__":
                 ban_message,
                 LOGGER,
                 parse_mode="HTML",
-                reply_markup=lols_check_and_banned_kb,
+                reply_markup=lols_check_and_banned_kb.as_markup(),
                 message_thread_id=ADMIN_MANBAN,
             )
 
@@ -5806,7 +5824,7 @@ if __name__ == "__main__":
                 # Continue processing despite error
             try:
                 # Convert the Message object to a dictionary
-                message_dict = message.to_python()
+                message_dict = message.model_dump()
                 formatted_message = json.dumps(
                     message_dict, indent=4, ensure_ascii=False
                 )  # Convert back to a JSON string with indentation and human-readable characters
@@ -6037,7 +6055,7 @@ if __name__ == "__main__":
                             message_thread_id=ADMIN_SUSPICIOUS,
                             parse_mode="HTML",
                             disable_web_page_preview=True,
-                            reply_markup=kb,
+                            reply_markup=kb.as_markup(),
                         )
                         # Log immediate profile change
                         await log_profile_change(
@@ -6406,7 +6424,7 @@ if __name__ == "__main__":
                     CHANNEL_DICT,
                 )
                 # BOT.ban_chat_member(
-                #     message.chat.id, message.from_id, revoke_messages=True
+                #     message.chat.id, message.from_user.id, revoke_messages=True
                 # )
                 return
 
@@ -6561,7 +6579,7 @@ if __name__ == "__main__":
                                 message_thread_id=ADMIN_SUSPICIOUS,
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
-                                reply_markup=_missed_join_kb,
+                                reply_markup=_missed_join_kb.as_markup(),
                             )
                             missed_join_notification_sent = True
                             LOGGER.info(
@@ -6649,9 +6667,20 @@ if __name__ == "__main__":
             )
 
             # Convert the string to a datetime object
-            user_join_chat_date = datetime.strptime(
-                user_join_chat_date_str, "%Y-%m-%d %H:%M:%S"
-            )
+            # Handle both naive and timezone-aware datetime strings
+            try:
+                # Try parsing with timezone first (e.g., "2025-12-01 17:29:12+00:00")
+                from datetime import timezone
+                user_join_chat_date = datetime.fromisoformat(user_join_chat_date_str)
+                # Ensure timezone-aware for comparison with message.date (which is UTC)
+                if user_join_chat_date.tzinfo is None:
+                    user_join_chat_date = user_join_chat_date.replace(tzinfo=timezone.utc)
+            except ValueError:
+                # Fallback to naive datetime format - make it UTC
+                from datetime import timezone
+                user_join_chat_date = datetime.strptime(
+                    user_join_chat_date_str, "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=timezone.utc)
 
             # flag true if user joined the chat more than 1 week ago
             # BUT: if user_first_seen_unknown, treat as NOT old (do checks)
@@ -6677,7 +6706,7 @@ if __name__ == "__main__":
             # check if user flagged legit by setting
             # new_chat_member and left_chat_member in the DB to 1
             # to indicate that checks were cancelled
-            user_flagged_legit = check_user_legit(CURSOR, message.from_id)
+            user_flagged_legit = check_user_legit(CURSOR, message.from_user.id)
 
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
@@ -6713,13 +6742,14 @@ if __name__ == "__main__":
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
             # Check if the message is forwarded and ensure forward_from is not None
+            # In aiogram 3.x, use forward_origin instead of is_forward()
             if (
-                message.is_forward()
+                message.forward_origin is not None
                 and message.forward_from
                 and message.forward_from.id != message.from_user.id
             ):
                 # this is possibly a spam
-                the_reason = f"{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
+                the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
@@ -6741,7 +6771,7 @@ if __name__ == "__main__":
                 message
             ):  # check if the message contains spammy custom emojis
                 the_reason = (
-                    f"{message.from_id} message contains 5 or more spammy custom emojis"
+                    f"{message.from_user.id} message contains 5 or more spammy custom emojis"
                 )
                 if await check_n_ban(message, the_reason):
                     return
@@ -6756,7 +6786,7 @@ if __name__ == "__main__":
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
             elif check_message_for_sentences(message, PREDETERMINED_SENTENCES, LOGGER):
-                the_reason = f"{message.from_id} message contains spammy sentences"
+                the_reason = f"{message.from_user.id} message contains spammy sentences"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
@@ -6772,7 +6802,7 @@ if __name__ == "__main__":
             elif check_message_for_capital_letters(
                 message
             ) and check_message_for_emojis(message):
-                the_reason = f"{message.from_id} message contains 5+ spammy capital letters and 5+ spammy regular emojis"
+                the_reason = f"{message.from_user.id} message contains 5+ spammy capital letters and 5+ spammy regular emojis"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
@@ -6788,13 +6818,13 @@ if __name__ == "__main__":
             # check if the message is sent less then 10 seconds after joining the chat
             elif user_is_10sec_old:
                 # this is possibly a bot
-                the_reason = f"{message.from_id} message is sent less then 10 seconds after joining the chat"
+                the_reason = f"{message.from_user.id} message is sent less then 10 seconds after joining the chat"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(
                         "%s is possibly a bot typing histerically...",
-                        message.from_id,
+                        message.from_user.id,
                     )
                     if not autoreport_sent:
                         autoreport_sent = True
@@ -6804,7 +6834,7 @@ if __name__ == "__main__":
             elif user_is_1hr_old and entity_spam_trigger:
                 # this is possibly a spam
                 the_reason = (
-                    f"(<code>{message.from_id}</code>) sent message less then 1 hour after joining the chat and have "
+                    f"(<code>{message.from_user.id}</code>) sent message less then 1 hour after joining the chat and have "
                     + entity_spam_trigger
                     + " inside"
                 )
@@ -6822,12 +6852,12 @@ if __name__ == "__main__":
                         return  # stop further actions for this message since user was banned before
             elif message.via_bot:
                 # check if the message is sent via inline bot comand
-                the_reason = f"{message.from_id} message sent via inline bot"
+                the_reason = f"{message.from_user.id} message sent via inline bot"
                 if await check_n_ban(message, the_reason):
                     return
                 else:
                     LOGGER.info(
-                        "%s possibly sent a spam via inline bot", message.from_id
+                        "%s possibly sent a spam via inline bot", message.from_user.id
                     )
                     if not autoreport_sent:
                         autoreport_sent = True
@@ -6836,11 +6866,11 @@ if __name__ == "__main__":
             elif message_sent_during_night(message):  # disabled for now only logging
                 # await BOT.set_message_reaction(message, "🌙")
                 # NOTE switch to aiogram 3.13.1 or higher
-                the_reason = f"{message.from_id} message {message.message_id} in chat {message.chat.title} sent during the night"
+                the_reason = f"{message.from_user.id} message {message.message_id} in chat {message.chat.title} sent during the night"
                 if await check_n_ban(message, the_reason):
                     return
-                elif message.from_id not in active_user_checks_dict:
-                    active_user_checks_dict[message.from_id] = {
+                elif message.from_user.id not in active_user_checks_dict:
+                    active_user_checks_dict[message.from_user.id] = {
                         "username": (
                             message.from_user.username
                             if message.from_user.username
@@ -6850,7 +6880,7 @@ if __name__ == "__main__":
 
                     # Store the message link in the active_user_checks_dict
                     message_key = f"{message.chat.id}_{message.message_id}"
-                    active_user_checks_dict[message.from_id][message_key] = message_link
+                    active_user_checks_dict[message.from_user.id][message_key] = message_link
 
                     # start the perform_checks coroutine
                     # Note: need to delete the message if user is spammer
@@ -6858,7 +6888,7 @@ if __name__ == "__main__":
                     # Note: -100 prefix is required for supergroup API calls
                     LOGGER.info(
                         "%s:@%s Nightwatch Message to delete: %s",
-                        message.from_id,
+                        message.from_user.id,
                         (
                             message.from_user.username
                             if message.from_user.username
@@ -6869,16 +6899,16 @@ if __name__ == "__main__":
                     asyncio.create_task(
                         perform_checks(
                             message_to_delete=message_to_delete,
-                            event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
-                            user_id=message.from_id,
-                            inout_logmessage=f"{message.from_id} message sent during the night, in {message.chat.title}, checking user activity...",
+                            event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_user.id:<10} night message in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
+                            user_id=message.from_user.id,
+                            inout_logmessage=f"{message.from_user.id} message sent during the night, in {message.chat.title}, checking user activity...",
                             user_name=(
                                 message.from_user.username
                                 if message.from_user.username
                                 else "!UNDEFINED!"
                             ),
                         ),
-                        name=str(message.from_id),
+                        name=str(message.from_user.id),
                     )
                 # if not autoreport_sent:
                 #         autoreport_sent = True
@@ -6972,7 +7002,7 @@ if __name__ == "__main__":
                         )
                         LOGGER.info(
                             "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
-                            message.from_id,
+                            message.from_user.id,
                             (
                                 message.from_user.username
                                 if message.from_user.username
@@ -6982,7 +7012,7 @@ if __name__ == "__main__":
                             human_readable_time,
                             message_link,
                         )
-                    the_reason = f"\033[91m{message.from_id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
+                    the_reason = f"\033[91m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} identified as a spammer when sending a message during the first WEEK after registration. Telefragged in {human_readable_time}...\033[0m"
                     if await check_n_ban(message, the_reason):
 
                         # At the point where you want to print the traceback
@@ -7758,7 +7788,7 @@ if __name__ == "__main__":
                 perform_checks(
                     event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} 👀 manual check requested by admin {message.from_user.id}",
                     user_id=user_id,
-                    inout_logmessage=f"{user_id} manual check requested, checking user activity requested by admin {message.from_id}...",
+                    inout_logmessage=f"{user_id} manual check requested, checking user activity requested by admin {message.from_user.id}...",
                     user_name=active_user_checks_dict[user_id],
                 ),
                 name=str(user_id),
@@ -9689,13 +9719,13 @@ if __name__ == "__main__":
 
     @DP.message(
         is_valid_message,
-        content_types=ALLOWED_CONTENT_TYPES,
+        F.content_type.in_(ALLOWED_CONTENT_TYPES),
     )  # exclude admins and technolog group, exclude join/left messages
     async def log_all_unhandled_messages(message: Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
             # Convert the Message object to a dictionary
-            message_dict = message.to_python()
+            message_dict = message.model_dump()
             full_formatted_message = json.dumps(
                 message_dict, indent=4, ensure_ascii=False
             )  # Convert back to a JSON string with indentation and human-readable characters
@@ -10622,7 +10652,7 @@ if __name__ == "__main__":
 
         LOGGER.info(
             "%s:@%s changed in user_changed_message function:\n\t\t\t%s --> %s, deleting system message...",
-            message.from_id,
+            message.from_user.id,
             message.from_user.username if message.from_user.username else "!UNDEFINED!",
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
@@ -10696,11 +10726,14 @@ if __name__ == "__main__":
         # Delete webhook and skip pending updates before polling
         await BOT.delete_webhook(drop_pending_updates=True)
         
-        # Start polling
-        await DP.start_polling(BOT, allowed_updates=ALLOWED_UPDATES)
+        # Start polling with close_bot_session=False to prevent flood errors
+        # We handle cleanup ourselves in on_shutdown
+        await DP.start_polling(BOT, allowed_updates=ALLOWED_UPDATES, close_bot_session=False)
     
     try:
         asyncio.run(main())
+    except TelegramRetryAfter as e:
+        LOGGER.warning("Bot shutdown rate limited by Telegram (retry after %s seconds). Exiting anyway.", e.retry_after)
     finally:
         # Close SQLite connection
         CONN.close()

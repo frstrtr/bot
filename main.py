@@ -6810,8 +6810,8 @@ if __name__ == "__main__":
             # Helper function to extract text from entity
             def extract_entity_text(text, entity):
                 """Extract text from message entity."""
-                offset = entity.get("offset", 0)
-                length = entity.get("length", 0)
+                offset = entity.get("offset", 0) if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                length = entity.get("length", 0) if isinstance(entity, dict) else getattr(entity, "length", 0)
                 if text and offset is not None and length:
                     # Handle UTF-16 encoding (Telegram uses UTF-16 for offsets)
                     return text.encode("utf-16-le")[
@@ -6856,12 +6856,12 @@ if __name__ == "__main__":
             # Check message entities for links, mentions, phone numbers
             if message.entities and message.text:
                 for entity in message.entities:
-                    entity_type = entity.get("type")
+                    entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
                     if entity_type in ["url", "text_link"]:
                         has_suspicious_content = True
                         # Extract URL from text_link or visible url
                         if entity_type == "text_link":
-                            url = entity.get("url", "")
+                            url = entity.get("url", "") if isinstance(entity, dict) else getattr(entity, "url", "")
                             visible_text = extract_entity_text(message.text, entity)
                             visible_clean = make_visible(visible_text, max_len=50)
                             suspicious_items["links"].append(
@@ -6879,11 +6879,11 @@ if __name__ == "__main__":
                     elif entity_type == "text_mention":
                         # Direct mention of user by ID (users without username)
                         has_suspicious_content = True
-                        user = entity.get("user")
+                        user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
                         if user:
-                            user_id = user.get("id")
-                            user_name = user.get("username")
-                            first_name = user.get("first_name", "")
+                            user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                            user_name = user.get("username") if isinstance(user, dict) else getattr(user, "username", None)
+                            first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
                             if user_name:
                                 suspicious_items["mentions"].append(f"@{user_name}")
                             else:
@@ -6920,12 +6920,12 @@ if __name__ == "__main__":
             # Check caption entities for media messages
             if message.caption_entities and message.caption:
                 for entity in message.caption_entities:
-                    entity_type = entity.get("type")
+                    entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
                     if entity_type in ["url", "text_link"]:
                         has_suspicious_content = True
                         # Extract URL from text_link or visible url
                         if entity_type == "text_link":
-                            url = entity.get("url", "")
+                            url = entity.get("url", "") if isinstance(entity, dict) else getattr(entity, "url", "")
                             visible_text = extract_entity_text(message.caption, entity)
                             visible_clean = make_visible(visible_text, max_len=50)
                             suspicious_items["links"].append(
@@ -6943,11 +6943,11 @@ if __name__ == "__main__":
                     elif entity_type == "text_mention":
                         # Direct mention of user by ID (users without username)
                         has_suspicious_content = True
-                        user = entity.get("user")
+                        user = entity.get("user") if isinstance(entity, dict) else getattr(entity, "user", None)
                         if user:
-                            user_id = user.get("id")
-                            user_name = user.get("username")
-                            first_name = user.get("first_name", "")
+                            user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+                            user_name = user.get("username") if isinstance(user, dict) else getattr(user, "username", None)
+                            first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
                             if user_name:
                                 suspicious_items["mentions"].append(f"@{user_name}")
                             else:

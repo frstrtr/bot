@@ -3,6 +3,18 @@
 ## [2025-12-01]
 
 ### Added
+- **Standardized offense types enum**: `OffenseType` enum in `utils.py` for consistent ban tracking
+  - Auto-ban triggers: `fast_message`, `spam_pattern`, `spam_sentences`, `custom_emoji_spam`, `caps_emoji_spam`, `via_inline_bot`, `night_message`, `latency_banned`
+  - Bot mention: `bot_mention`, `bot_mention_monitored`, `bot_mention_missed_join`
+  - Forward/Channel: `forwarded_spam`, `channel_spam`, `forwarded_channel_spam`
+  - Account-based: `high_id_spam`, `high_id_join`
+  - Content-based: `suspicious_links`, `suspicious_mentions`, `suspicious_phones`, `suspicious_emails`, `suspicious_bot_commands`, `hidden_mentions`, `suspicious_content`
+  - Profile-based: `profile_change_watch`, `profile_change_leave`, `profile_change_periodic`
+  - External DB: `lols_banned`, `cas_banned`, `p2p_banned`, `local_db_banned`
+  - Admin actions: `admin_ban`, `admin_report`
+  - Behavior-based: `quick_leave`, `join_leave_pattern`, `week_old_suspicious`
+  - Helper function `classify_offense_from_reason()` to map reason strings to offense types
+
 - **Extended ban tracking in database**: Comprehensive ban details stored in `user_baselines`
   - Ban source tracking: `lols`, `cas`, `p2p`, `local`, `admin`, `autoreport`
   - Admin details: `banned_by_admin_id`, `banned_by_admin_username`
@@ -10,7 +22,6 @@
   - Offense details: `offense_type`, `offense_details` (JSON), `first_message_text`
   - Timing: `time_to_first_message` (seconds from join to first message)
   - Detection flags: `detected_by_lols`, `detected_by_cas`, `detected_by_p2p`, `detected_by_local`, `detected_by_admin`
-  - Offense types: `fast_message`, `spam_pattern`, `bot_mention`, `hidden_mentions`, `forwarded_spam`, `channel_spam`, `high_id_spam`
 
 ### Fixed
 - **Prevent duplicate autoreport/suspicious notifications**: Messages sent to AUTOREPORT thread are now tracked

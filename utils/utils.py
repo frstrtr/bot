@@ -40,6 +40,7 @@ import subprocess
 import re
 from datetime import datetime
 from typing import Optional, Tuple
+from enum import Enum
 
 from sqlite3 import Connection, Cursor
 
@@ -48,6 +49,232 @@ import sys
 import aiohttp
 import pytz
 import emoji
+
+
+# ============================================================================
+# Offense Types - standardized values for ban/report tracking
+# ============================================================================
+
+class OffenseType(str, Enum):
+    """Standardized offense types for spam detection and ban tracking.
+    
+    Auto-ban triggers (immediate action):
+        FAST_MESSAGE: Message within 10s of join
+        SPAM_PATTERN: Matched spam dictionary pattern
+        SPAM_SENTENCES: Matched predetermined spam sentences
+        CUSTOM_EMOJI_SPAM: 5+ spammy custom emojis in message
+        CAPS_EMOJI_SPAM: 5+ capital letters AND 5+ emojis combined
+        VIA_INLINE_BOT: Message sent via inline bot
+        NIGHT_MESSAGE: Message sent during suspicious hours
+        LATENCY_BANNED: User was already banned but message squeezed through
+        
+    Bot mention triggers:
+        BOT_MENTION: Mentioned @...bot in message
+        BOT_MENTION_MONITORED: Bot mention by user under active monitoring
+        BOT_MENTION_MISSED_JOIN: Bot mention by user whose join was missed
+        
+    Forward/Channel spam:
+        FORWARDED_SPAM: Forwarded spam content from unknown source
+        CHANNEL_SPAM: Spam via linked channel
+        FORWARDED_CHANNEL_SPAM: Forwarded from banned channel
+        
+    Account-based triggers:
+        HIGH_ID_SPAM: Very new account (ID > 8.2B) + spam indicators
+        HIGH_ID_JOIN: Very new account flagged on join
+        
+    Content-based detection (suspicious thread):
+        SUSPICIOUS_LINKS: Links/URLs in message
+        SUSPICIOUS_MENTIONS: User mentions (@ mentions) in message
+        SUSPICIOUS_PHONES: Phone numbers detected
+        SUSPICIOUS_EMAILS: Email addresses detected
+        SUSPICIOUS_BOT_COMMANDS: Bot commands in message
+        HIDDEN_MENTIONS: Invisible/obfuscated chars in mentions
+        
+    Profile-based triggers:
+        PROFILE_CHANGE_WATCH: Profile changed while under monitoring
+        PROFILE_CHANGE_LEAVE: Profile changed between join and leave
+        PROFILE_CHANGE_PERIODIC: Profile changed during periodic check
+        
+    External database detection:
+        LOLS_BANNED: Detected by LOLS anti-spam database
+        CAS_BANNED: Detected by CAS (Combot Anti-Spam) database
+        P2P_BANNED: Detected by P2P spamcheck network
+        LOCAL_DB_BANNED: Detected by local spam database
+        
+    Manual admin actions:
+        ADMIN_BAN: Manually banned by admin
+        ADMIN_REPORT: Reported by admin
+        
+    Join/Leave behavior:
+        QUICK_LEAVE: Left chat within 1 minute of join
+        JOIN_LEAVE_PATTERN: Suspicious join/leave pattern detected
+        
+    Week-old user monitoring:
+        WEEK_OLD_SUSPICIOUS: User under week-old monitoring posted suspicious content
+    """
+    
+    # Auto-ban triggers
+    FAST_MESSAGE = "fast_message"
+    SPAM_PATTERN = "spam_pattern"
+    SPAM_SENTENCES = "spam_sentences"
+    CUSTOM_EMOJI_SPAM = "custom_emoji_spam"
+    CAPS_EMOJI_SPAM = "caps_emoji_spam"
+    VIA_INLINE_BOT = "via_inline_bot"
+    NIGHT_MESSAGE = "night_message"
+    LATENCY_BANNED = "latency_banned"
+    
+    # Bot mention triggers
+    BOT_MENTION = "bot_mention"
+    BOT_MENTION_MONITORED = "bot_mention_monitored"
+    BOT_MENTION_MISSED_JOIN = "bot_mention_missed_join"
+    
+    # Forward/Channel spam
+    FORWARDED_SPAM = "forwarded_spam"
+    CHANNEL_SPAM = "channel_spam"
+    FORWARDED_CHANNEL_SPAM = "forwarded_channel_spam"
+    
+    # Account-based
+    HIGH_ID_SPAM = "high_id_spam"
+    HIGH_ID_JOIN = "high_id_join"
+    
+    # Content-based (suspicious)
+    SUSPICIOUS_LINKS = "suspicious_links"
+    SUSPICIOUS_MENTIONS = "suspicious_mentions"
+    SUSPICIOUS_PHONES = "suspicious_phones"
+    SUSPICIOUS_EMAILS = "suspicious_emails"
+    SUSPICIOUS_BOT_COMMANDS = "suspicious_bot_commands"
+    HIDDEN_MENTIONS = "hidden_mentions"
+    SUSPICIOUS_CONTENT = "suspicious_content"  # Generic for multiple types
+    
+    # Profile-based
+    PROFILE_CHANGE_WATCH = "profile_change_watch"
+    PROFILE_CHANGE_LEAVE = "profile_change_leave"
+    PROFILE_CHANGE_PERIODIC = "profile_change_periodic"
+    
+    # External database detection
+    LOLS_BANNED = "lols_banned"
+    CAS_BANNED = "cas_banned"
+    P2P_BANNED = "p2p_banned"
+    LOCAL_DB_BANNED = "local_db_banned"
+    
+    # Admin actions
+    ADMIN_BAN = "admin_ban"
+    ADMIN_REPORT = "admin_report"
+    
+    # Join/Leave behavior
+    QUICK_LEAVE = "quick_leave"
+    JOIN_LEAVE_PATTERN = "join_leave_pattern"
+    
+    # Week-old monitoring
+    WEEK_OLD_SUSPICIOUS = "week_old_suspicious"
+
+
+# Helper to get offense type from reason string
+def classify_offense_from_reason(reason: str) -> str:
+    """Classify offense type from a reason string.
+    
+    Args:
+        reason: The ban/report reason string
+        
+    Returns:
+        Matching OffenseType value or the original reason if no match
+    """
+    reason_lower = reason.lower() if reason else ""
+    
+    # Fast message detection
+    if "10 second" in reason_lower or "10s" in reason_lower or "less then 10" in reason_lower:
+        return OffenseType.FAST_MESSAGE.value
+    
+    # Spam patterns
+    if "spam" in reason_lower and "sentence" in reason_lower:
+        return OffenseType.SPAM_SENTENCES.value
+    if "spam pattern" in reason_lower or "spam dict" in reason_lower:
+        return OffenseType.SPAM_PATTERN.value
+    
+    # Custom emoji spam
+    if "custom emoji" in reason_lower or "spammy custom emojis" in reason_lower:
+        return OffenseType.CUSTOM_EMOJI_SPAM.value
+    
+    # Caps + emoji spam
+    if "capital letter" in reason_lower and "emoji" in reason_lower:
+        return OffenseType.CAPS_EMOJI_SPAM.value
+    
+    # Bot mention
+    if "bot mention" in reason_lower:
+        if "missed join" in reason_lower:
+            return OffenseType.BOT_MENTION_MISSED_JOIN.value
+        if "monitored" in reason_lower:
+            return OffenseType.BOT_MENTION_MONITORED.value
+        return OffenseType.BOT_MENTION.value
+    if "@" in reason_lower and "bot" in reason_lower:
+        return OffenseType.BOT_MENTION.value
+    
+    # Forwarded content
+    if "forward" in reason_lower:
+        if "channel" in reason_lower:
+            return OffenseType.FORWARDED_CHANNEL_SPAM.value
+        return OffenseType.FORWARDED_SPAM.value
+    
+    # Channel spam
+    if "channel" in reason_lower and "spam" in reason_lower:
+        return OffenseType.CHANNEL_SPAM.value
+    
+    # High ID
+    if "high" in reason_lower and "id" in reason_lower:
+        return OffenseType.HIGH_ID_SPAM.value
+    if "> 8.2b" in reason_lower or ">8.2b" in reason_lower:
+        return OffenseType.HIGH_ID_JOIN.value
+    
+    # Inline bot
+    if "inline bot" in reason_lower or "via bot" in reason_lower:
+        return OffenseType.VIA_INLINE_BOT.value
+    
+    # Night message
+    if "night" in reason_lower:
+        return OffenseType.NIGHT_MESSAGE.value
+    
+    # Latency
+    if "latency" in reason_lower or "squizzed" in reason_lower:
+        return OffenseType.LATENCY_BANNED.value
+    
+    # 1 hour entity spam
+    if "1 hour" in reason_lower or "less then 1 hour" in reason_lower:
+        if "link" in reason_lower or "url" in reason_lower:
+            return OffenseType.SUSPICIOUS_LINKS.value
+        if "mention" in reason_lower:
+            return OffenseType.SUSPICIOUS_MENTIONS.value
+        return OffenseType.SUSPICIOUS_CONTENT.value
+    
+    # Profile changes
+    if "profile" in reason_lower and "change" in reason_lower:
+        if "periodic" in reason_lower:
+            return OffenseType.PROFILE_CHANGE_PERIODIC.value
+        if "leave" in reason_lower:
+            return OffenseType.PROFILE_CHANGE_LEAVE.value
+        return OffenseType.PROFILE_CHANGE_WATCH.value
+    
+    # External databases
+    if "lols" in reason_lower:
+        return OffenseType.LOLS_BANNED.value
+    if "cas" in reason_lower:
+        return OffenseType.CAS_BANNED.value
+    if "p2p" in reason_lower:
+        return OffenseType.P2P_BANNED.value
+    
+    # Admin actions
+    if "admin" in reason_lower and ("ban" in reason_lower or "report" in reason_lower):
+        return OffenseType.ADMIN_BAN.value
+    
+    # Quick leave
+    if ("left" in reason_lower or "leave" in reason_lower) and ("minute" in reason_lower or "quick" in reason_lower):
+        return OffenseType.QUICK_LEAVE.value
+    
+    # Week-old monitoring
+    if "week" in reason_lower and ("old" in reason_lower or "suspicious" in reason_lower):
+        return OffenseType.WEEK_OLD_SUSPICIOUS.value
+    
+    # Default: return original reason
+    return reason
 
 from aiogram import types
 from aiogram.types import (

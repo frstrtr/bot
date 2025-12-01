@@ -55,6 +55,201 @@ import emoji
 # Offense Types - standardized values for ban/report tracking
 # ============================================================================
 
+class BanSource(str, Enum):
+    """Ban source identifiers for tracking which system detected/banned the user.
+    
+    These can be combined (e.g., "lols+cas" if detected by multiple systems).
+    Use build_ban_source() helper to create combined sources.
+    """
+    # External API detection
+    LOLS = "lols"           # LOLS anti-spam database
+    CAS = "cas"             # Combot Anti-Spam database  
+    P2P = "p2p"             # P2P spamcheck network
+    LOCAL = "local"         # Local spam database (127.0.0.1:8081)
+    
+    # Bot detection
+    AUTOREPORT = "autoreport"   # Bot's automatic report system
+    AUTOBAN = "autoban"         # Bot's automatic ban system
+    
+    # Manual actions
+    ADMIN = "admin"         # Manually banned by admin
+    
+    @classmethod
+    def combine(cls, *sources) -> str:
+        """Combine multiple ban sources into a single string.
+        
+        Args:
+            *sources: BanSource values or strings
+            
+        Returns:
+            Combined source string (e.g., "lols+cas+p2p")
+        """
+        unique_sources = []
+        for src in sources:
+            val = src.value if isinstance(src, cls) else str(src)
+            if val and val not in unique_sources:
+                unique_sources.append(val)
+        return "+".join(sorted(unique_sources)) if unique_sources else None
+
+
+def build_ban_source(
+    lols: bool = False,
+    cas: bool = False, 
+    p2p: bool = False,
+    local: bool = False,
+    admin: bool = False,
+    autoreport: bool = False,
+    autoban: bool = False,
+) -> str:
+    """Build a combined ban source string from detection flags.
+    
+    Args:
+        lols: Detected by LOLS database
+        cas: Detected by CAS database
+        p2p: Detected by P2P network
+        local: Detected by local database
+        admin: Manually banned by admin
+        autoreport: Bot's autoreport triggered
+        autoban: Bot's autoban triggered
+        
+    Returns:
+        Combined source string (e.g., "cas+lols+p2p") or None
+        
+    Example:
+        >>> build_ban_source(lols=True, cas=True)
+        'cas+lols'
+        >>> build_ban_source(admin=True)
+        'admin'
+        >>> build_ban_source(lols=True, p2p=True, autoban=True)
+        'autoban+lols+p2p'
+    """
+    sources = []
+    if lols:
+        sources.append(BanSource.LOLS.value)
+    if cas:
+        sources.append(BanSource.CAS.value)
+    if p2p:
+        sources.append(BanSource.P2P.value)
+    if local:
+        sources.append(BanSource.LOCAL.value)
+    if admin:
+        sources.append(BanSource.ADMIN.value)
+    if autoreport:
+        sources.append(BanSource.AUTOREPORT.value)
+    if autoban:
+        sources.append(BanSource.AUTOBAN.value)
+    
+    return "+".join(sorted(sources)) if sources else None
+
+
+def parse_ban_source(source_str: str) -> dict:
+    """Parse a combined ban source string back into individual flags.
+    
+    Args:
+        source_str: Combined source string (e.g., "cas+lols+p2p")
+        
+    Returns:
+        Dictionary with boolean flags for each source
+        
+    Example:
+        >>> parse_ban_source("cas+lols+p2p")
+        {'lols': True, 'cas': True, 'p2p': True, 'local': False, 'admin': False, ...}
+    """
+    sources = source_str.lower().split("+") if source_str else []
+    return {
+        "lols": "lols" in sources,
+        "cas": "cas" in sources,
+        "p2p": "p2p" in sources,
+        "local": "local" in sources,
+        "admin": "admin" in sources,
+        "autoreport": "autoreport" in sources,
+        "autoban": "autoban" in sources,
+    }
+
+
+def build_admin_ban_info(
+    admin_id: int,
+    admin_username: str = None,
+    admin_first_name: str = None,
+    admin_last_name: str = None,
+) -> dict:
+    """Build admin info dictionary for manual ban tracking.
+    
+    Args:
+        admin_id: Telegram user ID of the admin
+        admin_username: Admin's username (without @)
+        admin_first_name: Admin's first name
+        admin_last_name: Admin's last name
+        
+    Returns:
+        Dictionary with admin profile info for storage in offense_details
+        
+    Example:
+        >>> build_admin_ban_info(123456, "admin_user", "John", "Doe")
+        {'admin_id': 123456, 'admin_username': 'admin_user', 'admin_name': 'John Doe'}
+    """
+    admin_name_parts = []
+    if admin_first_name:
+        admin_name_parts.append(admin_first_name)
+    if admin_last_name:
+        admin_name_parts.append(admin_last_name)
+    
+    return {
+        "admin_id": admin_id,
+        "admin_username": admin_username,
+        "admin_name": " ".join(admin_name_parts) if admin_name_parts else None,
+    }
+
+
+def build_detection_details(
+    lols_result: dict = None,
+    cas_result: dict = None,
+    p2p_result: dict = None,
+    local_result: dict = None,
+    admin_info: dict = None,
+    additional_info: dict = None,
+) -> str:
+    """Build JSON string with detailed detection information.
+    
+    Args:
+        lols_result: Raw response from LOLS API
+        cas_result: Raw response from CAS API (includes offenses count)
+        p2p_result: Raw response from P2P network
+        local_result: Raw response from local DB
+        admin_info: Admin info dict from build_admin_ban_info()
+        additional_info: Any additional context
+        
+    Returns:
+        JSON string for storage in offense_details field
+        
+    Example:
+        >>> build_detection_details(
+        ...     lols_result={"banned": True, "reason": "spam"},
+        ...     cas_result={"ok": True, "result": {"offenses": 5}},
+        ...     admin_info=build_admin_ban_info(123, "admin")
+        ... )
+        '{"lols": {"banned": true, ...}, "cas": {...}, "admin": {...}}'
+    """
+    import json
+    
+    details = {}
+    
+    if lols_result:
+        details["lols"] = lols_result
+    if cas_result:
+        details["cas"] = cas_result
+    if p2p_result:
+        details["p2p"] = p2p_result
+    if local_result:
+        details["local"] = local_result
+    if admin_info:
+        details["admin"] = admin_info
+    if additional_info:
+        details["info"] = additional_info
+    
+    return json.dumps(details) if details else None
+
+
 class OffenseType(str, Enum):
     """Standardized offense types for spam detection and ban tracking.
     

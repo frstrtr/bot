@@ -3,6 +3,14 @@
 ## [2025-12-01]
 
 ### Added
+- **Ban source tracking with combinations**: `BanSource` enum and helpers for detailed ban origin tracking
+  - Sources: `lols`, `cas`, `p2p`, `local`, `admin`, `autoreport`, `autoban`
+  - `build_ban_source()`: Create combined sources (e.g., `"cas+lols+p2p"` when detected by multiple APIs)
+  - `parse_ban_source()`: Parse combined string back to individual flags
+  - `build_admin_ban_info()`: Create admin profile dict for manual ban tracking
+  - `build_detection_details()`: Build JSON with raw API responses (LOLS/CAS/P2P) and admin info
+  - Example: User detected by LOLS and CAS → `ban_source="cas+lols"`, `offense_details={"lols": {...}, "cas": {...}}`
+
 - **Standardized offense types enum**: `OffenseType` enum in `utils.py` for consistent ban tracking
   - Auto-ban triggers: `fast_message`, `spam_pattern`, `spam_sentences`, `custom_emoji_spam`, `caps_emoji_spam`, `via_inline_bot`, `night_message`, `latency_banned`
   - Bot mention: `bot_mention`, `bot_mention_monitored`, `bot_mention_missed_join`
@@ -16,10 +24,10 @@
   - Helper function `classify_offense_from_reason()` to map reason strings to offense types
 
 - **Extended ban tracking in database**: Comprehensive ban details stored in `user_baselines`
-  - Ban source tracking: `lols`, `cas`, `p2p`, `local`, `admin`, `autoreport`
+  - Ban source tracking: combined sources (e.g., `"cas+lols+p2p"`)
   - Admin details: `banned_by_admin_id`, `banned_by_admin_username`
   - Chat context: `banned_in_chat_id`, `banned_in_chat_title`
-  - Offense details: `offense_type`, `offense_details` (JSON), `first_message_text`
+  - Offense details: `offense_type`, `offense_details` (JSON with API responses), `first_message_text`
   - Timing: `time_to_first_message` (seconds from join to first message)
   - Detection flags: `detected_by_lols`, `detected_by_cas`, `detected_by_p2p`, `detected_by_local`, `detected_by_admin`
 

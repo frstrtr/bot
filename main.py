@@ -1314,6 +1314,10 @@ async def handle_autoreports(
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
         f"ℹ️ <a href='{technnolog_spamMessage_copy_link}'>Technolog copy</a>\n"
         f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
+        f"\n🔗 <b>Profile links:</b>\n"
+        f"   ├ <a href='tg://user?id={spammer_id}'>ID based profile link</a>\n"
+        f"   └ <a href='tg://openmessage?user_id={spammer_id}'>Android</a>, "
+        f"<a href='https://t.me/@id{spammer_id}'>iOS</a>\n"
     )
 
     # Analyze mentions in the message
@@ -4278,6 +4282,10 @@ if __name__ == "__main__":
             f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
             f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
+            f"\n🔗 <b>Profile links:</b>\n"
+            f"   ├ <a href='tg://user?id={user_id}'>ID based profile link</a>\n"
+            f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, "
+            f"<a href='https://t.me/@id{user_id}'>iOS</a>\n"
         )
 
         # construct lols check link button

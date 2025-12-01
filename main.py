@@ -15,7 +15,7 @@ from datetime import timedelta
 from datetime import datetime
 import argparse
 import asyncio
-import os  # noqa: E402  # needed throughout the codebase
+import os
 import random
 import sqlite3
 import json
@@ -748,7 +748,7 @@ async def ban_rogue_chat_everywhere(
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
             success_count += 1
             await asyncio.sleep(1)  # pause 1 sec
-        except BadRequest as e:  # if user were Deleted Account while banning
+        except TelegramBadRequest as e:  # if user were Deleted Account while banning
             LOGGER.error(
                 "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
                 rogue_chat_id,
@@ -816,7 +816,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
             await BOT.unban_chat_sender_chat(chat_id, rogue_chat_id)
             # LOGGER.debug("%s  CHANNEL successfully unbanned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
-        except BadRequest as e:  # if user were Deleted Account while unbanning
+        except TelegramBadRequest as e:  # if user were Deleted Account while unbanning
             # chat_name = get_channel_id_by_name(channel_dict, chat_id)
             LOGGER.error(
                 "%s %s @%s - error unbanning in chat (%s): %s. Deleted CHANNEL?",
@@ -1325,7 +1325,7 @@ async def handle_autoreports(
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
-    except MessageToForwardNotFound:
+    except TelegramBadRequest:
         LOGGER.error(
             "%s:@%s Message to forward not found: %s",
             spammer_id,
@@ -1565,7 +1565,7 @@ async def handle_autoreports(
             message_thread_id=ADMIN_AUTOREPORTS,
             disable_notification=True,
         )
-    except MessageToForwardNotFound:
+    except TelegramBadRequest:
         if message:
             await message.forward(ADMIN_GROUP_ID, ADMIN_AUTOREPORTS)
         else:
@@ -1728,7 +1728,7 @@ async def ban_user_from_all_chats(
             await BOT.ban_chat_member(chat_id, user_id, revoke_messages=True)
             success_count += 1
             # LOGGER.debug("Successfully banned USER %s in chat %s", user_id, chat_id)
-        except BadRequest as e:  # if user were Deleted Account while banning
+        except TelegramBadRequest as e:  # if user were Deleted Account while banning
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
@@ -1785,7 +1785,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
 
     # Delete ALL stored messages for this user BEFORE removing from active_user_checks_dict
     if _id in active_user_checks_dict:
-        deleted_count, failed_count = await delete_all_user_messages(_id, user_name)
+        deleted_count, _ = await delete_all_user_messages(_id, user_name)
         if deleted_count > 0:
             LOGGER.info(
                 "%s:@%s Deleted %d spam messages during autoban",
@@ -1800,7 +1800,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         )  # add and remove the user to the banned_users_dict
 
         # remove user from all known chats first
-        success_count, fail_count, total_count = await ban_user_from_all_chats(
+        _, _, _ = await ban_user_from_all_chats(
             _id, user_name, CHANNEL_IDS, CHANNEL_DICT
         )
 
@@ -1927,28 +1927,30 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                         message_id,
                         chat_id,
                     )
-                except MessageToDeleteNotFound:
-                    LOGGER.debug(
-                        "%s:@%s Message %s not found (already deleted?)",
-                        user_id,
-                        user_name,
-                        message_id,
-                    )
+                except TelegramBadRequest as e:
+                    # Covers MessageToDeleteNotFound, MessageCantBeDeleted, etc.
+                    if "message to delete not found" in str(e).lower():
+                        LOGGER.debug(
+                            "%s:@%s Message %s not found (already deleted?)",
+                            user_id,
+                            user_name,
+                            message_id,
+                        )
+                    else:
+                        LOGGER.warning(
+                            "%s:@%s Cannot delete message %s: %s",
+                            user_id,
+                            user_name,
+                            message_id,
+                            e,
+                        )
                     failed_count += 1
-                except ChatNotFound:
+                except TelegramNotFound:
                     LOGGER.warning(
                         "%s:@%s Chat %s not found for message deletion",
                         user_id,
                         user_name,
                         chat_id,
-                    )
-                    failed_count += 1
-                except MessageCantBeDeleted:
-                    LOGGER.warning(
-                        "%s:@%s Cannot delete message %s (no permission?)",
-                        user_id,
-                        user_name,
-                        message_id,
                     )
                     failed_count += 1
                 except RetryAfter as e:
@@ -2076,14 +2078,14 @@ async def check_and_autoban(
             )
             try:
                 await BOT.delete_message(origin_chat_id, message_to_delete[1])
-            except ChatNotFound:
+            except TelegramNotFound:
                 LOGGER.error(
                     "%s:@%s Chat not found: %s",
                     user_id,
                     user_name,
                     message_to_delete[0],
                 )
-            except MessageToDeleteNotFound:
+            except TelegramBadRequest:
                 LOGGER.debug(
                     "%s:@%s Message to delete not found (maybe already deleted): %s",
                     user_id,
@@ -2354,7 +2356,7 @@ async def check_n_ban(message: Message, reason: str):
                     message_thread_id=ADMIN_AUTOBAN,
                 )
                 LOGGER.debug("%s BOT.forward_message #CNB", message.from_user.id)
-        except MessageToForwardNotFound as e:
+        except TelegramBadRequest as e:
             LOGGER.error(
                 "\033[93m%s - message %s to forward using check_n_ban(1044) not found in %s (%s)\033[0m Already deleted? %s",
                 message.from_user.id,
@@ -2514,7 +2516,7 @@ async def check_n_ban(message: Message, reason: str):
         # TODO shift to delete_messages in aiogram 3.0
         try:
             await BOT.delete_message(message.chat.id, message.message_id)
-        except MessageToDeleteNotFound:
+        except TelegramBadRequest:
             LOGGER.error(
                 "\033[93m%s:@%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
@@ -3425,7 +3427,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                except BadRequest as e:
+                except TelegramBadRequest as e:
                     LOGGER.error("Error sending active user checks chunk: %s", e)
         else:
             await safe_send_message(
@@ -3455,7 +3457,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                except BadRequest as e:
+                except TelegramBadRequest as e:
                     LOGGER.error("Error sending banned users chunk: %s", e)
         else:
             await safe_send_message(
@@ -3466,7 +3468,7 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 message_thread_id=msg_thread_id,
                 parse_mode="HTML",
             )
-    except BadRequest as e:
+    except TelegramBadRequest as e:
         LOGGER.error("Error sending active_user_checks_dict: %s", e)
 
 
@@ -4672,7 +4674,7 @@ if __name__ == "__main__":
 
                 return admin_group_banner_message
 
-        except BadRequest as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error while sending the banner to the admin group: %s", e)
             await message.answer(
                 "Error while sending the banner to the admin group. Please check the logs."
@@ -5116,17 +5118,20 @@ if __name__ == "__main__":
                             time.sleep(wait_time)
                         else:
                             continue  # Move to the next message after the last attempt
-                    except MessageToDeleteNotFound:
+                    except TelegramBadRequest as inner_e:
+                        # Covers MessageToDeleteNotFound, MessageCantBeDeleted
                         LOGGER.warning(
-                            "%s:@%s Message %s in chat %s (%s) not found for deletion.",
+                            "%s:@%s Message %s in chat %s (%s) could not be deleted: %s",
                             author_id,
                             user_name,
                             message_id,
                             CHANNEL_DICT[channel_id],
                             channel_id,
+                            inner_e,
                         )
                         break  # Cancel current attempt
-                    except ChatAdminRequired as inner_e:
+                    except TelegramForbiddenError as inner_e:
+                        # Covers ChatAdminRequired
                         LOGGER.error(
                             "\033[91mBot is not an admin in chat %s (%s). Error: %s\033[0m",
                             CHANNEL_DICT[channel_id],
@@ -5138,16 +5143,6 @@ if __name__ == "__main__":
                             TECHNOLOG_GROUP_ID,
                             f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
                             LOGGER,
-                        )
-                        break  # Cancel current attempt
-                    except MessageCantBeDeleted:
-                        LOGGER.warning(
-                            "%s:@%s Message %s in chat %s (%s) can't be deleted. Too old message?",
-                            author_id,
-                            user_name,
-                            message_id,
-                            CHANNEL_DICT[channel_id],
-                            channel_id,
                         )
                         break  # Cancel current attempt
                     # except Exception as inner_e:
@@ -5295,7 +5290,7 @@ if __name__ == "__main__":
                 ),
             )
 
-        except MessageCantBeDeleted as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error in handle_ban function: %s", e)
             await callback_query.message.reply(f"Error in handle_ban function: {e}")
 
@@ -5802,21 +5797,13 @@ if __name__ == "__main__":
                     disable_notification=True,
                     reply_markup=channel_ban_kb.as_markup(),
                 )
-            except MessageIdInvalid as e:
+            except TelegramBadRequest as e:
+                # Covers MessageIdInvalid, MessageToForwardNotFound, MessageCantBeForwarded
                 LOGGER.error(
-                    "🔴 CHANNEL MESSAGE: Message ID %s is invalid or was deleted in chat %s (%s): %s",
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
+                    "🔴 CHANNEL MESSAGE: Processing error (bad request): %s",
                     e,
                 )
-            except MessageToForwardNotFound as e:
-                LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted: %s", e)
-            except MessageCantBeForwarded as e:
-                LOGGER.error("🔴 CHANNEL MESSAGE: Can't be forwarded: %s", e)
-            except BadRequest as e:
-                LOGGER.error("🔴 CHANNEL MESSAGE: Processing error: %s", e)
-                # Continue processing despite BadRequest error
+                # Continue processing despite error
             try:
                 # Convert the Message object to a dictionary
                 message_dict = message.to_python()
@@ -5841,7 +5828,7 @@ if __name__ == "__main__":
                     disable_web_page_preview=True,
                     message_thread_id=TECHNO_ADMIN,
                 )
-            except MessageToDeleteNotFound as e:
+            except TelegramBadRequest as e:
                 LOGGER.error("🔴 CHANNEL MESSAGE: Already deleted! %s", e)
 
             return  # Stop processing - don't store channel messages in DB
@@ -6368,7 +6355,7 @@ if __name__ == "__main__":
                         disable_notification=True,
                     )
                     return  # stop actions for this message forwarded from channel/chat and do not record to DB
-                except BadRequest as e:
+                except TelegramBadRequest as e:
                     LOGGER.error(
                         "Error banning channel %s in chat %s: %s",
                         message.sender_chat,
@@ -6393,7 +6380,7 @@ if __name__ == "__main__":
                 )
                 try:
                     await BOT.delete_message(message.chat.id, message.message_id)
-                except MessageToDeleteNotFound as e:
+                except TelegramBadRequest as e:
                     LOGGER.error(
                         "\033[93m%s:@%s message %s to delete not found in chat %s (%s) @%s #LSS\033[0m:\n\t\t\t%s",
                         message.from_user.id,
@@ -7490,7 +7477,7 @@ if __name__ == "__main__":
                     LOGGER.error("Error forwarding suspicious content message: %s", e)
 
         # If other user/admin or bot deletes message earlier than this bot we got an error
-        except MessageIdInvalid as e:
+        except TelegramBadRequest as e:
             LOGGER.error(
                 "Error storing/deleting recent %s message, %s - someone deleted it already?",
                 message.message_id,
@@ -8051,7 +8038,7 @@ if __name__ == "__main__":
                     message_thread_id=ADMIN_MANBAN,
                 )
 
-            except ChatNotFound as e:
+            except TelegramNotFound as e:
                 LOGGER.error(
                     "Failed to delete message %d in chat %s. Error: %s",
                     message_id,
@@ -8163,7 +8150,7 @@ if __name__ == "__main__":
                         await message.reply(
                             f"Banning channel {rogue_chan_id} generated error: {result}."
                         )
-                except BadRequest as e:
+                except TelegramBadRequest as e:
                     LOGGER.error(
                         "Failed to ban channel %d. Error: %s", rogue_chan_id, e
                     )
@@ -10310,7 +10297,7 @@ if __name__ == "__main__":
                     total_count,
                 )
                 callback_answer = f"User banned globally! ({success_count}/{total_count} chats) Messages deleted!"
-            except BadRequest as e:
+            except TelegramBadRequest as e:
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
@@ -10483,7 +10470,7 @@ if __name__ == "__main__":
                     admin_id,
                 )
                 callback_answer = "User banned in ONE chat and the message were deleted.\nForward message to the bot to ban user everywhere!"
-            except BadRequest as e:
+            except TelegramBadRequest as e:
                 LOGGER.error("Suspicious user ban failed: %s", e)
                 callback_answer = "User not found in chat or ban failed."
             
@@ -10527,7 +10514,7 @@ if __name__ == "__main__":
                     new_values={},
                     photo_changed=False,
                 )
-            except MessageToDeleteNotFound as e:
+            except TelegramBadRequest as e:
                 LOGGER.error("Suspicious message to delete not found: %s", e)
                 callback_answer = "Suspicious message to delete not found."
         elif comand in ["canceldelmsg", "cancelban", "cancelglobalban"]:
@@ -10646,7 +10633,7 @@ if __name__ == "__main__":
             await BOT.delete_message(
                 message_id=message.message_id, chat_id=message.chat.id
             )
-        except MessageCantBeDeleted as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Message can't be deleted: %s", e)
             await safe_send_message(
                 BOT,

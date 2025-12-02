@@ -42,6 +42,7 @@ from datetime import datetime
 from typing import Optional, Tuple
 from enum import Enum
 
+import sqlite3
 from sqlite3 import Connection, Cursor
 
 import os
@@ -472,10 +473,7 @@ def classify_offense_from_reason(reason: str) -> str:
     return reason
 
 from aiogram import types
-from aiogram.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.enums import ChatMemberStatus
@@ -665,7 +663,7 @@ async def safe_send_message(
             if logger:
                 logger.error("BadRequest sending message to %s: %s", chat_id, e)
             return None
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             if logger:
                 logger.error("Unexpected error sending message to %s: %s", chat_id, e)
             return None
@@ -1046,7 +1044,7 @@ def db_init(cursor: Cursor, conn: Connection):
     try:
         cursor.execute("ALTER TABLE recent_messages ADD COLUMN deletion_reason TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
 
     # User baselines table - stores monitoring state and profile snapshots
@@ -1182,7 +1180,7 @@ def save_user_baseline(
         )
         conn.commit()
         return True
-    except Exception as e:
+    except sqlite3.Error as e:
         logging.getLogger(__name__).error(
             "Error saving user baseline for %s: %s", user_id, e
         )
@@ -1427,7 +1425,7 @@ def update_user_baseline_status(
         )
         conn.commit()
         return cursor.rowcount > 0
-    except Exception as e:
+    except sqlite3.Error as e:
         logging.getLogger(__name__).error(
             "Error updating user baseline status for %s: %s", user_id, e
         )
@@ -1449,7 +1447,7 @@ def delete_user_baseline(conn: Connection, user_id: int) -> bool:
         cursor.execute("DELETE FROM user_baselines WHERE user_id = ?", (user_id,))
         conn.commit()
         return cursor.rowcount > 0
-    except Exception as e:
+    except sqlite3.Error as e:
         logging.getLogger(__name__).error(
             "Error deleting user baseline for %s: %s", user_id, e
         )
@@ -1570,9 +1568,11 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
             "created_at": row[35],
             "updated_at": row[36],
         }
-        result["username"] = result["baseline"]["username"] or result["username"]
-        result["first_name"] = result["baseline"]["first_name"]
-        result["last_name"] = result["baseline"]["last_name"]
+        baseline_data = result["baseline"]
+        if isinstance(baseline_data, dict):
+            result["username"] = baseline_data.get("username") or result["username"]
+            result["first_name"] = baseline_data.get("first_name") or result["first_name"]
+            result["last_name"] = baseline_data.get("last_name") or result["last_name"]
     
     # Get message history from recent_messages
     cursor.execute(
@@ -1607,11 +1607,6 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
             result["last_name"] = row[5]
         
         # Track chats
-        chat_info = {
-            "chat_id": chat_id,
-            "chat_username": chat_username,
-            "chat_title": chat_title,
-        }
         result["chats_seen"].add((chat_id, chat_username or "", chat_title or ""))
         
         # Track dates
@@ -1685,15 +1680,15 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
         
         if user_id:
             msg += f"🆔 User ID: <code>{user_id}</code>\n"
-            msg += f"\n🔗 <b>External checks:</b>\n"
+            msg += "\n🔗 <b>External checks:</b>\n"
             msg += f"   └ <a href='https://t.me/oLolsBot?start={user_id}'>Check on LOLS</a>\n"
-            msg += f"\n📱 <b>Profile links:</b>\n"
+            msg += "\n📱 <b>Profile links:</b>\n"
             msg += f"   ├ <a href='tg://user?id={user_id}'>ID based profile</a>\n"
             msg += f"   └ <a href='https://t.me/@id{user_id}'>iOS link</a>"
         elif username:
             clean_name = username.lstrip("@")
             msg += f"👤 Username: @{html.escape(clean_name)}\n"
-            msg += f"\n🔗 <b>External checks:</b>\n"
+            msg += "\n🔗 <b>External checks:</b>\n"
             msg += f"   └ <a href='https://t.me/oLolsBot?start=u-{clean_name}'>Check on LOLS</a>"
         
         return msg
@@ -1790,7 +1785,7 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             if date_str and len(str(date_str)) > 10:
                 try:
                     date_str = str(date_str)[:16]  # "YYYY-MM-DD HH:MM"
-                except:
+                except (TypeError, ValueError):
                     pass
             msg += f"   {prefix} {event['type']} {html.escape(str(event['chat']))} <i>({date_str})</i>\n"
         
@@ -1856,7 +1851,7 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             if date_str and len(str(date_str)) > 10:
                 try:
                     date_str = str(date_str)[:16]
-                except:
+                except (TypeError, ValueError):
                     pass
             chat = html.escape(str(dr.get("chat_title") or "?"))
             msg += f"   {prefix} <code>{reason}</code> in {chat} <i>({date_str})</i>\n"
@@ -1864,20 +1859,20 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             msg += f"   ... and {len(deletion_reasons) - 5} more\n"
     
     # Profile links
-    msg += f"\n🔗 <b>Profile links:</b>\n"
+    msg += "\n🔗 <b>Profile links:</b>\n"
     msg += f"   ├ <a href='tg://user?id={user_id}'>ID based profile</a>\n"
     msg += f"   ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
     msg += f"   └ <a href='https://t.me/@id{user_id}'>iOS</a>\n"
     
     # External check links
     if include_lols_link:
-        msg += f"\n🔍 <b>External checks:</b>\n"
+        msg += "\n🔍 <b>External checks:</b>\n"
         msg += f"   └ <a href='https://t.me/oLolsBot?start={user_id}'>Check on LOLS</a>"
     
     return msg
 
 
-def create_inline_keyboard(message_link, lols_link, message: types.Message):
+def create_inline_keyboard(_message_link, lols_link, message: types.Message):
     """Create the inline keyboard for a suspicious forwarded / monitored message.
 
     Original version included immediate Global BAN / BAN / Delete Message buttons whose

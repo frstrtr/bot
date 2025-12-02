@@ -1759,8 +1759,11 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             chat_username = chat.get("chat_username")
             chat_id = chat.get("chat_id")
             
+            # Check if it's a direct message (positive chat_id = user id)
+            if chat_id and isinstance(chat_id, int) and chat_id > 0:
+                chat_disp = "📱 Direct messages"
             # Create link if possible
-            if chat_username:
+            elif chat_username:
                 chat_disp = f'<a href="https://t.me/{chat_username}">{html.escape(str(chat_title))}</a>'
             elif chat_id and str(chat_id).startswith("-100"):
                 # Convert supergroup ID to link format (remove -100 prefix)

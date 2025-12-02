@@ -14,6 +14,8 @@ test.py
 # Exclude spam_dict.txt from being ignored
 !spam_dict.txt
 !CHANGELOG.md
+!.github/
+!.github/*
 !p2spm.py
 !parse_spam.py
 !server/

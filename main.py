@@ -937,7 +937,8 @@ def analyze_mentions_in_message(message) -> dict:
     Analyze mentions in a message to detect:
     - All @username and text_mention entities
     - Hidden/invisible characters around mentions (used by spammers to obfuscate)
-    - t.me/m/ profile deeplinks (spam recruitment links)
+    - t.me/m/ profile deeplinks (spam recruitment links) - both in text and in text_link entities
+    - Fake mentions: text_link entities with t.me/m/ URLs hidden under @username-like text
     - Plain @username patterns in text
     - Total count of mentions
     
@@ -950,7 +951,8 @@ def analyze_mentions_in_message(message) -> dict:
             - total_count: total number of mention entities found
             - hidden_mentions: list of mentions with suspicious invisible chars
             - has_more: True if more than max_buttons mentions exist
-            - tme_deeplinks: list of t.me/m/ codes found
+            - tme_deeplinks: list of full t.me/m/ URLs found
+            - fake_mentions: list of dicts with visible_text and hidden_url for deceptive links
     """
     # Invisible/zero-width characters commonly used by spammers
     INVISIBLE_CHARS = {
@@ -977,6 +979,7 @@ def analyze_mentions_in_message(message) -> dict:
         "hidden_mentions": [],
         "has_more": False,
         "tme_deeplinks": [],
+        "fake_mentions": [],  # List of {visible_text, hidden_url} for deceptive links
     }
     
     # Get entities and text (support both text and caption)
@@ -989,12 +992,16 @@ def analyze_mentions_in_message(message) -> dict:
         entities_to_check = message.caption_entities
         text_to_check = message.caption
     
+    # Regex for t.me/m/ profile deeplinks
+    tme_m_pattern = re.compile(r'(?:https?://)?(?:t\.me|telegram\.me)/m/([A-Za-z0-9_-]+)')
+    
     # Even if no entities, check for text patterns (t.me/m/ links, @usernames)
     if text_to_check:
-        # Detect t.me/m/ profile deeplinks (spam recruitment links)
-        tme_m_pattern = re.compile(r'(?:https?://)?(?:t\.me|telegram\.me)/m/([A-Za-z0-9_-]+)')
+        # Detect t.me/m/ profile deeplinks in plain text (spam recruitment links)
         tme_m_matches = tme_m_pattern.findall(text_to_check)
-        result["tme_deeplinks"] = tme_m_matches
+        # Store full URLs, not just codes
+        for code in tme_m_matches:
+            result["tme_deeplinks"].append(f"https://t.me/m/{code}")
         
         # Detect plain @username patterns that may not be entity-detected
         # (some messages have @username as plain text without entity)
@@ -1064,6 +1071,28 @@ def analyze_mentions_in_message(message) -> dict:
                     has_invisible = any(char in context for char in INVISIBLE_CHARS)
                     if has_invisible:
                         result["hidden_mentions"].append(f"ID:{user_id}")
+        
+        elif entity_type == "text_link":
+            # Check if text_link contains t.me/m/ deeplink (hidden spam link)
+            url = entity.get("url", "") if isinstance(entity, dict) else getattr(entity, "url", "")
+            tme_m_match = tme_m_pattern.search(url)
+            if tme_m_match:
+                # This is a deceptive link - visible text hides a t.me/m/ deeplink
+                offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                visible_text = text_to_check[offset:offset + length]
+                
+                # Normalize URL to include https://
+                full_url = url if url.startswith("http") else f"https://{url}"
+                
+                result["fake_mentions"].append({
+                    "visible_text": visible_text,
+                    "hidden_url": full_url,
+                })
+                
+                # Also add to deeplinks list if not already there
+                if full_url not in result["tme_deeplinks"]:
+                    result["tme_deeplinks"].append(full_url)
     
     # Add any plain text @usernames that weren't detected as entities (e.g., broken by invisible chars)
     for username in plain_username_set:
@@ -2522,10 +2551,18 @@ async def check_n_ban(message: Message, reason: str):
             if mention_info_parts:
                 autoban_banner_text += "".join(mention_info_parts)
         
+        # Add fake mentions info (text_link with t.me/m/ hidden under @username-like text)
+        if mention_analysis.get("fake_mentions"):
+            fake_list = []
+            for fake in mention_analysis["fake_mentions"][:3]:
+                fake_list.append(f"'{fake['visible_text']}' → <code>{fake['hidden_url']}</code>")
+            autoban_banner_text += f"\n🎭 <b>FAKE MENTIONS (deceptive links):</b>\n" + "\n".join(fake_list)
+        
         # Add t.me/m/ deeplink info if present (spam recruitment links)
         if mention_analysis.get("tme_deeplinks"):
-            deeplinks_str = ", ".join(mention_analysis["tme_deeplinks"][:3])
-            autoban_banner_text += f"\n🔗 <b>Profile deeplinks detected:</b> <code>{deeplinks_str}</code>"
+            deeplinks_list = mention_analysis["tme_deeplinks"][:3]
+            deeplinks_str = "\n".join([f"<code>{link}</code>" for link in deeplinks_list])
+            autoban_banner_text += f"\n🔗 <b>Profile deeplinks:</b>\n{deeplinks_str}"
         
         admin_autoban_banner = await safe_send_message(
             BOT,

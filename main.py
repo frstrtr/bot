@@ -2831,19 +2831,21 @@ async def perform_checks(
                         cur_username = baseline.get("username", "")
                         cur_photo_count = baseline.get("photo_count", 0)
 
-                        try:
-                            _member = await BOT.get_chat_member(_chat_id, user_id)
-                            _user = getattr(_member, "user", None) or _member
-                            cur_first = getattr(_user, "first_name", "") or ""
-                            cur_last = getattr(_user, "last_name", "") or ""
-                            cur_username = getattr(_user, "username", "") or ""
-                        except Exception as _e:
-                            LOGGER.debug(
-                                "%s:@%s unable to fetch chat member for profile-change check: %s",
-                                user_id,
-                                user_name,
-                                _e,
-                            )
+                        # Only fetch live data if we have a valid chat_id
+                        if _chat_id:
+                            try:
+                                _member = await BOT.get_chat_member(_chat_id, user_id)
+                                _user = getattr(_member, "user", None) or _member
+                                cur_first = getattr(_user, "first_name", "") or ""
+                                cur_last = getattr(_user, "last_name", "") or ""
+                                cur_username = getattr(_user, "username", "") or ""
+                            except Exception as _e:
+                                LOGGER.debug(
+                                    "%s:@%s unable to fetch chat member for profile-change check: %s",
+                                    user_id,
+                                    user_name,
+                                    _e,
+                                )
 
                         try:
                             _photos = await BOT.get_user_profile_photos(

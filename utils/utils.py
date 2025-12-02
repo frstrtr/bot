@@ -1806,9 +1806,9 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
         # Sort by date descending (most recent first)
         all_events.sort(key=lambda x: x.get("date") or "", reverse=True)
         
-        # Show up to 10 most recent events
-        for i, event in enumerate(all_events[:10]):
-            prefix = "└" if i == len(all_events[:10]) - 1 else "├"
+        # Show all events
+        for i, event in enumerate(all_events):
+            prefix = "└" if i == len(all_events) - 1 else "├"
             date_str = event.get("date", "?")
             # Format date if it's a full datetime string
             if date_str and len(str(date_str)) > 10:
@@ -1817,9 +1817,6 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
                 except (TypeError, ValueError):
                     pass
             msg += f"   {prefix} {event['type']} {html.escape(str(event['chat']))} <i>({date_str})</i>\n"
-        
-        if len(all_events) > 10:
-            msg += f"   ... and {len(all_events) - 10} more events\n"
     
     # Ban details
     if baseline.get("is_banned"):

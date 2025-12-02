@@ -8504,8 +8504,14 @@ if __name__ == "__main__":
                 try:
                     is_admin_there = await is_admin(found_user_id, chat_id)
                     if is_admin_there:
-                        chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
-                        chat_username = get_cached_chat_username(chat_id)
+                        # Get actual chat info for proper title
+                        try:
+                            chat_info = await BOT.get_chat(chat_id)
+                            chat_name = chat_info.title or CHANNEL_DICT.get(chat_id, str(chat_id))
+                            chat_username = chat_info.username
+                        except Exception:
+                            chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
+                            chat_username = get_cached_chat_username(chat_id)
                         admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name, "chat_username": chat_username})
                 except TelegramBadRequest:
                     pass  # User might not be in chat or bot has no access

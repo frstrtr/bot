@@ -3583,12 +3583,12 @@ if __name__ == "__main__":
 
         if update.from_user.id != update.old_chat_member.user.id:
             # Someone else changed user status
-            by_username = update.from_user.username or "!UNDEFINED!"  # optional
+            by_username = update.from_user.username  # optional, may be None
             # by_userid = update.from_user.id
             by_userfirstname = update.from_user.first_name
             by_userlastname = update.from_user.last_name or ""  # optional
-            # by_user = f"by @{by_username}(<code>{by_userid}</code>): {by_userfirstname} {by_userlastname}\n"
-            by_user = f"by {by_userfirstname} {by_userlastname} @{by_username} (<code>{update.from_user.id}</code>)\n"
+            by_username_display = f"@{by_username}" if by_username else ""
+            by_user = f"by {by_userfirstname} {by_userlastname} {by_username_display} (<code>{update.from_user.id}</code>)\n"
 
         inout_status = update.new_chat_member.status
 
@@ -3626,9 +3626,10 @@ if __name__ == "__main__":
         # Get current date and time DD-MM-YY HH:MM
         greet_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Construct the log message
+        inout_username_display = f"@{inout_username}" if inout_username and inout_username != "!UNDEFINED!" else ""
         inout_logmessage = (
             f"{escaped_inout_userfirstname} {escaped_inout_userlastname} "
-            f"@{inout_username} (<code>{inout_userid}</code>)\n"
+            f"{inout_username_display} (<code>{inout_userid}</code>)\n"
             f"{'❌ -->' if lols_spam is True else '🟢 -->' if lols_spam is False else '❓ '}"
             f" {inout_status}\n"
             f"{by_user if by_user else ''}"
@@ -3720,10 +3721,10 @@ if __name__ == "__main__":
         color = status_colors.get(inout_status, "")  # Default to no color
         reset_color = "\033[0m" if color else ""  # Reset color if a color was used
         LOGGER.info(
-            "%s%s:@%s --> %s in %s%s",
+            "%s%s:%s --> %s in %s%s",
             color,
             inout_userid,
-            inout_username,
+            format_username_for_log(inout_username),
             inout_status,
             inout_chattitle,
             reset_color,

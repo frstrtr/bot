@@ -8960,6 +8960,11 @@ if __name__ == "__main__":
             "  • No forwarding attribution shown\n"
             "  • Auto-delete: <code>/copy -t 60 link target</code>\n\n"
             
+            "📋↩️ <b>/copyreply</b> <code>&lt;source_link&gt; &lt;target_link&gt;</code>\n"
+            "Copy message and send as reply to another message.\n"
+            "  • Copies from source, replies to target\n"
+            "  • Appears as bot's reply (no forwarding header)\n\n"
+            
             "📢 <b>/broadcast</b> <code>&lt;message&gt;</code>\n"
             "Send to ALL monitored chats.\n"
             "  • Use <code>-list chat1,chat2</code> for specific chats\n"
@@ -9759,6 +9764,131 @@ if __name__ == "__main__":
         except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in copy_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
+
+    @DP.message(superadmin_filter, Command("copyreply"))
+    async def copyreply_message_cmd(message: Message):
+        """Copy a message and send it as a reply to another message.
+        
+        Usage: /copyreply <source_link> <target_link>
+        Example: /copyreply https://t.me/source/123 https://t.me/target/456
+        
+        This copies the message from source_link and sends it as a reply
+        to the message at target_link (under the bot's name).
+        
+        NOTE: Only available to superadmin in private chat or superadmin group.
+        """
+        LOGGER.info(
+            "%s:%s COMM /copyreply in chat %s",
+            message.from_user.id,
+            f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
+            message.chat.id,
+        )
+        try:
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/copyreply &lt;source_link&gt; &lt;target_link&gt;</code>\n"
+                    "Example: <code>/copyreply https://t.me/source/123 https://t.me/target/456</code>\n\n"
+                    "💡 Copies message from source and sends as reply to target message",
+                    parse_mode="HTML",
+                )
+                return
+
+            source_link = parts[1]
+            target_link = parts[2]
+
+            # Extract source chat and message ID
+            try:
+                source_chat, source_msg_id = extract_chat_name_and_message_id_from_link(source_link)
+            except ValueError as e:
+                await message.reply(f"❌ Invalid source message link: {e}")
+                return
+
+            if not source_chat or not source_msg_id:
+                await message.reply("❌ Invalid source message link format.")
+                return
+
+            # Extract target chat and message ID (the message to reply to)
+            try:
+                target_chat, target_msg_id = extract_chat_name_and_message_id_from_link(target_link)
+            except ValueError as e:
+                await message.reply(f"❌ Invalid target message link: {e}")
+                return
+
+            if not target_chat or not target_msg_id:
+                await message.reply("❌ Invalid target message link format.")
+                return
+
+            # Determine target chat_id
+            if isinstance(target_chat, int):
+                target_chat_id = target_chat
+            elif str(target_chat).lstrip("-").isdigit():
+                target_chat_id = int(target_chat)
+            else:
+                target_chat_id = target_chat  # Already has @ prefix from parser
+
+            # Copy the message as a reply to target message
+            copied = await BOT.copy_message(
+                chat_id=target_chat_id,
+                from_chat_id=source_chat,
+                message_id=source_msg_id,
+                reply_to_message_id=target_msg_id,
+            )
+
+            if copied:
+                # Build link to copied message
+                if isinstance(target_chat_id, str) and target_chat_id.startswith("@"):
+                    msg_link = f"https://t.me/{target_chat_id[1:]}/{copied.message_id}"
+                else:
+                    chat_id_str = str(target_chat_id)[4:] if str(target_chat_id).startswith("-100") else str(target_chat_id)
+                    msg_link = f"https://t.me/c/{chat_id_str}/{copied.message_id}"
+
+                await message.reply(
+                    f"✅ Message copied and sent as reply\n"
+                    f"📤 Source: <code>{source_chat}</code> msg {source_msg_id}\n"
+                    f"📥 Target: <code>{target_chat_id}</code> (reply to msg {target_msg_id})\n"
+                    f"🔗 <a href='{msg_link}'>View reply</a>",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+
+                LOGGER.info(
+                    "%s:%s copyreply: copied msg %s from %s as reply to msg %s in %s -> new msg %s",
+                    message.from_user.id,
+                    f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
+                    source_msg_id,
+                    source_chat,
+                    target_msg_id,
+                    target_chat_id,
+                    copied.message_id,
+                )
+            else:
+                await message.reply("❌ Failed to copy message as reply")
+
+        except TelegramBadRequest as e:
+            error_msg = str(e)
+            LOGGER.error(
+                "%s:%s Error in copyreply_message_cmd: %s",
+                message.from_user.id,
+                f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
+                e,
+            )
+            if "message to copy not found" in error_msg.lower():
+                await message.reply("❌ Source message not found or bot doesn't have access to it")
+            elif "message to reply not found" in error_msg.lower() or "replied message not found" in error_msg.lower():
+                await message.reply("❌ Target message not found (may be deleted)")
+            elif "chat not found" in error_msg.lower():
+                await message.reply("❌ Chat not found or bot is not a member")
+            else:
+                await message.reply(f"❌ Error: {e}")
+        except ValueError as e:
+            LOGGER.error(
+                "%s:%s Error in copyreply_message_cmd: %s",
+                message.from_user.id,
+                f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
+                e,
+            )
+            await message.reply(f"❌ Error: {e}")
 
     @DP.message(superadmin_filter, Command("broadcast"))
     async def broadcast_message(message: Message):

@@ -937,6 +937,8 @@ def analyze_mentions_in_message(message) -> dict:
     Analyze mentions in a message to detect:
     - All @username and text_mention entities
     - Hidden/invisible characters around mentions (used by spammers to obfuscate)
+    - t.me/m/ profile deeplinks (spam recruitment links)
+    - Plain @username patterns in text
     - Total count of mentions
     
     Args:
@@ -948,6 +950,7 @@ def analyze_mentions_in_message(message) -> dict:
             - total_count: total number of mention entities found
             - hidden_mentions: list of mentions with suspicious invisible chars
             - has_more: True if more than max_buttons mentions exist
+            - tme_deeplinks: list of t.me/m/ codes found
     """
     # Invisible/zero-width characters commonly used by spammers
     INVISIBLE_CHARS = {
@@ -973,6 +976,7 @@ def analyze_mentions_in_message(message) -> dict:
         "total_count": 0,
         "hidden_mentions": [],
         "has_more": False,
+        "tme_deeplinks": [],
     }
     
     # Get entities and text (support both text and caption)
@@ -985,10 +989,37 @@ def analyze_mentions_in_message(message) -> dict:
         entities_to_check = message.caption_entities
         text_to_check = message.caption
     
-    if not entities_to_check or not text_to_check:
+    # Even if no entities, check for text patterns (t.me/m/ links, @usernames)
+    if text_to_check:
+        # Detect t.me/m/ profile deeplinks (spam recruitment links)
+        tme_m_pattern = re.compile(r'(?:https?://)?(?:t\.me|telegram\.me)/m/([A-Za-z0-9_-]+)')
+        tme_m_matches = tme_m_pattern.findall(text_to_check)
+        result["tme_deeplinks"] = tme_m_matches
+        
+        # Detect plain @username patterns that may not be entity-detected
+        # (some messages have @username as plain text without entity)
+        username_pattern = re.compile(r'@([A-Za-z][A-Za-z0-9_]{4,31})')
+        plain_usernames = username_pattern.findall(text_to_check)
+        # Store plain usernames to compare with entity-based ones later
+        plain_username_set = set(u.lower() for u in plain_usernames)
+    else:
+        plain_username_set = set()
+    
+    if not entities_to_check:
+        # No entities but may have detected patterns above
+        # Add plain @usernames as mentions if found
+        max_buttons = 3
+        seen_usernames = set()
+        for username in plain_usernames if text_to_check else []:
+            if username.lower() not in seen_usernames and len(result["mentions"]) < max_buttons:
+                result["mentions"].append(("username", username, f"@{username}"))
+                seen_usernames.add(username.lower())
+                result["total_count"] += 1
+        result["has_more"] = len(plain_usernames if text_to_check else []) > max_buttons
         return result
     
     max_buttons = 3
+    seen_usernames = set()  # Track usernames we've already added
     
     for entity in entities_to_check:
         entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
@@ -1007,6 +1038,7 @@ def analyze_mentions_in_message(message) -> dict:
             
             if mention.startswith("@"):
                 username_clean = mention.lstrip("@")
+                seen_usernames.add(username_clean.lower())
                 if len(result["mentions"]) < max_buttons:
                     result["mentions"].append(("username", username_clean, mention))
                 if has_invisible:
@@ -1032,6 +1064,14 @@ def analyze_mentions_in_message(message) -> dict:
                     has_invisible = any(char in context for char in INVISIBLE_CHARS)
                     if has_invisible:
                         result["hidden_mentions"].append(f"ID:{user_id}")
+    
+    # Add any plain text @usernames that weren't detected as entities (e.g., broken by invisible chars)
+    for username in plain_username_set:
+        if username not in seen_usernames:
+            result["total_count"] += 1
+            if len(result["mentions"]) < max_buttons:
+                result["mentions"].append(("username", username, f"@{username}"))
+            seen_usernames.add(username)
     
     result["has_more"] = result["total_count"] > max_buttons
     return result
@@ -2482,6 +2522,11 @@ async def check_n_ban(message: Message, reason: str):
             if mention_info_parts:
                 autoban_banner_text += "".join(mention_info_parts)
         
+        # Add t.me/m/ deeplink info if present (spam recruitment links)
+        if mention_analysis.get("tme_deeplinks"):
+            deeplinks_str = ", ".join(mention_analysis["tme_deeplinks"][:3])
+            autoban_banner_text += f"\n🔗 <b>Profile deeplinks detected:</b> <code>{deeplinks_str}</code>"
+        
         admin_autoban_banner = await safe_send_message(
             BOT,
             ADMIN_GROUP_ID,
@@ -2494,6 +2539,11 @@ async def check_n_ban(message: Message, reason: str):
         )
 
         # Store the autoban state for Actions button to work
+        # Generate report_id from chat_id and message_id
+        if str(message.chat.id).startswith("-100"):
+            report_id = int(str(message.chat.id)[4:] + str(message.message_id))
+        else:
+            report_id = int(str(message.chat.id) + str(message.message_id))
         set_forwarded_state(
             DP,
             report_id,

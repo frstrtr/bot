@@ -1188,7 +1188,8 @@ async def load_active_user_checks():
         joined_at_str = baseline.get("joined_at")
         if joined_at_str:
             try:
-                start_time = datetime.strptime(joined_at_str, "%Y-%m-%d %H:%M:%S")
+                # Handle both formats: with and without timezone
+                start_time = datetime.fromisoformat(joined_at_str.replace(" ", "T"))
             except ValueError:
                 LOGGER.warning(
                     "%s: Could not parse joined_at: %s", user_id, joined_at_str
@@ -1576,7 +1577,8 @@ async def handle_autoreports(
         first_name = found_message_data[5]
         last_name = found_message_data[6]
 
-    message_timestamp = datetime.strptime(found_message_data[7], "%Y-%m-%d %H:%M:%S")
+    # Handle both formats: with and without timezone
+    message_timestamp = datetime.fromisoformat(found_message_data[7].replace(" ", "T"))
 
     # Get the username
     username = found_message_data[4]
@@ -4300,10 +4302,11 @@ if __name__ == "__main__":
                     """,
                     (inout_userid,),
                 ).fetchall()
+                # Handle both formats: with and without timezone
                 time_diff = (
-                    datetime.strptime(last2_join_left_event[0][0], "%Y-%m-%d %H:%M:%S")
-                    - datetime.strptime(
-                        last2_join_left_event[1][0], "%Y-%m-%d %H:%M:%S"
+                    datetime.fromisoformat(last2_join_left_event[0][0].replace(" ", "T"))
+                    - datetime.fromisoformat(
+                        last2_join_left_event[1][0].replace(" ", "T")
                     )
                 ).total_seconds()
 
@@ -6835,7 +6838,8 @@ if __name__ == "__main__":
                         # Parse first message date and check if older than threshold
                         _first_msg_old_enough = False
                         try:
-                            _first_msg_dt = datetime.strptime(user_first_message_date[0], "%Y-%m-%d %H:%M:%S")
+                            # Handle both formats: with and without timezone
+                            _first_msg_dt = datetime.fromisoformat(user_first_message_date[0].replace(" ", "T"))
                             _threshold_date = datetime.now() - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
                             _first_msg_old_enough = _first_msg_dt < _threshold_date
                         except (ValueError, TypeError) as parse_err:

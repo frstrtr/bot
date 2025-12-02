@@ -6814,7 +6814,7 @@ if __name__ == "__main__":
                     )
                     
                     # Check if this is an established user - skip suspicious banner if so
-                    # Established = (>10 messages OR marked legitimate) AND first message > 1 year ago
+                    # Established = (>10 messages OR any legit marker) AND first message > 3 months ago
                     _skip_missed_join_banner = False
                     if should_notify_missed_join:
                         # Count user's messages
@@ -6823,7 +6823,7 @@ if __name__ == "__main__":
                             (message.from_user.id,),
                         ).fetchone()[0]
                         
-                        # Check if user is marked as legit
+                        # Check if user has any legit marker (either in recent_messages or baselines)
                         _is_user_legit = check_user_legit(CURSOR, message.from_user.id)
                         if not _is_user_legit:
                             # Also check baseline for is_legit flag
@@ -6831,12 +6831,12 @@ if __name__ == "__main__":
                             if _user_baseline and _user_baseline.get("is_legit"):
                                 _is_user_legit = True
                         
-                        # Parse first message date and check if > 1 year old
-                        _first_msg_over_1_year = False
+                        # Parse first message date and check if > 3 months old
+                        _first_msg_over_3_months = False
                         try:
                             _first_msg_dt = datetime.strptime(user_first_message_date[0], "%Y-%m-%d %H:%M:%S")
-                            _one_year_ago = datetime.now() - timedelta(days=365)
-                            _first_msg_over_1_year = _first_msg_dt < _one_year_ago
+                            _three_months_ago = datetime.now() - timedelta(days=90)
+                            _first_msg_over_3_months = _first_msg_dt < _three_months_ago
                         except (ValueError, TypeError) as parse_err:
                             LOGGER.warning(
                                 "Failed to parse first message date '%s' for user %s: %s",
@@ -6845,12 +6845,12 @@ if __name__ == "__main__":
                                 parse_err,
                             )
                         
-                        # Skip if (>10 messages OR legit) AND first message > 1 year
-                        if (_user_msg_count > 10 or _is_user_legit) and _first_msg_over_1_year:
+                        # Skip if (>10 messages OR legit) AND first message > 3 months
+                        if (_user_msg_count > 10 or _is_user_legit) and _first_msg_over_3_months:
                             _skip_missed_join_banner = True
                             LOGGER.info(
                                 "\033[92mSkipping missed join banner for established user %s:@%s "
-                                "(messages: %d, legit: %s, first_msg: %s - over 1 year old)\033[0m",
+                                "(messages: %d, legit: %s, first_msg: %s - over 3 months old)\033[0m",
                                 message.from_user.id,
                                 message.from_user.username or "!NO_USERNAME!",
                                 _user_msg_count,

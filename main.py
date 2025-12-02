@@ -292,6 +292,10 @@ BOT_USERNAME: str | None = None
 # Key: (chat_id, message_id) - cleared periodically or on message processing completion
 autoreported_messages: set[tuple[int, int]] = set()
 
+# Track messages that have been sent to suspicious thread to prevent duplicate reports
+# Key: (chat_id, message_id) - prevents same message being reported twice
+suspicious_reported_messages: set[tuple[int, int]] = set()
+
 # Track processed media groups to prevent duplicate reports for multi-photo messages
 # Key: (chat_id, media_group_id) - cleared after 60 seconds
 processed_media_groups: dict[tuple[int, str], float] = {}
@@ -306,6 +310,16 @@ def was_autoreported(message: Message) -> bool:
 def clear_autoreport_tracking(message: Message):
     """Clear autoreport tracking for a message after processing is complete."""
     autoreported_messages.discard((message.chat.id, message.message_id))
+
+
+def was_suspicious_reported(message: Message) -> bool:
+    """Check if a message was already sent to suspicious thread."""
+    return (message.chat.id, message.message_id) in suspicious_reported_messages
+
+
+def mark_suspicious_reported(message: Message):
+    """Mark a message as sent to suspicious thread."""
+    suspicious_reported_messages.add((message.chat.id, message.message_id))
 
 
 def was_media_group_processed(message: Message) -> bool:
@@ -7003,6 +7017,7 @@ if __name__ == "__main__":
                                 reply_markup=_missed_join_kb.as_markup(),
                             )
                             missed_join_notification_sent = True
+                            mark_suspicious_reported(message)  # Prevent duplicate suspicious content report
                             LOGGER.info(
                                 "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
                                 message.from_user.id,
@@ -7792,8 +7807,8 @@ if __name__ == "__main__":
                     # bot_mentions are already in suspicious_items, will be shown in the report
 
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
-            # Skip if message was already sent to autoreport thread
-            if has_suspicious_content and not was_autoreported(message):
+            # Skip if message was already sent to autoreport or suspicious thread
+            if has_suspicious_content and not was_autoreported(message) and not was_suspicious_reported(message):
                 try:
                     # Forward the message to suspicious thread
                     await message.forward(

@@ -7914,7 +7914,7 @@ if __name__ == "__main__":
                     if suspicious_items["hashtags"]:
                         hashtags_count = len(suspicious_items["hashtags"])
                         content_details.append(f"<b>#️⃣ Hashtags ({hashtags_count}):</b>")
-                        for i, hashtag in enumerate(
+                        for _i, hashtag in enumerate(
                             suspicious_items["hashtags"][:max_items_per_type]
                         ):
                             content_details.append(
@@ -7930,7 +7930,7 @@ if __name__ == "__main__":
                         content_details.append(
                             f"<b>💰 Cashtags ({cashtags_count}):</b>"
                         )
-                        for i, cashtag in enumerate(
+                        for _i, cashtag in enumerate(
                             suspicious_items["cashtags"][:max_items_per_type]
                         ):
                             content_details.append(
@@ -7946,7 +7946,7 @@ if __name__ == "__main__":
                         content_details.append(
                             f"<b>🤖 Bot Commands ({bot_commands_count}):</b>"
                         )
-                        for i, bot_cmd in enumerate(
+                        for _i, bot_cmd in enumerate(
                             suspicious_items["bot_commands"][:max_items_per_type]
                         ):
                             content_details.append(
@@ -7960,7 +7960,7 @@ if __name__ == "__main__":
                     if suspicious_items["emails"]:
                         emails_count = len(suspicious_items["emails"])
                         content_details.append(f"<b>📧 Emails ({emails_count}):</b>")
-                        for i, email in enumerate(
+                        for _i, email in enumerate(
                             suspicious_items["emails"][:max_items_per_type]
                         ):
                             content_details.append(

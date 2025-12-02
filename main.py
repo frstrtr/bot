@@ -7739,6 +7739,7 @@ if __name__ == "__main__":
                             suspicious_items["phones"].append(cleaned_phone)
 
             # Handle bot mentions based on user monitoring status
+            # Only skip if already sent to AUTOREPORT (not SUSPICIOUS - AUTOREPORT has priority)
             if suspicious_items["bot_mentions"] and not was_autoreported(message):
                 bot_mentions_str = ", ".join(suspicious_items["bot_mentions"])
                 user_in_active_checks = message.from_user.id in active_user_checks_dict

@@ -6488,13 +6488,16 @@ if __name__ == "__main__":
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER by spam_check, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
 
             # Forward banned user message to ADMIN AUTOBAN
-            await BOT.forward_message(
-                ADMIN_GROUP_ID,
-                message.chat.id,
-                message.message_id,
-                message_thread_id=ADMIN_AUTOBAN,
-                disable_notification=True,
-            )
+            try:
+                await BOT.forward_message(
+                    ADMIN_GROUP_ID,
+                    message.chat.id,
+                    message.message_id,
+                    message_thread_id=ADMIN_AUTOBAN,
+                    disable_notification=True,
+                )
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                LOGGER.debug("Could not forward banned user message to admin: %s", e)
 
             # report ids of sender_chat, forward_from and forward_from_chat as SPAM to p2p server
             await report_spam_from_message(message, LOGGER, TELEGRAM_CHANNEL_BOT_ID)

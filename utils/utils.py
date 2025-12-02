@@ -966,9 +966,9 @@ def has_spam_entities(spam_triggers, message: types.Message):
     """
     if message.entities:
         for entity in message.entities:
-            if entity["type"] in spam_triggers:
+            if entity.type in spam_triggers:
                 # Spam detected
-                return entity["type"]
+                return entity.type
     return None
 
 

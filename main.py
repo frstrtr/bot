@@ -8492,8 +8492,11 @@ if __name__ == "__main__":
         
         # Perform the lookup
         whois_data = get_user_whois(CONN, user_id=user_id, username=username)
+        if whois_data is None:
+            LOGGER.error("get_user_whois returned None for user_id=%s, username=%s", user_id, username)
+            whois_data = {"found": False, "user_id": user_id, "username": username}
         found_user_id = whois_data.get("user_id")
-        
+
         # Check if user is admin in any monitored chat
         admin_in_chats = []
         if found_user_id:

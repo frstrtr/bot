@@ -1035,11 +1035,19 @@ def db_init(cursor: Cursor, conn: Connection):
         forwarded_from_last_name TEXT,
         new_chat_member BOOL,
         left_chat_member BOOL,
+        deletion_reason TEXT,
         PRIMARY KEY (chat_id, message_id)
     )
     """
     )
     conn.commit()
+
+    # Add deletion_reason column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE recent_messages ADD COLUMN deletion_reason TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
 
     # User baselines table - stores monitoring state and profile snapshots
     cursor.execute(
@@ -1570,7 +1578,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
     cursor.execute(
         """
         SELECT chat_id, chat_username, message_id, user_name, user_first_name, user_last_name,
-               received_date, from_chat_title, new_chat_member, left_chat_member
+               received_date, from_chat_title, new_chat_member, left_chat_member, deletion_reason
         FROM recent_messages 
         WHERE user_id = ?
         ORDER BY received_date DESC
@@ -1588,6 +1596,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
         received_date = row[6]
         new_chat_member = bool(row[8])
         left_chat_member = bool(row[9])
+        deletion_reason = row[10] if len(row) > 10 else None
         
         # Update user info if not set
         if not result["username"] and row[3]:
@@ -1636,12 +1645,19 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
             "received_date": received_date,
             "new_chat_member": new_chat_member,
             "left_chat_member": left_chat_member,
+            "deletion_reason": deletion_reason,
         })
     
     # Convert set to list for JSON serialization
     result["chats_seen"] = [
         {"chat_id": c[0], "chat_username": c[1], "chat_title": c[2]}
         for c in result["chats_seen"]
+    ]
+    
+    # Collect all deletion reasons
+    result["deletion_reasons"] = [
+        {"reason": m["deletion_reason"], "date": m["received_date"], "chat_title": m["chat_title"]}
+        for m in result["messages"] if m.get("deletion_reason")
     ]
     
     return result
@@ -1828,6 +1844,24 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             else:
                 ttfm_str = f"{ttfm // 3600}h {(ttfm % 3600) // 60}m"
             msg += f"   └ Time to first msg: {ttfm_str}\n"
+    
+    # Deletion reasons (messages deleted by bot)
+    deletion_reasons = data.get("deletion_reasons", [])
+    if deletion_reasons:
+        msg += f"\n🗑 <b>Deleted Messages ({len(deletion_reasons)}):</b>\n"
+        for i, dr in enumerate(deletion_reasons[:5]):
+            prefix = "└" if i == len(deletion_reasons[:5]) - 1 else "├"
+            reason = html.escape(dr.get("reason", "unknown"))
+            date_str = dr.get("date", "?")
+            if date_str and len(str(date_str)) > 10:
+                try:
+                    date_str = str(date_str)[:16]
+                except:
+                    pass
+            chat = html.escape(str(dr.get("chat_title") or "?"))
+            msg += f"   {prefix} <code>{reason}</code> in {chat} <i>({date_str})</i>\n"
+        if len(deletion_reasons) > 5:
+            msg += f"   ... and {len(deletion_reasons) - 5} more\n"
     
     # Profile links
     msg += f"\n🔗 <b>Profile links:</b>\n"

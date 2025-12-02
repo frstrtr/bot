@@ -7292,6 +7292,60 @@ if __name__ == "__main__":
                             has_suspicious_content = True
                             suspicious_items["phones"].append(cleaned_phone)
 
+            # If message mentions other bots - send to AUTOREPORT and delete
+            if suspicious_items["bot_mentions"] and not was_autoreported(message):
+                bot_mentions_str = ", ".join(suspicious_items["bot_mentions"])
+                LOGGER.info(
+                    "User %s:@%s mentioned bots (%s) - sending to AUTOREPORT and deleting",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    bot_mentions_str,
+                )
+                await submit_autoreport(message, f"Bot mention: {bot_mentions_str}")
+                
+                # Delete the message and store deletion reason in database
+                try:
+                    await message.delete()
+                    # Store deletion reason in database
+                    received_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    if message.chat.id < 0:
+                        report_id = int(str(message.chat.id)[4:] + str(message.message_id))
+                    else:
+                        report_id = int(str(message.chat.id) + str(message.message_id))
+                    CURSOR.execute(
+                        """
+                        INSERT OR REPLACE INTO recent_messages 
+                        (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, 
+                         received_date, from_chat_title, deletion_reason)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            message.chat.id,
+                            report_id,
+                            message.from_user.id,
+                            message.from_user.username,
+                            message.from_user.first_name,
+                            message.from_user.last_name,
+                            received_date,
+                            message.chat.title,
+                            f"bot_mention: {bot_mentions_str}",
+                        ),
+                    )
+                    CONN.commit()
+                    LOGGER.info(
+                        "Deleted message %s from chat %s - mentioned bots: %s (reason stored in DB)",
+                        message.message_id,
+                        message.chat.id,
+                        bot_mentions_str,
+                    )
+                except Exception as del_err:
+                    LOGGER.warning(
+                        "Failed to delete message %s with bot mentions: %s",
+                        message.message_id,
+                        del_err,
+                    )
+                return  # Don't process further - already sent to autoreport
+
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
             # Skip if message was already sent to autoreport thread
             if has_suspicious_content and not was_autoreported(message):
@@ -7376,21 +7430,6 @@ if __name__ == "__main__":
                         if links_count > max_items_per_type:
                             content_details.append(
                                 f"  ... and {links_count - max_items_per_type} more"
-                            )
-
-                    if suspicious_items["bot_mentions"]:
-                        # Bot mentions are shown first with warning about auto-deletion
-                        bot_mentions_count = len(suspicious_items["bot_mentions"])
-                        content_details.append(
-                            f"<b>🤖 Bot Mentions ({bot_mentions_count}) - MESSAGE WILL BE DELETED:</b>"
-                        )
-                        for bot_mention in suspicious_items["bot_mentions"][:max_items_per_type]:
-                            content_details.append(
-                                f"  • <code>{html.escape(bot_mention)}</code>"
-                            )
-                        if bot_mentions_count > max_items_per_type:
-                            content_details.append(
-                                f"  ... and {bot_mentions_count - max_items_per_type} more"
                             )
 
                     if suspicious_items["mentions"]:
@@ -7527,23 +7566,6 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                    
-                    # Delete original message if it mentions other bots
-                    if suspicious_items["bot_mentions"]:
-                        try:
-                            await message.delete()
-                            LOGGER.info(
-                                "Deleted message %s from chat %s - mentioned bots: %s",
-                                message.message_id,
-                                message.chat.id,
-                                ", ".join(suspicious_items["bot_mentions"])
-                            )
-                        except Exception as del_err:
-                            LOGGER.warning(
-                                "Failed to delete message %s with bot mentions: %s",
-                                message.message_id,
-                                del_err
-                            )
                 except Exception as e:
                     LOGGER.error("Error forwarding suspicious content message: %s", e)
 

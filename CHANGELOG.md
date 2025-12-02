@@ -25,6 +25,14 @@
   - 60-second expiry for tracking entries
   - Early check placement covers: latency bans, fast typing, entity spam, inline bot, night messages
 
+- **Suspicious content triggers user monitoring**: Users reported to SUSPICIOUS thread are now automatically monitored
+  - When suspicious content is detected and reported, monitoring starts automatically
+  - Saves user baseline (bio, profile photo count, names) to database
+  - Starts regular 24-hour watchdog monitoring via `perform_checks()`
+  - Starts intensive watchdog for first few hours
+  - Monitoring can be cancelled via "Mark as Legit" button in the report
+  - Prevents repeated monitoring if user already in `active_user_checks_dict`
+
 - **Configuration migration to .env format**: Migrated from XML-only to `.env` file configuration
   - Added `.env.example` template with all configuration options
   - `python-dotenv` support in `utils_config.py`

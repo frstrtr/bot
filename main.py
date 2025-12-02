@@ -212,6 +212,7 @@ from utils.utils_config import (
     ADMIN_AUTOREPORTS,
     # TECHNO_LOGGING,
     TECHNO_ADMIN,
+    ADMIN_ORDERS,
     TECHNO_ORIGINALS,
     TECHNO_UNHANDLED,
     ADMIN_AUTOBAN,
@@ -8411,7 +8412,7 @@ if __name__ == "__main__":
         """Lookup comprehensive user data from database.
         
         Available in:
-        - ADMIN_GROUP orders thread (TECHNO_ADMIN)
+        - ADMIN_GROUP orders thread (ADMIN_ORDERS)
         - Direct messages with superadmin (ADMIN_USER_ID)
         
         Usage:
@@ -8419,15 +8420,15 @@ if __name__ == "__main__":
             /whois @username  - lookup by username
         """
         try:
-            # Restrict to orders thread (TECHNO_ADMIN) in admin group
-            if message.message_thread_id != TECHNO_ADMIN:
+            # Restrict to orders thread (ADMIN_ORDERS) in admin group
+            if message.message_thread_id != ADMIN_ORDERS:
                 await message.reply(
                     "⚠️ This command is only available in the Orders thread.",
                     parse_mode="HTML",
                 )
                 return
             
-            await _perform_whois_lookup(message, thread_id=TECHNO_ADMIN)
+            await _perform_whois_lookup(message, thread_id=ADMIN_ORDERS)
             
         except (sqlite3.Error, TelegramBadRequest) as e:
             LOGGER.error("Error in whois_user: %s", e)

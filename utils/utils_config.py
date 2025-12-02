@@ -59,6 +59,7 @@ CHANNEL_DICT: Dict[int, str] = {}
 ALLOWED_CONTENT_TYPES: List[ContentType] = []
 API_TOKEN: Optional[str] = None
 TECHNO_ADMIN: Optional[int] = None
+ADMIN_ORDERS: Optional[int] = None
 TELEGRAM_CHANNEL_BOT_ID: int = 136817688  # Telegram @Channel_bot ID
 P2P_SERVER_URL: str = "http://localhost:8081"
 
@@ -194,6 +195,7 @@ def load_from_env() -> bool:
     ADMIN_AUTOBAN = _get_env_int("ADMIN_AUTOBAN", 1)
     ADMIN_MANBAN = _get_env_int("ADMIN_MANBAN", 1)
     ADMIN_SUSPICIOUS = _get_env_int("ADMIN_SUSPICIOUS", 1)
+    ADMIN_ORDERS = _get_env_int("ADMIN_ORDERS", 1)
 
     # Technolog group thread IDs
     TECHNO_LOGGING = _get_env_int("TECHNO_LOGGING", 1)

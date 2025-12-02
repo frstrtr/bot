@@ -1743,12 +1743,22 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
     chats = data.get("chats_seen", [])
     if chats:
         msg += f"\n💬 <b>Seen in {len(chats)} chat(s):</b>\n"
-        for i, chat in enumerate(chats[:5]):  # Limit to 5
-            prefix = "└" if i == len(chats[:5]) - 1 else "├"
-            chat_disp = chat.get("chat_title") or chat.get("chat_username") or str(chat.get("chat_id"))
-            msg += f"   {prefix} {html.escape(str(chat_disp))}\n"
-        if len(chats) > 5:
-            msg += f"   ... and {len(chats) - 5} more\n"
+        for i, chat in enumerate(chats):  # Show all chats
+            prefix = "└" if i == len(chats) - 1 else "├"
+            chat_title = chat.get("chat_title") or chat.get("chat_username") or str(chat.get("chat_id"))
+            chat_username = chat.get("chat_username")
+            chat_id = chat.get("chat_id")
+            
+            # Create link if possible
+            if chat_username:
+                chat_disp = f'<a href="https://t.me/{chat_username}">{html.escape(str(chat_title))}</a>'
+            elif chat_id and str(chat_id).startswith("-100"):
+                # Convert supergroup ID to link format (remove -100 prefix)
+                link_id = str(chat_id)[4:]  # Remove "-100"
+                chat_disp = f'<a href="https://t.me/c/{link_id}">{html.escape(str(chat_title))}</a>'
+            else:
+                chat_disp = html.escape(str(chat_title))
+            msg += f"   {prefix} {chat_disp}\n"
     
     # Admin status in monitored chats
     admin_in_chats = data.get("admin_in_chats", [])

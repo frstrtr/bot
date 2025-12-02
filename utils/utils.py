@@ -1774,12 +1774,21 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
     admin_in_chats = data.get("admin_in_chats", [])
     if admin_in_chats:
         msg += f"\n👑 <b>Admin in {len(admin_in_chats)} chat(s):</b>\n"
-        for i, chat in enumerate(admin_in_chats[:5]):
-            prefix = "└" if i == len(admin_in_chats[:5]) - 1 else "├"
-            chat_disp = chat.get("chat_name") or str(chat.get("chat_id"))
-            msg += f"   {prefix} {html.escape(str(chat_disp))}\n"
-        if len(admin_in_chats) > 5:
-            msg += f"   ... and {len(admin_in_chats) - 5} more\n"
+        for i, chat in enumerate(admin_in_chats):  # Show all admin chats
+            prefix = "└" if i == len(admin_in_chats) - 1 else "├"
+            chat_title = chat.get("chat_name") or str(chat.get("chat_id"))
+            chat_username = chat.get("chat_username")
+            chat_id = chat.get("chat_id")
+            
+            # Create link if possible
+            if chat_username:
+                chat_disp = f'<a href="https://t.me/{chat_username}">{html.escape(str(chat_title))}</a>'
+            elif chat_id and str(chat_id).startswith("-100"):
+                link_id = str(chat_id)[4:]  # Remove "-100"
+                chat_disp = f'<a href="https://t.me/c/{link_id}">{html.escape(str(chat_title))}</a>'
+            else:
+                chat_disp = html.escape(str(chat_title))
+            msg += f"   {prefix} {chat_disp}\n"
     
     # Join/Leave roaming history
     joins = data.get("join_events", [])

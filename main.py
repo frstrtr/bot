@@ -8505,7 +8505,8 @@ if __name__ == "__main__":
                     is_admin_there = await is_admin(found_user_id, chat_id)
                     if is_admin_there:
                         chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
-                        admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name})
+                        chat_username = get_cached_chat_username(chat_id)
+                        admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name, "chat_username": chat_username})
                 except TelegramBadRequest:
                     pass  # User might not be in chat or bot has no access
         
@@ -8519,7 +8520,7 @@ if __name__ == "__main__":
         keyboard = None
         baseline = whois_data.get("baseline") or {}
         if whois_data.get("found") and found_user_id:
-            keyboard = make_lols_kb(found_user_id)
+            keyboard = KeyboardBuilder()
             # Add check button if not already monitoring
             if not baseline.get("monitoring_active"):
                 keyboard.add(

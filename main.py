@@ -796,9 +796,9 @@ async def ban_rogue_chat_everywhere(
             await asyncio.sleep(1)  # pause 1 sec
         except TelegramBadRequest as e:  # if user were Deleted Account while banning
             LOGGER.error(
-                "%s:@%s - error banning in chat (%s): %s. Deleted CHANNEL?",
+                "%s:%s - error banning in chat (%s): %s. Deleted CHANNEL?",
                 rogue_chat_id,
-                rogue_chat_username or "!UNDEFINED!",
+                format_username_for_log(rogue_chat_username),
                 chat_id,
                 e,
             )
@@ -1472,7 +1472,7 @@ async def handle_autoreports(
             message.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
-            message.forward_date if message.forward_date else None,
+            message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
             received_date,
             str(found_message_data),
         ),
@@ -1787,9 +1787,9 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s:@%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)",
+                "%s:%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)",
                 user_id,
-                user_name or "!UNDEFINED!",
+                format_username_for_log(user_name),
                 chat_name,
                 chat_id,
                 e,
@@ -1802,9 +1802,9 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s:@%s - unexpected error banning in chat %s (%s): %s",
+                "%s:%s - unexpected error banning in chat %s (%s): %s",
                 user_id,
-                user_name or "!UNDEFINED!",
+                format_username_for_log(user_name),
                 chat_name,
                 chat_id,
                 e,
@@ -2118,9 +2118,9 @@ async def check_and_autoban(
         # Delete ALL stored messages for this user (not just one)
         _del_count, _fail_count = await delete_all_user_messages(user_id, user_name)
         LOGGER.debug(
-            "%s:@%s check_and_autoban deleted %d messages (failed: %d)",
+            "%s:%s check_and_autoban deleted %d messages (failed: %d)",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
             _del_count,
             _fail_count,
         )
@@ -4047,9 +4047,10 @@ if __name__ == "__main__":
                     getattr(update.old_chat_member.user, "username", ""),
                     getattr(update.old_chat_member.user, "first_name", ""),
                     getattr(update.old_chat_member.user, "last_name", ""),
-                    getattr(update, "date", None),
+                    # Convert datetime to string to avoid Python 3.12+ deprecation warning
+                    update.date.strftime("%Y-%m-%d %H:%M:%S") if update.date else None,
                     getattr(update.from_user, "id", ""),
-                    getattr(update, "date", None),
+                    update.date.strftime("%Y-%m-%d %H:%M:%S") if update.date else None,
                     getattr(update.chat, "title", None),
                     getattr(update.from_user, "id", None),
                     getattr(update.from_user, "username", ""),
@@ -4497,7 +4498,7 @@ if __name__ == "__main__":
                 message.from_user.username,
                 message.from_user.first_name,
                 message.from_user.last_name,
-                message.forward_date if message.forward_date else None,
+                message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
                 received_date,
                 str(found_message_data),
             ),

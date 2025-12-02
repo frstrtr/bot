@@ -6813,6 +6813,77 @@ if __name__ == "__main__":
                         user_first_message_date[0],
                     )
                     
+                    # Check if this is an established user - skip suspicious banner if so
+                    # Established = (>10 messages OR marked legitimate) AND first message > 1 year ago
+                    _skip_missed_join_banner = False
+                    if should_notify_missed_join:
+                        # Count user's messages
+                        _user_msg_count = CURSOR.execute(
+                            "SELECT COUNT(*) FROM recent_messages WHERE user_id = ?",
+                            (message.from_user.id,),
+                        ).fetchone()[0]
+                        
+                        # Check if user is marked as legit
+                        _is_user_legit = check_user_legit(CURSOR, message.from_user.id)
+                        if not _is_user_legit:
+                            # Also check baseline for is_legit flag
+                            _user_baseline = get_user_baseline(CONN, message.from_user.id)
+                            if _user_baseline and _user_baseline.get("is_legit"):
+                                _is_user_legit = True
+                        
+                        # Parse first message date and check if > 1 year old
+                        _first_msg_over_1_year = False
+                        try:
+                            _first_msg_dt = datetime.strptime(user_first_message_date[0], "%Y-%m-%d %H:%M:%S")
+                            _one_year_ago = datetime.now() - timedelta(days=365)
+                            _first_msg_over_1_year = _first_msg_dt < _one_year_ago
+                        except (ValueError, TypeError) as parse_err:
+                            LOGGER.warning(
+                                "Failed to parse first message date '%s' for user %s: %s",
+                                user_first_message_date[0],
+                                message.from_user.id,
+                                parse_err,
+                            )
+                        
+                        # Skip if (>10 messages OR legit) AND first message > 1 year
+                        if (_user_msg_count > 10 or _is_user_legit) and _first_msg_over_1_year:
+                            _skip_missed_join_banner = True
+                            LOGGER.info(
+                                "\033[92mSkipping missed join banner for established user %s:@%s "
+                                "(messages: %d, legit: %s, first_msg: %s - over 1 year old)\033[0m",
+                                message.from_user.id,
+                                message.from_user.username or "!NO_USERNAME!",
+                                _user_msg_count,
+                                _is_user_legit,
+                                user_first_message_date[0],
+                            )
+                            # Mark first message as join event (just like after notification)
+                            try:
+                                CURSOR.execute(
+                                    """
+                                    UPDATE recent_messages 
+                                    SET new_chat_member = 1 
+                                    WHERE user_id = ? AND received_date = ?
+                                    """,
+                                    (
+                                        message.from_user.id,
+                                        user_first_message_date[0],
+                                    ),
+                                )
+                                CONN.commit()
+                                LOGGER.debug(
+                                    "Marked first message as join event for established user %s",
+                                    message.from_user.id,
+                                )
+                            except Exception as db_err:
+                                LOGGER.warning(
+                                    "Failed to mark first message as join event for established user %s: %s",
+                                    message.from_user.id,
+                                    db_err,
+                                )
+                            # Skip the notification
+                            should_notify_missed_join = False
+                    
                     # Bot was offline when user joined - send suspicious notification
                     # This user might be a spammer who joined while bot wasn't watching
                     # Only send notification once per user (when first detected)

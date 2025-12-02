@@ -1,5 +1,37 @@
 # Changelog
 
+## [2025-12-02]
+
+### Added
+- **Bot mention detection and handling**: Automatic handling of messages mentioning other bots
+  - Detects mentions ending with "bot" (case insensitive, e.g., `@somebot`, `@AnotherBot`)
+  - **For monitored users** (in `active_user_checks_dict`, within 24hr monitoring window):
+    - Sends to **AUTOREPORT** thread
+    - **Deletes message** from chat
+    - Stores deletion reason `bot_mention: @somebot` in database
+  - **For non-monitored users** (established users):
+    - Sends to **SUSPICIOUS** thread (no deletion)
+    - Bot mentions shown in suspicious content report
+    - Message remains in chat for admin review
+
+- **Deletion reason tracking**: New `deletion_reason` column in `recent_messages` table
+  - Stores reason when bot deletes a message (e.g., `bot_mention: @spambot`)
+  - Auto-migration for existing databases (ALTER TABLE if column doesn't exist)
+  - Displayed in `/whois` command under "🗑 Deleted Messages" section
+
+- **Configuration migration to .env format**: Migrated from XML-only to `.env` file configuration
+  - Added `.env.example` template with all configuration options
+  - `python-dotenv` support in `utils_config.py`
+  - `.env` file preferred, falls back to XML for backwards compatibility
+  - Added `P2P_SERVER_URL` configuration option
+  - Updated `requirements.txt` with `python-dotenv>=1.0.0` and `certifi>=2024.0.0`
+
+### Changed
+- **`/whois` command enhanced**: Now shows deleted messages section
+  - Lists messages deleted by bot with reasons
+  - Shows deletion date and chat where message was deleted
+  - Up to 5 most recent deletions shown
+
 ## [2025-12-01]
 
 ### Added

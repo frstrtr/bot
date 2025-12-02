@@ -761,8 +761,9 @@ async def ban_rogue_chat_everywhere(
             await asyncio.sleep(1)  # pause 1 sec
         except TelegramBadRequest as e:  # if user were Deleted Account while banning
             LOGGER.error(
-                "%s - error banning in chat (%s): %s. Deleted CHANNEL?",
+                "%s:@%s - error banning in chat (%s): %s. Deleted CHANNEL?",
                 rogue_chat_id,
+                rogue_chat_username or "!UNDEFINED!",
                 chat_id,
                 e,
             )
@@ -1751,8 +1752,9 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)",
+                "%s:@%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)",
                 user_id,
+                user_name or "!UNDEFINED!",
                 chat_name,
                 chat_id,
                 e,
@@ -1765,8 +1767,9 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s - unexpected error banning in chat %s (%s): %s",
+                "%s:@%s - unexpected error banning in chat %s (%s): %s",
                 user_id,
+                user_name or "!UNDEFINED!",
                 chat_name,
                 chat_id,
                 e,

@@ -7067,6 +7067,7 @@ if __name__ == "__main__":
             suspicious_items = {
                 "links": [],
                 "mentions": [],
+                "bot_mentions": [],  # Mentions of other bots (@somebot)
                 "phones": [],
                 "hashtags": [],
                 "cashtags": [],
@@ -7149,6 +7150,9 @@ if __name__ == "__main__":
                         mention = extract_entity_text(message.text, entity)
                         if mention:
                             suspicious_items["mentions"].append(mention)
+                            # Check if this is a bot mention (ends with "bot", case insensitive)
+                            if mention.lower().endswith("bot"):
+                                suspicious_items["bot_mentions"].append(mention)
                     elif entity_type == "text_mention":
                         # Direct mention of user by ID (users without username)
                         has_suspicious_content = True
@@ -7374,6 +7378,21 @@ if __name__ == "__main__":
                                 f"  ... and {links_count - max_items_per_type} more"
                             )
 
+                    if suspicious_items["bot_mentions"]:
+                        # Bot mentions are shown first with warning about auto-deletion
+                        bot_mentions_count = len(suspicious_items["bot_mentions"])
+                        content_details.append(
+                            f"<b>🤖 Bot Mentions ({bot_mentions_count}) - MESSAGE WILL BE DELETED:</b>"
+                        )
+                        for bot_mention in suspicious_items["bot_mentions"][:max_items_per_type]:
+                            content_details.append(
+                                f"  • <code>{html.escape(bot_mention)}</code>"
+                            )
+                        if bot_mentions_count > max_items_per_type:
+                            content_details.append(
+                                f"  ... and {bot_mentions_count - max_items_per_type} more"
+                            )
+
                     if suspicious_items["mentions"]:
                         mentions_count = len(suspicious_items["mentions"])
                         content_details.append(
@@ -7508,6 +7527,23 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
+                    
+                    # Delete original message if it mentions other bots
+                    if suspicious_items["bot_mentions"]:
+                        try:
+                            await message.delete()
+                            LOGGER.info(
+                                "Deleted message %s from chat %s - mentioned bots: %s",
+                                message.message_id,
+                                message.chat.id,
+                                ", ".join(suspicious_items["bot_mentions"])
+                            )
+                        except Exception as del_err:
+                            LOGGER.warning(
+                                "Failed to delete message %s with bot mentions: %s",
+                                message.message_id,
+                                del_err
+                            )
                 except Exception as e:
                     LOGGER.error("Error forwarding suspicious content message: %s", e)
 

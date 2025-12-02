@@ -7147,8 +7147,9 @@ if __name__ == "__main__":
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
 
-            # initialize the autoreport_sent flag
-            autoreport_sent = False
+            # initialize the autoreport_sent flag based on whether message was already autoreported
+            # (e.g., by missed join detection earlier in the flow)
+            autoreport_sent = was_autoreported(message)
 
             # Skip duplicate processing for media groups (multi-photo messages)
             # Only process the first message in a media group for ALL spam checks

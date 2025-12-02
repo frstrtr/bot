@@ -825,7 +825,7 @@ async def ban_rogue_chat_everywhere(
             continue
 
     # report rogue chat to the p2p server
-    await report_spam_2p2p(rogue_chat_id, LOGGER)
+    await report_spam_2p2p(rogue_chat_id, LOGGER, rogue_chat_username)
     await safe_send_message(
         BOT,
         TECHNOLOG_GROUP_ID,
@@ -4015,7 +4015,7 @@ if __name__ == "__main__":
                         
                         # Remove from P2P network spam list
                         try:
-                            p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER)
+                            p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER, inout_username)
                             if p2p_removed:
                                 LOGGER.info(
                                     "\033[92m%s:@%s removed from P2P spam list by admin re-add\033[0m",
@@ -5462,8 +5462,8 @@ if __name__ == "__main__":
             await callback_query.message.reply(f"Error in handle_ban function: {e}")
 
         # report spam to the P2P spamcheck server
-        await report_spam_2p2p(author_id, LOGGER)
         _display_name = user_name if user_name and str(user_name) not in ["None", "0", "!UNDEFINED!"] else None
+        await report_spam_2p2p(author_id, LOGGER, _display_name)
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
@@ -5642,7 +5642,7 @@ if __name__ == "__main__":
             await save_report_file("inout_", "mbn" + event_record)
 
             # Report to spam servers
-            await report_spam_2p2p(user_id, LOGGER)
+            await report_spam_2p2p(user_id, LOGGER, username)
 
             ban_message = (
                 f"Manual ban completed by {_admin_for_record}:\n"
@@ -8370,12 +8370,12 @@ if __name__ == "__main__":
             await message.reply(f"Error: {e}")
 
         # report spammer to P2P spam checker server
-        await report_spam_2p2p(author_id, LOGGER)
         user_name = (
             forwarded_message_data[4]
             if forwarded_message_data[4] not in [0, "0", None, "None"]
             else None
         )
+        await report_spam_2p2p(author_id, LOGGER, user_name)
         lols_check_kb = make_lols_kb(author_id)
         await safe_send_message(
             BOT,
@@ -10263,13 +10263,13 @@ if __name__ == "__main__":
 
             # Remove from P2P network spam list
             try:
-                p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER)
+                p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER, user_name)
                 if p2p_removed:
-                    LOGGER.info("\033[92m%d removed from P2P spam list\033[0m", user_id)
+                    LOGGER.info("\033[92m%s:@%s removed from P2P spam list\033[0m", user_id, user_name)
                 else:
-                    LOGGER.warning("\033[93m%d could not be removed from P2P spam list\033[0m", user_id)
+                    LOGGER.warning("\033[93m%s:@%s could not be removed from P2P spam list\033[0m", user_id, user_name)
             except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
-                LOGGER.error("Failed to remove user %d from P2P: %s", user_id, p2p_e)
+                LOGGER.error("Failed to remove user %s:@%s from P2P: %s", user_id, user_name, p2p_e)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)
@@ -11124,8 +11124,8 @@ if __name__ == "__main__":
                 LOGGER.error("Suspicious user not found: %s", e)
                 callback_answer = "User not found in chat."
             # report spammer to the P2P spam check server
-            await report_spam_2p2p(susp_user_id, LOGGER)
             _display_name = susp_user_name if susp_user_name and str(susp_user_name) not in ["None", "0", "!UNDEFINED!"] else None
+            await report_spam_2p2p(susp_user_id, LOGGER, _display_name)
             await safe_send_message(
                 BOT,
                 TECHNOLOG_GROUP_ID,
@@ -11298,7 +11298,7 @@ if __name__ == "__main__":
                 callback_answer = "User not found in chat or ban failed."
             
             # Report to P2P network
-            await report_spam_2p2p(susp_user_id, LOGGER)
+            await report_spam_2p2p(susp_user_id, LOGGER, susp_user_name)
             
             # Cancel watchdog and update tracking dicts
             await cancel_named_watchdog(susp_user_id)

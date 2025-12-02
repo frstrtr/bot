@@ -1948,7 +1948,7 @@ def check_user_legit(cursor: Cursor, user_id: int) -> bool:
     return result is not None
 
 
-async def report_spam_2p2p(spammer_id: int, logger) -> bool:
+async def report_spam_2p2p(spammer_id: int, logger, username: str = None) -> bool:
     """Function to report spammer to local P2P spamcheck server"""
     try:
         # local P2P spamcheck server
@@ -1956,8 +1956,11 @@ async def report_spam_2p2p(spammer_id: int, logger) -> bool:
         async with aiohttp.ClientSession() as session:
             async with session.post(url) as response:
                 if response.status == 200:
+                    _display = f"@{username}" if username and username not in ["None", "0", "!UNDEFINED!"] else "!UNDEFINED!"
                     logger.info(
-                        f"{spammer_id} successfully reported spammer to local P2P spamcheck server."
+                        "%s:%s successfully reported spammer to local P2P spamcheck server.",
+                        spammer_id,
+                        _display,
                     )
                     return True
                 else:
@@ -1970,21 +1973,27 @@ async def report_spam_2p2p(spammer_id: int, logger) -> bool:
         return False
 
 
-async def remove_spam_from_2p2p(user_id: int, logger) -> bool:
+async def remove_spam_from_2p2p(user_id: int, logger, username: str = None) -> bool:
     """Function to remove user from P2P spamcheck server (mark as legit)"""
     try:
         # local P2P spamcheck server - assuming there's a whitelist/remove endpoint
         url = f"http://localhost:8081/remove_id?user_id={user_id}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url) as response:
+                _display = f"@{username}" if username and username not in ["None", "0", "!UNDEFINED!"] else "!UNDEFINED!"
                 if response.status == 200:
                     logger.info(
-                        f"{user_id} successfully removed from P2P spamcheck server (marked as legit)."
+                        "%s:%s successfully removed from P2P spamcheck server (marked as legit).",
+                        user_id,
+                        _display,
                     )
                     return True
                 else:
                     logger.warning(
-                        f"{user_id} failed to remove from P2P server, status: {response.status}"
+                        "%s:%s failed to remove from P2P server, status: %s",
+                        user_id,
+                        _display,
+                        response.status,
                     )
                     return False
     except aiohttp.ServerTimeoutError as e:

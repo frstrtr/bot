@@ -5987,7 +5987,12 @@ if __name__ == "__main__":
 
     @DP.callback_query(lambda c: c.data.startswith("botcmdreply_"))
     async def handle_bot_command_reply(callback_query: CallbackQuery):
-        """Handle the reply button for bot commands detected in groups."""
+        """Handle the reply button for bot commands detected in groups.
+        
+        After sending the easter egg reply:
+        - After 3 minutes: delete the bot's response message
+        - After 3 minutes 10 seconds: delete the original command message
+        """
         try:
             parts = callback_query.data.split("_")
             if len(parts) != 4:
@@ -5996,7 +6001,7 @@ if __name__ == "__main__":
             
             _, chat_id_str, message_id_str, user_id_str = parts
             chat_id = int(chat_id_str)
-            message_id = int(message_id_str)
+            message_id = int(message_id_str)  # Original command message ID
             user_id = int(user_id_str)
             
             # Send the easter egg reply to the original message
@@ -6015,11 +6020,43 @@ if __name__ == "__main__":
             )
             
             if sent_msg:
-                await callback_query.answer("Easter egg reply sent! 🤖", show_alert=False)
+                await callback_query.answer("Easter egg reply sent! Will auto-delete in 3 min 🤖", show_alert=False)
+                
+                # Schedule message deletions
+                async def delayed_cleanup():
+                    """Delete bot response after 3 min, then command message after 3:10."""
+                    try:
+                        # Wait 3 minutes, then delete bot's response
+                        await asyncio.sleep(180)  # 3 minutes
+                        try:
+                            await BOT.delete_message(chat_id, sent_msg.message_id)
+                            LOGGER.debug(
+                                "Deleted easter egg response %s in chat %s after 3 min",
+                                sent_msg.message_id, chat_id
+                            )
+                        except Exception as e:
+                            LOGGER.debug("Could not delete easter egg response: %s", e)
+                        
+                        # Wait 10 more seconds, then delete the original command message
+                        await asyncio.sleep(10)  # 10 more seconds
+                        try:
+                            await BOT.delete_message(chat_id, message_id)
+                            LOGGER.debug(
+                                "Deleted original command message %s in chat %s after 3:10",
+                                message_id, chat_id
+                            )
+                        except Exception as e:
+                            LOGGER.debug("Could not delete original command message: %s", e)
+                            
+                    except Exception as e:
+                        LOGGER.error("Error in delayed_cleanup for easter egg: %s", e)
+                
+                # Start the cleanup task in the background
+                asyncio.create_task(delayed_cleanup())
                 
                 # Update the message to show it was handled
                 try:
-                    new_text = callback_query.message.text + "\n\n✅ <b>Replied with easter egg</b>"
+                    new_text = callback_query.message.text + "\n\n✅ <b>Replied with easter egg</b> (auto-deletes in 3 min)"
                     # Remove the reply button, keep LOLS buttons
                     new_kb = InlineKeyboardBuilder()
                     new_kb.add(

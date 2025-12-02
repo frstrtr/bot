@@ -1815,9 +1815,9 @@ async def ban_user_from_all_chats(
     total_count = len(channel_ids)
     # RED color for the log
     LOGGER.info(
-        "\033[91m%s:@%s identified as a SPAMMER, banned from %d/%d chats.\033[0m",
+        "\033[91m%s:%s identified as a SPAMMER, banned from %d/%d chats.\033[0m",
         user_id,
-        user_name if user_name else "!UNDEFINED!",
+        format_username_for_log(user_name),
         success_count,
         total_count,
     )
@@ -1881,9 +1881,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
-            "\033[91m%s:@%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
+            "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
             _id,
-            user_name if user_name else "!UNDEFINED!",
+            format_username_for_log(user_name),
             last_3_users_str,  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
@@ -1892,7 +1892,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     norm_username = normalize_username(user_name)
     if not norm_username:
         LOGGER.debug(
-            "%s username undefined; skipping TECHNO_NAMES notification line (1156)", _id
+            "%s username undefined; skipping TECHNO_NAMES notification", _id
         )
         return
     # Check if already posted to avoid duplicates

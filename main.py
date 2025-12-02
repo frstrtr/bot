@@ -10330,7 +10330,10 @@ if __name__ == "__main__":
             susp_user_name = susp_user_name_dict if susp_user_name_dict and str(susp_user_name_dict) not in ["None", "0"] else "!UNDEFINED!"
 
         # create unified message link (used in action confirmation message)
-        message_link = construct_message_link([susp_chat_id, susp_message_id, None])
+        # Note: susp_message_id might be a report_id (timestamp) for join events, not a real message ID
+        # Real Telegram message IDs are typically < 1 billion, timestamps are > 1.7 billion
+        is_real_message_id = susp_message_id < 1_000_000_000
+        message_link = construct_message_link([susp_chat_id, susp_message_id, None]) if is_real_message_id else None
         # create lols check link
         lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
 
@@ -10816,10 +10819,15 @@ if __name__ == "__main__":
             cache_time=0,
         )
 
+        # Build action confirmation message - only include message link if it's a real message (not a join event)
+        message_origin_text = (
+            f"Message origin: <a href='{message_link}'>{message_link}</a>\n"
+            if message_link else "(join event - no message)\n"
+        )
         bot_reply_action_message = (
             f"{callback_answer}\n"
             f"Suspicious user {f'@{susp_user_name}' if susp_user_name and susp_user_name != '!UNDEFINED!' else '!UNDEFINED!'} (<code>{susp_user_id}</code>) "
-            f"Message origin: <a href='{message_link}'>{message_link}</a>\n"
+            f"{message_origin_text}"
             f"Action done by Admin {f'@{admin_username}' if admin_username else '!UNDEFINED!'}"
         )
 

@@ -1462,7 +1462,7 @@ async def handle_autoreports(
         )
         return
 
-    message_as_json = json.dumps(message.model_dump(), indent=4, ensure_ascii=False)
+    message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -4390,7 +4390,7 @@ if __name__ == "__main__":
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
-        message_as_json = json.dumps(message.model_dump(), indent=4, ensure_ascii=False)
+        message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
             message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -6170,7 +6170,7 @@ if __name__ == "__main__":
                 # Continue processing despite error
             try:
                 # Convert the Message object to a dictionary
-                message_dict = message.model_dump()
+                message_dict = message.model_dump(mode="json")
                 formatted_message = json.dumps(
                     message_dict, indent=4, ensure_ascii=False
                 )  # Convert back to a JSON string with indentation and human-readable characters
@@ -10346,7 +10346,7 @@ if __name__ == "__main__":
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
             # Convert the Message object to a dictionary
-            message_dict = message.model_dump()
+            message_dict = message.model_dump(mode="json")
             full_formatted_message = json.dumps(
                 message_dict, indent=4, ensure_ascii=False
             )  # Convert back to a JSON string with indentation and human-readable characters

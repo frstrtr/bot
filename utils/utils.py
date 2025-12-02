@@ -1643,11 +1643,21 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
             "deletion_reason": deletion_reason,
         })
     
-    # Convert set to list for JSON serialization
-    result["chats_seen"] = [
-        {"chat_id": c[0], "chat_username": c[1], "chat_title": c[2]}
-        for c in result["chats_seen"]
-    ]
+    # Convert set to list for JSON serialization, deduplicating by chat_id
+    # Keep the entry with the most info (prefer entries with username and title)
+    chats_by_id = {}
+    for c in result["chats_seen"]:
+        chat_id, chat_username, chat_title = c
+        if chat_id not in chats_by_id:
+            chats_by_id[chat_id] = {"chat_id": chat_id, "chat_username": chat_username, "chat_title": chat_title}
+        else:
+            # Update with better info if available
+            existing = chats_by_id[chat_id]
+            if chat_username and not existing["chat_username"]:
+                existing["chat_username"] = chat_username
+            if chat_title and (not existing["chat_title"] or len(chat_title) > len(existing["chat_title"] or "")):
+                existing["chat_title"] = chat_title
+    result["chats_seen"] = list(chats_by_id.values())
     
     # Collect all deletion reasons
     result["deletion_reasons"] = [

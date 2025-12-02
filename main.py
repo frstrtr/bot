@@ -8537,23 +8537,8 @@ if __name__ == "__main__":
                         callback_data=f"suspiciousactions_{message.chat.id}_0_{found_user_id}",
                     )
                 )
-        elif not whois_data.get("found"):
-            # User not in DB - add LOLS check button
-            keyboard = KeyboardBuilder()
-            if user_id:
-                keyboard.add(
-                    InlineKeyboardButton(
-                        text="🔍 Check on LOLS",
-                        url=f"https://t.me/oLolsBot?start={user_id}",
-                    )
-                )
-            elif username:
-                keyboard.add(
-                    InlineKeyboardButton(
-                        text="🔍 Check on LOLS",
-                        url=f"https://t.me/oLolsBot?start=u-{username}",
-                    )
-                )
+        # Note: LOLS check link is already included in the message text,
+        # so we don't need a separate button for it
         
         # Send response - use thread_id if provided (admin group), otherwise no thread (private chat)
         await safe_send_message(

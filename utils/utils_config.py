@@ -66,6 +66,9 @@ P2P_SERVER_URL: str = "http://localhost:8081"
 ESTABLISHED_USER_MIN_MESSAGES: int = 10  # Minimum messages to be considered established
 ESTABLISHED_USER_FIRST_MSG_DAYS: int = 90  # First message must be older than this (days)
 
+# Threshold for flagging very new accounts (very high user IDs)
+HIGH_USER_ID_THRESHOLD: int = 8_400_000_000
+
 
 def _get_env_or_none(key: str) -> Optional[str]:
     """Get environment variable or return None."""
@@ -159,6 +162,7 @@ def load_from_env() -> bool:
     global DP, BOT, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
     global API_TOKEN, TELEGRAM_CHANNEL_BOT_ID, P2P_SERVER_URL
     global ESTABLISHED_USER_MIN_MESSAGES, ESTABLISHED_USER_FIRST_MSG_DAYS
+    global HIGH_USER_ID_THRESHOLD
 
     # Check if BOT_TOKEN is set (required for .env mode)
     API_TOKEN = _get_env_or_none("BOT_TOKEN")
@@ -227,6 +231,9 @@ def load_from_env() -> bool:
     # Established user detection settings
     ESTABLISHED_USER_MIN_MESSAGES = _get_env_int("ESTABLISHED_USER_MIN_MESSAGES", 10)
     ESTABLISHED_USER_FIRST_MSG_DAYS = _get_env_int("ESTABLISHED_USER_FIRST_MSG_DAYS", 90)
+
+    # High user ID threshold for new accounts
+    HIGH_USER_ID_THRESHOLD = _get_env_int("HIGH_USER_ID_THRESHOLD", 8_400_000_000)
 
     # Content types
     ALLOWED_CONTENT_TYPES = _get_allowed_content_types()

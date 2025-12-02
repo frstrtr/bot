@@ -255,6 +255,7 @@ from utils.utils_config import (
     P2P_SERVER_URL,
     ESTABLISHED_USER_MIN_MESSAGES,
     ESTABLISHED_USER_FIRST_MSG_DAYS,
+    HIGH_USER_ID_THRESHOLD,
 )
 
 # Parse command line arguments
@@ -287,9 +288,6 @@ bot_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 # Set to keep track of active user IDs
 active_user_checks_dict = dict()
 banned_users_dict = dict()
-
-# Threshold for flagging very new accounts (very high user IDs)
-HIGH_USER_ID_THRESHOLD = 8_200_000_000
 
 # Cache for chat usernames (chat_id -> username)
 # Populated when processing messages, used for constructing public links

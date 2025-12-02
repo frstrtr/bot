@@ -1975,7 +1975,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     norm_username = normalize_username(user_name)
     if not norm_username:
         LOGGER.debug(
-            "%s:@%s username undefined; skipping TECHNO_NAMES notification", _id, user_name or "!UNDEFINED!"
+            "%s:%s username undefined; skipping TECHNO_NAMES notification", _id, format_username_for_log(user_name)
         )
         return
     # Check if already posted to avoid duplicates
@@ -2283,7 +2283,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username_990:
                 LOGGER.debug(
-                    "%s:@%s username undefined; skipping 990 notification line", user_id, user_name or "!UNDEFINED!"
+                    "%s:%s username undefined; skipping 990 notification line", user_id, format_username_for_log(user_name)
                 )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
@@ -2340,7 +2340,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username:
                 LOGGER.debug(
-                    "%s:@%s username undefined; skipping 1526 notification line", user_id, user_name or "!UNDEFINED!"
+                    "%s:%s username undefined; skipping 1526 notification line", user_id, format_username_for_log(user_name)
                 )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
@@ -2404,7 +2404,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username_1054:
                 LOGGER.debug(
-                    "%s:@%s username undefined; skipping 1054 notification line", user_id, user_name or "!UNDEFINED!"
+                    "%s:%s username undefined; skipping 1054 notification line", user_id, format_username_for_log(user_name)
                 )
         return True
 

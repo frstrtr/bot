@@ -9786,12 +9786,18 @@ if __name__ == "__main__":
                     task.cancel()
                     task_cancelled = True
                     LOGGER.info(
-                        f"Watchdog task for user {user_id_legit} ({_user_display}) cancelled by admin {admin_id}."
+                        "%s:%s Watchdog task cancelled by admin %s:%s",
+                        user_id_legit,
+                        _user_display,
+                        admin_id,
+                        _admin_display,
                     )
                     break
             if not task_cancelled:
                 LOGGER.warning(
-                    f"Watchdog task for user {user_id_legit} ({_user_display}) not found for cancellation, though user was in active_user_checks_dict."
+                    "%s:%s Watchdog task not found for cancellation, though user was in active_user_checks_dict",
+                    user_id_legit,
+                    _user_display,
                 )
 
             if len(active_user_checks_dict) > 3:
@@ -9852,10 +9858,19 @@ if __name__ == "__main__":
             )
             CONN.commit()
             LOGGER.info(
-                f"{user_id_legit} (@{user_name}) Recorded/Updated legitimization status in DB, linked to original context {orig_chat_id}/{orig_message_id}."
+                "%s:%s Recorded/Updated legitimization status in DB, linked to original context %s/%s",
+                user_id_legit,
+                format_username_for_log(user_name),
+                orig_chat_id,
+                orig_message_id,
             )
         except Exception as e_db:
-            LOGGER.error(f"{user_id_legit}: {e_db} Error updating DB in stop_checks")
+            LOGGER.error(
+                "%s:%s Error updating DB in stop_checks: %s",
+                user_id_legit,
+                format_username_for_log(user_name),
+                e_db,
+            )
 
         await callback_query.answer(
             "Checks stopped. User marked as legit.", show_alert=False

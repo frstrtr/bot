@@ -156,9 +156,9 @@ async def log_profile_change(
     """
     try:
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        uid_fmt = f"{user_id:<10}"
-        uname = username or "!UNDEFINED!"
-        chat_repr = f"{chat_title or ''}({chat_id})" if chat_id else str(chat_id)
+        uname = username if username else "!UNDEFINED!"
+        uname_fmt = f"@{uname}" if username else uname
+        chat_repr = f"{chat_title or ''}({chat_id})" if chat_id else "(unknown chat)"
         # Build compact diffs old->new for changed fields
         diff_parts = []
         mapping = {
@@ -172,11 +172,11 @@ async def log_profile_change(
             o = old_values.get(key)
             n = new_values.get(key)
             if key == "username":
-                o = ("@" + o) if o else "@!UNDEFINED!"
-                n = ("@" + n) if n else "@!UNDEFINED!"
+                o = f"@{o}" if o else "!UNDEFINED!"
+                n = f"@{n}" if n else "!UNDEFINED!"
             diff_parts.append(f"{label}='{o}'→'{n}'")
         photo_marker = " P" if photo_changed else ""
-        record = f"{ts}: {uid_fmt} PC[{context}{photo_marker}] @{uname:<20} in {chat_repr:<40} changes: {', '.join(diff_parts)}\n"
+        record = f"{ts}: {user_id} PC[{context}{photo_marker}] {uname_fmt} in {chat_repr} changes: {', '.join(diff_parts)}\n"
         await save_report_file("inout_", "pc" + record)
         LOGGER.info(record.rstrip())
     except Exception as _e:  # silent failure should not break main flow

@@ -15,7 +15,7 @@ from datetime import timedelta
 from datetime import datetime
 import argparse
 import asyncio
-import os
+import os  # noqa: E402 - reimport needed, _os used only for early TZ setup
 import random
 import sqlite3
 import json
@@ -32,7 +32,6 @@ import certifi
 
 import aiohttp
 from aiogram import Dispatcher, Router, F
-from aiogram import types
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
 from aiogram.enums import ChatMemberStatus, ChatType
 from aiogram.filters import Command, CommandStart
@@ -2382,7 +2381,7 @@ async def check_and_autoban(
         await safe_send_message(
             BOT,
             ADMIN_GROUP_ID,
-            f"User is not now in the SPAM database\nbut kicked/restricted by Admin or other BOT.\n"
+            "User is not now in the SPAM database\nbut kicked/restricted by Admin or other BOT.\n"
             + inout_logmessage,
             LOGGER,
             message_thread_id=ADMIN_MANBAN,
@@ -2569,7 +2568,7 @@ async def check_n_ban(message: Message, reason: str):
             fake_list = []
             for fake in mention_analysis["fake_mentions"][:3]:
                 fake_list.append(f"'{fake['visible_text']}' → <code>{fake['hidden_url']}</code>")
-            autoban_banner_text += f"\n🎭 <b>FAKE MENTIONS (deceptive links):</b>\n" + "\n".join(fake_list)
+            autoban_banner_text += "\n🎭 <b>FAKE MENTIONS (deceptive links):</b>\n" + "\n".join(fake_list)
         
         # Add t.me/m/ deeplink info if present (spam recruitment links)
         if mention_analysis.get("tme_deeplinks"):
@@ -4318,7 +4317,7 @@ if __name__ == "__main__":
                         inout_chattitle,
                     )
                     # ban user from all chats
-                    success_count, fail_count, total_count = (
+                    _success_count, _fail_count, _total_count = (
                         await ban_user_from_all_chats(
                             inout_userid, inout_username, CHANNEL_IDS, CHANNEL_DICT
                         )
@@ -4850,7 +4849,7 @@ if __name__ == "__main__":
         # DEBUG:
         # logger.debug(f"Report {callback_query} confirmed for banning.")
 
-        keyboard = InlineKeyboardMarkup(row_width=2)
+        keyboard = KeyboardBuilder()
         # MODIFIED: Pass spammer_user_id_str and report_id_to_ban_str, and rename callback prefixes
         confirm_btn = InlineKeyboardButton(
             text="🟢 Confirm",
@@ -4989,7 +4988,7 @@ if __name__ == "__main__":
             if not forwarded_report_state:
                 # Ad-hoc ban (e.g., profile change alert) – perform minimal ban logic
                 author_id = int(author_id_from_callback_str)
-                success_count, fail_count, total_count = await ban_user_from_all_chats(
+                _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
                     author_id, None, CHANNEL_IDS, CHANNEL_DICT
                 )
                 banned_users_dict[author_id] = "!UNDEFINED!"
@@ -5540,11 +5539,11 @@ if __name__ == "__main__":
             first_name = user_info.first_name or ""
             last_name = user_info.last_name or ""
             display_name = f"{first_name} {last_name}".strip() or username
-        except:
+        except Exception:
             username = "!UNDEFINED!"
             display_name = "Unknown User"
 
-        keyboard = InlineKeyboardMarkup(row_width=2)
+        keyboard = KeyboardBuilder()
         confirm_btn = InlineKeyboardButton(
             text="✅ Yes, Ban", callback_data=f"confirmbanuser_{user_id_str}"
         )
@@ -5597,7 +5596,7 @@ if __name__ == "__main__":
                 username = user_info.username or "!UNDEFINED!"
                 first_name = user_info.first_name or ""
                 last_name = user_info.last_name or ""
-            except:
+            except Exception:
                 username = "!UNDEFINED!"
                 first_name = "Unknown"
                 last_name = "User"
@@ -10418,7 +10417,7 @@ if __name__ == "__main__":
             )
 
             # Create an inline keyboard with two buttons
-            inline_kb = InlineKeyboardMarkup(row_width=3)
+            inline_kb = KeyboardBuilder()
             button1 = InlineKeyboardButton(
                 text="SRY",
                 callback_data="button_sry",

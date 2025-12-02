@@ -2879,7 +2879,7 @@ async def perform_checks(
                         if changed:
                             chat_username = _chat_info.get("username")
                             chat_title = _chat_info.get("title") or ""
-                            universal_chatlink = build_chat_link(_chat_id, chat_username, chat_title)
+                            universal_chatlink = build_chat_link(_chat_id, chat_username, chat_title) if _chat_id else "(unknown chat)"
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
                             _chat_id_for_gban = baseline.get("chat", {}).get("id")
@@ -2894,8 +2894,8 @@ async def perform_checks(
 
                             def _fmt(old, new, label, username=False):
                                 if username:
-                                    old_disp = ("@" + old) if old else "@!UNDEFINED!"
-                                    new_disp = ("@" + new) if new else "@!UNDEFINED!"
+                                    old_disp = f"@{old}" if old else "!UNDEFINED!"
+                                    new_disp = f"@{new}" if new else "!UNDEFINED!"
                                 else:
                                     old_disp = html.escape(old) if old else ""
                                     new_disp = html.escape(new) if new else ""
@@ -2936,8 +2936,9 @@ async def perform_checks(
                             elapsed_line = ""
                             if joined_at_raw:
                                 try:
-                                    joined_dt = datetime.strptime(
-                                        joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                    # Handle both formats: with and without timezone
+                                    joined_dt = datetime.fromisoformat(
+                                        joined_at_raw.replace(" ", "T")
                                     )
                                     delta = datetime.now() - joined_dt
                                     # human friendly formatting

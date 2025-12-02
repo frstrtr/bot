@@ -1,21 +1,20 @@
 """Yet Another Telegram Bot for Spammers Detection and Reporting"""
 
 # Force process timezone to Indian/Mauritius as early as possible
-import os as _os
+import os
 
-_os.environ.setdefault("TZ", "Indian/Mauritius")
+os.environ.setdefault("TZ", "Indian/Mauritius")
 try:
     import time as _time
 
     _time.tzset()  # Ensure the process picks up TZ on Unix
-except Exception:
-    pass
+except AttributeError:
+    pass  # tzset() not available on Windows
 
 from datetime import timedelta
 from datetime import datetime
 import argparse
 import asyncio
-import os  # noqa: E402 - reimport needed, _os used only for early TZ setup
 import random
 import sqlite3
 import json
@@ -179,7 +178,7 @@ async def log_profile_change(
         record = f"{ts}: {user_id} PC[{context}{photo_marker}] {uname_fmt} in {chat_repr} changes: {', '.join(diff_parts)}\n"
         await save_report_file("inout_", "pc" + record)
         LOGGER.info(record.rstrip())
-    except Exception as _e:  # silent failure should not break main flow
+    except OSError as _e:  # silent failure should not break main flow
         LOGGER.debug("Failed to log profile change: %s", _e)
 
 
@@ -698,7 +697,7 @@ async def on_startup():
         bot_info = await BOT.get_me()
         BOT_USERNAME = bot_info.username
         LOGGER.info("Bot username: @%s", BOT_USERNAME)
-    except Exception as e:
+    except TelegramBadRequest as e:
         LOGGER.error("Failed to get bot info: %s", e)
         BOT_USERNAME = None
 
@@ -710,7 +709,7 @@ async def on_startup():
             update_chat_username_cache(chat_id, chat.username)
             if chat.username:
                 LOGGER.debug("Cached username for %s: @%s", chat.title, chat.username)
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.warning("Could not get chat info for %s: %s", chat_id, e)
     LOGGER.info("Chat username cache populated with %d entries", len(chat_username_cache))
 
@@ -935,7 +934,7 @@ async def get_user_other_chats(
                 chat_name = channel_dict.get(chat_id, str(chat_id))
                 chat_username = get_cached_chat_username(chat_id)
                 other_chats.append((chat_id, chat_name, chat_username))
-        except Exception as e:
+        except TelegramBadRequest as e:
             # User not in chat or bot can't access - skip silently
             LOGGER.debug(
                 "Cannot check user %s in chat %s: %s", user_id, chat_id, e
@@ -1393,7 +1392,7 @@ async def on_shutdown():
             LOGGER,
             message_thread_id=TECHNO_RESTART,
         )
-    except Exception as e:
+    except TelegramBadRequest as e:
         LOGGER.warning("Could not send shutdown stats message: %s", e)
         
     LOGGER.info(
@@ -1876,7 +1875,7 @@ async def ban_user_from_all_chats(
             await asyncio.sleep(1)
             # Note: Consider removing user_id check coroutine from monitoring list on ChatMigrated
             continue
-        except Exception as e:  # Catch any other exceptions
+        except TelegramForbiddenError as e:  # Catch permission errors
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
@@ -2100,9 +2099,9 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                     try:
                         await BOT.delete_message(chat_id, message_id)
                         deleted_count += 1
-                    except Exception:
+                    except (TelegramBadRequest, TelegramForbiddenError):
                         failed_count += 1
-                except Exception as e:
+                except TelegramBadRequest as e:
                     LOGGER.warning(
                         "%s:@%s Failed to delete message %s: %s",
                         user_id,
@@ -2227,7 +2226,7 @@ async def check_and_autoban(
                     user_name,
                     message_to_delete[1],
                 )
-            except Exception:
+            except TelegramForbiddenError:
                 pass  # Already handled by delete_all_user_messages
 
         if "kicked" in inout_logmessage or "restricted" in inout_logmessage:
@@ -2835,7 +2834,7 @@ async def perform_checks(
                                 cur_first = getattr(_user, "first_name", "") or ""
                                 cur_last = getattr(_user, "last_name", "") or ""
                                 cur_username = getattr(_user, "username", "") or ""
-                            except Exception as _e:
+                            except TelegramBadRequest as _e:
                                 LOGGER.debug(
                                     "%s:@%s unable to fetch chat member for profile-change check: %s",
                                     user_id,
@@ -2852,7 +2851,7 @@ async def perform_checks(
                                 if _photos
                                 else cur_photo_count
                             )
-                        except Exception as _e:
+                        except TelegramBadRequest as _e:
                             LOGGER.debug(
                                 "%s:@%s unable to fetch photo count during checks: %s",
                                 user_id,
@@ -2950,7 +2949,7 @@ async def perform_checks(
                                         parts.append(f"{seconds}s")
                                     human_elapsed = " ".join(parts) or f"{seconds}s"
                                     elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {human_elapsed})"
-                                except Exception:
+                                except ValueError:
                                     elapsed_line = f"\nJoined at: {joined_at_raw}"
 
                             message_text = (
@@ -3068,7 +3067,7 @@ async def perform_checks(
             # remove user from active checks dict as LEGIT / cleanup baseline
             try:
                 del active_user_checks_dict[user_id]
-            except Exception:
+            except KeyError:
                 active_user_checks_dict.pop(user_id, None)
             # Mark monitoring as ended (completed without ban = legit)
             update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
@@ -3113,7 +3112,7 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
                     user_id,
                     user_name,
                 )
-            except Exception:
+            except RuntimeError:
                 pass
     
     if user_id in running_watchdogs:
@@ -3149,7 +3148,7 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
                 user_id,
                 user_name,
             )
-        except Exception as e:
+        except RuntimeError as e:
             LOGGER.error(
                 "%s:@%s Error during watchdog cancellation: %s",
                 user_id,
@@ -3169,7 +3168,7 @@ async def perform_intensive_checks(
     user_name: str = "!UNDEFINED!",
     message_chat_id: int = None,
     message_id: int = None,
-    message_link: str = None,
+    _message_link: str = None,
 ):
     """Perform intensive spam checks when a user from active_checks posts a message.
     
@@ -3305,7 +3304,7 @@ async def perform_intensive_checks(
             user_id,
             user_name,
         )
-    except Exception as e:
+    except RuntimeError as e:
         LOGGER.error(
             "%s:@%s Error during INTENSIVE checks: %s",
             user_id,
@@ -3327,7 +3326,7 @@ async def cancel_intensive_watchdog(user_id: int, user_name: str = "!UNDEFINED!"
                 user_id,
                 user_name,
             )
-        except Exception as e:
+        except RuntimeError as e:
             LOGGER.warning(
                 "%s:@%s Error cancelling intensive watchdog: %s",
                 user_id,
@@ -3341,7 +3340,7 @@ async def start_intensive_watchdog(
     user_name: str = "!UNDEFINED!",
     message_chat_id: int = None,
     message_id: int = None,
-    message_link: str = None,
+    _message_link: str = None,
 ):
     """Start an intensive watchdog for a user who posted a message while in active_checks.
     
@@ -3365,7 +3364,6 @@ async def start_intensive_watchdog(
             user_name=user_name,
             message_chat_id=message_chat_id,
             message_id=message_id,
-            message_link=message_link,
         ),
         name=f"intensive_{user_id}",
     )
@@ -3927,7 +3925,7 @@ if __name__ == "__main__":
             or inout_status == ChatMemberStatus.RESTRICTED
         ):  # not Timeout (lols_spam) exactly or if kicked/restricted by someone else
             # Call check_and_autoban with concurrency control using named tasks
-            task_GCM = await create_named_watchdog(
+            _task_GCM = await create_named_watchdog(
                 check_and_autoban(
                     event_record,
                     inout_userid,
@@ -4384,14 +4382,14 @@ if __name__ == "__main__":
 
         # Check if this is superadmin in private chat or superadmin group - they may be forwarding for /copy or /forward
         # We'll only respond after we verify we can process the report
-        is_superadmin_context = superadmin_filter(message)
+        is_superadmin_msg = superadmin_filter(message)
 
         # LOGGER.debug("############################################################")
         # LOGGER.debug("                                                            ")
         # LOGGER.debug("------------------------------------------------------------")
         # LOGGER.debug("Received forwarded message for the investigation: %s", message)
         # Send a thank you note to the user (but not to superadmin - wait until we verify)
-        if not is_superadmin_context:
+        if not is_superadmin_msg:
             await message.answer("Thank you for the report. We will investigate it.")
         # Forward the message to the admin group
         technnolog_spam_message_copy = await BOT.forward_message(
@@ -4509,7 +4507,7 @@ if __name__ == "__main__":
                 # Different behavior based on who forwarded the message:
                 
                 # 1. Superadmin in private chat or superadmin group - stay silent (they may use /copy or /forward)
-                if is_superadmin_context:
+                if is_superadmin_msg:
                     LOGGER.debug(
                         "Superadmin forwarded message from unknown source - staying silent for potential /copy or /forward use"
                     )
@@ -4575,7 +4573,7 @@ if __name__ == "__main__":
         if report_id:
             # send report ID to the reporter
             # For superadmin in private chat or group, also send "Thank you" since we successfully found the data
-            if is_superadmin_context:
+            if is_superadmin_msg:
                 await message.answer(f"Thank you for the report. Report ID: {report_id}")
             else:
                 await message.answer(f"Report ID: {report_id}")
@@ -5538,10 +5536,10 @@ if __name__ == "__main__":
             username = user_info.username or "!UNDEFINED!"
             first_name = user_info.first_name or ""
             last_name = user_info.last_name or ""
-            display_name = f"{first_name} {last_name}".strip() or username
-        except Exception:
+            _display_name = f"{first_name} {last_name}".strip() or username
+        except (TelegramBadRequest, TelegramNotFound):
             username = "!UNDEFINED!"
-            display_name = "Unknown User"
+            _display_name = "Unknown User"
 
         keyboard = KeyboardBuilder()
         confirm_btn = InlineKeyboardButton(
@@ -5573,7 +5571,7 @@ if __name__ == "__main__":
         user_id = int(user_id_str)
 
         button_pressed_by = callback_query.from_user.username or "!UNDEFINED!"
-        admin_id = callback_query.from_user.id
+        _admin_id = callback_query.from_user.id
 
         # Create response message
         lols_check_and_banned_kb = make_lols_kb(user_id)
@@ -5596,7 +5594,7 @@ if __name__ == "__main__":
                 username = user_info.username or "!UNDEFINED!"
                 first_name = user_info.first_name or ""
                 last_name = user_info.last_name or ""
-            except Exception:
+            except (TelegramBadRequest, TelegramNotFound):
                 username = "!UNDEFINED!"
                 first_name = "Unknown"
                 last_name = "User"
@@ -5611,7 +5609,7 @@ if __name__ == "__main__":
                 )
 
             # Ban user from all chats
-            success_count, fail_count, total_count = await ban_user_from_all_chats(
+            _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
                 user_id, username, CHANNEL_IDS, CHANNEL_DICT
             )
 
@@ -5764,7 +5762,7 @@ if __name__ == "__main__":
         # Parse channel_id from callback data
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
-        source_chat_id = int(parts[2])
+        _source_chat_id = int(parts[2])
 
         admin_username = callback_query.from_user.username
         admin_id = callback_query.from_user.id
@@ -6140,24 +6138,24 @@ if __name__ == "__main__":
                     )
                 )
 
-                channel_info = f"<b>⚠️ CHANNEL MESSAGE DETECTED</b>\n\n"
-                channel_info += (
+                channel_msg_info = "<b>⚠️ CHANNEL MESSAGE DETECTED</b>\n\n"
+                channel_msg_info += (
                     f"<b>Channel:</b> {message.sender_chat.title or 'Unknown'}\n"
                 )
                 if message.sender_chat.username:
-                    channel_info += (
+                    channel_msg_info += (
                         f"<b>Username:</b> @{message.sender_chat.username}\n"
                     )
-                channel_info += (
+                channel_msg_info += (
                     f"<b>Channel ID:</b> <code>{message.sender_chat.id}</code>\n"
                 )
-                channel_info += f"<b>Posted in:</b> {message.chat.title}\n"
-                channel_info += f"<b>Status:</b> ❌ Deleted from chat"
+                channel_msg_info += f"<b>Posted in:</b> {message.chat.title}\n"
+                channel_msg_info += "<b>Status:</b> ❌ Deleted from chat"
 
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
-                    f"{channel_info}\n\nMessage link (deleted): <a href='{message_link}'>Click here</a>",
+                    f"{channel_msg_info}\n\nMessage link (deleted): <a href='{message_link}'>Click here</a>",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=TECHNO_ORIGINALS,
@@ -6629,10 +6627,10 @@ if __name__ == "__main__":
                         sender_or_forwarder_id = "!NO sender/forwarder chat ID!"
 
                     # Determine the HTML link for the chat where the ban occurred
-                    escaped_chat_title_for_link = html.escape(
+                    _escaped_chat_title_for_link = html.escape(
                         message.chat.title, quote=True
                     )
-                    escaped_chat_title_for_display = html.escape(
+                    _escaped_chat_title_for_display = html.escape(
                         message.chat.title
                     )  # Used when no link is formed
 
@@ -6758,7 +6756,7 @@ if __name__ == "__main__":
                         message.chat.id,
                         message.chat.username or "NoName",
                     )
-                success_count, fail_count, total_count = await ban_user_from_all_chats(
+                _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
                     message.from_user.id,
                     (
                         message.from_user.username
@@ -7396,7 +7394,6 @@ if __name__ == "__main__":
                             ),
                             message_chat_id=message.chat.id,
                             message_id=message.message_id,
-                            message_link=message_link,
                         )
                     )
                 
@@ -7849,7 +7846,7 @@ if __name__ == "__main__":
 
                             inline_kb.add(
                                 InlineKeyboardButton(
-                                    button_text,
+                                    text=button_text,
                                     url=mention_lols_link,
                                 )
                             )
@@ -7861,7 +7858,7 @@ if __name__ == "__main__":
                     if suspicious_items["links"]:
                         links_count = len(suspicious_items["links"])
                         content_details.append(f"<b>🔗 Links ({links_count}):</b>")
-                        for i, link in enumerate(
+                        for _i, link in enumerate(
                             suspicious_items["links"][:max_items_per_type]
                         ):
                             # Truncate very long URLs
@@ -7984,7 +7981,7 @@ if __name__ == "__main__":
                             )
 
                     if suspicious_items["high_user_id"]:
-                        content_details.insert(0, f"<b>🆕 Very New Account (ID &gt; 8.2B)</b>")
+                        content_details.insert(0, "<b>🆕 Very New Account (ID &gt; 8.2B)</b>")
 
                     content_report = "\n".join(content_details)
 
@@ -8093,7 +8090,6 @@ if __name__ == "__main__":
                             user_name=_username or "!UNDEFINED!",
                             message_chat_id=message.chat.id,
                             message_id=message.message_id,
-                            message_link=message_link,
                         )
                     else:
                         LOGGER.debug(

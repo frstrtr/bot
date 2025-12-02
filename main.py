@@ -1585,16 +1585,17 @@ async def handle_autoreports(
     lols_link = f"https://t.me/oLolsBot?start={user_id}"
     keyboard.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
     # Add legitimization button to stop further checks
+    # Use actual message_id for linking (not report_id which is for DB storage)
     keyboard.add(
         InlineKeyboardButton(
             text="✅ Mark as Legit",
-            callback_data=f"stopchecks_{spammer_id}_{message.chat.id}_{report_id}",
+            callback_data=f"stopchecks_{spammer_id}_{message.chat.id}_{message.message_id}",
         )
     )
     # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
     actions_btn = InlineKeyboardButton(
         text="⚙️ Actions (Ban / Delete) ⚙️",
-        callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{spammer_id}",
+        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{spammer_id}",
     )
     keyboard.add(actions_btn)
 
@@ -2432,15 +2433,11 @@ async def check_n_ban(message: Message, reason: str):
             )
         )
         # Add Actions button for manual review/unban
-        report_id = (
-            int(str(message.chat.id)[4:] + str(message.message_id))
-            if message.chat.id < 0
-            else int(str(message.chat.id) + str(message.message_id))
-        )
+        # Use actual message_id for linking back to the message
         inline_kb.add(
             InlineKeyboardButton(
                 text="⚙️ Actions (Unban / Review) ⚙️",
-                callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{message.from_user.id}",
+                callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
             )
         )
 
@@ -2782,13 +2779,13 @@ async def perform_checks(
                             universal_chatlink = build_chat_link(_chat_id, chat_username, chat_title)
                             _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                             kb = make_lols_kb(user_id)
-                            _report_id = int(datetime.now().timestamp())
                             _chat_id_for_gban = baseline.get("chat", {}).get("id")
                             # Consolidated actions menu (expands to Ban / Global Ban / Delete)
+                            # Use 0 for message_id - this is a profile change event, not a message
                             kb.add(
                                 InlineKeyboardButton(
                                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                                    callback_data=f"suspiciousactions_{_chat_id_for_gban}_{_report_id}_{user_id}",
+                                    callback_data=f"suspiciousactions_{_chat_id_for_gban}_0_{user_id}",
                                 )
                             )
 
@@ -3689,12 +3686,11 @@ if __name__ == "__main__":
         else:
             inout_thread = TECHNO_IN
             # Add buttons for non-spammers joining
-            # Generate report_id for callbacks
-            _join_report_id = int(datetime.now().timestamp())
+            # Use 0 for message_id to indicate this is a join event (no message to link to)
             inline_kb.add(
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
-                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_{_join_report_id}",
+                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_0",
                 )
             )
             inline_kb.add(
@@ -3785,7 +3781,7 @@ if __name__ == "__main__":
         # Check for very high user ID on JOIN events (very new accounts are suspicious)
         if is_member and not was_member and inout_userid > HIGH_USER_ID_THRESHOLD:
             # User is joining and has very high ID - send alert to suspicious thread
-            _report_id = int(datetime.now().timestamp())
+            # Use 0 for message_id to indicate this is a join event (no message to link to)
             _chat_link_html = build_chat_link(update.chat.id, update.chat.username, update.chat.title)
             _high_id_message = (
                 f"🆕 <b>Very New Account Joined</b>\n"
@@ -3802,13 +3798,13 @@ if __name__ == "__main__":
             _high_id_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                    callback_data=f"suspiciousactions_{update.chat.id}_{_report_id}_{inout_userid}",
+                    callback_data=f"suspiciousactions_{update.chat.id}_0_{inout_userid}",
                 )
             )
             _high_id_kb.add(
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
-                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_{_report_id}",
+                    callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_0",
                 )
             )
             await safe_send_message(
@@ -4119,12 +4115,11 @@ if __name__ == "__main__":
                         _link = build_chat_link(_cid, _cuser, _ctitle)
                         _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         _kb = make_lols_kb(inout_userid)
-                        _rid = int(datetime.now().timestamp())
-                        # Consolidated actions button (expands to ban/global/delete options)
+                        # Use 0 for message_id - this is a leave event, not a message
                         _kb.add(
                             InlineKeyboardButton(
                                 text="⚙️ Actions (Ban / Delete) ⚙️",
-                                callback_data=f"suspiciousactions_{update.chat.id}_{_rid}_{inout_userid}",
+                                callback_data=f"suspiciousactions_{update.chat.id}_0_{inout_userid}",
                             )
                         )
                         # Elapsed time since join if available
@@ -4601,9 +4596,12 @@ if __name__ == "__main__":
         # Keyboard ban/cancel/confirm buttons
         keyboard = KeyboardBuilder()
         # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
+        # Use original message_id from found_message_data for proper linking
+        original_chat_id = found_message_data[0]
+        original_message_id = found_message_data[1]
         actions_btn = InlineKeyboardButton(
             text="⚙️ Actions (Ban / Delete) ⚙️",
-            callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{user_id}",
+            callback_data=f"suspiciousactions_{original_chat_id}_{original_message_id}_{user_id}",
         )
         keyboard.add(actions_btn)
 
@@ -6009,11 +6007,11 @@ if __name__ == "__main__":
                             )
 
                         kb = make_lols_kb(_uid)
-                        _report_id = int(datetime.now().timestamp())
+                        # Use 0 for message_id - this is a profile change event, not a message
                         kb.add(
                             InlineKeyboardButton(
                                 text="⚙️ Actions (Ban / Delete) ⚙️",
-                                callback_data=f"suspiciousactions_{message.chat.id}_{_report_id}_{_uid}",
+                                callback_data=f"suspiciousactions_{message.chat.id}_0_{_uid}",
                             )
                         )
 
@@ -6540,7 +6538,7 @@ if __name__ == "__main__":
                             missed_join_notification_sent = True
                         else:
                             # Regular missed join notification to ADMIN_SUSPICIOUS
-                            _report_id = int(datetime.now().timestamp())
+                            # Use actual message_id since we have a message to link to
                             _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
                             _first_seen_date = user_first_message_date[0]
                         
@@ -6570,13 +6568,13 @@ if __name__ == "__main__":
                             _missed_join_kb.add(
                                 InlineKeyboardButton(
                                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                                    callback_data=f"suspiciousactions_{message.chat.id}_{_report_id}_{message.from_user.id}",
+                                    callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
                                 )
                             )
                             _missed_join_kb.add(
                                 InlineKeyboardButton(
                                     text="✅ Mark as Legit",
-                                    callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{_report_id}",
+                                    callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
                                 )
                             )
                             
@@ -8142,12 +8140,12 @@ if __name__ == "__main__":
                     )
                 )
             # Add ban button if not banned
+            # Use 0 for message_id - this is from /whois command, not a message report
             if not whois_data.get("baseline", {}).get("is_banned"):
-                report_id = int(datetime.now().timestamp())
                 keyboard.add(
                     InlineKeyboardButton(
                         text="⚙️ Actions (Ban / Delete)",
-                        callback_data=f"suspiciousactions_{message.chat.id}_{report_id}_{found_user_id}",
+                        callback_data=f"suspiciousactions_{message.chat.id}_0_{found_user_id}",
                     )
                 )
         elif not whois_data.get("found"):
@@ -10330,9 +10328,9 @@ if __name__ == "__main__":
             susp_user_name = susp_user_name_dict if susp_user_name_dict and str(susp_user_name_dict) not in ["None", "0"] else "!UNDEFINED!"
 
         # create unified message link (used in action confirmation message)
-        # Note: susp_message_id might be a report_id (timestamp) for join events, not a real message ID
-        # Real Telegram message IDs are typically < 1 billion, timestamps are > 1.7 billion
-        is_real_message_id = susp_message_id < 1_000_000_000
+        # Note: susp_message_id = 0 indicates a join/event-based report with no actual message
+        # When susp_message_id > 0, it's a real message ID that can be linked to
+        is_real_message_id = susp_message_id > 0
         message_link = construct_message_link([susp_chat_id, susp_message_id, None]) if is_real_message_id else None
         # create lols check link
         lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"

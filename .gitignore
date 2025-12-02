@@ -30,3 +30,4 @@ test.py
 !utils/*
 !utils/utils.py
 .venv/
+.github/copilot.txt

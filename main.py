@@ -1587,7 +1587,7 @@ async def handle_autoreports(
     # Add legitimization button to stop further checks
     keyboard.add(
         InlineKeyboardButton(
-            text="🟢 Seems legit, STOP checks 🟢",
+            text="✅ Mark as Legit",
             callback_data=f"stopchecks_{spammer_id}_{message.chat.id}_{report_id}",
         )
     )

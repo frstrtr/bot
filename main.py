@@ -2101,15 +2101,6 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                         deleted_count += 1
                     except (TelegramBadRequest, TelegramForbiddenError):
                         failed_count += 1
-                except TelegramBadRequest as e:
-                    LOGGER.warning(
-                        "%s:@%s Failed to delete message %s: %s",
-                        user_id,
-                        user_name,
-                        message_id,
-                        e,
-                    )
-                    failed_count += 1
         except (ValueError, IndexError) as e:
             LOGGER.warning(
                 "%s:@%s Invalid message key format '%s': %s",
@@ -3421,7 +3412,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     if existing_task:
         try:
             existing_task.cancel()
-        except Exception:
+        except RuntimeError:
             pass
 
         async def _await_cancel(_t: asyncio.Task, _uid=user_id, _uname=user_name):
@@ -3446,7 +3437,7 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
                     _uid,
                     _formatted_uname,
                 )
-            except Exception as e:
+            except RuntimeError as e:
                 _formatted_uname = (
                     f"@{_uname}"
                     if _uname and _uname != "!UNDEFINED!"
@@ -4024,7 +4015,7 @@ if __name__ == "__main__":
                                     inout_userid,
                                     inout_username,
                                 )
-                        except Exception as p2p_e:
+                        except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
                             LOGGER.error(
                                 "Failed to remove user %s from P2P on admin re-add: %s", inout_userid, p2p_e
                             )
@@ -4039,7 +4030,7 @@ if __name__ == "__main__":
                         )
                         
                         return  # Skip further processing
-                except Exception as admin_check_err:
+                except TelegramBadRequest as admin_check_err:
                     LOGGER.error(
                         "Error checking admin status for user re-add: %s", admin_check_err
                     )
@@ -4063,7 +4054,7 @@ if __name__ == "__main__":
                         _photo_count = (
                             getattr(photos, "total_count", 0) if photos else 0
                         )
-                    except Exception as _e:
+                    except TelegramBadRequest as _e:
                         _photo_count = 0
                         LOGGER.debug(
                             "%s:@%s unable to fetch initial photo count: %s",
@@ -4178,7 +4169,7 @@ if __name__ == "__main__":
                             if _p
                             else _baseline.get("photo_count", 0)
                         )
-                    except Exception as _e:
+                    except TelegramBadRequest as _e:
                         cur_photo_count = _baseline.get("photo_count", 0)
                         LOGGER.debug(
                             "%s:@%s unable to fetch photo count on leave: %s",
@@ -4241,7 +4232,7 @@ if __name__ == "__main__":
                                     _parts.append(f"{_seconds}s")
                                 _human_elapsed = " ".join(_parts) or f"{_seconds}s"
                                 elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {_human_elapsed})"
-                            except Exception:
+                            except ValueError:
                                 elapsed_line = f"\nJoined at: {joined_at_raw}"
 
                         _leave_msg = (
@@ -4364,7 +4355,7 @@ if __name__ == "__main__":
                         inout_userid,
                         inout_username,
                     )
-                except Exception as _e:
+                except KeyError as _e:
                     LOGGER.debug(
                         "%s:@%s failed to remove baseline/watch entry on leave: %s",
                         inout_userid,
@@ -4551,7 +4542,7 @@ if __name__ == "__main__":
                         LOGGER,
                         message_thread_id=TECHNO_UNHANDLED,
                     )
-                except Exception as log_err:
+                except TelegramBadRequest as log_err:
                     LOGGER.warning("Failed to log unknown forward to technolog: %s", log_err)
                 return
 
@@ -4925,7 +4916,7 @@ if __name__ == "__main__":
                             chat_id=ADMIN_GROUP_ID,
                             message_id=admin_group_banner_message.message_id,
                         )
-                except Exception as _e:
+                except TelegramBadRequest as _e:
                     LOGGER.debug(
                         "Editing related banners during confirmation failed: %s", _e
                     )
@@ -5335,7 +5326,7 @@ if __name__ == "__main__":
                     #     channels_dict[chat_id],
                     #     chat_id,
                     # )
-                except Exception as inner_e:
+                except (TelegramBadRequest, TelegramForbiddenError) as inner_e:
                     LOGGER.error(
                         "%s:%s Failed to ban and delete messages in chat %s (%s). Error: %s",
                         author_id,
@@ -5681,7 +5672,7 @@ if __name__ == "__main__":
 
             # await callback_query.answer("User banned successfully!", show_alert=True)
 
-        except Exception as e:
+        except (TelegramBadRequest, TelegramForbiddenError) as e:
             error_msg = f"Error banning user {user_id}: {str(e)}"
             LOGGER.error(error_msg)
             await callback_query.answer(f"Error: {str(e)}", show_alert=True)
@@ -5770,7 +5761,7 @@ if __name__ == "__main__":
         # Answer callback immediately to prevent timeout (no popup alert)
         try:
             await callback_query.answer()
-        except Exception as answer_error:
+        except TelegramBadRequest as answer_error:
             # Query might be too old, but continue with ban anyway
             LOGGER.debug("Could not answer callback query: %s", answer_error)
 
@@ -5833,7 +5824,7 @@ if __name__ == "__main__":
                 message_thread_id=TECHNO_ADMIN,
             )
 
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Failed to execute channel ban for %s: %s", channel_id, e)
 
     @DP.callback_query(lambda c: c.data.startswith("banchannelcancel_"))
@@ -5977,7 +5968,7 @@ if __name__ == "__main__":
         # Forward the original message to superadmin
         try:
             await message.forward(ADMIN_USER_ID, disable_notification=True)
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.warning("Could not forward bot command message to admin: %s", e)
         
         # Don't return here - let the message continue to store_recent_messages handler
@@ -6031,7 +6022,7 @@ if __name__ == "__main__":
                                 "Deleted easter egg response %s in chat %s after 3 min",
                                 sent_msg.message_id, chat_id
                             )
-                        except Exception as e:
+                        except TelegramBadRequest as e:
                             LOGGER.debug("Could not delete easter egg response: %s", e)
                         
                         # Wait 10 more seconds, then delete the original command message
@@ -6042,10 +6033,10 @@ if __name__ == "__main__":
                                 "Deleted original command message %s in chat %s after 3:10",
                                 message_id, chat_id
                             )
-                        except Exception as e:
+                        except TelegramBadRequest as e:
                             LOGGER.debug("Could not delete original command message: %s", e)
                             
-                    except Exception as e:
+                    except (asyncio.CancelledError, TelegramBadRequest) as e:
                         LOGGER.error("Error in delayed_cleanup for easter egg: %s", e)
                 
                 # Start the cleanup task in the background
@@ -6070,12 +6061,12 @@ if __name__ == "__main__":
                         disable_web_page_preview=True,
                         reply_markup=new_kb.as_markup(),
                     )
-                except Exception as e:
+                except TelegramBadRequest as e:
                     LOGGER.debug("Could not update message after reply: %s", e)
             else:
                 await callback_query.answer("Failed to send reply", show_alert=True)
                 
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error in handle_bot_command_reply: %s", e)
             await callback_query.answer(f"Error: {e}", show_alert=True)
 
@@ -6109,7 +6100,7 @@ if __name__ == "__main__":
                         message.sender_chat.id,
                         message.chat.title,
                     )
-                except Exception as del_error:
+                except TelegramBadRequest as del_error:
                     LOGGER.warning(
                         "🔴 CHANNEL MESSAGE: Could not delete message %s in chat %s: %s",
                         message.message_id,
@@ -6268,7 +6259,7 @@ if __name__ == "__main__":
                     try:
                         _p = await BOT.get_user_profile_photos(_uid, limit=1)
                         new_pcnt = getattr(_p, "total_count", 0) if _p else old_pcnt
-                    except Exception as _e:
+                    except TelegramBadRequest as _e:
                         LOGGER.debug(
                             "%s:@%s unable to fetch photo count on message: %s",
                             _uid,
@@ -6306,7 +6297,7 @@ if __name__ == "__main__":
                                     ADMIN_SUSPICIOUS,
                                     disable_notification=True,
                                 )
-                            except Exception as _e:
+                            except (TelegramBadRequest, TelegramForbiddenError) as _e:
                                 LOGGER.debug(
                                     "%s:@%s forward to admin/suspicious failed: %s",
                                     _uid,
@@ -6380,7 +6371,7 @@ if __name__ == "__main__":
                                     _parts.append(f"{_seconds}s")
                                 _human_elapsed = " ".join(_parts) or f"{_seconds}s"
                                 elapsed_line = f"\nJoined at: {joined_at_raw} (elapsed: {_human_elapsed})"
-                            except Exception:
+                            except ValueError:
                                 elapsed_line = f"\nJoined at: {joined_at_raw}"
 
                         message_text = (
@@ -6427,7 +6418,7 @@ if __name__ == "__main__":
                             photo_changed=("profile photo" in changed),
                         )
                         active_user_checks_dict[_uid]["notified_profile_change"] = True
-        except Exception as _e:
+        except (TelegramBadRequest, KeyError, TypeError) as _e:
             LOGGER.debug("Immediate profile-change check failed: %s", _e)
 
         ### AUTOBAHN MESSAGE CHECKING ###
@@ -6878,7 +6869,7 @@ if __name__ == "__main__":
                                     "Marked first message as join event for established user %s",
                                     message.from_user.id,
                                 )
-                            except Exception as db_err:
+                            except sqlite3.Error as db_err:
                                 LOGGER.warning(
                                     "Failed to mark first message as join event for established user %s: %s",
                                     message.from_user.id,
@@ -6985,7 +6976,7 @@ if __name__ == "__main__":
                                     ADMIN_SUSPICIOUS,
                                     disable_notification=True,
                                 )
-                            except Exception as fwd_err:
+                            except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
                                 LOGGER.warning("Failed to forward message for missed join: %s", fwd_err)
                             
                             await safe_send_message(
@@ -7027,7 +7018,7 @@ if __name__ == "__main__":
                                     message.from_user.id,
                                     user_first_message_date[0],
                                 )
-                            except Exception as db_err:
+                            except sqlite3.Error as db_err:
                                 LOGGER.warning(
                                     "Failed to mark first message as join event for %s: %s",
                                     message.from_user.id,
@@ -7069,7 +7060,7 @@ if __name__ == "__main__":
                             message.from_user.id,
                             message.from_user.username or "!NO_USERNAME!",
                         )
-                    except Exception as db_err:
+                    except sqlite3.Error as db_err:
                         LOGGER.warning(
                             "Failed to save synthetic join event for %s: %s",
                             message.from_user.id,
@@ -7769,7 +7760,7 @@ if __name__ == "__main__":
                             message.chat.id,
                             bot_mentions_str,
                         )
-                    except Exception as del_err:
+                    except TelegramBadRequest as del_err:
                         LOGGER.warning(
                             "Failed to delete message %s with bot mentions: %s",
                             message.message_id,
@@ -7878,7 +7869,7 @@ if __name__ == "__main__":
                         content_details.append(
                             f"<b>👤 Mentions ({mentions_count}):</b>"
                         )
-                        for i, mention in enumerate(
+                        for _i, mention in enumerate(
                             suspicious_items["mentions"][:max_items_per_type]
                         ):
                             content_details.append(
@@ -7909,7 +7900,7 @@ if __name__ == "__main__":
                         content_details.append(
                             f"<b>📞 Phone Numbers ({phones_count}):</b>"
                         )
-                        for i, phone in enumerate(
+                        for _i, phone in enumerate(
                             suspicious_items["phones"][:max_items_per_type]
                         ):
                             content_details.append(
@@ -8040,7 +8031,7 @@ if __name__ == "__main__":
                         try:
                             _photos = await BOT.get_user_profile_photos(_user_id, limit=1)
                             _photo_count = _photos.total_count if _photos else 0
-                        except Exception:
+                        except TelegramBadRequest:
                             _photo_count = 0
                         
                         # Save baseline to database
@@ -8098,7 +8089,7 @@ if __name__ == "__main__":
                             format_username_for_log(_username),
                         )
                         
-                except Exception as e:
+                except (TelegramBadRequest, TelegramForbiddenError) as e:
                     LOGGER.error("Error forwarding suspicious content message: %s", e)
 
         # If other user/admin or bot deletes message earlier than this bot we got an error
@@ -8248,7 +8239,7 @@ if __name__ == "__main__":
                         f"User {author_id} banned and their messages deleted from chat {CHANNEL_DICT[chat_id]} ({chat_id}).",
                         LOGGER,
                     )
-                except Exception as inner_e:
+                except (TelegramBadRequest, TelegramForbiddenError) as inner_e:
                     LOGGER.error(
                         "Failed to ban and delete messages in chat %s (%s). Error: %s",
                         CHANNEL_DICT[chat_id],
@@ -8287,7 +8278,7 @@ if __name__ == "__main__":
                         user_name,
                         author_id,
                     )
-                except Exception as inner_e:
+                except TelegramBadRequest as inner_e:
                     LOGGER.error(
                         "Failed to delete message %s in chat %s (%s). Error: %s",
                         message_id,
@@ -8310,7 +8301,12 @@ if __name__ == "__main__":
             lols_check_kb = KeyboardBuilder().add(
                 InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
-            _display_user = f"@{user_name}" if user_name and str(user_name) not in ["None", "0"] else "!UNDEFINED!"
+            # user_name comes from DB query loop - use a safe default if not defined
+            try:
+                _ban_user_name = user_name if user_name and str(user_name) not in ["None", "0"] else None
+            except NameError:
+                _ban_user_name = None
+            _display_user = f"@{_ban_user_name}" if _ban_user_name else "!UNDEFINED!"
             await message.reply(
                 f"Action taken: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
                 parse_mode="HTML",
@@ -8394,7 +8390,7 @@ if __name__ == "__main__":
             )
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:
+        except (TelegramBadRequest, RuntimeError) as e:
             LOGGER.error("Error in check_user: %s", e)
             await message.reply("An error occurred while trying to check the user.")
 
@@ -8421,7 +8417,7 @@ if __name__ == "__main__":
             
             await _perform_whois_lookup(message, thread_id=TECHNO_ADMIN)
             
-        except Exception as e:
+        except (sqlite3.Error, TelegramBadRequest) as e:
             LOGGER.error("Error in whois_user: %s", e)
             await message.reply("An error occurred while looking up user data.")
 
@@ -8430,7 +8426,7 @@ if __name__ == "__main__":
         """Lookup comprehensive user data - superadmin private chat version."""
         try:
             await _perform_whois_lookup(message, thread_id=None)
-        except Exception as e:
+        except (sqlite3.Error, TelegramBadRequest) as e:
             LOGGER.error("Error in whois_user_superadmin: %s", e)
             await message.reply("An error occurred while looking up user data.")
 
@@ -8494,7 +8490,7 @@ if __name__ == "__main__":
                     if is_admin_there:
                         chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
                         admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name})
-                except Exception:
+                except TelegramBadRequest:
                     pass  # User might not be in chat or bot has no access
         
         # Add admin info to whois_data
@@ -8676,7 +8672,7 @@ if __name__ == "__main__":
 
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error in delete_message: %s", e)
             await message.reply("An error occurred while trying to delete the message.")
 
@@ -8843,7 +8839,7 @@ if __name__ == "__main__":
                         )
                     else:
                         await message.reply(f"Channel {rogue_chan_id} was not banned.")
-                except Exception as e:
+                except TelegramBadRequest as e:
                     LOGGER.error(
                         "Failed to unban channel %d. Error: %s", rogue_chan_id, e
                     )
@@ -9025,7 +9021,7 @@ if __name__ == "__main__":
                 chat_id = int(target)
             elif "t.me/" in target:
                 # Extract chat and optional topic/message from t.me link
-                import re
+                # (re is imported at module level)
                 
                 # Check for private link format: t.me/c/chat_id/... 
                 if "t.me/c/" in target:
@@ -9106,7 +9102,7 @@ if __name__ == "__main__":
                     text_to_send,
                     **send_kwargs,
                 )
-            except Exception as send_error:
+            except TelegramBadRequest as send_error:
                 error_str = str(send_error).lower()
                 # If thread not found, try as reply_to_message_id (non-forum group)
                 if thread_id and ("thread not found" in error_str or "message thread" in error_str):
@@ -9128,7 +9124,7 @@ if __name__ == "__main__":
                             "Successfully sent as reply to message %s",
                             thread_id,
                         )
-                    except Exception as reply_error:
+                    except TelegramBadRequest as reply_error:
                         # Reply also failed, try plain send without thread/reply
                         LOGGER.info(
                             "Reply to %s also failed (%s), falling back to plain send",
@@ -9141,7 +9137,7 @@ if __name__ == "__main__":
                                 text_to_send,
                                 **send_kwargs,
                             )
-                        except Exception as plain_error:
+                        except TelegramBadRequest as plain_error:
                             await message.reply(f"❌ Failed to send message: {plain_error}")
                             return
                 else:
@@ -9200,7 +9196,7 @@ if __name__ == "__main__":
                                 chat_id,
                                 delete_after,
                             )
-                        except Exception as del_e:
+                        except TelegramBadRequest as del_e:
                             LOGGER.warning("Failed to auto-delete message: %s", del_e)
                     
                     asyncio.create_task(delete_message_later())
@@ -9216,7 +9212,7 @@ if __name__ == "__main__":
                     delete_after,
                 )
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in say_to_chat: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -9300,7 +9296,7 @@ if __name__ == "__main__":
             else:
                 await message.reply(f"❌ Failed to reply to message in {chat_id}")
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in reply_to_message: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -9316,7 +9312,7 @@ if __name__ == "__main__":
         
         Returns: (chat_id, thread_id) where thread_id may be None
         """
-        import re
+        # re is imported at module level
         thread_id = None
         
         if target.startswith("@"):
@@ -9443,7 +9439,7 @@ if __name__ == "__main__":
                             from_chat_id=source_chat,
                             message_id=source_msg_id,
                         )
-                except Exception as fwd_error:
+                except TelegramBadRequest as fwd_error:
                     error_str = str(fwd_error).lower()
                     if thread_id and ("thread not found" in error_str or "message thread" in error_str):
                         # Thread not found - this might be a non-forum group where the ID is a message to reply to
@@ -9465,7 +9461,7 @@ if __name__ == "__main__":
                                 "Successfully sent as reply to message %s (used copy_message)",
                                 thread_id,
                             )
-                        except Exception as reply_error:
+                        except TelegramBadRequest as reply_error:
                             # Reply also failed, try plain forward without thread
                             LOGGER.info(
                                 "Reply to %s also failed (%s), falling back to plain forward",
@@ -9520,7 +9516,7 @@ if __name__ == "__main__":
                         try:
                             await BOT.delete_message(forwarded.chat.id, forwarded.message_id)
                             LOGGER.info("%s:%s auto-deleted forwarded message after %ds", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", delete_after)
-                        except Exception as del_e:
+                        except TelegramBadRequest as del_e:
                             LOGGER.warning("Failed to auto-delete forwarded message: %s", del_e)
                     asyncio.create_task(delete_forwarded_later())
 
@@ -9536,10 +9532,10 @@ if __name__ == "__main__":
                     delete_after,
                 )
 
-            except Exception as e:
+            except TelegramBadRequest as e:
                 await message.reply(f"❌ Failed to forward message: {e}")
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in forward_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -9624,7 +9620,7 @@ if __name__ == "__main__":
                         from_chat_id=source_chat,
                         message_id=source_msg_id,
                     )
-            except Exception as copy_err:
+            except TelegramBadRequest as copy_err:
                 error_str = str(copy_err).lower()
                 # If thread not found, try as reply_to_message_id instead
                 if thread_id and ("thread not found" in error_str or "message thread" in error_str):
@@ -9645,7 +9641,7 @@ if __name__ == "__main__":
                             "Successfully copied as reply to message %s",
                             thread_id,
                         )
-                    except Exception as reply_err:
+                    except TelegramBadRequest as reply_err:
                         # Reply also failed, try plain copy
                         LOGGER.info(
                             "Reply to %s also failed (%s), falling back to plain copy",
@@ -9669,7 +9665,7 @@ if __name__ == "__main__":
                         try:
                             await BOT.delete_message(target_chat, copied.message_id)
                             LOGGER.info("Auto-deleted copied message %s in %s after %ds", copied.message_id, target_chat, delete_timeout)
-                        except Exception as del_err:
+                        except TelegramBadRequest as del_err:
                             LOGGER.warning("Failed to auto-delete copied message %s in %s: %s", copied.message_id, target_chat, del_err)
                     asyncio.create_task(auto_delete())
 
@@ -9712,7 +9708,7 @@ if __name__ == "__main__":
                     delete_timeout,
                 )
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in copy_message_cmd: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -9841,7 +9837,7 @@ if __name__ == "__main__":
                         disable_web_page_preview=True,
                     )
                     success_count += 1
-                except Exception as e:
+                except TelegramBadRequest as e:
                     fail_count += 1
                     failed_chats.append(f"{chat_id}: {str(e)[:30]}")
                     LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
@@ -9868,7 +9864,7 @@ if __name__ == "__main__":
                 fail_count,
             )
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in broadcast_message: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -9928,7 +9924,7 @@ if __name__ == "__main__":
             # action == "final" - this shouldn't be hit via callback anymore
             await callback_query.answer("Use text confirmation.", show_alert=True)
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("Error in handle_broadcast_callback: %s", e)
             await callback_query.answer(f"Error: {e}", show_alert=True)
 
@@ -9984,7 +9980,7 @@ if __name__ == "__main__":
                         disable_web_page_preview=True,
                     )
                     success_count += 1
-                except Exception as e:
+                except TelegramBadRequest as e:
                     fail_count += 1
                     failed_chats.append(f"{chat_id}: {str(e)[:30]}")
                     LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
@@ -10011,7 +10007,7 @@ if __name__ == "__main__":
                 fail_count,
             )
 
-        except Exception as e:
+        except (TelegramBadRequest, ValueError) as e:
             LOGGER.error("%s:%s Error in handle_broadcast_text_confirm: %s", message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!", e)
             await message.reply(f"Error: {e}")
 
@@ -10094,7 +10090,7 @@ if __name__ == "__main__":
                     LOGGER.info("\033[92m%d removed from P2P spam list\033[0m", user_id)
                 else:
                     LOGGER.warning("\033[93m%d could not be removed from P2P spam list\033[0m", user_id)
-            except Exception as p2p_e:
+            except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
                 LOGGER.error("Failed to remove user %d from P2P: %s", user_id, p2p_e)
 
             for channel_name in CHANNEL_NAMES:
@@ -10110,7 +10106,7 @@ if __name__ == "__main__":
                             channel_name,
                             channel_id,
                         )
-                    except Exception as e:
+                    except (TelegramBadRequest, TelegramForbiddenError) as e:
                         LOGGER.error(
                             "Failed to unban user %d in channel %s (ID: %d): %s",
                             user_id,
@@ -10133,7 +10129,7 @@ if __name__ == "__main__":
             )
         except ValueError as ve:
             await message.reply(str(ve))
-        except Exception as e:  # Note:: Specify more specific exception types
+        except (TelegramBadRequest, sqlite3.Error) as e:  # Note:: Specify more specific exception types
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
 
@@ -10149,7 +10145,9 @@ if __name__ == "__main__":
             orig_message_id = int(orig_message_id_str)
         except ValueError as e:
             LOGGER.error(
-                f"Invalid callback data for stop_checks: {callback_query.data}, Error: {e}"
+                "Invalid callback data for stop_checks: %s, Error: %s",
+                callback_query.data,
+                e,
             )
             await callback_query.answer(
                 "Invalid data format for stop_checks.", show_alert=True
@@ -10183,9 +10181,11 @@ if __name__ == "__main__":
                 message_id=callback_query.message.message_id,
                 reply_markup=inline_kb.as_markup(),
             )
-        except Exception as e_edit:
+        except TelegramBadRequest as e_edit:
             LOGGER.error(
-                f"Error editing message markup in stop_checks for user {user_id_legit}: {e_edit}"
+                "Error editing message markup in stop_checks for user %s: %s",
+                user_id_legit,
+                e_edit,
             )
 
         _admin_display = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
@@ -10222,9 +10222,11 @@ if __name__ == "__main__":
                 message_thread_id=TECHNO_ADMIN,
                 disable_web_page_preview=True,
             )
-        except Exception as e_send:
+        except TelegramBadRequest as e_send:
             LOGGER.error(
-                f"Error sending notification messages in stop_checks for user {user_id_legit}: {e_send}"
+                "Error sending notification messages in stop_checks for user %s: %s",
+                user_id_legit,
+                e_send,
             )
 
         if user_id_legit in active_user_checks_dict:
@@ -10315,7 +10317,7 @@ if __name__ == "__main__":
                 orig_chat_id,
                 orig_message_id,
             )
-        except Exception as e_db:
+        except sqlite3.Error as e_db:
             LOGGER.error(
                 "%s:%s Error updating DB in stop_checks: %s",
                 user_id_legit,
@@ -10464,7 +10466,7 @@ if __name__ == "__main__":
 
             return
 
-        except Exception as e:
+        except (TelegramBadRequest, sqlite3.Error) as e:
             LOGGER.error("Error in log_all_unhandled_messages function: %s", e)
             await message.reply(f"Error: {e}")
 
@@ -10557,7 +10559,7 @@ if __name__ == "__main__":
                     reply_markup=None,
                 )
 
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error in process_callback function: %s", e)
 
         # Acknowledge the callback query
@@ -10615,7 +10617,7 @@ if __name__ == "__main__":
                     message_id=callback_query.message.message_id,
                     reply_markup=collapsed_kb.as_markup(),
                 )
-            except Exception as e:  # noqa
+            except TelegramBadRequest as e:  # noqa
                 LOGGER.debug("Failed to collapse suspicious actions menu: %s", e)
             await callback_query.answer("Menu closed.")
             return
@@ -10657,7 +10659,7 @@ if __name__ == "__main__":
                     message_id=callback_query.message.message_id,
                     reply_markup=expand_kb.as_markup(),
                 )
-            except Exception as e:  # noqa
+            except TelegramBadRequest as e:  # noqa
                 LOGGER.error("Failed to expand suspicious actions keyboard: %s", e)
             await callback_query.answer()
             return
@@ -10683,7 +10685,7 @@ if __name__ == "__main__":
         elif action_prefix == "canceldelmsg":
             comand = "canceldelmsg"
         else:
-            LOGGER.error(f"Unknown prefix in handle_suspicious_sender: {action_prefix}")
+            LOGGER.error("Unknown prefix in handle_suspicious_sender: %s", action_prefix)
             await callback_query.answer(
                 "Internal error processing action.", show_alert=True
             )
@@ -10791,7 +10793,7 @@ if __name__ == "__main__":
                         susp_message_id,
                         susp_chat_id,
                     )
-            except Exception as e_del_orig:
+            except TelegramBadRequest as e_del_orig:
                 LOGGER.debug(
                     "Could not delete original suspicious message %s in chat %s: %s",
                     susp_message_id,
@@ -10817,7 +10819,7 @@ if __name__ == "__main__":
                             if len(str(_m)) < 13 and _m < 4_000_000_000:
                                 await BOT.delete_message(_c, _m)
                                 deleted_cnt += 1
-                        except Exception as _e_del:
+                        except TelegramBadRequest as _e_del:
                             LOGGER.debug(
                                 "Unable to delete message %s in chat %s for global ban cleanup: %s",
                                 _m,
@@ -10875,7 +10877,7 @@ if __name__ == "__main__":
                                                     _msg_id_candidate,
                                                 )
                                                 extra_deleted += 1
-                                        except Exception as _e_del2:
+                                        except TelegramBadRequest as _e_del2:
                                             LOGGER.debug(
                                                 "Active-check cleanup miss delete message %s in chat %s: %s",
                                                 _msg_id_candidate,
@@ -10890,7 +10892,7 @@ if __name__ == "__main__":
                                 extra_attempts,
                                 extra_deleted,
                             )
-                    except Exception as _e_active_extra:
+                    except (TelegramBadRequest, KeyError) as _e_active_extra:
                         LOGGER.debug(
                             "Globalban active-check extra cleanup skipped (user %s): %s",
                             susp_user_id,
@@ -10904,7 +10906,7 @@ if __name__ == "__main__":
                             len(rows),
                             deleted_cnt,
                         )
-                except Exception as _e_bulk:
+                except (TelegramBadRequest, sqlite3.Error) as _e_bulk:
                     LOGGER.error(
                         "Error bulk-deleting messages for global ban user %s:@%s: %s",
                         susp_user_id,
@@ -10912,7 +10914,7 @@ if __name__ == "__main__":
                         _e_bulk,
                     )
                 # Ban user from all monitored chats
-                success_count, fail_count, total_count = await ban_user_from_all_chats(
+                success_count, _fail_count, total_count = await ban_user_from_all_chats(
                     susp_user_id,
                     susp_user_name,
                     CHANNEL_IDS,
@@ -10976,7 +10978,7 @@ if __name__ == "__main__":
                         susp_message_id,
                         susp_chat_id,
                     )
-            except Exception as e_del_orig:
+            except TelegramBadRequest as e_del_orig:
                 LOGGER.debug(
                     "Could not delete original suspicious message %s in chat %s: %s",
                     susp_message_id,
@@ -10998,7 +11000,7 @@ if __name__ == "__main__":
                         if len(str(_mid)) < 13 and _mid < 4_000_000_000:
                             await BOT.delete_message(susp_chat_id, _mid)
                             chat_deleted += 1
-                    except Exception as _e_del:
+                    except TelegramBadRequest as _e_del:
                         LOGGER.debug(
                             "Unable to delete message %s in chat %s for local ban cleanup: %s",
                             _mid,
@@ -11044,7 +11046,7 @@ if __name__ == "__main__":
                                                 susp_chat_id, _msg_id_candidate
                                             )
                                             extra_deleted += 1
-                                    except Exception as _e_del2:
+                                    except TelegramBadRequest as _e_del2:
                                         LOGGER.debug(
                                             "Local ban active-check cleanup failed msg %s chat %s: %s",
                                             _msg_id_candidate,
@@ -11060,7 +11062,7 @@ if __name__ == "__main__":
                             extra_attempts,
                             extra_deleted,
                         )
-                except Exception as _e_active_local:
+                except (TelegramBadRequest, KeyError) as _e_active_local:
                     LOGGER.debug(
                         "Local ban active-check extra cleanup skipped (user %s chat %s): %s",
                         susp_user_id,
@@ -11076,7 +11078,7 @@ if __name__ == "__main__":
                         len(rows),
                         chat_deleted,
                     )
-            except Exception as _e_bulk:
+            except (TelegramBadRequest, sqlite3.Error) as _e_bulk:
                 LOGGER.error(
                     "Error deleting messages for local ban user %s:@%s in chat %s: %s",
                     susp_user_id,
@@ -11184,7 +11186,7 @@ if __name__ == "__main__":
                     message_id=callback_query.message.message_id,
                     reply_markup=collapsed_kb.as_markup(),
                 )
-            except Exception as e:
+            except TelegramBadRequest as e:
                 LOGGER.debug("Failed to restore collapsed keyboard after cancel: %s", e)
 
         await callback_query.answer(
@@ -11254,7 +11256,7 @@ if __name__ == "__main__":
                 # Optionally, you can delete the mapping after the reply is processed
                 # del unhandled_messages[message.reply_to_message.message_id]
 
-        except Exception as e:
+        except TelegramBadRequest as e:
             LOGGER.error("Error in handle_admin_reply function: %s", e)
             await message.reply(f"Error: {e}")
 

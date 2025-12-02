@@ -1962,7 +1962,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     norm_username = normalize_username(user_name)
     if not norm_username:
         LOGGER.debug(
-            "%s username undefined; skipping TECHNO_NAMES notification", _id
+            "%s:@%s username undefined; skipping TECHNO_NAMES notification", _id, user_name or "!UNDEFINED!"
         )
         return
     # Check if already posted to avoid duplicates
@@ -2270,7 +2270,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username_990:
                 LOGGER.debug(
-                    "%s username undefined; skipping 990 notification line", user_id
+                    "%s:@%s username undefined; skipping 990 notification line", user_id, user_name or "!UNDEFINED!"
                 )
             event_record = (
                 event_record.replace("member", "kicked", 1).split(" by ")[0]
@@ -2327,7 +2327,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username:
                 LOGGER.debug(
-                    "%s username undefined; skipping 1526 notification line", user_id
+                    "%s:@%s username undefined; skipping 1526 notification line", user_id, user_name or "!UNDEFINED!"
                 )
             event_record = (
                 event_record.replace("--> member", "--> kicked", 1)
@@ -2391,7 +2391,7 @@ async def check_and_autoban(
                 )
             elif not _norm_username_1054:
                 LOGGER.debug(
-                    "%s username undefined; skipping 1054 notification line", user_id
+                    "%s:@%s username undefined; skipping 1054 notification line", user_id, user_name or "!UNDEFINED!"
                 )
         return True
 
@@ -6508,36 +6508,29 @@ if __name__ == "__main__":
                     )
                     return  # stop processing further this message
             else:
-                # LSS LATENCY squezzed spammer?
-                LOGGER.debug(
-                    "\033[91m%s:@%s banned and message %s deleted in chat %s (%s) @%s #LSS\033[0m",
-                    message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
-                    message.message_id,
-                    message.chat.title,
-                    message.chat.id,
-                    message.chat.username if message.chat.username else "NoName",
-                )
+                # LSS LATENCY - spammer detected by LOLS after message was processed
+                # Try to delete the message (may already be deleted by earlier handler - that's OK)
                 try:
                     await BOT.delete_message(message.chat.id, message.message_id)
-                except TelegramBadRequest as e:
-                    LOGGER.error(
-                        "\033[93m%s:@%s message %s to delete not found in chat %s (%s) @%s #LSS\033[0m:\n\t\t\t%s",
+                    LOGGER.debug(
+                        "\033[91m%s:@%s message %s deleted (late LOLS detection) in chat %s (%s) @%s #LSS\033[0m",
                         message.from_user.id,
-                        (
-                            message.from_user.username
-                            if message.from_user.username
-                            else "!UNDEFINED!"
-                        ),
+                        message.from_user.username or "!UNDEFINED!",
                         message.message_id,
                         message.chat.title,
                         message.chat.id,
-                        message.chat.username if message.chat.username else "NoName",
-                        e,
+                        message.chat.username or "NoName",
+                    )
+                except TelegramBadRequest as e:
+                    # Message already deleted by earlier spam handler - this is expected race condition
+                    LOGGER.debug(
+                        "\033[93m%s:@%s message %s already deleted (race condition OK) in chat %s (%s) @%s #LSS\033[0m",
+                        message.from_user.id,
+                        message.from_user.username or "!UNDEFINED!",
+                        message.message_id,
+                        message.chat.title,
+                        message.chat.id,
+                        message.chat.username or "NoName",
                     )
                 success_count, fail_count, total_count = await ban_user_from_all_chats(
                     message.from_user.id,

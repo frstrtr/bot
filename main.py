@@ -6753,6 +6753,18 @@ if __name__ == "__main__":
 
             # initialize the autoreport_sent flag
             autoreport_sent = False
+
+            # Skip duplicate processing for media groups (multi-photo messages)
+            # Only process the first message in a media group for ALL spam checks
+            if was_media_group_processed(message):
+                LOGGER.debug(
+                    "%s:@%s skipping duplicate media group message (group_id: %s) - early check",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    message.media_group_id,
+                )
+                return
+
             # Check if user is in the banned list (latency edge case)
             # Note: User may have been banned but message was already in flight
             if message.from_user.id in banned_users_dict:
@@ -7100,17 +7112,6 @@ if __name__ == "__main__":
                         return
                 else:
                     return
-
-            # Skip duplicate processing for media groups (multi-photo messages)
-            # Only process the first message in a media group
-            if was_media_group_processed(message):
-                LOGGER.debug(
-                    "%s:@%s skipping duplicate media group message (group_id: %s)",
-                    message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
-                    message.media_group_id,
-                )
-                return
 
             # Check if message contains suspicious content: links, mentions, or phone numbers
             has_suspicious_content = False

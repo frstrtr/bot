@@ -7370,6 +7370,84 @@ if __name__ == "__main__":
             #     the_reason = "Message contains 5+ spammy regular emojis"
             #     await take_heuristic_action(message, the_reason)
 
+            # CHECK FOR BOT MENTIONS BY USERS IN ACTIVE MONITORING
+            # This must run BEFORE "SUSPICIOUS MESSAGE CHECKING" to prioritize AUTOREPORT
+            if not autoreport_sent and message.from_user.id in active_user_checks_dict:
+                _bot_mentions = []
+                # Check message text for bot mentions
+                if message.entities and message.text:
+                    for entity in message.entities:
+                        entity_type = entity.type if hasattr(entity, 'type') else entity.get("type")
+                        if entity_type == "mention":
+                            offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
+                            length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
+                            mention = message.text[offset:offset + length].lower()
+                            if mention.endswith("bot"):
+                                _bot_mentions.append(mention)
+                # Check caption for bot mentions
+                if message.caption_entities and message.caption:
+                    for entity in message.caption_entities:
+                        entity_type = entity.type if hasattr(entity, 'type') else entity.get("type")
+                        if entity_type == "mention":
+                            offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
+                            length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
+                            mention = message.caption[offset:offset + length].lower()
+                            if mention.endswith("bot"):
+                                _bot_mentions.append(mention)
+                
+                if _bot_mentions:
+                    bot_mentions_str = ", ".join(_bot_mentions)
+                    LOGGER.info(
+                        "User %s:@%s (in active checks) mentioned bots (%s) - sending to AUTOREPORT and deleting",
+                        message.from_user.id,
+                        message.from_user.username or "!UNDEFINED!",
+                        bot_mentions_str,
+                    )
+                    await submit_autoreport(message, f"Bot mention by monitored user: {bot_mentions_str}")
+                    
+                    # Delete the message and store deletion reason in database
+                    try:
+                        await message.delete()
+                        # Store deletion reason in database
+                        received_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        if message.chat.id < 0:
+                            report_id = int(str(message.chat.id)[4:] + str(message.message_id))
+                        else:
+                            report_id = int(str(message.chat.id) + str(message.message_id))
+                        CURSOR.execute(
+                            """
+                            INSERT OR REPLACE INTO recent_messages 
+                            (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, 
+                             received_date, from_chat_title, deletion_reason)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                message.chat.id,
+                                report_id,
+                                message.from_user.id,
+                                message.from_user.username,
+                                message.from_user.first_name,
+                                message.from_user.last_name,
+                                received_date,
+                                message.chat.title,
+                                f"bot_mention: {bot_mentions_str}",
+                            ),
+                        )
+                        CONN.commit()
+                        LOGGER.info(
+                            "Deleted message %s from chat %s - mentioned bots: %s (reason stored in DB)",
+                            message.message_id,
+                            message.chat.id,
+                            bot_mentions_str,
+                        )
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning(
+                            "Failed to delete message %s with bot mentions: %s",
+                            message.message_id,
+                            del_err,
+                        )
+                    return  # Don't process further - already sent to autoreport
+
             # FINALLY:
             ### SUSPICIOUS MESSAGE CHECKING ###
             # Skip if we already sent a missed join notification for this message
@@ -7739,74 +7817,18 @@ if __name__ == "__main__":
                             has_suspicious_content = True
                             suspicious_items["phones"].append(cleaned_phone)
 
-            # Handle bot mentions based on user monitoring status
-            # Only skip if already sent to AUTOREPORT (not SUSPICIOUS - AUTOREPORT has priority)
+            # Log bot mentions for users NOT in active monitoring
+            # (Users in active_checks with bot mentions are handled earlier and sent to AUTOREPORT)
             if suspicious_items["bot_mentions"] and not was_autoreported(message):
                 bot_mentions_str = ", ".join(suspicious_items["bot_mentions"])
-                user_in_active_checks = message.from_user.id in active_user_checks_dict
-                
-                if user_in_active_checks:
-                    # User is in active monitoring (recently joined) - send to AUTOREPORT and delete
-                    LOGGER.info(
-                        "User %s:@%s (in active checks) mentioned bots (%s) - sending to AUTOREPORT and deleting",
-                        message.from_user.id,
-                        message.from_user.username or "!UNDEFINED!",
-                        bot_mentions_str,
-                    )
-                    await submit_autoreport(message, f"Bot mention by monitored user: {bot_mentions_str}")
-                    
-                    # Delete the message and store deletion reason in database
-                    try:
-                        await message.delete()
-                        # Store deletion reason in database
-                        received_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        if message.chat.id < 0:
-                            report_id = int(str(message.chat.id)[4:] + str(message.message_id))
-                        else:
-                            report_id = int(str(message.chat.id) + str(message.message_id))
-                        CURSOR.execute(
-                            """
-                            INSERT OR REPLACE INTO recent_messages 
-                            (chat_id, message_id, user_id, user_name, user_first_name, user_last_name, 
-                             received_date, from_chat_title, deletion_reason)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            (
-                                message.chat.id,
-                                report_id,
-                                message.from_user.id,
-                                message.from_user.username,
-                                message.from_user.first_name,
-                                message.from_user.last_name,
-                                received_date,
-                                message.chat.title,
-                                f"bot_mention: {bot_mentions_str}",
-                            ),
-                        )
-                        CONN.commit()
-                        LOGGER.info(
-                            "Deleted message %s from chat %s - mentioned bots: %s (reason stored in DB)",
-                            message.message_id,
-                            message.chat.id,
-                            bot_mentions_str,
-                        )
-                    except TelegramBadRequest as del_err:
-                        LOGGER.warning(
-                            "Failed to delete message %s with bot mentions: %s",
-                            message.message_id,
-                            del_err,
-                        )
-                    return  # Don't process further - already sent to autoreport
-                else:
-                    # User is NOT in active monitoring - will be handled by suspicious content flow below
-                    # Mark that we have suspicious content so it goes to SUSPICIOUS thread
-                    LOGGER.info(
-                        "User %s:@%s (not in active checks) mentioned bots (%s) - will send to SUSPICIOUS (no deletion)",
-                        message.from_user.id,
-                        message.from_user.username or "!UNDEFINED!",
-                        bot_mentions_str,
-                    )
-                    # bot_mentions are already in suspicious_items, will be shown in the report
+                # User is NOT in active monitoring - will be handled by suspicious content flow below
+                LOGGER.info(
+                    "User %s:@%s (not in active checks) mentioned bots (%s) - will send to SUSPICIOUS (no deletion)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    bot_mentions_str,
+                )
+                # bot_mentions are already in suspicious_items, will be shown in the report
 
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
             # Skip if message was already sent to autoreport or suspicious thread

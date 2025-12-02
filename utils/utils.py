@@ -1751,6 +1751,7 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
     
     # Chats
     chats = data.get("chats_seen", [])
+    user_id = data.get("user_id")
     if chats:
         msg += f"\n💬 <b>Seen in {len(chats)} chat(s):</b>\n"
         for i, chat in enumerate(chats):  # Show all chats
@@ -1759,8 +1760,8 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
             chat_username = chat.get("chat_username")
             chat_id = chat.get("chat_id")
             
-            # Check if it's a direct message (positive chat_id = user id)
-            if chat_id and isinstance(chat_id, int) and chat_id > 0:
+            # Check if it's a direct message (chat_id == user_id)
+            if chat_id and user_id and chat_id == user_id:
                 chat_disp = "📱 Direct messages"
             # Create link if possible
             elif chat_username:

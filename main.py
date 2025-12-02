@@ -7647,6 +7647,83 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
+                    
+                    # Start monitoring for users reported to SUSPICIOUS thread
+                    # This activates watchdog and intensive checks (can be cancelled by legitimization button)
+                    _user_id = message.from_user.id
+                    _username = message.from_user.username
+                    
+                    # Only start monitoring if user is not already being monitored
+                    if _user_id not in active_user_checks_dict:
+                        LOGGER.info(
+                            "%s:%s Starting monitoring due to suspicious content report",
+                            _user_id,
+                            format_username_for_log(_username),
+                        )
+                        
+                        # Get profile photo count for baseline
+                        try:
+                            _photos = await BOT.get_user_profile_photos(_user_id, limit=1)
+                            _photo_count = _photos.total_count if _photos else 0
+                        except Exception:
+                            _photo_count = 0
+                        
+                        # Save baseline to database
+                        save_user_baseline(
+                            conn=CONN,
+                            user_id=_user_id,
+                            username=_username,
+                            first_name=message.from_user.first_name or "",
+                            last_name=message.from_user.last_name or "",
+                            photo_count=_photo_count,
+                            join_chat_id=message.chat.id,
+                            join_chat_username=getattr(message.chat, "username", None),
+                            join_chat_title=getattr(message.chat, "title", "") or "",
+                        )
+                        
+                        # Add to active checks dict
+                        active_user_checks_dict[_user_id] = {
+                            "username": _username,
+                            "baseline": {
+                                "first_name": message.from_user.first_name or "",
+                                "last_name": message.from_user.last_name or "",
+                                "username": _username or "",
+                                "photo_count": _photo_count,
+                                "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "chat": {
+                                    "id": message.chat.id,
+                                    "username": getattr(message.chat, "username", None),
+                                    "title": getattr(message.chat, "title", "") or "",
+                                },
+                            },
+                        }
+                        
+                        # Start regular watchdog (24h monitoring)
+                        asyncio.create_task(
+                            perform_checks(
+                                event_record=f"SUSPICIOUS:{_user_id}:{_username}",
+                                user_id=_user_id,
+                                inout_logmessage=f"Suspicious content triggered monitoring for {_user_id}:@{_username or '!UNDEFINED!'}",
+                                user_name=_username or "!UNDEFINED!",
+                            ),
+                            name=str(_user_id),
+                        )
+                        
+                        # Start intensive watchdog (first few hours)
+                        await start_intensive_watchdog(
+                            user_id=_user_id,
+                            user_name=_username or "!UNDEFINED!",
+                            message_chat_id=message.chat.id,
+                            message_id=message.message_id,
+                            message_link=message_link,
+                        )
+                    else:
+                        LOGGER.debug(
+                            "%s:%s Already in active checks, suspicious report sent but not starting new monitoring",
+                            _user_id,
+                            format_username_for_log(_username),
+                        )
+                        
                 except Exception as e:
                     LOGGER.error("Error forwarding suspicious content message: %s", e)
 

@@ -62,6 +62,10 @@ TECHNO_ADMIN: Optional[int] = None
 TELEGRAM_CHANNEL_BOT_ID: int = 136817688  # Telegram @Channel_bot ID
 P2P_SERVER_URL: str = "http://localhost:8081"
 
+# Established user detection settings (for skipping missed join banner)
+ESTABLISHED_USER_MIN_MESSAGES: int = 10  # Minimum messages to be considered established
+ESTABLISHED_USER_FIRST_MSG_DAYS: int = 90  # First message must be older than this (days)
+
 
 def _get_env_or_none(key: str) -> Optional[str]:
     """Get environment variable or return None."""
@@ -154,6 +158,7 @@ def load_from_env() -> bool:
     global BOT_NAME, BOT_USERID, LOG_GROUP, LOG_GROUP_NAME, TECHNOLOG_GROUP, TECHNOLOG_GROUP_NAME
     global DP, BOT, ALLOWED_UPDATES, CHANNEL_DICT, ALLOWED_CONTENT_TYPES
     global API_TOKEN, TELEGRAM_CHANNEL_BOT_ID, P2P_SERVER_URL
+    global ESTABLISHED_USER_MIN_MESSAGES, ESTABLISHED_USER_FIRST_MSG_DAYS
 
     # Check if BOT_TOKEN is set (required for .env mode)
     API_TOKEN = _get_env_or_none("BOT_TOKEN")
@@ -218,6 +223,10 @@ def load_from_env() -> bool:
 
     # P2P server
     P2P_SERVER_URL = _get_env_or_none("P2P_SERVER_URL") or "http://localhost:8081"
+
+    # Established user detection settings
+    ESTABLISHED_USER_MIN_MESSAGES = _get_env_int("ESTABLISHED_USER_MIN_MESSAGES", 10)
+    ESTABLISHED_USER_FIRST_MSG_DAYS = _get_env_int("ESTABLISHED_USER_FIRST_MSG_DAYS", 90)
 
     # Content types
     ALLOWED_CONTENT_TYPES = _get_allowed_content_types()

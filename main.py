@@ -253,6 +253,8 @@ from utils.utils_config import (
     ALLOWED_CONTENT_TYPES,
     TELEGRAM_CHANNEL_BOT_ID,
     P2P_SERVER_URL,
+    ESTABLISHED_USER_MIN_MESSAGES,
+    ESTABLISHED_USER_FIRST_MSG_DAYS,
 )
 
 # Parse command line arguments
@@ -6814,7 +6816,7 @@ if __name__ == "__main__":
                     )
                     
                     # Check if this is an established user - skip suspicious banner if so
-                    # Established = (>10 messages OR any legit marker) AND first message > 3 months ago
+                    # Established = (messages >= MIN AND first_msg_age >= DAYS) OR any legit marker
                     _skip_missed_join_banner = False
                     if should_notify_missed_join:
                         # Count user's messages
@@ -6831,12 +6833,12 @@ if __name__ == "__main__":
                             if _user_baseline and _user_baseline.get("is_legit"):
                                 _is_user_legit = True
                         
-                        # Parse first message date and check if > 3 months old
-                        _first_msg_over_3_months = False
+                        # Parse first message date and check if older than threshold
+                        _first_msg_old_enough = False
                         try:
                             _first_msg_dt = datetime.strptime(user_first_message_date[0], "%Y-%m-%d %H:%M:%S")
-                            _three_months_ago = datetime.now() - timedelta(days=90)
-                            _first_msg_over_3_months = _first_msg_dt < _three_months_ago
+                            _threshold_date = datetime.now() - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
+                            _first_msg_old_enough = _first_msg_dt < _threshold_date
                         except (ValueError, TypeError) as parse_err:
                             LOGGER.warning(
                                 "Failed to parse first message date '%s' for user %s: %s",
@@ -6845,17 +6847,19 @@ if __name__ == "__main__":
                                 parse_err,
                             )
                         
-                        # Skip if (>10 messages OR legit) AND first message > 3 months
-                        if (_user_msg_count > 10 or _is_user_legit) and _first_msg_over_3_months:
+                        # Skip if (messages >= threshold AND first_msg old enough) OR legit
+                        if (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit:
                             _skip_missed_join_banner = True
                             LOGGER.info(
                                 "\033[92mSkipping missed join banner for established user %s:@%s "
-                                "(messages: %d, legit: %s, first_msg: %s - over 3 months old)\033[0m",
+                                "(messages: %d/%d, legit: %s, first_msg: %s, threshold: %d days)\033[0m",
                                 message.from_user.id,
                                 message.from_user.username or "!NO_USERNAME!",
                                 _user_msg_count,
+                                ESTABLISHED_USER_MIN_MESSAGES,
                                 _is_user_legit,
                                 user_first_message_date[0],
+                                ESTABLISHED_USER_FIRST_MSG_DAYS,
                             )
                             # Mark first message as join event (just like after notification)
                             try:

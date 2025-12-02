@@ -4214,8 +4214,12 @@ if __name__ == "__main__":
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
+                                # Strip timezone if present
+                                _ja_str = str(joined_at_raw)
+                                if "+" in _ja_str:
+                                    _ja_str = _ja_str.split("+")[0].strip()
                                 _jdt = datetime.strptime(
-                                    joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                    _ja_str, "%Y-%m-%d %H:%M:%S"
                                 )
                                 _delta = datetime.now() - _jdt
                                 _days = _delta.days
@@ -4608,8 +4612,12 @@ if __name__ == "__main__":
             first_name = found_message_data[5]
             last_name = found_message_data[6]
 
+        # Handle both formats: with and without timezone
+        _ts_str = found_message_data[7]
+        if _ts_str and "+" in str(_ts_str):
+            _ts_str = str(_ts_str).split("+")[0].strip()
         massage_timestamp = datetime.strptime(
-            found_message_data[7], "%Y-%m-%d %H:%M:%S"
+            _ts_str, "%Y-%m-%d %H:%M:%S"
         )  # convert to datetime object
 
         # Get the username
@@ -6353,8 +6361,12 @@ if __name__ == "__main__":
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
+                                # Strip timezone if present
+                                _ja_str = str(joined_at_raw)
+                                if "+" in _ja_str:
+                                    _ja_str = _ja_str.split("+")[0].strip()
                                 _jdt = datetime.strptime(
-                                    joined_at_raw, "%Y-%m-%d %H:%M:%S"
+                                    _ja_str, "%Y-%m-%d %H:%M:%S"
                                 )
                                 _delta = datetime.now() - _jdt
                                 _days = _delta.days

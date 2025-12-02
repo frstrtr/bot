@@ -30,10 +30,10 @@ import ssl
 import certifi
 
 import aiohttp
-from aiogram import Dispatcher, Router, F
+from aiogram import F
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
 from aiogram.enums import ChatMemberStatus, ChatType
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command
 from aiogram.exceptions import (
     TelegramBadRequest,
     TelegramForbiddenError,
@@ -60,10 +60,7 @@ RetryAfter = TelegramRetryAfter
 # from PIL import Image
 # from io import BytesIO
 # from io import BytesIO
-from aiogram.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
@@ -103,10 +100,7 @@ from utils.utils import (
     extract_username,
     make_lols_kb,
     build_lols_url,
-    safe_get_chat_name_username,
-    get_forwarded_states,
     set_forwarded_state,
-    get_forwarded_state,
     safe_send_message,
     normalize_username,
     # User baselines DB functions
@@ -114,7 +108,6 @@ from utils.utils import (
     get_user_baseline,
     get_active_user_baselines,
     update_user_baseline_status,
-    delete_user_baseline,
     # Whois lookup
     get_user_whois,
     format_whois_response,
@@ -212,20 +205,6 @@ def format_username_for_log(username: str | None) -> str:
     if not username or username == "!UNDEFINED!":
         return "!UNDEFINED!"
     return f"@{username}"
-
-
-def normalize_username(username: str | None) -> str:
-    """Normalize username for comparison - treats None, '', '!UNDEFINED!' as equivalent empty.
-    
-    Args:
-        username: The username string, may be None, empty, or '!UNDEFINED!'
-    
-    Returns:
-        Empty string if no real username, otherwise the username
-    """
-    if not username or username in ("!UNDEFINED!", "None"):
-        return ""
-    return username
 
 
 from utils.utils_config import (

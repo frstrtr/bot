@@ -293,6 +293,9 @@ HIGH_USER_ID_THRESHOLD = 8_200_000_000
 # Populated when processing messages, used for constructing public links
 chat_username_cache: dict[int, str | None] = {}
 
+# Bot username (populated on startup via get_me)
+BOT_USERNAME: str | None = None
+
 # Track messages that have been sent to autoreport to prevent duplicate suspicious notifications
 # Key: (chat_id, message_id) - cleared periodically or on message processing completion
 autoreported_messages: set[tuple[int, int]] = set()
@@ -688,7 +691,17 @@ async def submit_autoreport(message: Message, reason):
 
 async def on_startup():
     """Function to handle the bot startup."""
+    global BOT_USERNAME
     _commit_info = get_latest_commit_info(LOGGER)
+
+    # Get bot info and store username for command detection
+    try:
+        bot_info = await BOT.get_me()
+        BOT_USERNAME = bot_info.username
+        LOGGER.info("Bot username: @%s", BOT_USERNAME)
+    except Exception as e:
+        LOGGER.error("Failed to get bot info: %s", e)
+        BOT_USERNAME = None
 
     # Pre-populate chat username cache for monitored channels
     LOGGER.info("Populating chat username cache for %d monitored channels...", len(CHANNEL_IDS))
@@ -5857,6 +5870,180 @@ if __name__ == "__main__":
             )
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not restore buttons: %s", e)
+
+    @DP.message(is_in_monitored_channel, F.text.regexp(r"^/\w+@\w+"))
+    async def handle_bot_command_in_group(message: Message):
+        """Detect and handle commands directed at this bot in monitored groups.
+        
+        When a user sends /command@botname where botname matches our bot,
+        notify the superadmin with detailed user info and provide a button
+        to reply with the easter egg response.
+        """
+        if not message.text or not BOT_USERNAME:
+            return
+        
+        # Check if command is directed at our bot
+        # Pattern: /command@botusername
+        command_match = re.match(r'^/(\w+)@(\w+)', message.text)
+        if not command_match:
+            return
+        
+        command_name = command_match.group(1)
+        target_bot = command_match.group(2).lower()
+        
+        if target_bot != BOT_USERNAME.lower():
+            # Command is for a different bot, ignore
+            return
+        
+        user_id = message.from_user.id
+        user_firstname = message.from_user.first_name or ""
+        user_lastname = message.from_user.last_name or ""
+        user_full_name = html.escape(f"{user_firstname} {user_lastname}".strip() or "Unknown")
+        user_name = message.from_user.username
+        
+        LOGGER.info(
+            "Bot command detected in group: /%s@%s from %s:@%s in %s (%s)",
+            command_name,
+            BOT_USERNAME,
+            user_id,
+            user_name or "!UNDEFINED!",
+            message.chat.title,
+            message.chat.id,
+        )
+        
+        # Construct message link
+        if message.chat.username:
+            message_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+        else:
+            # Private group - use t.me/c/ format
+            chat_id_str = str(message.chat.id)
+            if chat_id_str.startswith("-100"):
+                chat_id_short = chat_id_str[4:]
+            else:
+                chat_id_short = chat_id_str.lstrip("-")
+            message_link = f"https://t.me/c/{chat_id_short}/{message.message_id}"
+        
+        # Build detailed notification for superadmin
+        notification_text = (
+            f"🤖 <b>Bot Command Detected in Group</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"<b>Command:</b> <code>/{command_name}@{BOT_USERNAME}</code>\n"
+            f"<b>Chat:</b> {html.escape(message.chat.title)} (<code>{message.chat.id}</code>)\n"
+            f"<b>Message Link:</b> <code>{message_link}</code>\n\n"
+            f"<b>User Info:</b>\n"
+            f"  ├ Name: {user_full_name}\n"
+            f"  ├ Username: @{user_name if user_name else '!UNDEFINED!'}\n"
+            f"  ├ ID: <code>{user_id}</code>\n"
+            f"  └ Profile Links:\n"
+            f"      ├ <a href='tg://user?id={user_id}'>ID Profile Link</a>\n"
+            f"      ├ <a href='tg://openmessage?user_id={user_id}'>Android</a>\n"
+            f"      ├ <a href='https://t.me/@id{user_id}'>iOS (Apple)</a>\n"
+            f"      └ <a href='tg://resolve?domain={user_name}'>{f'@{user_name}' if user_name else 'N/A'}</a>\n\n"
+            f"<b>Reply with COMM:</b>\n"
+            f"<code>/reply {message_link} Your response here</code>"
+        )
+        
+        # Build keyboard with LOLS check and reply button
+        inline_kb = InlineKeyboardBuilder()
+        inline_kb.add(
+            InlineKeyboardButton(
+                text="ℹ️ Check LOLS",
+                url=f"https://t.me/oLolsBot?start={user_id}",
+            )
+        )
+        if user_name:
+            inline_kb.add(
+                InlineKeyboardButton(
+                    text=f"🔍 Check @{user_name}",
+                    url=f"https://t.me/oLolsBot?start=u-{user_name}",
+                )
+            )
+        inline_kb.add(
+            InlineKeyboardButton(
+                text="💬 Reply with Easter Egg",
+                callback_data=f"botcmdreply_{message.chat.id}_{message.message_id}_{user_id}",
+            )
+        )
+        inline_kb.adjust(2, 1)  # 2 buttons on first row, 1 on second
+        
+        # Send notification to superadmin
+        await safe_send_message(
+            BOT,
+            ADMIN_USER_ID,
+            notification_text,
+            LOGGER,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=inline_kb.as_markup(),
+        )
+        
+        # Forward the original message to superadmin
+        try:
+            await message.forward(ADMIN_USER_ID, disable_notification=True)
+        except Exception as e:
+            LOGGER.warning("Could not forward bot command message to admin: %s", e)
+        
+        # Don't return here - let the message continue to store_recent_messages handler
+
+    @DP.callback_query(lambda c: c.data.startswith("botcmdreply_"))
+    async def handle_bot_command_reply(callback_query: CallbackQuery):
+        """Handle the reply button for bot commands detected in groups."""
+        try:
+            parts = callback_query.data.split("_")
+            if len(parts) != 4:
+                await callback_query.answer("Invalid callback data", show_alert=True)
+                return
+            
+            _, chat_id_str, message_id_str, user_id_str = parts
+            chat_id = int(chat_id_str)
+            message_id = int(message_id_str)
+            user_id = int(user_id_str)
+            
+            # Send the easter egg reply to the original message
+            easter_egg_response = (
+                "Everything that follows is a result of what you see here.\n"
+                "I'm sorry. My responses are limited. You must ask the right questions.\n\n"
+                "Send me a direct message."
+            )
+            
+            sent_msg = await safe_send_message(
+                BOT,
+                chat_id,
+                easter_egg_response,
+                LOGGER,
+                reply_to_message_id=message_id,
+            )
+            
+            if sent_msg:
+                await callback_query.answer("Easter egg reply sent! 🤖", show_alert=False)
+                
+                # Update the message to show it was handled
+                try:
+                    new_text = callback_query.message.text + "\n\n✅ <b>Replied with easter egg</b>"
+                    # Remove the reply button, keep LOLS buttons
+                    new_kb = InlineKeyboardBuilder()
+                    new_kb.add(
+                        InlineKeyboardButton(
+                            text="ℹ️ Check LOLS",
+                            url=f"https://t.me/oLolsBot?start={user_id}",
+                        )
+                    )
+                    await BOT.edit_message_text(
+                        chat_id=callback_query.message.chat.id,
+                        message_id=callback_query.message.message_id,
+                        text=new_text,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=new_kb.as_markup(),
+                    )
+                except Exception as e:
+                    LOGGER.debug("Could not update message after reply: %s", e)
+            else:
+                await callback_query.answer("Failed to send reply", show_alert=True)
+                
+        except Exception as e:
+            LOGGER.error("Error in handle_bot_command_reply: %s", e)
+            await callback_query.answer(f"Error: {e}", show_alert=True)
 
     @DP.message(is_in_monitored_channel)
     async def store_recent_messages(message: Message):

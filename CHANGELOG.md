@@ -19,6 +19,12 @@
   - Auto-migration for existing databases (ALTER TABLE if column doesn't exist)
   - Displayed in `/whois` command under "🗑 Deleted Messages" section
 
+- **Media group deduplication**: Prevents rate limiting from multi-photo messages
+  - Tracks `media_group_id` to process only first message in album
+  - Applies to ALL spam detection triggers (not just suspicious content)
+  - 60-second expiry for tracking entries
+  - Early check placement covers: latency bans, fast typing, entity spam, inline bot, night messages
+
 - **Configuration migration to .env format**: Migrated from XML-only to `.env` file configuration
   - Added `.env.example` template with all configuration options
   - `python-dotenv` support in `utils_config.py`
@@ -31,6 +37,16 @@
   - Lists messages deleted by bot with reasons
   - Shows deletion date and chat where message was deleted
   - Up to 5 most recent deletions shown
+
+### Fixed
+- **Log messages no longer show `@!UNDEFINED!`**: All log messages now use `format_username_for_log()` helper
+  - Shows `@username` when available, `!NO_USERNAME!` otherwise (no `@` prefix)
+  - Fixed in: banning errors, check_and_autoban, profile change logs
+  
+- **SQLite datetime deprecation warning**: Fixed Python 3.12+ deprecation warning
+  - Converted `datetime` objects to strings before storing in sqlite
+  - Affected fields: `forward_date`, `received_date` in `recent_messages` table
+  - Uses format: `YYYY-MM-DD HH:MM:SS`
 
 ## [2025-12-01]
 

@@ -1208,12 +1208,6 @@ async def load_active_user_checks():
             )
         )
         
-        LOGGER.info(
-            "%s:%s loaded from DB%s",
-            user_id,
-            format_username_for_log(user_name_display),
-            "" if start_time else f", {MONITORING_DURATION_HOURS}hr monitoring started",
-        )
         # Insert a 1-second interval between task creations
         await asyncio.sleep(1)
     

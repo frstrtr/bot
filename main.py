@@ -8517,10 +8517,11 @@ if __name__ == "__main__":
         
         # Create keyboard with action buttons if user found
         keyboard = None
+        baseline = whois_data.get("baseline") or {}
         if whois_data.get("found") and found_user_id:
             keyboard = make_lols_kb(found_user_id)
             # Add check button if not already monitoring
-            if not whois_data.get("baseline", {}).get("monitoring_active"):
+            if not baseline.get("monitoring_active"):
                 keyboard.add(
                     InlineKeyboardButton(
                         text="👁 Start Monitoring",
@@ -8529,7 +8530,7 @@ if __name__ == "__main__":
                 )
             # Add ban button if not banned
             # Use 0 for message_id - this is from /whois command, not a message report
-            if not whois_data.get("baseline", {}).get("is_banned"):
+            if not baseline.get("is_banned"):
                 keyboard.add(
                     InlineKeyboardButton(
                         text="⚙️ Actions (Ban / Delete)",

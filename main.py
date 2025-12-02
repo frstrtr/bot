@@ -297,6 +297,11 @@ chat_username_cache: dict[int, str | None] = {}
 # Key: (chat_id, message_id) - cleared periodically or on message processing completion
 autoreported_messages: set[tuple[int, int]] = set()
 
+# Track processed media groups to prevent duplicate reports for multi-photo messages
+# Key: (chat_id, media_group_id) - cleared after 60 seconds
+processed_media_groups: dict[tuple[int, str], float] = {}
+MEDIA_GROUP_EXPIRY_SECONDS = 60  # How long to remember processed media groups
+
 
 def was_autoreported(message: Message) -> bool:
     """Check if a message was already sent to autoreport thread."""
@@ -306,6 +311,36 @@ def was_autoreported(message: Message) -> bool:
 def clear_autoreport_tracking(message: Message):
     """Clear autoreport tracking for a message after processing is complete."""
     autoreported_messages.discard((message.chat.id, message.message_id))
+
+
+def was_media_group_processed(message: Message) -> bool:
+    """Check if a message's media group was already processed.
+    
+    Returns True if this message is part of a media group that was already processed,
+    meaning we should skip duplicate processing for this message.
+    Returns False if this is a standalone message or first message in media group.
+    """
+    if not message.media_group_id:
+        return False  # Not a media group, process normally
+    
+    key = (message.chat.id, message.media_group_id)
+    current_time = datetime.now().timestamp()
+    
+    # Clean up old entries
+    expired_keys = [
+        k for k, v in processed_media_groups.items() 
+        if current_time - v > MEDIA_GROUP_EXPIRY_SECONDS
+    ]
+    for k in expired_keys:
+        del processed_media_groups[k]
+    
+    # Check if already processed
+    if key in processed_media_groups:
+        return True  # Already processed, skip
+    
+    # Mark as processed
+    processed_media_groups[key] = current_time
+    return False  # First message in group, process it
 
 
 def move_user_to_banned(
@@ -7065,6 +7100,17 @@ if __name__ == "__main__":
                         return
                 else:
                     return
+
+            # Skip duplicate processing for media groups (multi-photo messages)
+            # Only process the first message in a media group
+            if was_media_group_processed(message):
+                LOGGER.debug(
+                    "%s:@%s skipping duplicate media group message (group_id: %s)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    message.media_group_id,
+                )
+                return
 
             # Check if message contains suspicious content: links, mentions, or phone numbers
             has_suspicious_content = False

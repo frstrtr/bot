@@ -214,6 +214,20 @@ def format_username_for_log(username: str | None) -> str:
     return f"@{username}"
 
 
+def normalize_username(username: str | None) -> str:
+    """Normalize username for comparison - treats None, '', '!UNDEFINED!' as equivalent empty.
+    
+    Args:
+        username: The username string, may be None, empty, or '!UNDEFINED!'
+    
+    Returns:
+        Empty string if no real username, otherwise the username
+    """
+    if not username or username in ("!UNDEFINED!", "None"):
+        return ""
+    return username
+
+
 from utils.utils_config import (
     CHANNEL_IDS,
     ADMIN_AUTOREPORTS,
@@ -1237,10 +1251,12 @@ async def _migrate_legacy_active_checks(filename: str):
             if isinstance(user_name, dict):
                 baseline = user_name.get("baseline", {})
                 chat = baseline.get("chat", {})
+                # Normalize username - treat !UNDEFINED!/None/empty as None
+                _uname = normalize_username(user_name.get("username"))
                 save_user_baseline(
                     conn=CONN,
                     user_id=user_id,
-                    username=user_name.get("username"),
+                    username=_uname or None,
                     first_name=baseline.get("first_name"),
                     last_name=baseline.get("last_name"),
                     photo_count=baseline.get("photo_count", 0),
@@ -1250,10 +1266,12 @@ async def _migrate_legacy_active_checks(filename: str):
                 )
             else:
                 # Simple username string - minimal baseline
+                # Normalize username - treat !UNDEFINED!/None/empty as None
+                _uname = normalize_username(user_name)
                 save_user_baseline(
                     conn=CONN,
                     user_id=user_id,
-                    username=user_name if user_name != "None" else None,
+                    username=_uname or None,
                 )
             migrated += 1
     
@@ -2855,7 +2873,8 @@ async def perform_checks(
                             changed.append("first name")
                         if cur_last != baseline.get("last_name", ""):
                             changed.append("last name")
-                        if cur_username != baseline.get("username", ""):
+                        # Normalize usernames before comparison to handle !UNDEFINED!/None/empty equivalence
+                        if normalize_username(cur_username) != normalize_username(baseline.get("username", "")):
                             changed.append("username")
                         if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
                             changed.append("profile photo")
@@ -4183,7 +4202,8 @@ if __name__ == "__main__":
                         _changed.append("first name")
                     if cur_last != _baseline.get("last_name", ""):
                         _changed.append("last name")
-                    if cur_username != _baseline.get("username", ""):
+                    # Normalize usernames before comparison to handle !UNDEFINED!/None/empty equivalence
+                    if normalize_username(cur_username) != normalize_username(_baseline.get("username", "")):
                         _changed.append("username")
                     if _baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
                         _changed.append("profile photo")
@@ -6287,7 +6307,8 @@ if __name__ == "__main__":
                         diffs.append(
                             f"last name: '{html.escape(old_last)}' -> '{html.escape(new_last)}'"
                         )
-                    if new_usern != old_usern:
+                    # Normalize usernames before comparison to handle !UNDEFINED!/None/empty equivalence
+                    if normalize_username(new_usern) != normalize_username(old_usern):
                         changed.append("username")
                         diffs.append(
                             f"username: @{old_usern or '!UNDEFINED!'} -> @{new_usern or '!UNDEFINED!'}"

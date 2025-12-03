@@ -6067,11 +6067,17 @@ if __name__ == "__main__":
             )
         inline_kb.add(
             InlineKeyboardButton(
-                text="💬 Reply with Easter Egg",
-                callback_data=f"botcmdreply_{message.chat.id}_{message.message_id}_{user_id}",
+                text="🇬🇧 Easter Egg (EN)",
+                callback_data=f"botcmdreply_{message.chat.id}_{message.message_id}_{user_id}_en",
             )
         )
-        inline_kb.adjust(2, 1)  # 2 buttons on first row, 1 on second
+        inline_kb.add(
+            InlineKeyboardButton(
+                text="🇷🇺 Easter Egg (RU)",
+                callback_data=f"botcmdreply_{message.chat.id}_{message.message_id}_{user_id}_ru",
+            )
+        )
+        inline_kb.adjust(2, 2)  # 2 buttons on first row, 2 on second
         
         # Send notification to superadmin
         await safe_send_message(
@@ -6099,14 +6105,18 @@ if __name__ == "__main__":
         After sending the easter egg reply:
         - After 3 minutes: delete the bot's response message
         - After 3 minutes 10 seconds: delete the original command message
+        
+        Supports two languages:
+        - en: English easter egg
+        - ru: Russian easter egg
         """
         try:
             parts = callback_query.data.split("_")
-            if len(parts) != 4:
+            if len(parts) != 5:
                 await callback_query.answer("Invalid callback data", show_alert=True)
                 return
             
-            _, chat_id_str, message_id_str, user_id_str = parts
+            _, chat_id_str, message_id_str, user_id_str, lang = parts
             chat_id = int(chat_id_str)
             message_id = int(message_id_str)  # Original command message ID
             user_id = int(user_id_str)
@@ -6118,17 +6128,27 @@ if __name__ == "__main__":
                 if username:
                     user_mention = f"@{username}"
                 else:
-                    user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
+                    # Fallback text depends on language
+                    fallback_name = "друг" if lang == "ru" else "friend"
+                    user_mention = f"<a href='tg://user?id={user_id}'>{fallback_name}</a>"
             except (TelegramBadRequest, TelegramNotFound):
-                user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
+                fallback_name = "друг" if lang == "ru" else "friend"
+                user_mention = f"<a href='tg://user?id={user_id}'>{fallback_name}</a>"
             
-            # Send the easter egg reply to the original message
-            easter_egg_response = (
-                "Everything that follows is a result of what you see here.\n"
-                "I'm sorry. My responses are limited. You must ask the right questions.\n\n"
-                f"Dear {user_mention}!\n"
-                "Please, send me a direct message."
-            )
+            # Send the easter egg reply based on language
+            if lang == "ru":
+                easter_egg_response = (
+                    "-Не шалю, никого не трогаю, починяю примус,- недружелюбно насупившись, проговорил бот, - и еще считаю своим долгом предупредить, что бот древнее и неприкосновенное животное.\n\n"
+                    f"Товарищ {user_mention}!\n"
+                    "Пишите мне в личку!"
+                )
+            else:
+                easter_egg_response = (
+                    "Everything that follows is a result of what you see here.\n"
+                    "I'm sorry. My responses are limited. You must ask the right questions.\n\n"
+                    f"Dear {user_mention}!\n"
+                    "Please, send me a direct message."
+                )
             
             sent_msg = await safe_send_message(
                 BOT,
@@ -6140,7 +6160,8 @@ if __name__ == "__main__":
             )
             
             if sent_msg:
-                await callback_query.answer("Easter egg reply sent! Will auto-delete in 3 min 🤖", show_alert=False)
+                lang_emoji = "🇷🇺" if lang == "ru" else "🇬🇧"
+                await callback_query.answer(f"{lang_emoji} Easter egg sent! Auto-delete in 3 min 🤖", show_alert=False)
                 
                 # Schedule message deletions
                 async def delayed_cleanup():
@@ -6176,7 +6197,8 @@ if __name__ == "__main__":
                 
                 # Update the message to show it was handled
                 try:
-                    new_text = callback_query.message.text + "\n\n✅ <b>Replied with easter egg</b> (auto-deletes in 3 min)"
+                    lang_label = "RU 🇷🇺" if lang == "ru" else "EN 🇬🇧"
+                    new_text = callback_query.message.text + f"\n\n✅ <b>Replied with easter egg ({lang_label})</b> (auto-deletes in 3 min)"
                     # Remove the reply button, keep LOLS buttons
                     new_kb = InlineKeyboardBuilder()
                     new_kb.add(
@@ -11269,13 +11291,13 @@ if __name__ == "__main__":
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             expand_kb = KeyboardBuilder()
             expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
-            expand_kb.add(
+            expand_kb.row(
                 InlineKeyboardButton(
                     text="🌐 Global Ban",
                     callback_data=f"suspiciousglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
                 InlineKeyboardButton(
-                    text="🚫 Ban User",
+                    text="🚫 Chat Ban",
                     callback_data=f"suspiciousban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
             )

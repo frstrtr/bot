@@ -9540,6 +9540,7 @@ if __name__ == "__main__":
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned where possible.\n\n"
                             f"<b>Failed in {len(failed_chats)} chat(s):</b>\n{failed_list_html}",
                             parse_mode="HTML",
+                            disable_web_page_preview=True,
                         )
                 except TelegramBadRequest as e:
                     LOGGER.error(

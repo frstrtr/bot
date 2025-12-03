@@ -7326,8 +7326,12 @@ if __name__ == "__main__":
 
             # initialize the autoreport_sent flag based on whether message was already autoreported
             # (e.g., by missed join detection earlier in the flow)
-            # Also check if user has already been autoreported (for ANY message) to prevent spam
-            autoreport_sent = was_autoreported(message) or was_user_autoreported(message.from_user.id)
+            # Also check if user has already been autoreported OR suspicious-reported (for ANY message) to prevent spam
+            autoreport_sent = (
+                was_autoreported(message) 
+                or was_user_autoreported(message.from_user.id)
+                or was_user_suspicious_reported(message.from_user.id)
+            )
 
             # Skip duplicate processing for media groups (multi-photo messages)
             # Only process the first message in a media group for ALL spam checks

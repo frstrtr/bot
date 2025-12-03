@@ -6080,11 +6080,15 @@ if __name__ == "__main__":
             message_id = int(message_id_str)  # Original command message ID
             user_id = int(user_id_str)
             
+            # Build user mention - use @username if available, otherwise use tg://user?id link
+            user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
+            
             # Send the easter egg reply to the original message
             easter_egg_response = (
                 "Everything that follows is a result of what you see here.\n"
                 "I'm sorry. My responses are limited. You must ask the right questions.\n\n"
-                "Send me a direct message."
+                f"Dear {user_mention}!"
+                "Please, send me a direct message."
             )
             
             sent_msg = await safe_send_message(
@@ -6093,6 +6097,7 @@ if __name__ == "__main__":
                 easter_egg_response,
                 LOGGER,
                 reply_to_message_id=message_id,
+                parse_mode="HTML",
             )
             
             if sent_msg:
@@ -9072,8 +9077,9 @@ if __name__ == "__main__":
                 )
                 await BOT.delete_message(chat_id=chat_username, message_id=message_id)
                 LOGGER.info(
-                    "%s Message %d deleted from chat %s by admin request. Original message %s",
-                    deleted_message_user_id,
+                    "%s:%s Message %d deleted from chat %s by admin request. Original message %s",
+                    deleted_message_user_id if deleted_message_user_id else "unknown",
+                    format_username_for_log(deleted_message_user_name),
                     message_id,
                     chat_username,
                     user_details_log_str.replace("<code>", "")
@@ -10924,7 +10930,7 @@ if __name__ == "__main__":
             # process unhandled messages
             if len(full_formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
                 formatted_message = (
-                    formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
+                    full_formatted_message[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
                 )
             else:
                 formatted_message = full_formatted_message

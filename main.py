@@ -6846,6 +6846,19 @@ if __name__ == "__main__":
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
 
+            # Special handling for Telegram's anonymous channel admin (ID 777000)
+            # This is when someone posts as the channel name (not as themselves)
+            if message.from_user.id == 777000:
+                _channel_post_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                _channel_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                LOGGER.info(
+                    "777000:CHANNEL_ADMIN Posted as channel in %s | msg: %s",
+                    _channel_chat_link,
+                    _channel_post_link,
+                )
+                # Skip all further spam checks for channel admin posts
+                return
+
             # search for the latest user join chat event date using user_id in the DB
             user_join_chat_date_str = CURSOR.execute(
                 "SELECT received_date FROM recent_messages WHERE user_id = ? AND new_chat_member = 1 ORDER BY received_date DESC LIMIT 1",

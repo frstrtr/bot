@@ -7021,8 +7021,26 @@ if __name__ == "__main__":
                                 parse_err,
                             )
                         
-                        # Skip if (messages >= threshold AND first_msg old enough) OR legit
-                        if (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit:
+                        # Check for bot mentions first (before established user check)
+                        _has_bot_mention = False
+                        _bot_mention_name = None
+                        if message.entities and message.text:
+                            for entity in message.entities:
+                                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                                if entity_type == "mention":
+                                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                                    mention = message.text[offset:offset + length].lower()
+                                    if mention.endswith("bot"):
+                                        _has_bot_mention = True
+                                        _bot_mention_name = message.text[offset:offset + length]
+                                        break
+                        
+                        # Check if established user
+                        _is_established = (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit
+                        
+                        # Skip if established AND no bot mention
+                        if _is_established and not _has_bot_mention:
                             _skip_missed_join_banner = True
                             LOGGER.info(
                                 "\033[92m%s:%s Skipping missed join banner for established user "
@@ -7063,33 +7081,227 @@ if __name__ == "__main__":
                                 )
                             # Skip the notification
                             should_notify_missed_join = False
+                        
+                        # If established user mentions a bot - send to SUSPICIOUS, add to active checks with INTENSIVE monitoring
+                        elif _is_established and _has_bot_mention:
+                            LOGGER.info(
+                                "\033[93m%s:%s Established user mentioned bot %s - sending to SUSPICIOUS + starting INTENSIVE checks\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                                _bot_mention_name,
+                            )
+                            
+                            # Add to active checks (even though established) because bot mention is suspicious
+                            if message.from_user.id not in active_user_checks_dict:
+                                try:
+                                    _photos = await BOT.get_user_profile_photos(message.from_user.id, limit=1)
+                                    _photo_count = getattr(_photos, "total_count", 0) if _photos else 0
+                                except TelegramBadRequest:
+                                    _photo_count = 0
+                                
+                                save_user_baseline(
+                                    conn=CONN,
+                                    user_id=message.from_user.id,
+                                    username=message.from_user.username,
+                                    first_name=message.from_user.first_name or "",
+                                    last_name=message.from_user.last_name or "",
+                                    photo_count=_photo_count,
+                                    join_chat_id=message.chat.id,
+                                    join_chat_username=getattr(message.chat, "username", None),
+                                    join_chat_title=getattr(message.chat, "title", "") or "",
+                                )
+                                
+                                active_user_checks_dict[message.from_user.id] = {
+                                    "username": message.from_user.username,
+                                    "baseline": {
+                                        "first_name": message.from_user.first_name or "",
+                                        "last_name": message.from_user.last_name or "",
+                                        "username": message.from_user.username or "",
+                                        "photo_count": _photo_count,
+                                        "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "chat": {
+                                            "id": message.chat.id,
+                                            "username": getattr(message.chat, "username", None),
+                                            "title": getattr(message.chat, "title", "") or "",
+                                        },
+                                    },
+                                }
+                                
+                                LOGGER.info(
+                                    "\033[93m%s:%s Added to active_user_checks_dict (established user with bot mention)\033[0m",
+                                    message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
+                                )
+                            
+                            # Start 24hr monitoring
+                            asyncio.create_task(
+                                perform_checks(
+                                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_user.id:<10} bot mention ({_bot_mention_name}) in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
+                                    user_id=message.from_user.id,
+                                    inout_logmessage=f"{message.from_user.id} established user mentioned bot {_bot_mention_name}, starting monitoring...",
+                                    user_name=message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                                ),
+                                name=str(message.from_user.id),
+                            )
+                            
+                            # ALSO start INTENSIVE checks (15 min frequent checks)
+                            await start_intensive_watchdog(
+                                user_id=message.from_user.id,
+                                user_name=message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                                message_chat_id=message.chat.id,
+                                message_id=message.message_id,
+                            )
+                            
+                            _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                            if message.chat.username:
+                                _msg_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                            else:
+                                _chat_id_str = str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)
+                                _msg_link = f"https://t.me/c/{_chat_id_str}/{message.message_id}"
+                            
+                            _suspicious_message = (
+                                f"⚠️ <b>Bot Mention by Established User</b>\n"
+                                f"User: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} "
+                                f"(<code>{message.from_user.id}</code>)\n"
+                                f"Name: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                                f"Chat: {_chat_link_html}\n\n"
+                                f"🤖 <b>Bot mentioned:</b> {html.escape(_bot_mention_name)}\n"
+                                f"📊 <b>User stats:</b> {_user_msg_count} messages, first: {user_first_message_date[0]}\n"
+                                f"🔎 <b>INTENSIVE monitoring started</b>\n"
+                                f"🔗 <a href='{_msg_link}'>Message link</a>\n\n"
+                                f"🔗 <b>Profile links:</b>\n"
+                                f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
+                                f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
+                                f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
+                            )
+                            
+                            _suspicious_kb = make_lols_kb(message.from_user.id)
+                            _suspicious_kb.add(
+                                InlineKeyboardButton(
+                                    text="⚙️ Actions (Ban / Delete) ⚙️",
+                                    callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+                                )
+                            )
+                            _suspicious_kb.add(
+                                InlineKeyboardButton(
+                                    text="✅ Mark as Legit",
+                                    callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                )
+                            )
+                            
+                            # Forward the message first
+                            try:
+                                await message.forward(
+                                    ADMIN_GROUP_ID,
+                                    ADMIN_SUSPICIOUS,
+                                    disable_notification=True,
+                                )
+                            except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
+                                LOGGER.warning("Failed to forward message for established user bot mention: %s", fwd_err)
+                            
+                            await safe_send_message(
+                                BOT,
+                                ADMIN_GROUP_ID,
+                                _suspicious_message,
+                                LOGGER,
+                                message_thread_id=ADMIN_SUSPICIOUS,
+                                parse_mode="HTML",
+                                disable_web_page_preview=True,
+                                reply_markup=_suspicious_kb.as_markup(),
+                            )
+                            
+                            missed_join_notification_sent = True
+                            mark_suspicious_reported(message)
+                            mark_user_suspicious_reported(message.from_user.id)
+                            should_notify_missed_join = False
                     
                     # Bot was offline when user joined - send suspicious notification
                     # This user might be a spammer who joined while bot wasn't watching
                     # Only send notification once per user (when first detected)
+                    # Note: _has_bot_mention and _bot_mention_name already set above
                     if should_notify_missed_join:
-                        # Check if user is in active monitoring AND message contains bot mention
-                        # If so, treat as autoreport instead of suspicious notification
-                        _has_bot_mention = False
-                        if message.entities and message.text:
-                            for entity in message.entities:
-                                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
-                                if entity_type == "mention":
-                                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
-                                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
-                                    mention = message.text[offset:offset + length].lower()
-                                    if mention.endswith("bot"):
-                                        _has_bot_mention = True
-                                        break
-                        
-                        # If user is being monitored and mentions a bot, send to autoreport instead
-                        if message.from_user.id in active_user_checks_dict and _has_bot_mention:
+                        # Add missed join user to active checks first (simulating join event)
+                        if message.from_user.id not in active_user_checks_dict:
+                            # Get photo count for baseline
+                            try:
+                                _photos = await BOT.get_user_profile_photos(message.from_user.id, limit=1)
+                                _photo_count = getattr(_photos, "total_count", 0) if _photos else 0
+                            except TelegramBadRequest:
+                                _photo_count = 0
+                            
+                            # Save baseline to database
+                            save_user_baseline(
+                                conn=CONN,
+                                user_id=message.from_user.id,
+                                username=message.from_user.username,
+                                first_name=message.from_user.first_name or "",
+                                last_name=message.from_user.last_name or "",
+                                photo_count=_photo_count,
+                                join_chat_id=message.chat.id,
+                                join_chat_username=getattr(message.chat, "username", None),
+                                join_chat_title=getattr(message.chat, "title", "") or "",
+                            )
+                            
+                            # Add to active checks dict
+                            active_user_checks_dict[message.from_user.id] = {
+                                "username": message.from_user.username,
+                                "baseline": {
+                                    "first_name": message.from_user.first_name or "",
+                                    "last_name": message.from_user.last_name or "",
+                                    "username": message.from_user.username or "",
+                                    "photo_count": _photo_count,
+                                    "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "chat": {
+                                        "id": message.chat.id,
+                                        "username": getattr(message.chat, "username", None),
+                                        "title": getattr(message.chat, "title", "") or "",
+                                    },
+                                },
+                            }
+                            
                             LOGGER.info(
-                                "User %s:%s is in active checks and mentioned a bot - sending to AUTOREPORT instead of SUSPICIOUS",
+                                "\033[93m%s:%s Added to active_user_checks_dict (missed join detected)\033[0m",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                             )
-                            await submit_autoreport(message, "Bot mention by monitored user (missed join)")
+                            
+                            # Start monitoring for this user
+                            asyncio.create_task(
+                                perform_checks(
+                                    event_record=f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {message.from_user.id:<10} missed join in {'@' + message.chat.username + ': ' if message.chat.username else ''}{message.chat.title:<30}",
+                                    user_id=message.from_user.id,
+                                    inout_logmessage=f"{message.from_user.id} missed join detected, starting monitoring...",
+                                    user_name=message.from_user.username if message.from_user.username else "!UNDEFINED!",
+                                ),
+                                name=str(message.from_user.id),
+                            )
+                        
+                        # If missed join user mentions a bot - this is spam! Delete and send to autoreport
+                        if _has_bot_mention:
+                            LOGGER.info(
+                                "\033[91m%s:%s Missed join user mentioned bot %s - deleting message and sending to AUTOREPORT\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                                _bot_mention_name,
+                            )
+                            # Delete the spam message
+                            try:
+                                await message.delete()
+                                LOGGER.info(
+                                    "\033[91m%s:%s Message %s deleted (bot mention by missed join user)\033[0m",
+                                    message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
+                                    message.message_id,
+                                )
+                            except TelegramBadRequest as del_err:
+                                LOGGER.warning(
+                                    "%s:%s Failed to delete bot mention message: %s",
+                                    message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
+                                    del_err,
+                                )
+                            # Send to autoreport for admin review/ban
+                            await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by missed join user")
                             missed_join_notification_sent = True
                         else:
                             # Regular missed join notification to ADMIN_SUSPICIOUS

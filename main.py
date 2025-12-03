@@ -1749,6 +1749,21 @@ async def handle_autoreports(
                 InlineKeyboardButton(text=f"🔍 Check mentioned ID:{mention_value} ({display_name})", url=mention_lols_link)
             )
 
+    # Add buttons for t.me/m/ business chat deeplinks (up to 3)
+    for i, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
+        slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
+        slug_display = slug[:12] + "..." if len(slug) > 12 else slug
+        keyboard.add(
+            InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+        )
+
+    # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
+    for i, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
+        visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
+        keyboard.add(
+            InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+        )
+
     try:
         # Forward original message to the admin group
         await BOT.forward_message(
@@ -2580,6 +2595,22 @@ async def check_n_ban(message: Message, reason: str):
                 inline_kb.add(
                     InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
                 )
+
+        # Add buttons for t.me/m/ business chat deeplinks (up to 3)
+        for i, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
+            # Extract slug from URL for button text
+            slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
+            slug_display = slug[:12] + "..." if len(slug) > 12 else slug
+            inline_kb.add(
+                InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+            )
+
+        # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
+        for i, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
+            visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
+            inline_kb.add(
+                InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+            )
 
         chat_link = (
             f"https://t.me/{message.chat.username}"
@@ -7079,6 +7110,21 @@ if __name__ == "__main__":
                                     _missed_join_kb.add(
                                         InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
                                     )
+                            
+                            # Add buttons for t.me/m/ business chat deeplinks (up to 3)
+                            for deeplink in mention_analysis.get("tme_deeplinks", [])[:3]:
+                                slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
+                                slug_display = slug[:12] + "..." if len(slug) > 12 else slug
+                                _missed_join_kb.add(
+                                    InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+                                )
+
+                            # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
+                            for fake in mention_analysis.get("fake_mentions", [])[:2]:
+                                visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
+                                _missed_join_kb.add(
+                                    InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+                                )
                             
                             # Add mention info to message if needed
                             if mention_analysis["has_more"] or mention_analysis["hidden_mentions"]:

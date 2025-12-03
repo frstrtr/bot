@@ -7727,7 +7727,7 @@ if __name__ == "__main__":
                         )
                     )
                 
-                time_passed = message.date - user_join_chat_date
+                time_passed = msg_date_local - user_join_chat_date
                 human_readable_time = str(time_passed)
                 if message.chat.username:
                     message_link = construct_message_link(

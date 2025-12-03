@@ -1033,6 +1033,7 @@ def db_init(cursor: Cursor, conn: Connection):
         forwarded_from_last_name TEXT,
         new_chat_member BOOL,
         left_chat_member BOOL,
+        membership_status TEXT,
         deletion_reason TEXT,
         PRIMARY KEY (chat_id, message_id)
     )
@@ -1043,6 +1044,13 @@ def db_init(cursor: Cursor, conn: Connection):
     # Add deletion_reason column if it doesn't exist (for existing databases)
     try:
         cursor.execute("ALTER TABLE recent_messages ADD COLUMN deletion_reason TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Add membership_status column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE recent_messages ADD COLUMN membership_status TEXT")
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
@@ -1578,7 +1586,8 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
     cursor.execute(
         """
         SELECT chat_id, chat_username, message_id, user_name, user_first_name, user_last_name,
-               received_date, from_chat_title, new_chat_member, left_chat_member, deletion_reason
+               received_date, from_chat_title, new_chat_member, left_chat_member, deletion_reason,
+               membership_status
         FROM recent_messages 
         WHERE user_id = ?
         ORDER BY received_date DESC
@@ -1597,6 +1606,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
         new_chat_member = bool(row[8])
         left_chat_member = bool(row[9])
         deletion_reason = row[10] if len(row) > 10 else None
+        membership_status = row[11] if len(row) > 11 else None
         
         # Update user info if not set
         if not result["username"] and row[3]:
@@ -1623,6 +1633,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
                 "chat_id": chat_id,
                 "chat_username": chat_username,
                 "chat_title": chat_title,
+                "status": membership_status or "member",
             })
         if left_chat_member:
             result["leave_events"].append({
@@ -1630,6 +1641,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
                 "chat_id": chat_id,
                 "chat_username": chat_username,
                 "chat_title": chat_title,
+                "status": membership_status or "left",
             })
         
         result["messages"].append({
@@ -1640,6 +1652,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
             "received_date": received_date,
             "new_chat_member": new_chat_member,
             "left_chat_member": left_chat_member,
+            "membership_status": membership_status,
             "deletion_reason": deletion_reason,
         })
     
@@ -1800,12 +1813,26 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
     if joins or leaves:
         msg += f"\n🚪 <b>Roaming History:</b> ({len(joins)} join, {len(leaves)} leave)\n"
         
+        # Status to emoji/text mapping
+        status_display = {
+            "member": "➡️ JOIN",
+            "administrator": "➡️👑 ADMIN",
+            "creator": "➡️👑 OWNER",
+            "left": "⬅️ LEFT",
+            "kicked": "🚫 KICKED",
+            "restricted": "⚠️ RESTRICTED",
+        }
+        
         # Combine and sort events by date
         all_events = []
         for j in joins:
-            all_events.append({"type": "➡️ JOIN", "date": j.get("date"), "chat": j.get("chat_title") or j.get("chat_username") or str(j.get("chat_id"))})
+            status = j.get("status", "member").lower()
+            event_text = status_display.get(status, f"➡️ {status.upper()}")
+            all_events.append({"type": event_text, "date": j.get("date"), "chat": j.get("chat_title") or j.get("chat_username") or str(j.get("chat_id"))})
         for l in leaves:
-            all_events.append({"type": "⬅️ LEFT", "date": l.get("date"), "chat": l.get("chat_title") or l.get("chat_username") or str(l.get("chat_id"))})
+            status = l.get("status", "left").lower()
+            event_text = status_display.get(status, f"⬅️ {status.upper()}")
+            all_events.append({"type": event_text, "date": l.get("date"), "chat": l.get("chat_title") or l.get("chat_username") or str(l.get("chat_id"))})
         
         # Sort by date descending (most recent first)
         all_events.sort(key=lambda x: x.get("date") or "", reverse=True)

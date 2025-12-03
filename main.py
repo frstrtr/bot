@@ -4241,8 +4241,8 @@ if __name__ == "__main__":
             CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages
-                (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member, membership_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     getattr(update.chat, "id", None),
@@ -4264,6 +4264,7 @@ if __name__ == "__main__":
                     getattr(update.from_user, "last_name", ""),
                     is_member,
                     was_member,
+                    str(inout_status),  # Store the actual status (member, left, kicked, restricted)
                 ),
             )
             CONN.commit()
@@ -8867,6 +8868,11 @@ if __name__ == "__main__":
             reply_markup=lols_check_kb.as_markup(),
         )
 
+    @DP.message(Command("ban"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def ban_superadmin(message: Message):
+        """Superadmin DM version of /ban command."""
+        await ban(message)
+
     @DP.message(Command("check"), F.chat.id == ADMIN_GROUP_ID)
     async def check_user(message: Message):
         """Function to start lols_cas check coroutine to monitor user for spam."""
@@ -8924,6 +8930,11 @@ if __name__ == "__main__":
         except (TelegramBadRequest, RuntimeError) as e:
             LOGGER.error("Error in check_user: %s", e)
             await message.reply("An error occurred while trying to check the user.")
+
+    @DP.message(Command("check"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def check_user_superadmin(message: Message):
+        """Superadmin DM version of /check command."""
+        await check_user(message)
 
     @DP.message(Command("whois"), F.chat.id == ADMIN_GROUP_ID)
     async def whois_user(message: Message):
@@ -9204,6 +9215,11 @@ if __name__ == "__main__":
             LOGGER.error("Error in delete_message: %s", e)
             await message.reply("An error occurred while trying to delete the message.")
 
+    @DP.message(Command("delmsg"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def delete_message_superadmin(message: Message):
+        """Superadmin DM version of /delmsg command."""
+        await delete_message(message)
+
     @DP.message(Command("banchan"), F.chat.id == ADMIN_GROUP_ID)
     @DP.message(Command("unbanchan"), F.chat.id == ADMIN_GROUP_ID)
     async def manage_channel(message: Message):
@@ -9379,10 +9395,21 @@ if __name__ == "__main__":
             await message.reply(str(ve))
             LOGGER.error("No channel ID provided!")
 
+    @DP.message(Command("banchan"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    @DP.message(Command("unbanchan"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def manage_channel_superadmin(message: Message):
+        """Superadmin DM version of /banchan and /unbanchan commands."""
+        await manage_channel(message)
+
     @DP.message(Command("loglists"), F.chat.id == ADMIN_GROUP_ID)
     async def log_lists_handler(message: Message):
         """Function to log active checks and banned users dict."""
         await log_lists(message.chat.id, message.message_thread_id)
+
+    @DP.message(Command("loglists"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def log_lists_handler_superadmin(message: Message):
+        """Superadmin DM version of /loglists command."""
+        await log_lists(message.chat.id, None)
 
     # Helper to check if message is from superadmin in allowed location
     def is_superadmin_context(message: Message) -> bool:
@@ -10790,6 +10817,11 @@ if __name__ == "__main__":
         except (TelegramBadRequest, sqlite3.Error) as e:  # Note:: Specify more specific exception types
             LOGGER.error("Error in unban_user: %s", e)
             await message.reply("An error occurred while trying to unban the user.")
+
+    @DP.message(Command("unban"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
+    async def unban_user_superadmin(message: Message):
+        """Superadmin DM version of /unban command."""
+        await unban_user(message)
 
     @DP.callback_query(lambda c: c.data.startswith("stopchecks_"))
     async def stop_checks(callback_query: CallbackQuery):

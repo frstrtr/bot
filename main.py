@@ -3957,9 +3957,10 @@ if __name__ == "__main__":
         status_colors = {
             ChatMemberStatus.KICKED: "\033[91m",  # Red
             ChatMemberStatus.RESTRICTED: "\033[93m",  # Yellow
+            ChatMemberStatus.LEFT: "\033[91m",  # Red
         }
-        color = status_colors.get(inout_status, "")  # Default to no color
-        reset_color = "\033[0m" if color else ""  # Reset color if a color was used
+        color = status_colors.get(inout_status, "\033[96m")  # Default to cyan for joins
+        reset_color = "\033[0m"  # Always reset color
         LOGGER.info(
             "%s%s:%s --> %s in %s%s",
             color,

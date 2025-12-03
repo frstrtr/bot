@@ -308,6 +308,10 @@ autoreported_users: set[int] = set()
 # Key: (chat_id, message_id) - prevents same message being reported twice
 suspicious_reported_messages: set[tuple[int, int]] = set()
 
+# Track users who have been reported to suspicious thread (by user_id) to prevent duplicate reports
+# Key: user_id - once a user has been suspicious reported, don't report again until they're processed
+suspicious_reported_users: set[int] = set()
+
 # Track processed media groups to prevent duplicate reports for multi-photo messages
 # Key: (chat_id, media_group_id) - cleared after 60 seconds
 processed_media_groups: dict[tuple[int, str], float] = {}
@@ -344,9 +348,24 @@ def was_suspicious_reported(message: Message) -> bool:
     return (message.chat.id, message.message_id) in suspicious_reported_messages
 
 
+def was_user_suspicious_reported(user_id: int) -> bool:
+    """Check if a user has already been reported to suspicious thread (any message)."""
+    return user_id in suspicious_reported_users
+
+
 def mark_suspicious_reported(message: Message):
     """Mark a message as sent to suspicious thread."""
     suspicious_reported_messages.add((message.chat.id, message.message_id))
+
+
+def mark_user_suspicious_reported(user_id: int):
+    """Mark a user as having been reported to suspicious thread."""
+    suspicious_reported_users.add(user_id)
+
+
+def clear_user_suspicious_tracking(user_id: int):
+    """Clear user suspicious report tracking (called when user is banned or marked legit)."""
+    suspicious_reported_users.discard(user_id)
 
 
 def was_media_group_processed(message: Message) -> bool:
@@ -1940,8 +1959,9 @@ async def ban_user_from_all_chats(
         total_count,
     )
 
-    # Clear user autoreport tracking since they've been banned
+    # Clear user autoreport and suspicious tracking since they've been banned
     clear_user_autoreport_tracking(user_id)
+    clear_user_suspicious_tracking(user_id)
 
     return success_count, fail_count, total_count
 
@@ -7870,7 +7890,8 @@ if __name__ == "__main__":
 
             # If suspicious content detected, forward to ADMIN_SUSPICIOUS thread
             # Skip if message was already sent to autoreport or suspicious thread
-            if has_suspicious_content and not was_autoreported(message) and not was_suspicious_reported(message):
+            # Also skip if user was already reported to suspicious thread (user-level dedup)
+            if has_suspicious_content and not was_autoreported(message) and not was_suspicious_reported(message) and not was_user_suspicious_reported(message.from_user.id):
                 try:
                     # Forward the message to suspicious thread
                     await message.forward(
@@ -8103,6 +8124,9 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
+                    
+                    # Mark user as suspicious reported to prevent duplicate reports
+                    mark_user_suspicious_reported(message.from_user.id)
                     
                     # Start monitoring for users reported to SUSPICIOUS thread
                     # This activates watchdog and intensive checks (can be cancelled by legitimization button)
@@ -10506,8 +10530,9 @@ if __name__ == "__main__":
                 admin_id,
             )
 
-        # Clear user autoreport tracking since they've been marked legit
+        # Clear user autoreport and suspicious tracking since they've been marked legit
         clear_user_autoreport_tracking(user_id_legit)
+        clear_user_suspicious_tracking(user_id_legit)
 
         try:
             CURSOR.execute(

@@ -863,7 +863,7 @@ async def ban_rogue_chat_everywhere(
             await asyncio.sleep(1)  # pause 1 sec
         except (TelegramBadRequest, TelegramForbiddenError) as e:  # if bot not in chat or channel deleted
             LOGGER.warning(
-                "%s:%s - error banning in chat %s: %s. Bot not in chat or channel deleted?",
+                "\033[93m%s:%s - error banning in chat %s: %s. Bot not in chat or channel deleted?\033[0m",
                 rogue_chat_id,
                 format_username_for_log(rogue_chat_username),
                 chat_id,
@@ -1940,7 +1940,7 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s:%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)",
+                "\033[93m%s:%s - error banning in chat %s (%s): %s. Deleted ACCOUNT or no BOT in CHAT? (Successfully banned: %d)\033[0m",
                 user_id,
                 format_username_for_log(user_name),
                 chat_name,
@@ -1955,7 +1955,7 @@ async def ban_user_from_all_chats(
             fail_count += 1
             chat_name = get_channel_name_by_id(channel_dict, chat_id)
             LOGGER.error(
-                "%s:%s - unexpected error banning in chat %s (%s): %s",
+                "\033[93m%s:%s - unexpected error banning in chat %s (%s): %s\033[0m",
                 user_id,
                 format_username_for_log(user_name),
                 chat_name,
@@ -2266,7 +2266,7 @@ async def check_and_autoban(
         # Delete ALL stored messages for this user (not just one)
         _del_count, _fail_count = await delete_all_user_messages(user_id, user_name)
         LOGGER.debug(
-            "%s:%s check_and_autoban deleted %d messages (failed: %d)",
+            "\033[93m%s:%s check_and_autoban deleted %d messages (failed: %d)\033[0m",
             user_id,
             format_username_for_log(user_name),
             _del_count,

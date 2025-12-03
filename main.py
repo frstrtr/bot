@@ -1518,7 +1518,7 @@ async def handle_autoreports(
         )
     except TelegramBadRequest:
         LOGGER.error(
-            "%s:@%s Message to forward not found: %s",
+            "%s:%s Message to forward not found: %s",
             spammer_id,
             "!UNDEFINED!",
             message.message_id,
@@ -1977,9 +1977,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         if intensive_task:
             intensive_task.cancel()
             LOGGER.info(
-                "%s:@%s Intensive watchdog cancelled during autoban",
+                "%s:%s Intensive watchdog cancelled during autoban",
                 _id,
-                user_name,
+                format_username_for_log(user_name),
             )
 
     # Delete ALL stored messages for this user BEFORE removing from active_user_checks_dict
@@ -1987,9 +1987,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         deleted_count, _ = await delete_all_user_messages(_id, user_name)
         if deleted_count > 0:
             LOGGER.info(
-                "%s:@%s Deleted %d spam messages during autoban",
+                "%s:%s Deleted %d spam messages during autoban",
                 _id,
-                user_name,
+                format_username_for_log(user_name),
                 deleted_count,
             )
 
@@ -2006,9 +2006,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
         last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
         last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
         LOGGER.info(
-            "\033[91m%s:@%s removed from active_user_checks_dict during lols_autoban:\n\t\t\t%s... %d totally\033[0m",
+            "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban:\n\t\t\t%s... %d totally\033[0m",
             _id,
-            user_name,
+            format_username_for_log(user_name),
             last_3_users_str,  # Last 3 elements
             len(active_user_checks_dict),  # Number of elements left
         )
@@ -2088,9 +2088,9 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
         return deleted_count, failed_count
     
     LOGGER.info(
-        "%s:@%s Found %d messages to delete: %s",
+        "%s:%s Found %d messages to delete: %s",
         user_id,
-        user_name,
+        format_username_for_log(user_name),
         len(message_keys),
         message_keys,
     )
@@ -2120,9 +2120,9 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                     await BOT.delete_message(chat_id, message_id)
                     deleted_count += 1
                     LOGGER.debug(
-                        "%s:@%s Deleted message %s in chat %s",
+                        "%s:%s Deleted message %s in chat %s",
                         user_id,
-                        user_name,
+                        format_username_for_log(user_name),
                         message_id,
                         chat_id,
                     )
@@ -2130,34 +2130,34 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                     # Covers MessageToDeleteNotFound, MessageCantBeDeleted, etc.
                     if "message to delete not found" in str(e).lower():
                         LOGGER.debug(
-                            "%s:@%s Message %s not found (already deleted?)",
+                            "%s:%s Message %s not found (already deleted?)",
                             user_id,
-                            user_name,
+                            format_username_for_log(user_name),
                             message_id,
                         )
                     else:
                         LOGGER.warning(
-                            "%s:@%s Cannot delete message %s: %s",
+                            "%s:%s Cannot delete message %s: %s",
                             user_id,
-                            user_name,
+                            format_username_for_log(user_name),
                             message_id,
                             e,
                         )
                     failed_count += 1
                 except TelegramNotFound:
                     LOGGER.warning(
-                        "%s:@%s Chat %s not found for message deletion",
+                        "%s:%s Chat %s not found for message deletion",
                         user_id,
-                        user_name,
+                        format_username_for_log(user_name),
                         chat_id,
                     )
                     failed_count += 1
                 except RetryAfter as e:
                     # Telegram rate limit hit - wait and retry
                     LOGGER.warning(
-                        "%s:@%s Rate limit hit, waiting %s seconds...",
+                        "%s:%s Rate limit hit, waiting %s seconds...",
                         user_id,
-                        user_name,
+                        format_username_for_log(user_name),
                         e.retry_after,
                     )
                     await asyncio.sleep(e.retry_after)
@@ -2168,9 +2168,9 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
                         failed_count += 1
         except (ValueError, IndexError) as e:
             LOGGER.warning(
-                "%s:@%s Invalid message key format '%s': %s",
+                "%s:%s Invalid message key format '%s': %s",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
                 msg_key,
                 e,
             )
@@ -2178,9 +2178,9 @@ async def delete_all_user_messages(user_id: int, user_name: str = "!UNDEFINED!")
     
     if deleted_count > 0 or failed_count > 0:
         LOGGER.info(
-            "\033[91m%s:@%s Deleted %d/%d messages (failed: %d)\033[0m",
+            "\033[91m%s:%s Deleted %d/%d messages (failed: %d)\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
             deleted_count,
             deleted_count + failed_count,
             failed_count,
@@ -2270,16 +2270,16 @@ async def check_and_autoban(
                 await BOT.delete_message(origin_chat_id, message_to_delete[1])
             except TelegramNotFound:
                 LOGGER.error(
-                    "%s:@%s Chat not found: %s",
+                    "%s:%s Chat not found: %s",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                     message_to_delete[0],
                 )
             except TelegramBadRequest:
                 LOGGER.debug(
-                    "%s:@%s Message to delete not found (maybe already deleted): %s",
+                    "%s:%s Message to delete not found (maybe already deleted): %s",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                     message_to_delete[1],
                 )
             except TelegramForbiddenError:
@@ -2424,9 +2424,9 @@ async def check_and_autoban(
             else "!UNDEFINED!"
         )
         LOGGER.info(
-            "\033[95m%s:@%s kicked/restricted by %s, but is not now in the lols database.\033[0m",
+            "\033[95m%s:%s kicked/restricted by %s, but is not now in the lols database.\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
             admin_name,
         )
         await safe_send_message(
@@ -2503,26 +2503,18 @@ async def check_n_ban(message: Message, reason: str):
                     ]
                 )
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s... %d totally\033[0m",
+                    "\033[91m%s:%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s... %d totally\033[0m",
                     message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
+                    format_username_for_log(message.from_user.username),
                     active_user_checks_dict_last3_str,  # Last 3 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
                 banned_users_dict[message.from_user.id] = message.from_user.username
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s\033[0m",
+                    "\033[91m%s:%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s\033[0m",
                     message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
+                    format_username_for_log(message.from_user.username),
                     active_user_checks_dict,
                 )
             # stop the perform_checks coroutine if it is running for author_id
@@ -2694,25 +2686,17 @@ async def check_n_ban(message: Message, reason: str):
                     [f"{uid}: {uname}" for uid, uname in last_3_users]
                 )
                 LOGGER.info(
-                    "\033[93m%s:@%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
+                    "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
                     message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
+                    format_username_for_log(message.from_user.username),
                     last_3_users_str,  # First 2 elements
                     len(banned_users_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[93m%s:@%s added to banned users list in check_n_ban: %s\033[0m",
+                    "\033[93m%s:%s added to banned users list in check_n_ban: %s\033[0m",
                     message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
+                    format_username_for_log(message.from_user.username),
                     banned_users_dict,
                 )
 
@@ -2722,13 +2706,9 @@ async def check_n_ban(message: Message, reason: str):
             await BOT.delete_message(message.chat.id, message.message_id)
         except TelegramBadRequest:
             LOGGER.error(
-                "\033[93m%s:@%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
+                "\033[93m%s:%s - message %s to delete using check_n_ban(1132) not found in %s (%s)\033[0m Already deleted?",
                 message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
+                format_username_for_log(message.from_user.username),
                 message.message_id,
                 message.chat.title,
                 message.chat.id,
@@ -2892,9 +2872,9 @@ async def perform_checks(
                                 cur_username = getattr(_user, "username", "") or ""
                             except TelegramBadRequest as _e:
                                 LOGGER.debug(
-                                    "%s:@%s unable to fetch chat member for profile-change check: %s",
+                                    "%s:%s unable to fetch chat member for profile-change check: %s",
                                     user_id,
-                                    user_name,
+                                    format_username_for_log(user_name),
                                     _e,
                                 )
 
@@ -2909,9 +2889,9 @@ async def perform_checks(
                             )
                         except TelegramBadRequest as _e:
                             LOGGER.debug(
-                                "%s:@%s unable to fetch photo count during checks: %s",
+                                "%s:%s unable to fetch photo count during checks: %s",
                                 user_id,
-                                user_name,
+                                format_username_for_log(user_name),
                                 _e,
                             )
 
@@ -3089,18 +3069,18 @@ async def perform_checks(
 
     except asyncio.exceptions.CancelledError as e:
         LOGGER.error(
-            "\033[93m%s:@%s %dhr spam checking cancelled. %s\033[0m",
+            "\033[93m%s:%s %dhr spam checking cancelled. %s\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
             MONITORING_DURATION_HOURS,
             e,
         )
         if user_id in active_user_checks_dict:
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
             LOGGER.info(
-                "\033[93m%s:@%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s",
+                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
                 active_user_checks_dict,
             )
 
@@ -3139,17 +3119,17 @@ async def perform_checks(
                     ]
                 )
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block:\n\t\t\t%s... %d totally\033[0m",
+                    "\033[92m%s:%s removed from active_user_checks_dict in finally block:\n\t\t\t%s... %d totally\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                     active_user_checks_dict_last3_str,  # Last 3 elements
                     len(active_user_checks_dict),  # Number of elements left
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active_user_checks_dict in finally block:\n\t\t\t%s\033[0m",
+                    "\033[92m%s:%s removed from active_user_checks_dict in finally block:\n\t\t\t%s\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                     active_user_checks_dict,
                 )
 
@@ -3165,9 +3145,9 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
                 await intensive_task
             except asyncio.CancelledError:
                 LOGGER.info(
-                    "%s:@%s Intensive watchdog also cancelled.",
+                    "%s:%s Intensive watchdog also cancelled.",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
             except RuntimeError:
                 pass
@@ -3184,9 +3164,9 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
         if user_id in active_user_checks_dict:
             del active_user_checks_dict[user_id]
             LOGGER.info(
-                "\033[92m%s:@%s removed from active_user_checks_dict during cancel_named_watchdog:\033[0m\n\t\t\t%s",
+                "\033[92m%s:%s removed from active_user_checks_dict during cancel_named_watchdog:\033[0m\n\t\t\t%s",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
                 active_user_checks_dict,
             )
         # Cancel the task and remove it from the dictionary
@@ -3258,9 +3238,9 @@ async def perform_intensive_checks(
         message_to_delete = [message_chat_id, message_id]
     
     LOGGER.info(
-        "\033[95m%s:@%s INTENSIVE watchdog started (message posted while in active_checks)\033[0m",
+        "\033[95m%s:%s INTENSIVE watchdog started (message posted while in active_checks)\033[0m",
         user_id,
-        user_name,
+        format_username_for_log(user_name),
     )
     
     try:
@@ -3268,9 +3248,9 @@ async def perform_intensive_checks(
         for i in range(6):
             if user_id not in active_user_checks_dict:
                 LOGGER.info(
-                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    "%s:%s INTENSIVE check stopped - user no longer in active_checks",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 return
             
@@ -3289,13 +3269,13 @@ async def perform_intensive_checks(
             
             if lols_spam is True:
                 LOGGER.warning(
-                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    "\033[91m%s:%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 # Build event record and inout log message
                 event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
-                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                inout_logmessage = f"{user_id}:{format_username_for_log(user_name)} detected as spam during INTENSIVE checks after posting message"
                 
                 if await check_and_autoban(
                     event_record,
@@ -3311,9 +3291,9 @@ async def perform_intensive_checks(
         for i in range(8):
             if user_id not in active_user_checks_dict:
                 LOGGER.info(
-                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    "%s:%s INTENSIVE check stopped - user no longer in active_checks",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 return
             
@@ -3332,12 +3312,12 @@ async def perform_intensive_checks(
             
             if lols_spam is True:
                 LOGGER.warning(
-                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    "\033[91m%s:%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
-                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                inout_logmessage = f"{user_id}:{format_username_for_log(user_name)} detected as spam during INTENSIVE checks after posting message"
                 
                 if await check_and_autoban(
                     event_record,
@@ -3353,9 +3333,9 @@ async def perform_intensive_checks(
         for i in range(10):
             if user_id not in active_user_checks_dict:
                 LOGGER.info(
-                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    "%s:%s INTENSIVE check stopped - user no longer in active_checks",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 return
             
@@ -3374,12 +3354,12 @@ async def perform_intensive_checks(
             
             if lols_spam is True:
                 LOGGER.warning(
-                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    "\033[91m%s:%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
-                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                inout_logmessage = f"{user_id}:{format_username_for_log(user_name)} detected as spam during INTENSIVE checks after posting message"
                 
                 if await check_and_autoban(
                     event_record,
@@ -3392,22 +3372,22 @@ async def perform_intensive_checks(
                     return
         
         LOGGER.info(
-            "\033[92m%s:@%s INTENSIVE checks completed (15 min) - no spam detected, regular watchdog continues\033[0m",
+            "\033[92m%s:%s INTENSIVE checks completed (15 min) - no spam detected, regular watchdog continues\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
         )
     
     except asyncio.CancelledError:
         LOGGER.info(
-            "\033[93m%s:@%s INTENSIVE watchdog cancelled (user legitimized or banned elsewhere)\033[0m",
+            "\033[93m%s:%s INTENSIVE watchdog cancelled (user legitimized or banned elsewhere)\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
         )
     except RuntimeError as e:
         LOGGER.error(
-            "%s:@%s Error during INTENSIVE checks: %s",
+            "%s:%s Error during INTENSIVE checks: %s",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
             e,
         )
 
@@ -3421,15 +3401,15 @@ async def cancel_intensive_watchdog(user_id: int, user_name: str = "!UNDEFINED!"
             await task
         except asyncio.CancelledError:
             LOGGER.info(
-                "%s:@%s Intensive watchdog cancelled.",
+                "%s:%s Intensive watchdog cancelled.",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
             )
         except RuntimeError as e:
             LOGGER.warning(
-                "%s:@%s Error cancelling intensive watchdog: %s",
+                "%s:%s Error cancelling intensive watchdog: %s",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
                 e,
             )
 
@@ -3450,9 +3430,9 @@ async def start_intensive_watchdog(
         existing_task = running_intensive_watchdogs[user_id]
         if not existing_task.done():
             LOGGER.debug(
-                "%s:@%s Intensive watchdog already running, skipping restart",
+                "%s:%s Intensive watchdog already running, skipping restart",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
             )
             return
     
@@ -3487,18 +3467,18 @@ async def create_named_watchdog(coro, user_id, user_name="!UNDEFINED!"):
     existing_task = running_watchdogs.get(user_id)
     if existing_task:
         LOGGER.info(
-            "\033[93m%s:@%s Watchdog is already set. Cancelling and restarting existing task.\033[0m",
+            "\033[93m%s:%s Watchdog is already set. Cancelling and restarting existing task.\033[0m",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
         )
 
     # Always create and register the new task immediately (non-blocking restart)
     task = asyncio.create_task(coro, name=str(user_id))
     running_watchdogs[user_id] = task
     LOGGER.info(
-        "\033[91m%s:@%s Watchdog assigned.\033[0m",
+        "\033[91m%s:%s Watchdog assigned.\033[0m",
         user_id,
-        user_name,
+        format_username_for_log(user_name),
     )  # Include user_name
 
     # Remove the task from the dictionary when it completes (only if it's still the current one)
@@ -3802,9 +3782,9 @@ if __name__ == "__main__":
             update.old_chat_member.user.id in banned_users_dict
         ):  # prevent double actions if user already banned by other process
             LOGGER.info(
-                "%s:@%s already banned - skipping actions.",
+                "%s:%s already banned - skipping actions.",
                 update.old_chat_member.user.id,
-                update.from_user.username or "!UNDEFINED!",
+                format_username_for_log(update.from_user.username),
             )
             return
 
@@ -4100,11 +4080,11 @@ if __name__ == "__main__":
                             )
                             CONN.commit()
                             LOGGER.info(
-                                "\033[92m%s:%s marked as legitimate in database by admin %s:@%s re-add action\033[0m",
+                                "\033[92m%s:%s marked as legitimate in database by admin %s:%s re-add action\033[0m",
                                 inout_userid,
                                 inout_username_log,
                                 admin_id,
-                                admin_username,
+                                format_username_for_log(admin_username),
                             )
                         except sqlite3.Error as db_err:
                             LOGGER.error(
@@ -4637,9 +4617,9 @@ if __name__ == "__main__":
                 
                 # 3. Regular users - stay silent, but log and optionally notify admin group
                 LOGGER.info(
-                    "User %s:@%s forwarded message from unknown source - staying silent",
+                    "User %s:%s forwarded message from unknown source - staying silent",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    format_username_for_log(message.from_user.username),
                 )
                 # Optionally forward to admin group for review (without response to user)
                 try:
@@ -5080,9 +5060,9 @@ if __name__ == "__main__":
             # author_id_from_callback = int(author_id_from_callback_str) # Can be used for checks
 
             LOGGER.info(
-                "\033[95m%s:@%s requested to ban REPORT %s (Spammer ID from callback: %s)\033[0m",
+                "\033[95m%s:%s requested to ban REPORT %s (Spammer ID from callback: %s)\033[0m",
                 callback_query.from_user.id,
-                button_pressed_by,
+                format_username_for_log(button_pressed_by),
                 report_id_to_ban,
                 author_id_from_callback_str,
             )
@@ -5213,26 +5193,18 @@ if __name__ == "__main__":
                         ]
                     )
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s... %d totally",
+                        "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s... %d totally",
                         author_id,
-                        (
-                            forwarded_message_data[4]
-                            if forwarded_message_data[4] not in [0, "0", None]
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
                         button_pressed_by,
                         active_user_checks_dict_last3_str,  # Last 3 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s",
+                        "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s",
                         author_id,
-                        (
-                            forwarded_message_data[4]
-                            if forwarded_message_data[4] not in [0, "0", None]
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
                         button_pressed_by,
                         active_user_checks_dict,
                     )
@@ -5251,13 +5223,9 @@ if __name__ == "__main__":
                 f"{'@' + forwarded_message_data[2] + ': ' if forwarded_message_data[2] else '':<24}{forwarded_message_data[0]:<30} by {_admin_for_record}\n"
             )
             LOGGER.debug(
-                "%s:@%s (#HBN) forwared_message_data: %s",
+                "%s:%s (#HBN) forwared_message_data: %s",
                 author_id,
-                (
-                    forwarded_message_data[4]
-                    if forwarded_message_data[4] not in [0, "0", None]
-                    else "!UNDEFINED!"
-                ),
+                format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
                 forwarded_message_data,
             )
             await save_report_file("inout_", "hbn" + event_record)
@@ -5323,9 +5291,9 @@ if __name__ == "__main__":
                     )
                 except asyncio.TimeoutError:
                     LOGGER.error(
-                        "%s:@%s Timeout error while sending message to ORIGINALS",
+                        "%s:%s Timeout error while sending message to ORIGINALS",
                         author_id,
-                        user_name,
+                        format_username_for_log(user_name),
                     )
                 try:
                     await BOT.forward_message(
@@ -5359,9 +5327,9 @@ if __name__ == "__main__":
                             chat_id=channel_id, message_id=message_id
                         )
                         LOGGER.debug(
-                            "\033[91m%s:@%s message %s deleted from chat %s (%s).\033[0m",
+                            "\033[91m%s:%s message %s deleted from chat %s (%s).\033[0m",
                             author_id,
-                            user_name,
+                            format_username_for_log(user_name),
                             message_id,
                             CHANNEL_DICT[channel_id],
                             channel_id,
@@ -5375,9 +5343,9 @@ if __name__ == "__main__":
                             attempt < retry_attempts - 1
                         ):  # Don't wait after the last attempt
                             LOGGER.warning(
-                                "%s:@%s Rate limited. Waiting for %s seconds.",
+                                "%s:%s Rate limited. Waiting for %s seconds.",
                                 author_id,
-                                user_name,
+                                format_username_for_log(user_name),
                                 wait_time,
                             )
                             time.sleep(wait_time)
@@ -5386,9 +5354,9 @@ if __name__ == "__main__":
                     except TelegramBadRequest as inner_e:
                         # Covers MessageToDeleteNotFound, MessageCantBeDeleted
                         LOGGER.warning(
-                            "%s:@%s Message %s in chat %s (%s) could not be deleted: %s",
+                            "%s:%s Message %s in chat %s (%s) could not be deleted: %s",
                             author_id,
-                            user_name,
+                            format_username_for_log(user_name),
                             message_id,
                             CHANNEL_DICT[channel_id],
                             channel_id,
@@ -5537,15 +5505,15 @@ if __name__ == "__main__":
                     active_user_checks_dict.pop(forwarded_message_data[3], None)
                 )
                 LOGGER.info(
-                    "\033[91m%s:@%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin:\n\t\t\t%s\033[0m",
+                    "\033[91m%s:%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin:\n\t\t\t%s\033[0m",
                     forwarded_message_data[3],
-                    user_name,
+                    format_username_for_log(user_name),
                     active_user_checks_dict,
                 )
             LOGGER.info(
-                "\033[95m%s:@%s Report <code>%s</code> action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
+                "\033[95m%s:%s Report <code>%s</code> action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
                 author_id,
-                user_name,
+                format_username_for_log(user_name),
                 report_id_to_ban,
                 button_pressed_by,
                 (
@@ -5714,9 +5682,9 @@ if __name__ == "__main__":
             if user_id in active_user_checks_dict:
                 banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
                 LOGGER.info(
-                    "%s:@%s removed from active_user_checks_dict during manual ban",
+                    "%s:%s removed from active_user_checks_dict during manual ban",
                     user_id,
-                    username,
+                    format_username_for_log(username),
                 )
 
             # Ban user from all chats
@@ -5784,9 +5752,9 @@ if __name__ == "__main__":
                 )
 
             LOGGER.info(
-                "\033[91m%s:@%s manually banned from all chats by @%s\033[0m",
+                "\033[91m%s:%s manually banned from all chats by @%s\033[0m",
                 user_id,
-                username,
+                format_username_for_log(username),
                 button_pressed_by,
             )
 
@@ -6010,11 +5978,11 @@ if __name__ == "__main__":
         user_name = message.from_user.username
         
         LOGGER.info(
-            "Bot command detected in group: /%s@%s from %s:@%s in %s (%s)",
+            "Bot command detected in group: /%s@%s from %s:%s in %s (%s)",
             command_name,
             BOT_USERNAME,
             user_id,
-            user_name or "!UNDEFINED!",
+            format_username_for_log(user_name),
             message.chat.title,
             message.chat.id,
         )
@@ -6322,13 +6290,9 @@ if __name__ == "__main__":
             message.from_user.id, ADMIN_GROUP_ID
         ):
             LOGGER.debug(
-                "\033[95m%s:@%s is admin, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
+                "\033[95m%s:%s is admin, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
                 message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
+                format_username_for_log(message.from_user.username),
                 message.message_id,
                 message.chat.title,
                 message_link,
@@ -6341,13 +6305,9 @@ if __name__ == "__main__":
             *ALLOWED_FORWARD_CHANNEL_IDS,
         }:
             LOGGER.debug(
-                "\033[95m%s:@%s FORWARDED from allowed channel, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
+                "\033[95m%s:%s FORWARDED from allowed channel, skipping the message %s in the chat %s.\033[0m\n\t\t\tMessage link: %s",
                 message.from_user.id,
-                (
-                    message.from_user.username
-                    if message.from_user.username
-                    else "!UNDEFINED!"
-                ),
+                format_username_for_log(message.from_user.username),
                 message.message_id,
                 message.chat.title,
                 message_link,
@@ -6381,9 +6341,9 @@ if __name__ == "__main__":
                         new_pcnt = getattr(_p, "total_count", 0) if _p else old_pcnt
                     except TelegramBadRequest as _e:
                         LOGGER.debug(
-                            "%s:@%s unable to fetch photo count on message: %s",
+                            "%s:%s unable to fetch photo count on message: %s",
                             _uid,
-                            new_usern or "!UNDEFINED!",
+                            format_username_for_log(new_usern),
                             _e,
                         )
 
@@ -6420,11 +6380,11 @@ if __name__ == "__main__":
                                 )
                             except (TelegramBadRequest, TelegramForbiddenError) as _e:
                                 LOGGER.debug(
-                                    "%s:@%s forward to admin/suspicious failed: %s",
+                                    "%s:%s forward to admin/suspicious failed: %s",
                                     _uid,
-                                new_usern or "!UNDEFINED!",
-                                _e,
-                            )
+                                    format_username_for_log(new_usern),
+                                    _e,
+                                )
 
                         kb = make_lols_kb(_uid)
                         # Use 0 for message_id - this is a profile change event, not a message
@@ -6853,9 +6813,9 @@ if __name__ == "__main__":
                 try:
                     await BOT.delete_message(message.chat.id, message.message_id)
                     LOGGER.debug(
-                        "\033[91m%s:@%s message %s deleted (late LOLS detection) in chat %s (%s) @%s #LSS\033[0m",
+                        "\033[91m%s:%s message %s deleted (late LOLS detection) in chat %s (%s) @%s #LSS\033[0m",
                         message.from_user.id,
-                        message.from_user.username or "!UNDEFINED!",
+                        format_username_for_log(message.from_user.username),
                         message.message_id,
                         message.chat.title,
                         message.chat.id,
@@ -6864,9 +6824,9 @@ if __name__ == "__main__":
                 except TelegramBadRequest as e:
                     # Message already deleted by earlier spam handler - this is expected race condition
                     LOGGER.debug(
-                        "\033[93m%s:@%s message %s already deleted (race condition OK) in chat %s (%s) @%s #LSS\033[0m",
+                        "\033[93m%s:%s message %s already deleted (race condition OK) in chat %s (%s) @%s #LSS\033[0m",
                         message.from_user.id,
-                        message.from_user.username or "!UNDEFINED!",
+                        format_username_for_log(message.from_user.username),
                         message.message_id,
                         message.chat.title,
                         message.chat.id,
@@ -6993,10 +6953,10 @@ if __name__ == "__main__":
                         if (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit:
                             _skip_missed_join_banner = True
                             LOGGER.info(
-                                "\033[92mSkipping missed join banner for established user %s:@%s "
+                                "\033[92mSkipping missed join banner for established user %s:%s "
                                 "(messages: %d/%d, legit: %s, first_msg: %s, threshold: %d days)\033[0m",
                                 message.from_user.id,
-                                message.from_user.username or "!NO_USERNAME!",
+                                format_username_for_log(message.from_user.username),
                                 _user_msg_count,
                                 ESTABLISHED_USER_MIN_MESSAGES,
                                 _is_user_legit,
@@ -7053,9 +7013,9 @@ if __name__ == "__main__":
                         # If user is being monitored and mentions a bot, send to autoreport instead
                         if message.from_user.id in active_user_checks_dict and _has_bot_mention:
                             LOGGER.info(
-                                "User %s:@%s is in active checks and mentioned a bot - sending to AUTOREPORT instead of SUSPICIOUS",
+                                "User %s:%s is in active checks and mentioned a bot - sending to AUTOREPORT instead of SUSPICIOUS",
                                 message.from_user.id,
-                                message.from_user.username or "!UNDEFINED!",
+                                format_username_for_log(message.from_user.username),
                             )
                             await submit_autoreport(message, "Bot mention by monitored user (missed join)")
                             missed_join_notification_sent = True
@@ -7149,9 +7109,9 @@ if __name__ == "__main__":
                             # Also mark as autoreported to prevent this same message going to AUTOREPORT
                             autoreported_messages.add((message.chat.id, message.message_id))
                             LOGGER.info(
-                                "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
+                                "Sent missed join notification for %s:%s to ADMIN_SUSPICIOUS",
                                 message.from_user.id,
-                                message.from_user.username or "!NO_USERNAME!",
+                                format_username_for_log(message.from_user.username),
                             )
                         
                         # After sending notification (either autoreport or suspicious), mark first message as join event
@@ -7384,9 +7344,9 @@ if __name__ == "__main__":
             # Only process the first message in a media group for ALL spam checks
             if was_media_group_processed(message):
                 LOGGER.debug(
-                    "%s:@%s skipping duplicate media group message (group_id: %s) - early check",
+                    "%s:%s skipping duplicate media group message (group_id: %s) - early check",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    format_username_for_log(message.from_user.username),
                     message.media_group_id,
                 )
                 return
@@ -7403,13 +7363,9 @@ if __name__ == "__main__":
                     ]
                 )
                 LOGGER.info(
-                    "%s:@%s latency message link: %s",
+                    "%s:%s latency message link: %s",
                     message.from_user.id,
-                    (
-                        message.from_user.username
-                        if message.from_user.username
-                        else "!UNDEFINED!"
-                    ),
+                    format_username_for_log(message.from_user.username),
                     latency_message_link,
                 )
                 if await check_n_ban(message, the_reason):
@@ -7432,13 +7388,9 @@ if __name__ == "__main__":
                     return
                 else:
                     LOGGER.info(
-                        "\033[93m%s:@%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
+                        "\033[93m%s:%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
                         message.from_user.id,
-                        (
-                            message.from_user.username
-                            if message.from_user.username
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(message.from_user.username),
                         message.chat.title,
                     )
                     if not autoreport_sent:
@@ -7568,13 +7520,9 @@ if __name__ == "__main__":
                     message_to_delete = message.chat.id, message.message_id
                     # Note: -100 prefix is required for supergroup API calls
                     LOGGER.info(
-                        "%s:@%s Nightwatch Message to delete: %s",
+                        "%s:%s Nightwatch Message to delete: %s",
                         message.from_user.id,
-                        (
-                            message.from_user.username
-                            if message.from_user.username
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(message.from_user.username),
                         message_to_delete,
                     )
                     asyncio.create_task(
@@ -7630,9 +7578,9 @@ if __name__ == "__main__":
                 if _bot_mentions:
                     bot_mentions_str = ", ".join(_bot_mentions)
                     LOGGER.info(
-                        "User %s:@%s (in active checks) mentioned bots (%s) - sending to AUTOREPORT and deleting",
+                        "User %s:%s (in active checks) mentioned bots (%s) - sending to AUTOREPORT and deleting",
                         message.from_user.id,
-                        message.from_user.username or "!UNDEFINED!",
+                        format_username_for_log(message.from_user.username),
                         bot_mentions_str,
                     )
                     await submit_autoreport(message, f"Bot mention by monitored user: {bot_mentions_str}")
@@ -7736,13 +7684,9 @@ if __name__ == "__main__":
                 if not user_flagged_legit:
                     if message_sent_during_night(message):
                         LOGGER.warning(
-                            "\033[47m\033[34m%s:@%s sent a message during the night, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
+                            "\033[47m\033[34m%s:%s sent a message during the night, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
                             message.from_user.id,
-                            (
-                                message.from_user.username
-                                if message.from_user.username
-                                else "!UNDEFINED!"
-                            ),
+                            format_username_for_log(message.from_user.username),
                             message.message_id,
                             message.chat.title,
                             message.chat.id,
@@ -7750,26 +7694,18 @@ if __name__ == "__main__":
                         )
                     else:
                         LOGGER.warning(
-                            "\033[47m\033[34m%s:@%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
+                            "\033[47m\033[34m%s:%s is in active_user_checks_dict, check the message %s in the chat %s (%s).\033[0m\n\t\t\tSuspicious message link: %s",
                             message.from_user.id,
-                            (
-                                message.from_user.username
-                                if message.from_user.username
-                                else "!UNDEFINED!"
-                            ),
+                            format_username_for_log(message.from_user.username),
                             message.message_id,
                             message.chat.title,
                             message.chat.id,
                             message_link,
                         )
                         LOGGER.info(
-                            "\033[47m\033[34m%s:@%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
+                            "\033[47m\033[34m%s:%s sent message and joined the chat %s %s ago\033[0m\n\t\t\tMessage link: %s",
                             message.from_user.id,
-                            (
-                                message.from_user.username
-                                if message.from_user.username
-                                else "!UNDEFINED!"
-                            ),
+                            format_username_for_log(message.from_user.username),
                             message.chat.title,
                             human_readable_time,
                             message_link,
@@ -7791,9 +7727,9 @@ if __name__ == "__main__":
                         # Skip if message was already sent to autoreport thread
                         if was_autoreported(message):
                             LOGGER.debug(
-                                "%s:@%s skipping suspicious notification - already autoreported",
+                                "%s:%s skipping suspicious notification - already autoreported",
                                 message.from_user.id,
-                                message.from_user.username or "!UNDEFINED!",
+                                format_username_for_log(message.from_user.username),
                             )
                             return
                         await message.forward(
@@ -8055,9 +7991,9 @@ if __name__ == "__main__":
                 bot_mentions_str = ", ".join(suspicious_items["bot_mentions"])
                 # User is NOT in active monitoring - will be handled by suspicious content flow below
                 LOGGER.info(
-                    "User %s:@%s (not in active checks) mentioned bots (%s) - will send to SUSPICIOUS (no deletion)",
+                    "User %s:%s (not in active checks) mentioned bots (%s) - will send to SUSPICIOUS (no deletion)",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    format_username_for_log(message.from_user.username),
                     bot_mentions_str,
                 )
                 # bot_mentions are already in suspicious_items, will be shown in the report
@@ -8704,25 +8640,17 @@ if __name__ == "__main__":
                         ]
                     )
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s... %d totally\033[0m",
+                        "\033[91m%s:%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s... %d totally\033[0m",
                         author_id,
-                        (
-                            forwarded_message_data[4]
-                            if forwarded_message_data[4] not in [0, "0", None]
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
                         active_user_checks_dict_last3_str,  # Last 3 elements
                         len(active_user_checks_dict),  # Number of elements left
                     )
                 else:
                     LOGGER.info(
-                        "\033[91m%s:@%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s\033[0m",
+                        "\033[91m%s:%s removed from active_user_checks_dict during ban by admin:\n\t\t\t%s\033[0m",
                         author_id,
-                        (
-                            forwarded_message_data[4]
-                            if forwarded_message_data[4] not in [0, "0", None]
-                            else "!UNDEFINED!"
-                        ),
+                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
                         active_user_checks_dict,
                     )
                 # stop the perform_checks coroutine if it is running for author_id
@@ -10719,11 +10647,11 @@ if __name__ == "__main__":
                 )
                 CONN.commit()
                 LOGGER.info(
-                    "\033[92m%s:@%s marked as legitimate in database by admin %s:@%s\033[0m",
+                    "\033[92m%s:%s marked as legitimate in database by admin %s:%s\033[0m",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                     admin_id,
-                    admin_username,
+                    format_username_for_log(admin_username),
                 )
             except sqlite3.Error as db_err:
                 LOGGER.error(
@@ -10734,11 +10662,11 @@ if __name__ == "__main__":
             try:
                 p2p_removed = await remove_spam_from_2p2p(user_id, LOGGER, user_name)
                 if p2p_removed:
-                    LOGGER.info("\033[92m%s:@%s removed from P2P spam list\033[0m", user_id, user_name)
+                    LOGGER.info("\033[92m%s:%s removed from P2P spam list\033[0m", user_id, format_username_for_log(user_name))
                 else:
-                    LOGGER.warning("\033[93m%s:@%s could not be removed from P2P spam list\033[0m", user_id, user_name)
+                    LOGGER.warning("\033[93m%s:%s could not be removed from P2P spam list\033[0m", user_id, format_username_for_log(user_name))
             except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
-                LOGGER.error("Failed to remove user %s:@%s from P2P: %s", user_id, user_name, p2p_e)
+                LOGGER.error("Failed to remove user %s:%s from P2P: %s", user_id, format_username_for_log(user_name), p2p_e)
 
             for channel_name in CHANNEL_NAMES:
                 channel_id = get_channel_id_by_name(CHANNEL_DICT, channel_name)
@@ -10911,28 +10839,28 @@ if __name__ == "__main__":
                     ]
                 )
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s... %d left\033[0m",
+                    "\033[92m%s:%s removed from active checks dict by admin %s:%s:\n\t\t\t%s... %d left\033[0m",
                     user_id_legit,
-                    user_name,
+                    format_username_for_log(user_name),
                     admin_id,
-                    button_pressed_by,
+                    format_username_for_log(button_pressed_by),
                     active_user_checks_dict_last3_str,
                     len(active_user_checks_dict),
                 )
             else:
                 LOGGER.info(
-                    "\033[92m%s:@%s removed from active checks dict by admin %s:@%s:\n\t\t\t%s\033[0m",
+                    "\033[92m%s:%s removed from active checks dict by admin %s:%s:\n\t\t\t%s\033[0m",
                     user_id_legit,
-                    user_name,
+                    format_username_for_log(user_name),
                     admin_id,
-                    button_pressed_by,
+                    format_username_for_log(button_pressed_by),
                     active_user_checks_dict,
                 )
         else:
             LOGGER.info(
-                "%s:@%s was marked legit by %s(%s), but was not found in active_user_checks_dict. Checks might have already completed or been stopped.",
+                "%s:%s was marked legit by %s(%s), but was not found in active_user_checks_dict. Checks might have already completed or been stopped.",
                 user_id_legit,
-                user_name,
+                format_username_for_log(user_name),
                 button_pressed_by,
                 admin_id,
             )
@@ -11541,9 +11469,9 @@ if __name__ == "__main__":
                                             )
                         if extra_attempts:
                             LOGGER.info(
-                                "%s:@%s globalban active-check extra cleanup attempted %d, deleted %d",
+                                "%s:%s globalban active-check extra cleanup attempted %d, deleted %d",
                                 susp_user_id,
-                                susp_user_name,
+                                format_username_for_log(susp_user_name),
                                 extra_attempts,
                                 extra_deleted,
                             )
@@ -11555,17 +11483,17 @@ if __name__ == "__main__":
                         )
                     if rows:
                         LOGGER.info(
-                            "%s:@%s globalban cleanup attempted %d messages, deleted %d",
+                            "%s:%s globalban cleanup attempted %d messages, deleted %d",
                             susp_user_id,
-                            susp_user_name,
+                            format_username_for_log(susp_user_name),
                             len(rows),
                             deleted_cnt,
                         )
                 except (TelegramBadRequest, sqlite3.Error) as _e_bulk:
                     LOGGER.error(
-                        "Error bulk-deleting messages for global ban user %s:@%s: %s",
+                        "Error bulk-deleting messages for global ban user %s:%s: %s",
                         susp_user_id,
-                        susp_user_name,
+                        format_username_for_log(susp_user_name),
                         _e_bulk,
                     )
                 # Ban user from all monitored chats
@@ -11588,9 +11516,9 @@ if __name__ == "__main__":
                     photo_changed=False,
                 )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS banned globally by admin @%s(%s) - %d/%d chats",
+                    "%s:%s SUSPICIOUS banned globally by admin @%s(%s) - %d/%d chats",
                     susp_user_id,
-                    susp_user_name,
+                    format_username_for_log(susp_user_name),
                     admin_username,
                     admin_id,
                     success_count,
@@ -11712,9 +11640,9 @@ if __name__ == "__main__":
                                         )
                     if extra_attempts:
                         LOGGER.info(
-                            "%s:@%s local ban active-check extra cleanup chat %s attempted %d, deleted %d",
+                            "%s:%s local ban active-check extra cleanup chat %s attempted %d, deleted %d",
                             susp_user_id,
-                            susp_user_name,
+                            format_username_for_log(susp_user_name),
                             susp_chat_id,
                             extra_attempts,
                             extra_deleted,
@@ -11728,18 +11656,18 @@ if __name__ == "__main__":
                     )
                 if rows:
                     LOGGER.info(
-                        "%s:@%s local ban cleanup in chat %s attempted %d messages, deleted %d",
+                        "%s:%s local ban cleanup in chat %s attempted %d messages, deleted %d",
                         susp_user_id,
-                        susp_user_name,
+                        format_username_for_log(susp_user_name),
                         susp_chat_id,
                         len(rows),
                         chat_deleted,
                     )
             except (TelegramBadRequest, sqlite3.Error) as _e_bulk:
                 LOGGER.error(
-                    "Error deleting messages for local ban user %s:@%s in chat %s: %s",
+                    "Error deleting messages for local ban user %s:%s in chat %s: %s",
                     susp_user_id,
-                    susp_user_name,
+                    format_username_for_log(susp_user_name),
                     susp_chat_id,
                     _e_bulk,
                 )
@@ -11763,9 +11691,9 @@ if __name__ == "__main__":
                     photo_changed=False,
                 )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS banned in chat %s (%s) by admin @%s(%s)",
+                    "%s:%s SUSPICIOUS banned in chat %s (%s) by admin @%s(%s)",
                     susp_user_id,
-                    susp_user_name,
+                    format_username_for_log(susp_user_name),
                     susp_chat_title,
                     susp_chat_id,
                     admin_username,
@@ -11799,9 +11727,9 @@ if __name__ == "__main__":
                         susp_chat_id,
                     )
                 LOGGER.info(
-                    "%s:@%s SUSPICIOUS message %d were deleted from chat (%s)",
+                    "%s:%s SUSPICIOUS message %d were deleted from chat (%s)",
                     susp_user_id,
-                    susp_user_name,
+                    format_username_for_log(susp_user_name),
                     susp_message_id,
                     susp_chat_id,
                 )
@@ -11928,9 +11856,9 @@ if __name__ == "__main__":
         # LOGGER.info("Users changed", message.new_chat_members, message.left_chat_member)
 
         LOGGER.info(
-            "%s:@%s changed in user_changed_message function:\n\t\t\t%s --> %s, deleting system message...",
+            "%s:%s changed in user_changed_message function:\n\t\t\t%s --> %s, deleting system message...",
             message.from_user.id,
-            message.from_user.username if message.from_user.username else "!UNDEFINED!",
+            format_username_for_log(message.from_user.username),
             getattr(message, "left_chat_member", ""),
             getattr(message, "new_chat_members", ""),
         )

@@ -6112,7 +6112,15 @@ if __name__ == "__main__":
             user_id = int(user_id_str)
             
             # Build user mention - use @username if available, otherwise use tg://user?id link
-            user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
+            try:
+                user_info = await BOT.get_chat(user_id)
+                username = user_info.username
+                if username:
+                    user_mention = f"@{username}"
+                else:
+                    user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
+            except (TelegramBadRequest, TelegramNotFound):
+                user_mention = f"<a href='tg://user?id={user_id}'>friend</a>"
             
             # Send the easter egg reply to the original message
             easter_egg_response = (

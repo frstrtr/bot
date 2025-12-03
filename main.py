@@ -6854,9 +6854,9 @@ if __name__ == "__main__":
             
             # Debug: log what we found for join date
             LOGGER.debug(
-                "%s:@%s join_date query result: %s",
+                "%s:%s join_date query result: %s",
                 message.from_user.id,
-                message.from_user.username or "!UNDEFINED!",
+                format_username_for_log(message.from_user.username),
                 user_join_chat_date_str,
             )
             
@@ -7212,9 +7212,9 @@ if __name__ == "__main__":
             time_since_join = (message.date - user_join_chat_date).total_seconds()
             if user_is_10sec_old:
                 LOGGER.debug(
-                    "%s:@%s 10sec check: msg_date=%s, join_date=%s, diff=%.2fs (<10s=True)",
+                    "%s:%s 10sec check: msg_date=%s, join_date=%s, diff=%.2fs (<10s=True)",
                     message.from_user.id,
-                    message.from_user.username or "!UNDEFINED!",
+                    format_username_for_log(message.from_user.username),
                     message.date.strftime("%Y-%m-%d %H:%M:%S"),
                     user_join_chat_date.strftime("%Y-%m-%d %H:%M:%S"),
                     time_since_join,

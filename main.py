@@ -6118,7 +6118,7 @@ if __name__ == "__main__":
             easter_egg_response = (
                 "Everything that follows is a result of what you see here.\n"
                 "I'm sorry. My responses are limited. You must ask the right questions.\n\n"
-                f"Dear {user_mention}!"
+                f"Dear {user_mention}!\n"
                 "Please, send me a direct message."
             )
             
@@ -7160,7 +7160,7 @@ if __name__ == "__main__":
                             # Also mark as autoreported to prevent this same message going to AUTOREPORT
                             autoreported_messages.add((message.chat.id, message.message_id))
                             LOGGER.info(
-                                "Sent missed join notification for %s:%s to ADMIN_SUSPICIOUS",
+                                "%s:%s Sent missed join notification to ADMIN_SUSPICIOUS",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                             )

@@ -7447,7 +7447,8 @@ if __name__ == "__main__":
                         return  # stop further actions for this message since user was banned before
             # check if the message is sent less then 10 seconds after joining the chat
             # Use user-level tracking for this specific trigger to prevent spam (user sends many messages quickly)
-            elif user_is_10sec_old and not was_user_autoreported(message.from_user.id):
+            # Also skip if user was already reported to SUSPICIOUS (missed join) to avoid cross-thread duplicates
+            elif user_is_10sec_old and not was_user_autoreported(message.from_user.id) and not was_user_suspicious_reported(message.from_user.id):
                 # this is possibly a bot
                 the_reason = f"{message.from_user.id} message is sent less then 10 seconds after joining the chat"
                 if await check_n_ban(message, the_reason):

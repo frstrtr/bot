@@ -2773,7 +2773,7 @@ async def perform_checks(
 
     # Define a dictionary to map lols_spam values to ANSI color codes
     color_map = {
-        False: "\033[92m",  # Green for False
+        False: "\033[93m",  # Yellow for False (still checking)
         True: "\033[91m",  # Red for True
         None: "\033[93m",  # Yellow for None or other values
     }
@@ -3259,7 +3259,7 @@ async def perform_intensive_checks(
         message_link: Link to the suspicious message
     """
     color_map = {
-        False: "\033[92m",  # Green for False (not spam)
+        False: "\033[93m",  # Yellow for False (still checking)
         True: "\033[91m",   # Red for True (spam)
         None: "\033[93m",   # Yellow for None/unknown
     }

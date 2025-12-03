@@ -7319,47 +7319,50 @@ if __name__ == "__main__":
             # Handle both naive and timezone-aware datetime strings
             try:
                 # Try parsing with timezone first (e.g., "2025-12-01 17:29:12+00:00")
-                from datetime import timezone
                 user_join_chat_date = datetime.fromisoformat(user_join_chat_date_str)
-                # Ensure timezone-aware for comparison with message.date (which is UTC)
-                if user_join_chat_date.tzinfo is None:
-                    user_join_chat_date = user_join_chat_date.replace(tzinfo=timezone.utc)
+                # If it has timezone info, convert to local time for comparison
+                if user_join_chat_date.tzinfo is not None:
+                    # Convert to local time (naive) for comparison with local-stored dates
+                    user_join_chat_date = user_join_chat_date.astimezone().replace(tzinfo=None)
             except ValueError:
-                # Fallback to naive datetime format - make it UTC
-                from datetime import timezone
+                # Fallback to naive datetime format (already local time)
                 user_join_chat_date = datetime.strptime(
                     user_join_chat_date_str, "%Y-%m-%d %H:%M:%S"
-                ).replace(tzinfo=timezone.utc)
+                )
+
+            # Convert message.date (UTC) to local time for comparison with local-stored join date
+            # message.date is always timezone-aware (UTC), database stores local time
+            msg_date_local = message.date.astimezone().replace(tzinfo=None)
 
             # flag true if user joined the chat more than 1 week ago
             # BUT: if user_first_seen_unknown, treat as NOT old (do checks)
             user_is_old = (
                 not user_first_seen_unknown
-                and (message.date - user_join_chat_date).total_seconds() > 604805
+                and (msg_date_local - user_join_chat_date).total_seconds() > 604805
             )
             # user_is_between_3hours_and_1week_old = (
             #     10805  # 3 hours in seconds
-            #     <= (message.date - user_join_chat_date).total_seconds()
+            #     <= (msg_date_local - user_join_chat_date).total_seconds()
             #     < 604805  # 3 hours in seconds and 1 week in seconds
             # )
             # user_is_1day_old = (
-            #     message.date - user_join_chat_date
+            #     msg_date_local - user_join_chat_date
             # ).total_seconds() < 86400  # 1 days and 5 seconds
             user_is_1hr_old = (
-                message.date - user_join_chat_date
+                msg_date_local - user_join_chat_date
             ).total_seconds() < 3600
             user_is_10sec_old = (
-                message.date - user_join_chat_date
+                msg_date_local - user_join_chat_date
             ).total_seconds() < 10
 
             # Debug logging for 10-second check to diagnose duplicate reports issue
-            time_since_join = (message.date - user_join_chat_date).total_seconds()
+            time_since_join = (msg_date_local - user_join_chat_date).total_seconds()
             if user_is_10sec_old:
                 LOGGER.debug(
                     "%s:%s 10sec check: msg_date=%s, join_date=%s, diff=%.2fs (<10s=True)",
                     message.from_user.id,
                     format_username_for_log(message.from_user.username),
-                    message.date.strftime("%Y-%m-%d %H:%M:%S"),
+                    msg_date_local.strftime("%Y-%m-%d %H:%M:%S"),
                     user_join_chat_date.strftime("%Y-%m-%d %H:%M:%S"),
                     time_since_join,
                 )

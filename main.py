@@ -3108,11 +3108,14 @@ async def perform_checks(
         )
         if user_id in active_user_checks_dict:
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+            _last_3_users = list(active_user_checks_dict.items())[-3:]
+            _last_3_users_str = ", ".join([f"{uid}: {udata.get('username', '?') if isinstance(udata, dict) else udata}" for uid, udata in _last_3_users])
             LOGGER.info(
-                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s",
+                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s... %d totally",
                 user_id,
                 format_username_for_log(user_name),
-                active_user_checks_dict,
+                _last_3_users_str,
+                len(active_user_checks_dict),
             )
 
     except aiohttp.ServerDisconnectedError as e:

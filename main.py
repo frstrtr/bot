@@ -3069,9 +3069,9 @@ async def perform_checks(
                         ]
             else:
                 LOGGER.warning(
-                    "%s:@%s User ID not found in active_user_checks_dict. Skipping...",
+                    "%s:%s User ID not found in active_user_checks_dict. Skipping...",
                     user_id,
-                    user_name,
+                    format_username_for_log(user_name),
                 )
                 await cancel_named_watchdog(user_id, user_name)
                 # stop cycle
@@ -3195,28 +3195,28 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
         try:
             await task
             LOGGER.info(
-                "%s:@%s Watchdog disabled.(Cancelled)",
+                "%s:%s Watchdog disabled.(Cancelled)",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
             )
         except asyncio.CancelledError:
             LOGGER.info(
-                "%s:@%s Watchdog cancellation confirmed.",
+                "%s:%s Watchdog cancellation confirmed.",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
             )
         except RuntimeError as e:
             LOGGER.error(
-                "%s:@%s Error during watchdog cancellation: %s",
+                "%s:%s Error during watchdog cancellation: %s",
                 user_id,
-                user_name,
+                format_username_for_log(user_name),
                 e,
             )
     else:
         LOGGER.info(
-            "%s:@%s No running watchdog found to cancel.",
+            "%s:%s No running watchdog found to cancel.",
             user_id,
-            user_name,
+            format_username_for_log(user_name),
         )
 
 

@@ -170,7 +170,15 @@ async def log_profile_change(
         photo_marker = " P" if photo_changed else ""
         record = f"{ts}: {user_id} PC[{context}{photo_marker}] {uname_fmt} in {chat_repr} changes: {', '.join(diff_parts)}\n"
         await save_report_file("inout_", "pc" + record)
-        LOGGER.info(record.rstrip())
+        LOGGER.info(
+            "%s:%s PC[%s%s] in %s changes: %s",
+            user_id,
+            uname_fmt,
+            context,
+            photo_marker,
+            chat_repr,
+            ', '.join(diff_parts),
+        )
     except OSError as _e:  # silent failure should not break main flow
         LOGGER.debug("Failed to log profile change: %s", _e)
 
@@ -6826,8 +6834,9 @@ if __name__ == "__main__":
                     )
                     
                     LOGGER.debug(
-                        "No join record for %s, using first message date: %s",
+                        "%s:%s No join record, using first message date: %s",
                         message.from_user.id,
+                        format_username_for_log(message.from_user.username),
                         user_first_message_date[0],
                     )
                     
@@ -6893,13 +6902,15 @@ if __name__ == "__main__":
                                 )
                                 CONN.commit()
                                 LOGGER.debug(
-                                    "Marked first message as join event for established user %s",
+                                    "%s:%s Marked first message as join event for established user",
                                     message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
                                 )
                             except sqlite3.Error as db_err:
                                 LOGGER.warning(
-                                    "Failed to mark first message as join event for established user %s: %s",
+                                    "%s:%s Failed to mark first message as join event for established user: %s",
                                     message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
                                     db_err,
                                 )
                             # Skip the notification
@@ -7042,14 +7053,16 @@ if __name__ == "__main__":
                                 )
                                 CONN.commit()
                                 LOGGER.info(
-                                    "Marked first message as join event for %s (date: %s) to prevent duplicate notifications",
+                                    "%s:%s Marked first message as join event (date: %s) to prevent duplicate notifications",
                                     message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
                                     user_first_message_date[0],
                                 )
                             except sqlite3.Error as db_err:
                                 LOGGER.warning(
-                                    "Failed to mark first message as join event for %s: %s",
+                                    "%s:%s Failed to mark first message as join event: %s",
                                     message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
                                     db_err,
                                 )
                 else:
@@ -10973,7 +10986,9 @@ if __name__ == "__main__":
                     )
             except TelegramBadRequest as e_del_orig:
                 LOGGER.debug(
-                    "Could not delete original suspicious message %s in chat %s: %s",
+                    "%s:%s Could not delete original suspicious message %s in chat %s: %s",
+                    susp_user_id,
+                    format_username_for_log(susp_user_name),
                     susp_message_id,
                     susp_chat_id,
                     e_del_orig,
@@ -10999,7 +11014,9 @@ if __name__ == "__main__":
                                 deleted_cnt += 1
                         except TelegramBadRequest as _e_del:
                             LOGGER.debug(
-                                "Unable to delete message %s in chat %s for global ban cleanup: %s",
+                                "%s:%s Unable to delete message %s in chat %s for global ban cleanup: %s",
+                                susp_user_id,
+                                format_username_for_log(susp_user_name),
                                 _m,
                                 _c,
                                 _e_del,
@@ -11158,7 +11175,9 @@ if __name__ == "__main__":
                     )
             except TelegramBadRequest as e_del_orig:
                 LOGGER.debug(
-                    "Could not delete original suspicious message %s in chat %s: %s",
+                    "%s:%s Could not delete original suspicious message %s in chat %s: %s",
+                    susp_user_id,
+                    format_username_for_log(susp_user_name),
                     susp_message_id,
                     susp_chat_id,
                     e_del_orig,

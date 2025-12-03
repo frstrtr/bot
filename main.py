@@ -3785,7 +3785,10 @@ if __name__ == "__main__":
         inout_userlastname = update.old_chat_member.user.last_name or ""  # optional
         inout_username = (
             update.old_chat_member.user.username or "!UNDEFINED!"
-        )  # optional
+        )  # raw username for data storage
+        inout_username_log = format_username_for_log(
+            update.old_chat_member.user.username
+        )  # formatted for logs: '@username' or '!UNDEFINED!'
 
         lols_spam = await spam_check(update.old_chat_member.user.id)
 
@@ -3971,9 +3974,9 @@ if __name__ == "__main__":
                 reply_markup=_high_id_kb.as_markup(),
             )
             LOGGER.warning(
-                "\033[93m%s:@%s has very high user ID (>8.2B) - flagged as suspicious on join\033[0m",
+                "\033[93m%s:%s has very high user ID (>8.2B) - flagged as suspicious on join\033[0m",
                 inout_userid,
-                inout_username,
+                inout_username_log,
             )
 
         # Check lols after user join/leave event and ban if spam
@@ -4017,9 +4020,9 @@ if __name__ == "__main__":
                         admin_id = update.from_user.id
                         
                         LOGGER.info(
-                            "\033[95m%s:@%s manually re-added by admin %s:%s - cancelling checks and marking as legit\033[0m",
+                            "\033[95m%s:%s manually re-added by admin %s:%s - cancelling checks and marking as legit\033[0m",
                             inout_userid,
-                            inout_username,
+                            inout_username_log,
                             admin_id,
                             f"@{admin_username}" if admin_username else "!UNDEFINED!",
                         )
@@ -4055,9 +4058,9 @@ if __name__ == "__main__":
                             )
                             CONN.commit()
                             LOGGER.info(
-                                "\033[92m%s:@%s marked as legitimate in database by admin %s:@%s re-add action\033[0m",
+                                "\033[92m%s:%s marked as legitimate in database by admin %s:@%s re-add action\033[0m",
                                 inout_userid,
-                                inout_username,
+                                inout_username_log,
                                 admin_id,
                                 admin_username,
                             )
@@ -4071,15 +4074,15 @@ if __name__ == "__main__":
                             p2p_removed = await remove_spam_from_2p2p(inout_userid, LOGGER, inout_username)
                             if p2p_removed:
                                 LOGGER.info(
-                                    "\033[92m%s:@%s removed from P2P spam list by admin re-add\033[0m",
+                                    "\033[92m%s:%s removed from P2P spam list by admin re-add\033[0m",
                                     inout_userid,
-                                    inout_username,
+                                    inout_username_log,
                                 )
                             else:
                                 LOGGER.warning(
-                                    "\033[93m%s:@%s could not be removed from P2P spam list\033[0m",
+                                    "\033[93m%s:%s could not be removed from P2P spam list\033[0m",
                                     inout_userid,
-                                    inout_username,
+                                    inout_username_log,
                                 )
                         except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
                             LOGGER.error(
@@ -4105,9 +4108,9 @@ if __name__ == "__main__":
 
             # Log the message with the timestamp
             LOGGER.debug(
-                "\033[96m%s:@%s Scheduling perform_checks coroutine\033[0m",
+                "\033[96m%s:%s Scheduling perform_checks coroutine\033[0m",
                 inout_userid,
-                inout_username,
+                inout_username_log,
             )
             # Check if the user ID is already being processed
             if inout_userid not in active_user_checks_dict:
@@ -4123,9 +4126,9 @@ if __name__ == "__main__":
                     except TelegramBadRequest as _e:
                         _photo_count = 0
                         LOGGER.debug(
-                            "%s:@%s unable to fetch initial photo count: %s",
+                            "%s:%s unable to fetch initial photo count: %s",
                             inout_userid,
-                            inout_username,
+                            inout_username_log,
                             _e,
                         )
 
@@ -4174,9 +4177,9 @@ if __name__ == "__main__":
                 )
             else:
                 LOGGER.debug(
-                    "\033[93m%s:@%s skipping perform_checks as it is already being processed\033[0m",
+                    "\033[93m%s:%s skipping perform_checks as it is already being processed\033[0m",
                     inout_userid,
-                    inout_username,
+                    inout_username_log,
                 )
 
         # record the event in the database if not lols_spam
@@ -4238,9 +4241,9 @@ if __name__ == "__main__":
                     except TelegramBadRequest as _e:
                         cur_photo_count = _baseline.get("photo_count", 0)
                         LOGGER.debug(
-                            "%s:@%s unable to fetch photo count on leave: %s",
+                            "%s:%s unable to fetch photo count on leave: %s",
                             inout_userid,
-                            inout_username,
+                            inout_username_log,
                             _e,
                         )
 
@@ -4371,9 +4374,9 @@ if __name__ == "__main__":
                     and last2_join_left_event[1][1] == 1
                 ):
                     LOGGER.debug(
-                        "%s:@%s joined and left %s in 30 seconds or less",
+                        "%s:%s joined and left %s in 30 seconds or less",
                         inout_userid,
-                        inout_username,
+                        inout_username_log,
                         inout_chattitle,
                     )
                     # ban user from all chats
@@ -4412,9 +4415,9 @@ if __name__ == "__main__":
                         )
             except IndexError:
                 LOGGER.debug(
-                    "%s:@%s left and has no previous join/leave events or was already in lols/cas spam",
+                    "%s:%s left and has no previous join/leave events or was already in lols/cas spam",
                     inout_userid,
-                    inout_username,
+                    inout_username_log,
                 )
 
             # Always cleanup the baseline/watch entry when the user leaves
@@ -4422,15 +4425,15 @@ if __name__ == "__main__":
                 try:
                     del active_user_checks_dict[inout_userid]
                     LOGGER.debug(
-                        "%s:@%s removed baseline/watch entry on leave",
+                        "%s:%s removed baseline/watch entry on leave",
                         inout_userid,
-                        inout_username,
+                        inout_username_log,
                     )
                 except KeyError as _e:
                     LOGGER.debug(
-                        "%s:@%s failed to remove baseline/watch entry on leave: %s",
+                        "%s:%s failed to remove baseline/watch entry on leave: %s",
                         inout_userid,
-                        inout_username,
+                        inout_username_log,
                         _e,
                     )
 

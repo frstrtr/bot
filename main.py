@@ -861,9 +861,9 @@ async def ban_rogue_chat_everywhere(
             await BOT.ban_chat_sender_chat(chat_id, rogue_chat_id)
             success_count += 1
             await asyncio.sleep(1)  # pause 1 sec
-        except TelegramBadRequest as e:  # if user were Deleted Account while banning
-            LOGGER.error(
-                "%s:%s - error banning in chat (%s): %s. Deleted CHANNEL?",
+        except (TelegramBadRequest, TelegramForbiddenError) as e:  # if bot not in chat or channel deleted
+            LOGGER.warning(
+                "%s:%s - error banning in chat %s: %s. Bot not in chat or channel deleted?",
                 rogue_chat_id,
                 format_username_for_log(rogue_chat_username),
                 chat_id,

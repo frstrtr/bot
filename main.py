@@ -863,7 +863,7 @@ async def ban_rogue_chat_everywhere(
             await asyncio.sleep(1)  # pause 1 sec
         except (TelegramBadRequest, TelegramForbiddenError) as e:  # if bot not in chat or channel deleted
             LOGGER.warning(
-                "\033[93m%s:%s - error banning in chat %s: %s. Bot not in chat or channel deleted?\033[0m",
+                "\033[93m%s:%s error banning in chat %s: %s. Bot not in chat or channel deleted?\033[0m",
                 rogue_chat_id,
                 format_username_for_log(rogue_chat_username),
                 chat_id,
@@ -886,20 +886,20 @@ async def ban_rogue_chat_everywhere(
 
     if failed_chats:
         LOGGER.error(
-            "Failed to ban rogue channel %s @%s(%s) in %d chats: %s",
-            rogue_chat_name,
-            rogue_chat_username,
+            "%s:%s Failed to ban rogue channel %s in %d chats: %s",
             rogue_chat_id,
+            format_username_for_log(rogue_chat_username),
+            rogue_chat_name,
             len(failed_chats),
             failed_chats,
         )
         return False, rogue_chat_name, rogue_chat_username, failed_chats
     else:
         LOGGER.info(
-            "%s @%s(%s)  CHANNEL successfully banned in all %d chats",
-            rogue_chat_name,
-            rogue_chat_username,
+            "%s:%s CHANNEL %s successfully banned in all %d chats",
             rogue_chat_id,
+            format_username_for_log(rogue_chat_username),
+            rogue_chat_name,
             success_count,
         )
         banned_users_dict[rogue_chat_id] = rogue_chat_username
@@ -9504,10 +9504,10 @@ if __name__ == "__main__":
                     )
                     if result is True:
                         LOGGER.info(
-                            "\033[91mChannel %s %s(%s) banned where it is possible.\033[0m",
-                            rogue_chan_name,
-                            rogue_chan_username,
+                            "\033[91m%s:%s Channel %s banned where it is possible.\033[0m",
                             rogue_chan_id,
+                            format_username_for_log(rogue_chan_username),
+                            rogue_chan_name,
                         )
                         await message.reply(
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned where it is possible."
@@ -9528,8 +9528,18 @@ if __name__ == "__main__":
                             message_thread_id=ADMIN_MANBAN,
                         )
                     else:
+                        # Build informative error message with failed chat links
+                        failed_chats_info = []
+                        for failed_chat_id, error_msg in failed_chats:
+                            chat_name = get_channel_name_by_id(CHANNEL_DICT, failed_chat_id) or "Unknown"
+                            chat_link = build_chat_link(failed_chat_id, None, chat_name)
+                            failed_chats_info.append(f"{chat_link}: {html.escape(error_msg)}")
+                        
+                        failed_list_html = "\n".join(failed_chats_info) if failed_chats_info else "Unknown errors"
                         await message.reply(
-                            f"Banning channel {rogue_chan_id} generated error: {result}."
+                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) banned where possible.\n\n"
+                            f"<b>Failed in {len(failed_chats)} chat(s):</b>\n{failed_list_html}",
+                            parse_mode="HTML",
                         )
                 except TelegramBadRequest as e:
                     LOGGER.error(

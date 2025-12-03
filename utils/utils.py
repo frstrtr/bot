@@ -1587,7 +1587,8 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
         """
         SELECT chat_id, chat_username, message_id, user_name, user_first_name, user_last_name,
                received_date, from_chat_title, new_chat_member, left_chat_member, deletion_reason,
-               membership_status
+               membership_status, forwarded_from_id, forwarded_from_username, forwarded_from_first_name,
+               forwarded_from_last_name
         FROM recent_messages 
         WHERE user_id = ?
         ORDER BY received_date DESC
@@ -1607,6 +1608,11 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
         left_chat_member = bool(row[9])
         deletion_reason = row[10] if len(row) > 10 else None
         membership_status = row[11] if len(row) > 11 else None
+        # Who performed the action (admin who kicked/restricted/etc)
+        action_by_id = row[12] if len(row) > 12 else None
+        action_by_username = row[13] if len(row) > 13 else None
+        action_by_first_name = row[14] if len(row) > 14 else None
+        action_by_last_name = row[15] if len(row) > 15 else None
         
         # Update user info if not set
         if not result["username"] and row[3]:
@@ -1627,6 +1633,16 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
                 result["last_seen"] = received_date
         
         # Track join/leave events
+        # Build "by whom" info if someone else performed the action
+        action_by = None
+        if action_by_id and action_by_id != user_id:
+            if action_by_username:
+                action_by = f"@{action_by_username}"
+            elif action_by_first_name:
+                action_by = f"{action_by_first_name} {action_by_last_name or ''}".strip()
+            else:
+                action_by = str(action_by_id)
+        
         if new_chat_member:
             result["join_events"].append({
                 "date": received_date,
@@ -1634,6 +1650,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
                 "chat_username": chat_username,
                 "chat_title": chat_title,
                 "status": membership_status or "member",
+                "by": action_by,
             })
         if left_chat_member:
             result["leave_events"].append({
@@ -1642,6 +1659,7 @@ def get_user_whois(conn: Connection, user_id: int = None, username: str = None) 
                 "chat_username": chat_username,
                 "chat_title": chat_title,
                 "status": membership_status or "left",
+                "by": action_by,
             })
         
         result["messages"].append({
@@ -1828,11 +1846,11 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
         for j in joins:
             status = j.get("status", "member").lower()
             event_text = status_display.get(status, f"➡️ {status.upper()}")
-            all_events.append({"type": event_text, "date": j.get("date"), "chat": j.get("chat_title") or j.get("chat_username") or str(j.get("chat_id"))})
+            all_events.append({"type": event_text, "date": j.get("date"), "chat": j.get("chat_title") or j.get("chat_username") or str(j.get("chat_id")), "by": j.get("by")})
         for l in leaves:
             status = l.get("status", "left").lower()
             event_text = status_display.get(status, f"⬅️ {status.upper()}")
-            all_events.append({"type": event_text, "date": l.get("date"), "chat": l.get("chat_title") or l.get("chat_username") or str(l.get("chat_id"))})
+            all_events.append({"type": event_text, "date": l.get("date"), "chat": l.get("chat_title") or l.get("chat_username") or str(l.get("chat_id")), "by": l.get("by")})
         
         # Sort by date descending (most recent first)
         all_events.sort(key=lambda x: x.get("date") or "", reverse=True)
@@ -1847,7 +1865,9 @@ def format_whois_response(data: dict, include_lols_link: bool = True) -> str:
                     date_str = str(date_str)[:16]  # "YYYY-MM-DD HH:MM"
                 except (TypeError, ValueError):
                     pass
-            msg += f"   {prefix} {event['type']} {html.escape(str(event['chat']))} <i>({date_str})</i>\n"
+            # Show who performed the action if it was someone else
+            by_str = f" by {html.escape(event['by'])}" if event.get("by") else ""
+            msg += f"   {prefix} {event['type']} {html.escape(str(event['chat']))}{by_str} <i>({date_str})</i>\n"
     
     # Ban details
     if baseline.get("is_banned"):

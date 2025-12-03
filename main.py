@@ -7100,6 +7100,8 @@ if __name__ == "__main__":
                             missed_join_notification_sent = True
                             mark_suspicious_reported(message)  # Prevent duplicate suspicious content report
                             mark_user_suspicious_reported(message.from_user.id)  # Prevent duplicate user reports
+                            # Also mark as autoreported to prevent this same message going to AUTOREPORT
+                            autoreported_messages.add((message.chat.id, message.message_id))
                             LOGGER.info(
                                 "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
                                 message.from_user.id,
@@ -7324,14 +7326,10 @@ if __name__ == "__main__":
             # check if the message is a spam by checking the entities
             entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
 
-            # initialize the autoreport_sent flag based on whether message was already autoreported
-            # (e.g., by missed join detection earlier in the flow)
-            # Also check if user has already been autoreported OR suspicious-reported (for ANY message) to prevent spam
-            autoreport_sent = (
-                was_autoreported(message) 
-                or was_user_autoreported(message.from_user.id)
-                or was_user_suspicious_reported(message.from_user.id)
-            )
+            # initialize the autoreport_sent flag based on whether THIS MESSAGE was already autoreported
+            # This is message-level deduplication - each new message can still be checked
+            # Note: was_user_autoreported() is checked separately for specific triggers (like 10-sec check)
+            autoreport_sent = was_autoreported(message)
 
             # Skip duplicate processing for media groups (multi-photo messages)
             # Only process the first message in a media group for ALL spam checks
@@ -7447,7 +7445,8 @@ if __name__ == "__main__":
                         await submit_autoreport(message, the_reason)
                         return  # stop further actions for this message since user was banned before
             # check if the message is sent less then 10 seconds after joining the chat
-            elif user_is_10sec_old:
+            # Use user-level tracking for this specific trigger to prevent spam (user sends many messages quickly)
+            elif user_is_10sec_old and not was_user_autoreported(message.from_user.id):
                 # this is possibly a bot
                 the_reason = f"{message.from_user.id} message is sent less then 10 seconds after joining the chat"
                 if await check_n_ban(message, the_reason):

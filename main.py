@@ -32,7 +32,7 @@ import certifi
 import aiohttp
 from aiogram import F
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
-from aiogram.enums import ChatMemberStatus, ChatType
+from aiogram.enums import ChatMemberStatus, ChatType, ContentType
 from aiogram.filters import Command
 from aiogram.exceptions import (
     TelegramBadRequest,
@@ -8385,6 +8385,49 @@ if __name__ == "__main__":
             LOGGER.error(
                 "Error storing/deleting recent %s message, %s - someone deleted it already?",
                 message.message_id,
+                e,
+            )
+
+    @DP.message(is_in_monitored_channel, F.content_type.in_([ContentType.NEW_CHAT_MEMBERS, ContentType.LEFT_CHAT_MEMBER]))
+    async def handle_service_messages(message: Message):
+        """Handler for service messages (user joined/left) in monitored channels.
+        Deletes these system messages to keep chat clean."""
+        try:
+            # Try to delete the service message
+            await message.delete()
+            
+            # Log the deletion
+            chat_title = message.chat.title or message.chat.username or str(message.chat.id)
+            member_names = []
+            
+            if message.new_chat_members:
+                for member in message.new_chat_members:
+                    name = f"{member.first_name or ''} {member.last_name or ''}".strip()
+                    username_part = f"@{member.username}" if member.username else ""
+                    member_names.append(f"{name} {username_part} ({member.id})".strip())
+                action = "joined"
+            elif message.left_chat_member:
+                member = message.left_chat_member
+                name = f"{member.first_name or ''} {member.last_name or ''}".strip()
+                username_part = f"@{member.username}" if member.username else ""
+                member_names.append(f"{name} {username_part} ({member.id})".strip())
+                action = "left"
+            else:
+                action = "unknown"
+            
+            LOGGER.info(
+                "\033[94mDeleted service message: %s %s in %s\033[0m",
+                ", ".join(member_names) if member_names else "unknown",
+                action,
+                chat_title,
+            )
+            
+        except TelegramBadRequest as e:
+            # Message may have been deleted already or bot lacks permission
+            LOGGER.debug(
+                "Could not delete service message %s in chat %s: %s",
+                message.message_id,
+                message.chat.id,
                 e,
             )
 

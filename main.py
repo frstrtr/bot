@@ -8447,7 +8447,7 @@ if __name__ == "__main__":
             message.chat.username,
         ])
         
-        # If user is in active monitoring and edited to add spam/bot mentions - autoreport and delete
+        # If user is in active monitoring and edited to add spam/bot mentions - autoreport
         if user_id in active_user_checks_dict:
             if entity_spam_trigger or has_bot_mentions:
                 # Skip if already reported
@@ -8475,22 +8475,23 @@ if __name__ == "__main__":
                 # Submit autoreport (this also marks message and user as autoreported)
                 await submit_autoreport(message, the_reason)
                 
-                # Try to delete the edited message
-                try:
-                    await BOT.delete_message(message.chat.id, message.message_id)
-                    LOGGER.info(
-                        "%s:%s Deleted EDITED spam message %s",
-                        user_id,
-                        username_log,
-                        message.message_id,
-                    )
-                except TelegramBadRequest as del_err:
-                    LOGGER.warning(
-                        "%s:%s Could not delete edited message: %s",
-                        user_id,
-                        username_log,
-                        del_err,
-                    )
+                # Only delete the edited message if it contains bot mentions
+                if has_bot_mentions:
+                    try:
+                        await BOT.delete_message(message.chat.id, message.message_id)
+                        LOGGER.info(
+                            "%s:%s Deleted EDITED message with bot mentions %s",
+                            user_id,
+                            username_log,
+                            message.message_id,
+                        )
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning(
+                            "%s:%s Could not delete edited message: %s",
+                            user_id,
+                            username_log,
+                            del_err,
+                        )
                 return
         
         # User is NOT in active monitoring - check for suspicious edits and report to SUSPICIOUS

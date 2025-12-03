@@ -4969,7 +4969,7 @@ if __name__ == "__main__":
             callback_data=f"resetban_{spammer_user_id_str}_{report_id_to_ban_str}",
         )
 
-        keyboard.add(confirm_btn, cancel_btn)
+        keyboard.row(confirm_btn, cancel_btn)
 
         report_id_to_ban = int(report_id_to_ban_str)
         # Try to get report states (might not exist for ad-hoc ban buttons e.g. profile change alerts)
@@ -5659,7 +5659,7 @@ if __name__ == "__main__":
         cancel_btn = InlineKeyboardButton(
             text="❌ No, Cancel", callback_data=f"cancelbanuser_{user_id_str}"
         )
-        keyboard.add(confirm_btn, cancel_btn)
+        keyboard.row(confirm_btn, cancel_btn)
 
         # Edit the message to show confirmation
         await BOT.edit_message_reply_markup(

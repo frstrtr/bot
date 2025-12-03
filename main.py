@@ -7021,7 +7021,7 @@ if __name__ == "__main__":
                         if (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit:
                             _skip_missed_join_banner = True
                             LOGGER.info(
-                                "\033[92mSkipping missed join banner for established user %s:%s "
+                                "\033[92m%s:%s Skipping missed join banner for established user "
                                 "(messages: %d/%d, legit: %s, first_msg: %s, threshold: %d days)\033[0m",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),

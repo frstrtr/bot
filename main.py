@@ -6852,6 +6852,14 @@ if __name__ == "__main__":
                 (message.from_user.id,),
             ).fetchone()
             
+            # Debug: log what we found for join date
+            LOGGER.debug(
+                "%s:@%s join_date query result: %s",
+                message.from_user.id,
+                message.from_user.username or "!UNDEFINED!",
+                user_join_chat_date_str,
+            )
+            
             # If no join record, bot may have been offline when user joined
             # Check for earliest message from this user as fallback "first seen" date
             user_first_seen_unknown = False
@@ -7195,6 +7203,18 @@ if __name__ == "__main__":
             user_is_10sec_old = (
                 message.date - user_join_chat_date
             ).total_seconds() < 10
+
+            # Debug logging for 10-second check to diagnose duplicate reports issue
+            time_since_join = (message.date - user_join_chat_date).total_seconds()
+            if user_is_10sec_old:
+                LOGGER.debug(
+                    "%s:@%s 10sec check: msg_date=%s, join_date=%s, diff=%.2fs (<10s=True)",
+                    message.from_user.id,
+                    message.from_user.username or "!UNDEFINED!",
+                    message.date.strftime("%Y-%m-%d %H:%M:%S"),
+                    user_join_chat_date.strftime("%Y-%m-%d %H:%M:%S"),
+                    time_since_join,
+                )
 
             # check if user flagged legit by setting
             # new_chat_member and left_chat_member in the DB to 1

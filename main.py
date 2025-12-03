@@ -1191,9 +1191,9 @@ async def load_banned_users():
             user_name = ast.literal_eval(user_name_repr)
             banned_users_dict[user_id] = user_name
         LOGGER.info(
-            "\033[91mBanned users dict (%s) loaded from file:\033[0m\n%s",
+            "\033[91mBanned users dict (%s) loaded from file: %s\033[0m",
             len(banned_users_dict),
-            "\n".join([f"  {uid}: {uname}" for uid, uname in banned_users_dict.items()]) or "  (empty)",
+            dict(banned_users_dict),
         )
 
 
@@ -1268,9 +1268,9 @@ async def load_active_user_checks():
         await asyncio.sleep(1)
     
     LOGGER.info(
-        "\033[93mActive users checks dict (%s) loaded from database:\033[0m\n%s",
+        "\033[93mActive users checks dict (%s) loaded from database: %s\033[0m",
         len(active_user_checks_dict),
-        "\n".join([f"  {uid}: {udata.get('username', '?') if isinstance(udata, dict) else udata}" for uid, udata in active_user_checks_dict.items()]) or "  (empty)",
+        {uid: udata.get('username', '?') if isinstance(udata, dict) else udata for uid, udata in active_user_checks_dict.items()},
     )
 
 

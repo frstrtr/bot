@@ -993,7 +993,7 @@ async def get_user_other_chats(
         except TelegramBadRequest as e:
             # User not in chat or bot can't access - skip silently
             LOGGER.debug(
-                "%s:!NO_USERNAME! Cannot check user in chat %s: %s", user_id, chat_id, e
+                "%s:!UNDEFINED! Cannot check user in chat %s: %s", user_id, chat_id, e
             )
             continue
     return other_chats

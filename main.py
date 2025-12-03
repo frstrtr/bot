@@ -992,8 +992,9 @@ async def get_user_other_chats(
                 other_chats.append((chat_id, chat_name, chat_username))
         except TelegramBadRequest as e:
             # User not in chat or bot can't access - skip silently
+            chat_name = channel_dict.get(chat_id, "Unknown")
             LOGGER.debug(
-                "%s:!UNDEFINED! Cannot check user in chat %s: %s", user_id, chat_id, e
+                "%s:!UNDEFINED! Cannot check user in chat %s (%s): %s", user_id, chat_name, chat_id, e
             )
             continue
     return other_chats

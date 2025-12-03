@@ -7116,6 +7116,46 @@ if __name__ == "__main__":
                                     format_username_for_log(message.from_user.username),
                                     user_first_message_date[0],
                                 )
+                                
+                                # Send RECOVERED join banner to IN thread
+                                _recovered_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                                _recovered_msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                                _recovered_banner = (
+                                    f"🔄 <b>RECOVERED Join Event</b>\n"
+                                    f"👤 {message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'}\n"
+                                    f"📛 {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                                    f"💬 {_recovered_chat_link}\n"
+                                    f"🕔 First seen: {user_first_message_date[0]}\n"
+                                    f"🔗 <a href='{_recovered_msg_link}'>Current message</a>\n"
+                                    f"🔗 <b>Profile links:</b>\n"
+                                    f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
+                                    f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
+                                    f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
+                                )
+                                _recovered_kb = make_lols_kb(message.from_user.id)
+                                _recovered_kb.add(
+                                    InlineKeyboardButton(
+                                        text="✅ Mark as Legit",
+                                        callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                    )
+                                )
+                                _recovered_kb.add(
+                                    InlineKeyboardButton(
+                                        text="🚫 Ban User",
+                                        callback_data=f"banuser_{message.from_user.id}",
+                                    )
+                                )
+                                await safe_send_message(
+                                    BOT,
+                                    TECHNOLOG_GROUP,
+                                    _recovered_banner,
+                                    LOGGER,
+                                    message_thread_id=TECHNO_IN,
+                                    parse_mode="HTML",
+                                    disable_web_page_preview=True,
+                                    reply_markup=_recovered_kb.as_markup(),
+                                )
+                                
                             except sqlite3.Error as db_err:
                                 LOGGER.warning(
                                     "%s:%s Failed to mark first message as join event: %s",
@@ -7157,8 +7197,49 @@ if __name__ == "__main__":
                         LOGGER.info(
                             "Saved synthetic join event for user %s:%s (first message seen)",
                             message.from_user.id,
-                            message.from_user.username or "!NO_USERNAME!",
+                            format_username_for_log(message.from_user.username),
                         )
+                        
+                        # Send NEW join banner to IN thread
+                        _new_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                        _new_msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                        _new_join_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        _new_banner = (
+                            f"🆕 <b>NEW User Detected</b>\n"
+                            f"👤 {message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'}\n"
+                            f"📛 {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                            f"💬 {_new_chat_link}\n"
+                            f"🕔 {_new_join_time}\n"
+                            f"🔗 <a href='{_new_msg_link}'>First message</a>\n"
+                            f"🔗 <b>Profile links:</b>\n"
+                            f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
+                            f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
+                            f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
+                        )
+                        _new_kb = make_lols_kb(message.from_user.id)
+                        _new_kb.add(
+                            InlineKeyboardButton(
+                                text="✅ Mark as Legit",
+                                callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                            )
+                        )
+                        _new_kb.add(
+                            InlineKeyboardButton(
+                                text="🚫 Ban User",
+                                callback_data=f"banuser_{message.from_user.id}",
+                            )
+                        )
+                        await safe_send_message(
+                            BOT,
+                            TECHNOLOG_GROUP,
+                            _new_banner,
+                            LOGGER,
+                            message_thread_id=TECHNO_IN,
+                            parse_mode="HTML",
+                            disable_web_page_preview=True,
+                            reply_markup=_new_kb.as_markup(),
+                        )
+                        
                     except sqlite3.Error as db_err:
                         LOGGER.warning(
                             "Failed to save synthetic join event for %s: %s",

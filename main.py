@@ -3322,7 +3322,7 @@ async def perform_intensive_checks(
             
             color_code = color_map.get(lols_spam, "\033[93m")
             LOGGER.debug(
-                "%s%s:%s INTENSIVE check %d/14 (phase2 @30s): spam=%s\033[0m",
+                "%s%s:%s INTENSIVE check %d/24 (phase2 @30s): spam=%s\033[0m",
                 color_code,
                 user_id,
                 format_username_for_log(user_name),
@@ -3349,8 +3349,50 @@ async def perform_intensive_checks(
                 ):
                     return
         
+        # Phase 3: Next 10 minutes - check every 60 seconds (10 checks)
+        for i in range(10):
+            if user_id not in active_user_checks_dict:
+                LOGGER.info(
+                    "%s:@%s INTENSIVE check stopped - user no longer in active_checks",
+                    user_id,
+                    user_name,
+                )
+                return
+            
+            await asyncio.sleep(60)
+            lols_spam = await spam_check(user_id)
+            
+            color_code = color_map.get(lols_spam, "\033[93m")
+            LOGGER.debug(
+                "%s%s:%s INTENSIVE check %d/24 (phase3 @60s): spam=%s\033[0m",
+                color_code,
+                user_id,
+                format_username_for_log(user_name),
+                i + 15,  # 15-24
+                lols_spam,
+            )
+            
+            if lols_spam is True:
+                LOGGER.warning(
+                    "\033[91m%s:@%s INTENSIVE check DETECTED SPAM! Auto-banning...\033[0m",
+                    user_id,
+                    user_name,
+                )
+                event_record = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: {user_id:<10} INTENSIVE spam detected"
+                inout_logmessage = f"{user_id}:@{user_name} detected as spam during INTENSIVE checks after posting message"
+                
+                if await check_and_autoban(
+                    event_record,
+                    user_id,
+                    inout_logmessage,
+                    user_name,
+                    lols_spam=lols_spam,
+                    message_to_delete=message_to_delete,
+                ):
+                    return
+        
         LOGGER.info(
-            "\033[92m%s:@%s INTENSIVE checks completed (5 min) - no spam detected, regular watchdog continues\033[0m",
+            "\033[92m%s:@%s INTENSIVE checks completed (15 min) - no spam detected, regular watchdog continues\033[0m",
             user_id,
             user_name,
         )

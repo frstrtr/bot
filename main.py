@@ -9499,7 +9499,7 @@ if __name__ == "__main__":
 
             if action == "ban":
                 try:
-                    result, rogue_chan_name, rogue_chan_username = (
+                    result, rogue_chan_name, rogue_chan_username, failed_chats = (
                         await ban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
                     )
                     if result is True:

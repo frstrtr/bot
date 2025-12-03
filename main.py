@@ -6880,9 +6880,12 @@ if __name__ == "__main__":
                     
                     # Only notify if dates match (this IS the first message being processed)
                     # or if user is not yet in active checks (to avoid spam notifications)
+                    # Also skip if user was already autoreported or suspicious-reported (prevent duplicates)
                     should_notify_missed_join = (
-                        current_msg_date_str == first_msg_date_str
-                        or message.from_user.id not in active_user_checks_dict
+                        (current_msg_date_str == first_msg_date_str
+                        or message.from_user.id not in active_user_checks_dict)
+                        and not was_user_autoreported(message.from_user.id)
+                        and not was_user_suspicious_reported(message.from_user.id)
                     )
                     
                     LOGGER.debug(
@@ -7081,6 +7084,7 @@ if __name__ == "__main__":
                             )
                             missed_join_notification_sent = True
                             mark_suspicious_reported(message)  # Prevent duplicate suspicious content report
+                            mark_user_suspicious_reported(message.from_user.id)  # Prevent duplicate user reports
                             LOGGER.info(
                                 "Sent missed join notification for %s:@%s to ADMIN_SUSPICIOUS",
                                 message.from_user.id,

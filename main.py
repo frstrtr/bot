@@ -6853,11 +6853,13 @@ if __name__ == "__main__":
             ).fetchone()
             
             # Debug: log what we found for join date
+            _debug_msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
             LOGGER.debug(
-                "%s:%s join_date query result: %s",
+                "%s:%s join_date query: %s | msg: %s",
                 message.from_user.id,
                 format_username_for_log(message.from_user.username),
                 user_join_chat_date_str,
+                _debug_msg_link,
             )
             
             # If no join record, bot may have been offline when user joined

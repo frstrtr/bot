@@ -8384,6 +8384,195 @@ if __name__ == "__main__":
                 e,
             )
 
+    @DP.edited_message(is_in_monitored_channel)
+    async def handle_edited_message(message: Message):
+        """Handler for edited messages in monitored channels.
+        Checks if user added suspicious content (links, bot mentions) by editing their message."""
+        
+        # Skip if no user (channel messages, etc.)
+        if not message.from_user:
+            return
+        
+        # Skip admins
+        if await is_admin(message.from_user.id, message.chat.id):
+            return
+        
+        # Skip if user is already banned
+        if message.from_user.id in banned_users_dict:
+            return
+        
+        # Skip if user is flagged as legit
+        if check_user_legit(CURSOR, message.from_user.id):
+            return
+        
+        user_id = message.from_user.id
+        username = message.from_user.username
+        username_log = format_username_for_log(username)
+        
+        # Check for spam entities (links, mentions, etc.)
+        entity_spam_trigger = has_spam_entities(SPAM_TRIGGERS, message)
+        
+        # Check for bot mentions and other suspicious content
+        bot_mentions = []
+        suspicious_links = []
+        user_mentions = []
+        
+        if message.entities and message.text:
+            for entity in message.entities:
+                entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                
+                if entity_type == "mention" and message.text:
+                    mention = message.text[offset:offset + length].lower()
+                    if mention.endswith("bot"):
+                        bot_mentions.append(mention)
+                    else:
+                        user_mentions.append(mention)
+                elif entity_type in ["url", "text_link"]:
+                    if entity_type == "text_link":
+                        url = entity.get("url", "") if isinstance(entity, dict) else getattr(entity, "url", "")
+                    else:
+                        url = message.text[offset:offset + length] if message.text else ""
+                    if url:
+                        suspicious_links.append(url)
+        
+        has_bot_mentions = bool(bot_mentions)
+        has_suspicious_content = has_bot_mentions or suspicious_links or entity_spam_trigger
+        
+        # Build message link
+        message_link = construct_message_link([
+            message.chat.id,
+            message.message_id,
+            message.chat.username,
+        ])
+        
+        # If user is in active monitoring and edited to add spam/bot mentions - autoreport and delete
+        if user_id in active_user_checks_dict:
+            if entity_spam_trigger or has_bot_mentions:
+                # Skip if already reported
+                if was_autoreported(message):
+                    return
+                
+                reason_parts = []
+                if entity_spam_trigger:
+                    reason_parts.append("spam entities")
+                if has_bot_mentions:
+                    reason_parts.append(f"bot mentions: {', '.join(bot_mentions)}")
+                
+                the_reason = f"{user_id}:@{username or '!UNDEFINED!'} EDITED message to add {' and '.join(reason_parts)}"
+                
+                LOGGER.warning(
+                    "\033[91m%s:%s EDITED message detected with suspicious content - sending to AUTOREPORT\033[0m",
+                    user_id,
+                    username_log,
+                )
+                
+                # Check if should ban
+                if await check_n_ban(message, the_reason):
+                    return
+                
+                # Submit autoreport (this also marks message and user as autoreported)
+                await submit_autoreport(message, the_reason)
+                
+                # Try to delete the edited message
+                try:
+                    await BOT.delete_message(message.chat.id, message.message_id)
+                    LOGGER.info(
+                        "%s:%s Deleted EDITED spam message %s",
+                        user_id,
+                        username_log,
+                        message.message_id,
+                    )
+                except TelegramBadRequest as del_err:
+                    LOGGER.warning(
+                        "%s:%s Could not delete edited message: %s",
+                        user_id,
+                        username_log,
+                        del_err,
+                    )
+                return
+        
+        # User is NOT in active monitoring - check for suspicious edits and report to SUSPICIOUS
+        if has_suspicious_content and not was_suspicious_reported(message) and not was_user_suspicious_reported(user_id):
+            try:
+                # Forward the edited message to suspicious thread
+                await message.forward(
+                    ADMIN_GROUP_ID,
+                    ADMIN_SUSPICIOUS,
+                    disable_notification=True,
+                )
+                
+                # Build info message
+                _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                lols_link = f"https://t.me/oLolsBot?start={user_id}"
+                
+                # Build keyboard
+                inline_kb = KeyboardBuilder()
+                inline_kb.add(InlineKeyboardButton(text="ℹ️ Check User Data ℹ️", url=lols_link))
+                inline_kb.add(InlineKeyboardButton(text="🔗 Go to message", url=message_link))
+                inline_kb.add(
+                    InlineKeyboardButton(
+                        text="⚙️ Actions (Ban / Delete) ⚙️",
+                        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{user_id}",
+                    )
+                )
+                inline_kb.add(
+                    InlineKeyboardButton(
+                        text="✅ Mark as Legit",
+                        callback_data=f"stopchecks_{user_id}_{message.chat.id}_{message.message_id}",
+                    )
+                )
+                
+                # Build suspicious items summary
+                suspicious_summary = []
+                if bot_mentions:
+                    suspicious_summary.append(f"🤖 Bot mentions: {', '.join(bot_mentions)}")
+                if user_mentions:
+                    suspicious_summary.append(f"👤 Mentions: {', '.join(user_mentions[:5])}")
+                if suspicious_links:
+                    suspicious_summary.append(f"🔗 Links: {len(suspicious_links)}")
+                if entity_spam_trigger:
+                    suspicious_summary.append("⚠️ Spam entities detected")
+                
+                suspicious_text = "\n".join(suspicious_summary) if suspicious_summary else "General suspicious content"
+                
+                info_message = (
+                    f"✏️ <b>EDITED Message Alert</b>\n"
+                    f"User: @{username if username else '!UNDEFINED!'} (<code>{user_id}</code>)\n"
+                    f"Name: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                    f"Chat: {_chat_link_html}\n\n"
+                    f"<b>Suspicious content:</b>\n{suspicious_text}\n\n"
+                    f"🔗 <a href='{message_link}'>Message link</a>\n\n"
+                    f"🔗 <b>Profile links:</b>\n"
+                    f"   ├ <a href='tg://user?id={user_id}'>ID based profile link</a>\n"
+                    f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, "
+                    f"<a href='https://t.me/@id{user_id}'>iOS</a>"
+                )
+                
+                await safe_send_message(
+                    BOT,
+                    ADMIN_GROUP_ID,
+                    info_message,
+                    LOGGER,
+                    message_thread_id=ADMIN_SUSPICIOUS,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                    reply_markup=inline_kb.as_markup(),
+                )
+                
+                mark_suspicious_reported(message)
+                mark_user_suspicious_reported(user_id)
+                
+                LOGGER.info(
+                    "%s:%s EDITED message with suspicious content reported to SUSPICIOUS",
+                    user_id,
+                    username_log,
+                )
+                
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                LOGGER.error("Error forwarding edited suspicious message: %s", e)
+
     @DP.message(Command("ban"), F.chat.id == ADMIN_GROUP_ID)
     # NOTE: Manual typing command ban - useful if ban were postponed
     async def ban(message: Message):

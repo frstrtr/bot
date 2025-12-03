@@ -300,6 +300,10 @@ BOT_USERNAME: str | None = None
 # Key: (chat_id, message_id) - cleared periodically or on message processing completion
 autoreported_messages: set[tuple[int, int]] = set()
 
+# Track users who have been autoreported (by user_id) to prevent duplicate reports
+# Key: user_id - once a user has been autoreported, don't autoreport again until they're processed
+autoreported_users: set[int] = set()
+
 # Track messages that have been sent to suspicious thread to prevent duplicate reports
 # Key: (chat_id, message_id) - prevents same message being reported twice
 suspicious_reported_messages: set[tuple[int, int]] = set()
@@ -313,6 +317,21 @@ MEDIA_GROUP_EXPIRY_SECONDS = 60  # How long to remember processed media groups
 def was_autoreported(message: Message) -> bool:
     """Check if a message was already sent to autoreport thread."""
     return (message.chat.id, message.message_id) in autoreported_messages
+
+
+def was_user_autoreported(user_id: int) -> bool:
+    """Check if a user has already been autoreported (any message)."""
+    return user_id in autoreported_users
+
+
+def mark_user_autoreported(user_id: int):
+    """Mark a user as having been autoreported."""
+    autoreported_users.add(user_id)
+
+
+def clear_user_autoreport_tracking(user_id: int):
+    """Clear user autoreport tracking (called when user is banned or marked legit)."""
+    autoreported_users.discard(user_id)
 
 
 def clear_autoreport_tracking(message: Message):
@@ -663,6 +682,8 @@ async def submit_autoreport(message: Message, reason):
 
     # Track this message as autoreported to prevent duplicate suspicious notifications
     autoreported_messages.add((message.chat.id, message.message_id))
+    # Track the user as autoreported to prevent duplicate autoreports for subsequent messages
+    mark_user_autoreported(message.from_user.id)
 
     # Use the current date if message.forward_date is None
     # forward_date = message.forward_date if message.forward_date else datetime.now()
@@ -1918,6 +1939,9 @@ async def ban_user_from_all_chats(
         success_count,
         total_count,
     )
+
+    # Clear user autoreport tracking since they've been banned
+    clear_user_autoreport_tracking(user_id)
 
     return success_count, fail_count, total_count
 
@@ -7162,7 +7186,8 @@ if __name__ == "__main__":
 
             # initialize the autoreport_sent flag based on whether message was already autoreported
             # (e.g., by missed join detection earlier in the flow)
-            autoreport_sent = was_autoreported(message)
+            # Also check if user has already been autoreported (for ANY message) to prevent spam
+            autoreport_sent = was_autoreported(message) or was_user_autoreported(message.from_user.id)
 
             # Skip duplicate processing for media groups (multi-photo messages)
             # Only process the first message in a media group for ALL spam checks
@@ -10480,6 +10505,9 @@ if __name__ == "__main__":
                 button_pressed_by,
                 admin_id,
             )
+
+        # Clear user autoreport tracking since they've been marked legit
+        clear_user_autoreport_tracking(user_id_legit)
 
         try:
             CURSOR.execute(

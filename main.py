@@ -1594,7 +1594,33 @@ async def handle_autoreports(
         )
         return
 
-    message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
+    # Serialize message to JSON, handling aiogram Default objects
+    try:
+        message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
+    except Exception as ser_err:
+        # Fallback: use model_dump without mode="json" and handle non-serializable objects
+        LOGGER.warning("Message serialization failed: %s, using fallback", ser_err)
+        try:
+            message_dict = message.model_dump()
+            # Convert non-serializable objects to strings
+            def make_serializable(obj):
+                if isinstance(obj, dict):
+                    return {k: make_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [make_serializable(item) for item in obj]
+                elif hasattr(obj, '__class__') and 'Default' in obj.__class__.__name__:
+                    return f"<{obj.__class__.__name__}>"
+                else:
+                    try:
+                        json.dumps(obj)
+                        return obj
+                    except (TypeError, ValueError):
+                        return str(obj)
+            message_as_json = json.dumps(make_serializable(message_dict), indent=4, ensure_ascii=False)
+        except Exception as fallback_err:
+            LOGGER.error("Fallback serialization also failed: %s", fallback_err)
+            message_as_json = f"{{\"error\": \"Could not serialize message\", \"message_id\": {message.message_id}}}"
+    
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -4616,7 +4642,11 @@ if __name__ == "__main__":
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
-        message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
+        # Serialize message to JSON, handling aiogram Default objects
+        try:
+            message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
+        except Exception:
+            message_as_json = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
             message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
@@ -6468,11 +6498,14 @@ if __name__ == "__main__":
                 )
                 # Continue processing despite error
             try:
-                # Convert the Message object to a dictionary
-                message_dict = message.model_dump(mode="json")
-                formatted_message = json.dumps(
-                    message_dict, indent=4, ensure_ascii=False
-                )  # Convert back to a JSON string with indentation and human-readable characters
+                # Convert the Message object to a dictionary, handling serialization errors
+                try:
+                    message_dict = message.model_dump(mode="json")
+                    formatted_message = json.dumps(
+                        message_dict, indent=4, ensure_ascii=False
+                    )  # Convert back to a JSON string with indentation and human-readable characters
+                except Exception:
+                    formatted_message = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
                 formatted_message_tlgrm: str = None
                 if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
                     formatted_message_tlgrm = (
@@ -11716,11 +11749,14 @@ if __name__ == "__main__":
     async def log_all_unhandled_messages(message: Message):
         """Function to log all unhandled messages to the technolog group and admin."""
         try:
-            # Convert the Message object to a dictionary
-            message_dict = message.model_dump(mode="json")
-            full_formatted_message = json.dumps(
-                message_dict, indent=4, ensure_ascii=False
-            )  # Convert back to a JSON string with indentation and human-readable characters
+            # Convert the Message object to a dictionary, handling serialization errors
+            try:
+                message_dict = message.model_dump(mode="json")
+                full_formatted_message = json.dumps(
+                    message_dict, indent=4, ensure_ascii=False
+                )  # Convert back to a JSON string with indentation and human-readable characters
+            except Exception:
+                full_formatted_message = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
 
             # process unhandled messages
             if len(full_formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:

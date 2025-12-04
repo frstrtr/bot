@@ -3,6 +3,20 @@
 ## [2025-12-04]
 
 ### Changed
+- **Bot mention detection enhanced**: Now detects both `@botname` mentions AND `/command@botname` bot commands
+  - Only flags bots that are NOT members of the current chat (external bots)
+  - Bots that ARE members of the chat are ignored (legitimate usage like `/start@OurBot`)
+  - Added `is_bot_in_chat()` helper function to check bot membership
+  - Easter egg path preserved: Commands to our own bot still trigger superadmin notification
+
+- **Established user bot mention flow**: Changed from AUTOREPORT to SUSPICIOUS
+  - Message NOT deleted (established users are trusted)
+  - Notification sent to SUSPICIOUS thread (not AUTOREPORT)
+  - User NOT banned, NOT sent to AUTOBAN
+  - Still starts INTENSIVE 15-min monitoring
+  - Still starts 24hr regular monitoring
+  - Added LOLS check button for the mentioned bot
+
 - **Button labels clarified**: Renamed "Ban User" to "Global Ban" for buttons that trigger bans across all monitored chats
   - Affects: join/leave notifications, NEW user banner, RECOVERED join banner, cancel ban restore
 - **Confirm/Cancel buttons improved**: Added ✅/❌ icons and placed on same row

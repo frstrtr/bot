@@ -3914,7 +3914,7 @@ if __name__ == "__main__":
             )
             inline_kb.add(
                 InlineKeyboardButton(
-                    text="🚫 Ban User", callback_data=f"banuser_{inout_userid}"
+                    text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}"
                 )
             )
 
@@ -3925,7 +3925,7 @@ if __name__ == "__main__":
             if lols_spam is not True:  # Don't duplicate if already detected as spammer
                 inline_kb.add(
                     InlineKeyboardButton(
-                        text="🚫 Ban User", callback_data=f"banuser_{inout_userid}"
+                        text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}"
                     )
                 )
             
@@ -5837,7 +5837,7 @@ if __name__ == "__main__":
         inline_kb = KeyboardBuilder()
         inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
         inline_kb.add(
-            InlineKeyboardButton(text="🚫 Ban User", callback_data=f"banuser_{user_id_str}")
+            InlineKeyboardButton(text="🚫 Global Ban", callback_data=f"banuser_{user_id_str}")
         )
 
         await BOT.edit_message_reply_markup(
@@ -7568,7 +7568,7 @@ if __name__ == "__main__":
                                 )
                                 _recovered_kb.add(
                                     InlineKeyboardButton(
-                                        text="🚫 Ban User",
+                                        text="🚫 Global Ban",
                                         callback_data=f"banuser_{message.from_user.id}",
                                     )
                                 )
@@ -7652,7 +7652,7 @@ if __name__ == "__main__":
                         )
                         _new_kb.add(
                             InlineKeyboardButton(
-                                text="🚫 Ban User",
+                                text="🚫 Global Ban",
                                 callback_data=f"banuser_{message.from_user.id}",
                             )
                         )

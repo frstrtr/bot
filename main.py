@@ -3068,8 +3068,63 @@ async def perform_checks(
                         _had_name = baseline.get("first_name", "") or baseline.get("last_name", "")
                         _now_empty = not cur_first and not cur_last and not cur_username
                         _is_deleted_account = _had_name and _now_empty
+                        
+                        # Handle deleted account separately - ban globally and report to autoreport
                         if _is_deleted_account:
-                            changed.append("⚠️ ACCOUNT DELETED")
+                            chat_username = _chat_info.get("username")
+                            chat_title = _chat_info.get("title") or ""
+                            universal_chatlink = build_chat_link(_chat_id, chat_username, chat_title) if _chat_id else "(unknown chat)"
+                            _ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                            
+                            # Get original username from baseline for logging
+                            _orig_username = baseline.get("username", "!UNDEFINED!")
+                            _orig_first = baseline.get("first_name", "")
+                            _orig_last = baseline.get("last_name", "")
+                            
+                            # Ban from all chats
+                            success_count, fail_count, total_count = await ban_user_from_all_chats(
+                                user_id, _orig_username, CHANNEL_IDS, CHANNEL_DICT
+                            )
+                            
+                            # Remove from active checks
+                            if user_id in active_user_checks_dict:
+                                del active_user_checks_dict[user_id]
+                            
+                            # Add to banned users dict
+                            banned_users_dict[user_id] = datetime.now(timezone.utc)
+                            
+                            profile_links = (
+                                f"🔗 <b>Profile links:</b>\n"
+                                f"   ├ <a href='tg://user?id={user_id}'>id based profile link</a>\n"
+                                f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>"
+                            )
+                            
+                            # Send report to AUTOREPORT thread
+                            deleted_report = (
+                                f"⚠️ <b>DELETED ACCOUNT DETECTED & BANNED</b>\n\n"
+                                f"User: {html.escape(_orig_first)} {html.escape(_orig_last)} @{_orig_username} (<code>{user_id}</code>)\n"
+                                f"Chat: {universal_chatlink}\n"
+                                f"Detected at: {_ts}\n"
+                                f"Banned from: {success_count}/{total_count} chats\n\n"
+                                f"{profile_links}"
+                            )
+                            await safe_send_message(
+                                BOT,
+                                ADMIN_GROUP_ID,
+                                deleted_report,
+                                LOGGER,
+                                message_thread_id=ADMIN_AUTOREPORTS,
+                                parse_mode="HTML",
+                                disable_web_page_preview=True,
+                            )
+                            LOGGER.info(
+                                "\033[91m%s:%s DELETED ACCOUNT detected during periodic check, banned from %d/%d chats\033[0m",
+                                user_id,
+                                format_username_for_log(_orig_username),
+                                success_count,
+                                total_count,
+                            )
+                            continue  # Skip normal suspicious handling for deleted accounts
 
                         if changed:
                             chat_username = _chat_info.get("username")
@@ -4468,13 +4523,9 @@ if __name__ == "__main__":
                     if _baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
                         _changed.append("profile photo")
                     
-                    # Check if account was deleted by Telegram:
-                    # All profile fields become empty when account is deleted
-                    _had_name = _baseline.get("first_name", "") or _baseline.get("last_name", "")
-                    _now_empty = not cur_first and not cur_last and not cur_username
-                    _is_deleted_account = _had_name and _now_empty
-                    if _is_deleted_account:
-                        _changed.append("⚠️ ACCOUNT DELETED")
+                    # Note: Deleted account detection is NOT done here because a deleted account
+                    # cannot perform a "leave" action - Telegram just removes them from chats.
+                    # Deleted accounts are detected during periodic checks only.
 
                     if _changed:
                         _chat_info = _baseline.get("chat", {})

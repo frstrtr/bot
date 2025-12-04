@@ -1411,45 +1411,57 @@ async def sequential_shutdown_tasks(_id, _uname):
 
 async def on_shutdown():
     """Function to handle the bot shutdown."""
+    _users_count = len(active_user_checks_dict)
     LOGGER.info(
-        "\033[95mBot is shutting down... Performing final spammer check...\033[0m"
+        "\033[95mBot is shutting down... Performing final spammer check for %d users...\033[0m",
+        _users_count,
     )
 
     # Create a list to hold all tasks
     tasks = []
+    _user_ids_checking = []
 
     # Iterate over active user checks and create a task for each check
     for _id, _uname in active_user_checks_dict.items():
-        # Extract username from dict or use string value
-        _username_str = (
-            _uname.get("username") if isinstance(_uname, dict) else _uname
-        )
-        LOGGER.info(
-            "%s:%s shutdown check for spam...",
-            _id,
-            format_username_for_log(_username_str),
-        )
-
+        _user_ids_checking.append(_id)
         # Create the task for the sequential coroutine without awaiting it immediately
         task = asyncio.create_task(
             sequential_shutdown_tasks(_id, _uname), name=str(_id) + "shutdown"
         )
         tasks.append(task)
 
-    # try:
+    # Log summary of users being checked (not per-user spam)
+    if _user_ids_checking:
+        _sample = _user_ids_checking[:5]
+        _sample_str = ", ".join(str(uid) for uid in _sample)
+        if len(_user_ids_checking) > 5:
+            LOGGER.info(
+                "Shutdown: checking users [%s, ... +%d more]",
+                _sample_str,
+                len(_user_ids_checking) - 5,
+            )
+        else:
+            LOGGER.info("Shutdown: checking users [%s]", _sample_str)
+
     # Run all tasks concurrently
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Note: add messages deletion if spammer detected and have messages posted
-
-    # Process results and log any exceptions
-    for task, result in zip(tasks, results):
-        if isinstance(result, Exception):
-            LOGGER.error("Task %s failed with exception: %s", task.get_name(), result)
-        else:
-            LOGGER.info("Task %s completed successfully.", task.get_name())
-    # except Exception as e:
-    #     LOGGER.error("Unexpected error during shutdown tasks: %s", e)
+    # Count results instead of logging each one
+    _success = sum(1 for r in results if not isinstance(r, Exception))
+    _failed = sum(1 for r in results if isinstance(r, Exception))
+    
+    if _failed > 0:
+        # Only log exceptions, not successes
+        for task, result in zip(tasks, results):
+            if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                LOGGER.error("Shutdown task %s failed: %s", task.get_name(), result)
+        LOGGER.info(
+            "Shutdown tasks: %d completed, %d failed (cancelled tasks expected)",
+            _success,
+            _failed,
+        )
+    else:
+        LOGGER.info("Shutdown tasks: %d completed successfully", _success)
 
     # Database already has the current state - no need to save on shutdown
     # (baselines are saved on join, updated on ban/legit actions)
@@ -3169,25 +3181,13 @@ async def perform_checks(
             ):
                 return
 
-    except asyncio.exceptions.CancelledError as e:
-        LOGGER.error(
-            "\033[93m%s:%s %dhr spam checking cancelled. %s\033[0m",
-            user_id,
-            format_username_for_log(user_name),
-            MONITORING_DURATION_HOURS,
-            e,
-        )
+    except asyncio.exceptions.CancelledError:
+        # Shutdown in progress - move user to banned_users_dict for persistence
+        # Don't spam logs - on_shutdown will log summary
         if user_id in active_user_checks_dict:
             banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
-            _last_3_users = list(active_user_checks_dict.items())[-3:]
-            _last_3_users_str = ", ".join([f"{uid}: {udata.get('username', '?') if isinstance(udata, dict) else udata}" for uid, udata in _last_3_users])
-            LOGGER.info(
-                "\033[93m%s:%s removed from active_user_checks_dict during perform_checks:\033[0m\n\t\t\t%s... %d totally",
-                user_id,
-                format_username_for_log(user_name),
-                _last_3_users_str,
-                len(active_user_checks_dict),
-            )
+        # Re-raise to let caller know task was cancelled
+        raise
 
     except aiohttp.ServerDisconnectedError as e:
         LOGGER.warning(

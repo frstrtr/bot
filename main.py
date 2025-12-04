@@ -5768,8 +5768,10 @@ if __name__ == "__main__":
         user_id_str = parts[1]
         user_id = int(user_id_str)
 
-        button_pressed_by = callback_query.from_user.username or "!UNDEFINED!"
+        button_pressed_by = callback_query.from_user.username or None
         _admin_id = callback_query.from_user.id
+        _admin_first = callback_query.from_user.first_name or ""
+        _admin_last = callback_query.from_user.last_name or ""
 
         # Create response message
         lols_check_and_banned_kb = make_lols_kb(user_id)
@@ -5815,7 +5817,7 @@ if __name__ == "__main__":
             banned_users_dict[user_id] = username
 
             # Create event record (include admin ID for traceability)
-            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by and button_pressed_by != "!UNDEFINED!" else "!UNDEFINED!"
+            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by else f"({_admin_id})"
             _user_for_record = f"@{username}" if username and username != "!UNDEFINED!" else "!UNDEFINED!"
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
@@ -5829,12 +5831,18 @@ if __name__ == "__main__":
             # Report to spam servers
             await report_spam_2p2p(user_id, LOGGER, username)
 
-            # Build admin info with ID-based profile link
-            _admin_display = f"@{button_pressed_by}" if button_pressed_by and button_pressed_by != "!UNDEFINED!" else "!UNDEFINED!"
-            _admin_link = f"<a href='tg://user?id={_admin_id}'>{_admin_display}</a>"
+            # Build admin info:
+            # - If admin has username: show @username (Telegram makes it clickable)
+            # - Admin name with ID-based profile link below
+            _admin_name = f"{_admin_first} {_admin_last}".strip() or "Admin"
+            _admin_name_link = f"<a href='tg://user?id={_admin_id}'>{html.escape(_admin_name)}</a>"
+            if button_pressed_by:
+                _admin_info = f"@{button_pressed_by}\n{_admin_name_link} (<code>{_admin_id}</code>)"
+            else:
+                _admin_info = f"{_admin_name_link} (<code>{_admin_id}</code>)"
             
             ban_message = (
-                f"Manual ban completed by {_admin_link} (<code>{_admin_id}</code>):\n"
+                f"Manual ban completed by {_admin_info}:\n"
                 f"User {_user_for_record} ({first_name} {last_name}) <code>{user_id}</code> "
                 f"banned from all monitored chats and reported to spam servers."
             )

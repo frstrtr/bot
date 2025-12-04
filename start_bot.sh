@@ -33,9 +33,19 @@ fi
 echo "Pulling latest code from git..."
 git pull
 
+# Activate virtual environment if it exists
+VENV_PATH="$BOT_DIR/.venv"
+if [ -d "$VENV_PATH" ]; then
+    echo "Activating virtual environment..."
+    PYTHON_CMD="source $VENV_PATH/bin/activate && python3"
+else
+    echo "Warning: No virtual environment found at $VENV_PATH, using system Python"
+    PYTHON_CMD="python3"
+fi
+
 # Start bot in screen session
 echo "Starting bot in screen session '$SCREEN_NAME'..."
-screen -dmS "$SCREEN_NAME" bash -c "python3 main.py --log-level $LOG_LEVEL 2>&1 | tee -a $LOG_FILE"
+screen -dmS "$SCREEN_NAME" bash -c "$PYTHON_CMD main.py --log-level $LOG_LEVEL 2>&1 | tee -a $LOG_FILE"
 
 # Wait a moment for the bot to start
 sleep 3

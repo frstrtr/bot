@@ -7014,7 +7014,9 @@ if __name__ == "__main__":
                     # Check if this is the CURRENT message (first time we're seeing this user)
                     # Only send notification if this is the actual first message we stored
                     # This prevents false "RECOVERED" notifications after bot restarts
-                    current_msg_date_str = message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else None
+                    # IMPORTANT: Convert message.date (UTC) to local time for comparison with DB (stores local time)
+                    current_msg_date_local = message.date.astimezone().replace(tzinfo=None) if message.date else None
+                    current_msg_date_str = current_msg_date_local.strftime("%Y-%m-%d %H:%M:%S") if current_msg_date_local else None
                     first_msg_date_str = user_first_message_date[0] if user_first_message_date else None
                     
                     # STRICT check: Only notify if current message IS the first message in DB

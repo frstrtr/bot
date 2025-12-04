@@ -5411,8 +5411,9 @@ if __name__ == "__main__":
                         await safe_send_message(
                             BOT,
                             TECHNOLOG_GROUP_ID,
-                            f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
+                            f"Bot is not an admin in chat {CHANNEL_DICT[channel_id]} (<code>{channel_id}</code>). Error: {inner_e}",
                             LOGGER,
+                            parse_mode="HTML",
                         )
                         break  # Cancel current attempt
                     # except Exception as inner_e:
@@ -5463,8 +5464,9 @@ if __name__ == "__main__":
                     await safe_send_message(
                         BOT,
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[channel_id]} ({channel_id}). Error: {inner_e}",
+                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[channel_id]} (<code>{channel_id}</code>). Error: {inner_e}",
                         LOGGER,
+                        parse_mode="HTML",
                     )
             # Set default username from result if available
             _raw_result_name = result[0][2] if result else None
@@ -6787,7 +6789,7 @@ if __name__ == "__main__":
                     ban_member_task = await check_and_autoban(
                         f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} ({message.from_user.id}) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
                         message.from_user.id,
-                        f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} ({rogue_chan_id})",
+                        f"{escaped_user_name} @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} (<code>{message.from_user.id}</code>) CHANNELLED a SPAM message from ___{rogue_chan_name}___ @{rogue_chan_username} (<code>{rogue_chan_id}</code>)",
                         (
                             message.from_user.username
                             if message.from_user.username
@@ -8984,8 +8986,9 @@ if __name__ == "__main__":
                     await safe_send_message(
                         BOT,
                         TECHNOLOG_GROUP_ID,
-                        f"User {author_id} banned and their messages deleted from chat {CHANNEL_DICT[chat_id]} ({chat_id}).",
+                        f"User (<code>{author_id}</code>) banned and their messages deleted from chat {CHANNEL_DICT[chat_id]} (<code>{chat_id}</code>).",
                         LOGGER,
+                        parse_mode="HTML",
                     )
                 except (TelegramBadRequest, TelegramForbiddenError) as inner_e:
                     LOGGER.error(
@@ -8997,8 +9000,9 @@ if __name__ == "__main__":
                     await safe_send_message(
                         BOT,
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[chat_id]} ({chat_id}). Error: {inner_e}",
+                        f"Failed to ban and delete messages in chat {CHANNEL_DICT[chat_id]} (<code>{chat_id}</code>). Error: {inner_e}",
                         LOGGER,
+                        parse_mode="HTML",
                     )
             # select all messages from the user in the chat
             # and this is not records about join or leave
@@ -9037,8 +9041,9 @@ if __name__ == "__main__":
                     await safe_send_message(
                         BOT,
                         TECHNOLOG_GROUP_ID,
-                        f"Failed to delete message {message_id} in chat {CHANNEL_DICT[chat_id]} ({chat_id}). Error: {inner_e}",
+                        f"Failed to delete message {message_id} in chat {CHANNEL_DICT[chat_id]} (<code>{chat_id}</code>). Error: {inner_e}",
                         LOGGER,
+                        parse_mode="HTML",
                     )
             LOGGER.debug(
                 "\033[91m%s banned and their messages deleted where applicable.\033[0m",
@@ -9547,7 +9552,8 @@ if __name__ == "__main__":
                         "Failed to ban channel %d. Error: %s", rogue_chan_id, e
                     )
                     await message.reply(
-                        f"Failed to ban channel {rogue_chan_id}. Error: {e}"
+                        f"Failed to ban channel (<code>{rogue_chan_id}</code>). Error: {e}",
+                        parse_mode="HTML",
                     )
             else:  # action == "unban"
                 try:
@@ -9580,7 +9586,8 @@ if __name__ == "__main__":
                         )
                     else:
                         await message.reply(
-                            f"Unbanning channel {rogue_chan_id} generated error: {result}."
+                            f"Unbanning channel (<code>{rogue_chan_id}</code>) generated error: {result}.",
+                            parse_mode="HTML",
                         )
 
                     # Remove the channel from the banned_users_dict
@@ -9609,13 +9616,17 @@ if __name__ == "__main__":
                             message_thread_id=ADMIN_MANBAN,
                         )
                     else:
-                        await message.reply(f"Channel {rogue_chan_id} was not banned.")
+                        await message.reply(
+                            f"Channel (<code>{rogue_chan_id}</code>) was not banned.",
+                            parse_mode="HTML",
+                        )
                 except TelegramBadRequest as e:
                     LOGGER.error(
                         "Failed to unban channel %d. Error: %s", rogue_chan_id, e
                     )
                     await message.reply(
-                        f"Failed to unban channel {rogue_chan_id}. Error: {e}"
+                        f"Failed to unban channel (<code>{rogue_chan_id}</code>). Error: {e}",
+                        parse_mode="HTML",
                     )
 
         except ValueError as ve:

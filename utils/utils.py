@@ -1163,8 +1163,10 @@ def save_user_baseline(
         True if saved successfully, False otherwise
     """
     import json
+    from datetime import timezone
     cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
     metadata_json = json.dumps(metadata) if metadata else None
     
     try:
@@ -1348,8 +1350,10 @@ def update_user_baseline_status(
     Returns:
         True if updated successfully, False otherwise
     """
+    from datetime import timezone
     cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
     
     updates = ["updated_at = ?"]
     params = [now]

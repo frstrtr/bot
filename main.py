@@ -2877,10 +2877,12 @@ async def perform_checks(
         skipped_intervals = []
         if start_time:
             # Handle both naive and timezone-aware start_time
+            # DB timestamps are UTC (naive=old UTC, aware=new +00:00 format)
+            # Server is UTC+4, so for naive UTC use utcnow()
             if start_time.tzinfo is not None:
                 elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
             else:
-                elapsed_seconds = (datetime.now() - start_time).total_seconds()
+                elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
             if elapsed_seconds >= sleep_times[-1]:
                 # Monitoring period already completed
                 LOGGER.info(
@@ -7470,7 +7472,7 @@ if __name__ == "__main__":
                                         "last_name": message.from_user.last_name or "",
                                         "username": message.from_user.username or "",
                                         "photo_count": _photo_count,
-                                        "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "joined_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                                         "chat": {
                                             "id": message.chat.id,
                                             "username": getattr(message.chat, "username", None),
@@ -7554,7 +7556,7 @@ if __name__ == "__main__":
                                     "last_name": message.from_user.last_name or "",
                                     "username": message.from_user.username or "",
                                     "photo_count": _photo_count,
-                                    "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "joined_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                                     "chat": {
                                         "id": message.chat.id,
                                         "username": getattr(message.chat, "username", None),
@@ -8275,8 +8277,8 @@ if __name__ == "__main__":
                     # Delete the message and store deletion reason in database
                     try:
                         await message.delete()
-                        # Store deletion reason in database
-                        received_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        # Store deletion reason in database (use UTC for consistency)
+                        received_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
                         if message.chat.id < 0:
                             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
                         else:
@@ -8969,7 +8971,7 @@ if __name__ == "__main__":
                                 "last_name": message.from_user.last_name or "",
                                 "username": _username or "",
                                 "photo_count": _photo_count,
-                                "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "joined_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                                 "chat": {
                                     "id": message.chat.id,
                                     "username": getattr(message.chat, "username", None),

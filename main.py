@@ -11760,25 +11760,16 @@ if __name__ == "__main__":
             del active_user_checks_dict[user_id_legit]
             # Mark monitoring as ended and user as legit in baselines DB
             update_user_baseline_status(CONN, user_id_legit, monitoring_active=False, is_legit=True)
-            task_cancelled = False
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(user_id_legit):
-                    task.cancel()
-                    task_cancelled = True
-                    LOGGER.info(
-                        "%s:%s Watchdog task cancelled by admin %s:%s",
-                        user_id_legit,
-                        _user_display,
-                        admin_id,
-                        _admin_display,
-                    )
-                    break
-            if not task_cancelled:
-                LOGGER.warning(
-                    "%s:%s Watchdog task not found for cancellation, though user was in active_user_checks_dict",
-                    user_id_legit,
-                    _user_display,
-                )
+            
+            # Cancel both regular and intensive watchdogs using cancel_named_watchdog
+            await cancel_named_watchdog(user_id_legit, user_name)
+            LOGGER.info(
+                "%s:%s Watchdog tasks cancelled by admin %s:%s (via cancel_named_watchdog)",
+                user_id_legit,
+                _user_display,
+                admin_id,
+                _admin_display,
+            )
 
             if len(active_user_checks_dict) > 3:
                 active_user_checks_dict_last3_list = list(

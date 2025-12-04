@@ -4072,6 +4072,30 @@ if __name__ == "__main__":
                 other_chats_info = (
                     f"\n⚠️ <b>Still in {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}"
                 )
+        else:
+            # For joining users - show other chats they are already a member of
+            other_chats = await get_user_other_chats(
+                inout_userid, update.chat.id, CHANNEL_IDS, CHANNEL_DICT
+            )
+            if other_chats:
+                # Build clickable chat links with @username format
+                other_chats_links = []
+                for chat_id, chat_name, chat_username in other_chats:
+                    if chat_username:
+                        # @username (ChatName) with clickable link
+                        other_chats_links.append(
+                            f"<a href='https://t.me/{chat_username}'>@{chat_username}</a> ({html.escape(chat_name)})"
+                        )
+                    else:
+                        # Fallback to private link if no username
+                        chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
+                        other_chats_links.append(
+                            f"<a href='https://t.me/c/{chat_id_str}'>{html.escape(chat_name)}</a>"
+                        )
+                other_chats_list = "\n   • ".join(other_chats_links)
+                other_chats_info = (
+                    f"\n👥 <b>Also member of {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}"
+                )
 
         await safe_send_message(
             BOT,

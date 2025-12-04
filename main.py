@@ -6244,6 +6244,7 @@ if __name__ == "__main__":
             try:
                 await message.delete()
                 member_info = ""
+                action = "unknown"
                 if message.new_chat_members:
                     member_info = ", ".join([f"{m.first_name} ({m.id})" for m in message.new_chat_members])
                     action = "joined"

@@ -707,7 +707,9 @@ async def submit_autoreport(message: Message, reason):
 
     # Use the current date if message.forward_date is None
     # forward_date = message.forward_date if message.forward_date else datetime.now()
-    tobot_forward_date = message.date
+    # Convert to string format to avoid Python 3.12+ sqlite3 DeprecationWarning
+    # about default datetime adapter being deprecated
+    tobot_forward_date = message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else None
 
     # DEBUG
     # LOGGER.debug("DEBUG")
@@ -7383,10 +7385,10 @@ if __name__ == "__main__":
                                 name=str(message.from_user.id),
                             )
                         
-                        # If missed join user mentions a bot - this is spam! Delete and send to autoreport
+                        # If missed join user mentions a bot - this is spam! Delete, ban, and send to autoreport
                         if _has_bot_mention:
                             LOGGER.info(
-                                "\033[91m%s:%s Missed join user mentioned bot %s - sending to AUTOREPORT and deleting message\033[0m",
+                                "\033[91m%s:%s Missed join user mentioned bot %s - BANNING and sending to AUTOREPORT\033[0m",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                                 _bot_mention_name,
@@ -7409,6 +7411,63 @@ if __name__ == "__main__":
                                     format_username_for_log(message.from_user.username),
                                     del_err,
                                 )
+                            
+                            # BAN the user who mentioned bot after missed join
+                            _user_name = message.from_user.username if message.from_user.username else "!UNDEFINED!"
+                            _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
+                                message.from_user.id,
+                                _user_name,
+                                CHANNEL_IDS,
+                                CHANNEL_DICT,
+                            )
+                            
+                            # Add to banned_users_dict and remove from active checks
+                            if message.from_user.id in active_user_checks_dict:
+                                banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                            else:
+                                banned_users_dict[message.from_user.id] = _user_name
+                            
+                            # Cancel watchdog task if running
+                            for task in asyncio.all_tasks():
+                                if task.get_name() == str(message.from_user.id):
+                                    task.cancel()
+                            
+                            # Send notification to ADMIN_AUTOBAN with ban confirmation
+                            _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                            _escaped_name = html.escape(message.from_user.first_name or "")
+                            if message.from_user.last_name:
+                                _escaped_name += f" {html.escape(message.from_user.last_name)}"
+                            
+                            _autoban_kb = make_lols_kb(message.from_user.id)
+                            _autoban_notification = (
+                                f"🚫 <b>AUTO-BAN: Bot mention by missed join user</b>\n\n"
+                                f"User: {_escaped_name} @{_user_name} (<code>{message.from_user.id}</code>)\n"
+                                f"Mentioned: <b>{_bot_mention_name}</b>\n"
+                                f"In chat: {_chat_link_html}\n\n"
+                                f"✅ Banned in {_success_count}/{_total_count} chats"
+                            )
+                            if _fail_count > 0:
+                                _autoban_notification += f" (⚠️ {_fail_count} failed)"
+                            
+                            await safe_send_message(
+                                BOT,
+                                ADMIN_GROUP_ID,
+                                _autoban_notification,
+                                LOGGER,
+                                parse_mode="HTML",
+                                message_thread_id=ADMIN_AUTOBAN,
+                                disable_web_page_preview=True,
+                                reply_markup=_autoban_kb.as_markup(),
+                            )
+                            
+                            LOGGER.info(
+                                "\033[91m%s:%s BANNED in %d/%d chats (bot mention by missed join user)\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                                _success_count,
+                                _total_count,
+                            )
+                            
                             missed_join_notification_sent = True
                         else:
                             # Regular missed join notification to ADMIN_SUSPICIOUS

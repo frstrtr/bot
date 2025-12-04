@@ -5942,9 +5942,12 @@ if __name__ == "__main__":
                 first_name = "Unknown"
                 last_name = "User"
 
-            # Remove from active checks if present
+            # Cancel all watchdogs (regular and intensive) and remove from active checks
+            await cancel_named_watchdog(user_id, username)
+
+            # Remove from active checks if present (double-check after cancel_named_watchdog)
             if user_id in active_user_checks_dict:
-                banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+                del active_user_checks_dict[user_id]
                 LOGGER.info(
                     "%s:%s removed from active_user_checks_dict during manual ban",
                     user_id,

@@ -4719,22 +4719,18 @@ if __name__ == "__main__":
                     inout_username_log,
                 )
 
-            # Always cleanup the baseline/watch entry when the user leaves
+            # Always cleanup the baseline/watch entry and cancel watchdogs when the user leaves
             if inout_userid in active_user_checks_dict:
-                try:
+                # Cancel watchdogs first
+                await cancel_named_watchdog(inout_userid, inout_username)
+                # Then remove from dict if still present
+                if inout_userid in active_user_checks_dict:
                     del active_user_checks_dict[inout_userid]
-                    LOGGER.debug(
-                        "%s:%s removed baseline/watch entry on leave",
-                        inout_userid,
-                        inout_username_log,
-                    )
-                except KeyError as _e:
-                    LOGGER.debug(
-                        "%s:%s failed to remove baseline/watch entry on leave: %s",
-                        inout_userid,
-                        inout_username_log,
-                        _e,
-                    )
+                LOGGER.debug(
+                    "%s:%s removed baseline/watch entry and cancelled watchdogs on leave",
+                    inout_userid,
+                    inout_username_log,
+                )
 
     @DP.message(is_forwarded_from_unknown_channel_message)
     async def handle_forwarded_reports(message: Message):

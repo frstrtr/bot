@@ -973,7 +973,15 @@ def has_spam_entities(spam_triggers, message: types.Message):
 
 
 def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message):
-    """store message data to DB"""
+    """store message data to DB
+    
+    Note: All timestamps are stored in LOCAL TIME for consistency with datetime.now() usage elsewhere.
+    message.date from Telegram is UTC, so we convert it to local time before storing.
+    """
+    # Convert UTC message.date to local time for consistent storage
+    received_date_local = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
+    forward_date_local = message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None
+    
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 
@@ -988,9 +996,9 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
             getattr(message.from_user, "username", ""),
             getattr(message.from_user, "first_name", ""),
             getattr(message.from_user, "last_name", ""),
-            message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
+            forward_date_local,
             getattr(message, "forward_sender_name", ""),
-            message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else None,
+            received_date_local,
             getattr(message.forward_from_chat, "title", None),
             getattr(message.forward_from, "id", None),
             getattr(message.forward_from, "username", ""),

@@ -1589,7 +1589,8 @@ async def handle_autoreports(
     # LOGGER.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
-    received_date = message.date if message.date else None
+    # Convert UTC message.date to local time string for consistent DB storage
+    received_date = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
     # remove -100 from the chat ID if this is a public group
     if message.chat.id < 0:
         report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -1609,7 +1610,7 @@ async def handle_autoreports(
             message.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
-            message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
+            message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
             received_date,
             str(found_message_data),
         ),
@@ -4242,6 +4243,8 @@ if __name__ == "__main__":
 
         # record the event in the database if not lols_spam
         if not lols_spam:
+            # Convert UTC update.date to local time for consistent storage
+            update_date_local = update.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if update.date else None
             CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages
@@ -4257,10 +4260,10 @@ if __name__ == "__main__":
                     getattr(update.old_chat_member.user, "username", ""),
                     getattr(update.old_chat_member.user, "first_name", ""),
                     getattr(update.old_chat_member.user, "last_name", ""),
-                    # Convert datetime to string to avoid Python 3.12+ deprecation warning
-                    update.date.strftime("%Y-%m-%d %H:%M:%S") if update.date else None,
+                    # Convert datetime to local time string for consistent DB storage
+                    update_date_local,
                     getattr(update.from_user, "id", ""),
-                    update.date.strftime("%Y-%m-%d %H:%M:%S") if update.date else None,
+                    update_date_local,
                     getattr(update.chat, "title", None),
                     getattr(update.from_user, "id", None),
                     getattr(update.from_user, "username", ""),
@@ -4687,7 +4690,8 @@ if __name__ == "__main__":
         LOGGER.debug("%s - message data: %s", found_message_data[3], found_message_data)
 
         # Save both the original message_id and the forwarded message's date
-        received_date = message.date if message.date else None
+        # Convert UTC message.date to local time string for consistent DB storage
+        received_date = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
         # Create a unique report ID based on the chat ID and message ID and remove -100 if public chat
         if message.chat.id < 0:
             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -4714,7 +4718,7 @@ if __name__ == "__main__":
                 message.from_user.username,
                 message.from_user.first_name,
                 message.from_user.last_name,
-                message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
+                message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
                 received_date,
                 str(found_message_data),
             ),

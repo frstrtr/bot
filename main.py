@@ -1003,6 +1003,59 @@ async def get_user_other_chats(
     return other_chats
 
 
+async def is_bot_in_chat(bot_username: str, chat_id: int) -> bool:
+    """
+    Check if a bot with the given username is a member of the specified chat.
+    
+    Args:
+        bot_username: The username of the bot (with or without @)
+        chat_id: The chat ID to check
+        
+    Returns:
+        True if bot is a member/admin of the chat, False otherwise
+    """
+    try:
+        # Clean the username
+        username_clean = bot_username.lstrip("@").lower()
+        
+        # Try to get the bot's user info first
+        # We can use getChat with @username to resolve it
+        try:
+            bot_chat = await BOT.get_chat(f"@{username_clean}")
+            bot_id = bot_chat.id
+        except TelegramBadRequest:
+            # Bot username doesn't exist or is invalid
+            LOGGER.debug("is_bot_in_chat: Could not resolve bot @%s", username_clean)
+            return False
+        
+        # Now check if this bot is in the target chat
+        member = await BOT.get_chat_member(chat_id, bot_id)
+        if member.status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.CREATOR,
+            ChatMemberStatus.RESTRICTED,  # Restricted bots are still "in" the chat
+        ):
+            LOGGER.debug(
+                "is_bot_in_chat: Bot @%s (ID:%s) IS member of chat %s (status: %s)",
+                username_clean, bot_id, chat_id, member.status
+            )
+            return True
+        else:
+            LOGGER.debug(
+                "is_bot_in_chat: Bot @%s (ID:%s) NOT member of chat %s (status: %s)",
+                username_clean, bot_id, chat_id, member.status
+            )
+            return False
+    except TelegramBadRequest as e:
+        # Bot not in chat or can't check
+        LOGGER.debug("is_bot_in_chat: @%s not in chat %s: %s", bot_username, chat_id, e)
+        return False
+    except Exception as e:
+        LOGGER.debug("is_bot_in_chat: Error checking @%s in chat %s: %s", bot_username, chat_id, e)
+        return False
+
+
 def analyze_mentions_in_message(message) -> dict:
     """
     Analyze mentions in a message to detect:
@@ -7136,19 +7189,69 @@ if __name__ == "__main__":
                             )
                         
                         # Check for bot mentions first (before established user check)
+                        # Includes both @botname mentions AND /command@botname bot commands
+                        # Only flag if the bot is NOT a member of the current chat
                         _has_bot_mention = False
                         _bot_mention_name = None
                         if message.entities and message.text:
                             for entity in message.entities:
                                 entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                                offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                                length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                                
                                 if entity_type == "mention":
-                                    offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
-                                    length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                                    # Direct @botname mention
                                     mention = message.text[offset:offset + length].lower()
                                     if mention.endswith("bot"):
-                                        _has_bot_mention = True
-                                        _bot_mention_name = message.text[offset:offset + length]
-                                        break
+                                        # Check if this bot is NOT in the chat
+                                        if not await is_bot_in_chat(mention, message.chat.id):
+                                            _has_bot_mention = True
+                                            _bot_mention_name = message.text[offset:offset + length]
+                                            LOGGER.debug(
+                                                "%s:%s Bot mention %s detected (NOT in chat %s)",
+                                                message.from_user.id,
+                                                format_username_for_log(message.from_user.username),
+                                                _bot_mention_name,
+                                                message.chat.id,
+                                            )
+                                            break
+                                        else:
+                                            LOGGER.debug(
+                                                "%s:%s Bot mention %s IGNORED (bot IS member of chat %s)",
+                                                message.from_user.id,
+                                                format_username_for_log(message.from_user.username),
+                                                message.text[offset:offset + length],
+                                                message.chat.id,
+                                            )
+                                
+                                elif entity_type == "bot_command":
+                                    # Bot command like /start@botname
+                                    command = message.text[offset:offset + length]
+                                    if "@" in command:
+                                        # Extract bot username from command
+                                        bot_part = command.split("@", 1)[1].lower()
+                                        if bot_part.endswith("bot"):
+                                            # Check if this bot is NOT in the chat
+                                            if not await is_bot_in_chat(bot_part, message.chat.id):
+                                                _has_bot_mention = True
+                                                _bot_mention_name = f"@{command.split('@', 1)[1]}"
+                                                LOGGER.debug(
+                                                    "%s:%s Bot command %s detected (bot %s NOT in chat %s)",
+                                                    message.from_user.id,
+                                                    format_username_for_log(message.from_user.username),
+                                                    command,
+                                                    _bot_mention_name,
+                                                    message.chat.id,
+                                                )
+                                                break
+                                            else:
+                                                LOGGER.debug(
+                                                    "%s:%s Bot command %s IGNORED (bot IS member of chat %s)",
+                                                    message.from_user.id,
+                                                    format_username_for_log(message.from_user.username),
+                                                    command,
+                                                    message.chat.id,
+                                                )
                         
                         # Check if established user
                         _is_established = (_user_msg_count >= ESTABLISHED_USER_MIN_MESSAGES and _first_msg_old_enough) or _is_user_legit
@@ -8052,31 +8155,69 @@ if __name__ == "__main__":
             # This must run BEFORE "SUSPICIOUS MESSAGE CHECKING" to prioritize AUTOREPORT
             if not autoreport_sent and message.from_user.id in active_user_checks_dict:
                 _bot_mentions = []
-                # Check message text for bot mentions
+                # Check message text for bot mentions (@botname) and bot commands (/cmd@botname)
+                # Only flag bots that are NOT members of the current chat
                 if message.entities and message.text:
                     for entity in message.entities:
                         entity_type = entity.type if hasattr(entity, 'type') else entity.get("type")
+                        offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
+                        length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
+                        
                         if entity_type == "mention":
-                            offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
-                            length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
                             mention = message.text[offset:offset + length].lower()
                             if mention.endswith("bot"):
-                                _bot_mentions.append(mention)
-                # Check caption for bot mentions
+                                # Check if bot is NOT in chat
+                                if not await is_bot_in_chat(mention, message.chat.id):
+                                    _bot_mentions.append(mention)
+                                else:
+                                    LOGGER.debug(
+                                        "%s:%s Bot mention %s IGNORED (bot IS member of chat)",
+                                        message.from_user.id,
+                                        format_username_for_log(message.from_user.username),
+                                        mention,
+                                    )
+                        elif entity_type == "bot_command":
+                            command = message.text[offset:offset + length]
+                            if "@" in command:
+                                bot_part = command.split("@", 1)[1].lower()
+                                if bot_part.endswith("bot"):
+                                    # Check if bot is NOT in chat
+                                    if not await is_bot_in_chat(bot_part, message.chat.id):
+                                        _bot_mentions.append(f"@{bot_part}")
+                                    else:
+                                        LOGGER.debug(
+                                            "%s:%s Bot command %s IGNORED (bot IS member of chat)",
+                                            message.from_user.id,
+                                            format_username_for_log(message.from_user.username),
+                                            command,
+                                        )
+                
+                # Check caption for bot mentions (same logic)
                 if message.caption_entities and message.caption:
                     for entity in message.caption_entities:
                         entity_type = entity.type if hasattr(entity, 'type') else entity.get("type")
+                        offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
+                        length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
+                        
                         if entity_type == "mention":
-                            offset = entity.offset if hasattr(entity, 'offset') else entity.get("offset", 0)
-                            length = entity.length if hasattr(entity, 'length') else entity.get("length", 0)
                             mention = message.caption[offset:offset + length].lower()
                             if mention.endswith("bot"):
-                                _bot_mentions.append(mention)
+                                # Check if bot is NOT in chat
+                                if not await is_bot_in_chat(mention, message.chat.id):
+                                    _bot_mentions.append(mention)
+                        elif entity_type == "bot_command":
+                            command = message.caption[offset:offset + length]
+                            if "@" in command:
+                                bot_part = command.split("@", 1)[1].lower()
+                                if bot_part.endswith("bot"):
+                                    # Check if bot is NOT in chat
+                                    if not await is_bot_in_chat(bot_part, message.chat.id):
+                                        _bot_mentions.append(f"@{bot_part}")
                 
                 if _bot_mentions:
                     bot_mentions_str = ", ".join(_bot_mentions)
                     LOGGER.info(
-                        "User %s:%s (in active checks) mentioned bots (%s) - sending to AUTOREPORT and deleting",
+                        "\033[93m%s:%s (in active checks) mentioned external bots (%s) - sending to AUTOREPORT and deleting\033[0m",
                         message.from_user.id,
                         format_username_for_log(message.from_user.username),
                         bot_mentions_str,
@@ -8113,14 +8254,17 @@ if __name__ == "__main__":
                         )
                         CONN.commit()
                         LOGGER.info(
-                            "Deleted message %s from chat %s - mentioned bots: %s (reason stored in DB)",
+                            "\033[93m%s:%s Deleted message %s - mentioned external bots: %s\033[0m",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
                             message.message_id,
-                            message.chat.id,
                             bot_mentions_str,
                         )
                     except TelegramBadRequest as del_err:
                         LOGGER.warning(
-                            "Failed to delete message %s with bot mentions: %s",
+                            "%s:%s Failed to delete message %s with bot mentions: %s",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
                             message.message_id,
                             del_err,
                         )

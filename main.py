@@ -886,8 +886,8 @@ async def ban_rogue_chat_everywhere(
     )
 
     if failed_chats:
-        LOGGER.error(
-            "%s:%s Failed to ban rogue channel %s in %d chats: %s",
+        LOGGER.warning(
+            "\033[93m%s:%s Failed to ban rogue channel %s in %d chats: %s\033[0m",
             rogue_chat_id,
             format_username_for_log(rogue_chat_username),
             rogue_chat_name,

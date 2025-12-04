@@ -1,5 +1,48 @@
 # Changelog
 
+## [2025-12-04]
+
+### Changed
+- **Button labels clarified**: Renamed "Ban User" to "Global Ban" for buttons that trigger bans across all monitored chats
+  - Affects: join/leave notifications, NEW user banner, RECOVERED join banner, cancel ban restore
+- **Confirm/Cancel buttons improved**: Added ✅/❌ icons and placed on same row
+  - Affects: globalban, ban, and delmsg confirmation dialogs in suspiciousactions handler
+- **Yellow log for partial channel bans**: "Failed to ban rogue channel" now logged in yellow (warning level)
+  - Makes partial failures more visible in logs when bot lacks permissions in some chats
+
+### Fixed
+- **UTC timestamps for database portability**: All timestamps now stored in UTC with `+00:00` suffix
+  - Format: `2025-12-04 15:30:00+00:00` (ISO 8601 with timezone)
+  - Database can now be moved between servers in different timezones
+  - Backwards compatible: old records without timezone still work
+  - Affected: `store_message_to_db()`, report handlers, ChatMemberUpdated, synthetic joins, `joined_at`
+
+- **Timezone bug in missed join detection**: Fixed false "Missed Join Detected" notifications
+  - Root cause: `message.date` (UTC) was compared with database timestamps (local time)
+  - Solution: Convert all Telegram UTC timestamps to local time before comparison
+  - Fixed comparison in missed join detection logic
+
+- **False RECOVERED Join Event notifications**: Fixed after bot restart
+  - Bot no longer sends RECOVERED notifications for users who posted days/weeks ago
+  - Added strict check: only notify if current message IS the first message in database
+  - Added age check: skip if first message is more than 5 minutes old
+
+- **Retroactive join event marking**: Established users without join records now get marked
+  - When an established user posts (many messages, old first message), their first message is retroactively marked as `new_chat_member = 1`
+  - Prevents repeated "no join record" lookups for the same user
+
+- **Media group check moved earlier**: Reduces redundant database queries
+  - `was_media_group_processed()` now called before join date query, spam checks, etc.
+  - Avoids duplicate processing for multi-photo album messages
+
+- **/delmsg reply not appearing**: Fixed when forward fails for service messages
+  - Reply is now sent even if forward operation fails (e.g., service messages can't be forwarded)
+  - Downgraded forward failure log from error to debug level for expected cases
+
+- **/delmsg log pattern consistency**: All log entries now start with `userID:username`
+  - Fixed "Unknown author" messages to show user ID and username first
+  - Consistent format across all deletion scenarios
+
 ## [2025-12-02]
 
 ### Added

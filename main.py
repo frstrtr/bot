@@ -9412,10 +9412,12 @@ if __name__ == "__main__":
                 user_details_log_str = "DB error fetching user details"
 
             # Forward the command message first (before deleting target)
+            # Note: This forwards the /delmsg command itself for audit trail
             try:
                 await message.forward(TECHNOLOG_GROUP_ID)
             except Exception as e_fwd:
-                LOGGER.warning("Could not forward /delmsg command to technolog: %s", e_fwd)
+                # This can fail for service messages or other edge cases - not critical
+                LOGGER.debug("Could not forward /delmsg command to technolog: %s", e_fwd)
 
             try:
                 await BOT.delete_message(chat_id=chat_username, message_id=message_id)

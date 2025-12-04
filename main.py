@@ -7001,24 +7001,41 @@ if __name__ == "__main__":
                     
                     # Check if this is the CURRENT message (first time we're seeing this user)
                     # Only send notification if this is the actual first message we stored
+                    # This prevents false "RECOVERED" notifications after bot restarts
                     current_msg_date_str = message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else None
                     first_msg_date_str = user_first_message_date[0] if user_first_message_date else None
                     
-                    # Only notify if dates match (this IS the first message being processed)
-                    # or if user is not yet in active checks (to avoid spam notifications)
-                    # Also skip if user was already autoreported or suspicious-reported (prevent duplicates)
+                    # STRICT check: Only notify if current message IS the first message in DB
+                    # The previous logic with "or not in active_user_checks_dict" caused false positives
+                    # after bot restarts for users who posted long ago
+                    is_first_message_ever = (current_msg_date_str == first_msg_date_str)
+                    
+                    # Also consider: if first_msg is from today (within last few minutes), 
+                    # and user not in active checks - this might be a missed join we just stored
+                    # But if first_msg is days/weeks old - user is established, skip notification
+                    try:
+                        first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
+                        # If first message is more than 5 minutes old and not matching current - skip
+                        msg_age_seconds = (datetime.now() - first_msg_dt.replace(tzinfo=None)).total_seconds()
+                        is_recent_first_msg = msg_age_seconds < 300  # 5 minutes
+                    except (ValueError, TypeError, AttributeError):
+                        is_recent_first_msg = False
+                    
                     should_notify_missed_join = (
-                        (current_msg_date_str == first_msg_date_str
-                        or message.from_user.id not in active_user_checks_dict)
+                        (is_first_message_ever or is_recent_first_msg)
+                        and message.from_user.id not in active_user_checks_dict
                         and not was_user_autoreported(message.from_user.id)
                         and not was_user_suspicious_reported(message.from_user.id)
                     )
                     
                     LOGGER.debug(
-                        "%s:%s No join record, using first message date: %s",
+                        "%s:%s No join record, using first message date: %s (is_first=%s, is_recent=%s, should_notify=%s)",
                         message.from_user.id,
                         format_username_for_log(message.from_user.username),
                         user_first_message_date[0],
+                        is_first_message_ever,
+                        is_recent_first_msg,
+                        should_notify_missed_join,
                     )
                     
                     # Check if this is an established user - skip suspicious banner if so

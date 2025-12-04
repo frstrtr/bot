@@ -9411,10 +9411,13 @@ if __name__ == "__main__":
                 )
                 user_details_log_str = "DB error fetching user details"
 
+            # Forward the command message first (before deleting target)
             try:
-                await message.forward(
-                    TECHNOLOG_GROUP_ID,
-                )
+                await message.forward(TECHNOLOG_GROUP_ID)
+            except Exception as e_fwd:
+                LOGGER.warning("Could not forward /delmsg command to technolog: %s", e_fwd)
+
+            try:
                 await BOT.delete_message(chat_id=chat_username, message_id=message_id)
                 LOGGER.info(
                     "%s:%s Message %d deleted from chat %s by admin request. Original message %s",

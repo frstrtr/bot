@@ -11801,13 +11801,13 @@ if __name__ == "__main__":
         inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
 
         if comand == "globalban":
-            inline_kb.add(
+            inline_kb.row(
                 InlineKeyboardButton(
-                    text="Confirm global ban",
+                    text="✅ Confirm global ban",
                     callback_data=f"confirmglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
                 InlineKeyboardButton(
-                    text="Cancel global ban",
+                    text="❌ Cancel global ban",
                     callback_data=f"cancelglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
             )
@@ -11819,13 +11819,13 @@ if __name__ == "__main__":
             )
             return
         elif comand == "ban":
-            inline_kb.add(
+            inline_kb.row(
                 InlineKeyboardButton(
-                    text="Confirm ban",
+                    text="✅ Confirm ban",
                     callback_data=f"confirmban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
                 InlineKeyboardButton(
-                    text="Cancel ban",
+                    text="❌ Cancel ban",
                     callback_data=f"cancelban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
             )
@@ -11837,13 +11837,13 @@ if __name__ == "__main__":
             )
             return
         elif comand == "delmsg":
-            inline_kb.add(
+            inline_kb.row(
                 InlineKeyboardButton(
-                    text="Confirm delmsg",
+                    text="✅ Confirm delmsg",
                     callback_data=f"confirmdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
                 InlineKeyboardButton(
-                    text="Cancel delmsg",
+                    text="❌ Cancel delmsg",
                     callback_data=f"canceldelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                 ),
             )

@@ -3441,6 +3441,62 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
         )
 
 
+async def mark_user_as_legit(
+    user_id: int,
+    user_name: str,
+    legitimized_by: str = "system",
+    notes: str = None,
+) -> bool:
+    """Mark a user as legitimate and cancel any running watchdogs.
+    
+    This consolidates the legitimization logic used across multiple locations:
+    - Admin re-adding a previously banned user
+    - /legit command
+    - Mark as Legit button (stop_checks callback)
+    - Global Ban button (handle_user_inout_ban)
+    
+    Args:
+        user_id: The user ID to legitimize
+        user_name: Username for logging
+        legitimized_by: Who legitimized the user (for logging)
+        notes: Optional notes about the legitimization
+        
+    Returns:
+        bool: True if legitimization was successful
+    """
+    try:
+        # Cancel any running watchdogs (both regular and intensive)
+        await cancel_named_watchdog(user_id, user_name)
+        
+        # Remove from active checks if present
+        if user_id in active_user_checks_dict:
+            del active_user_checks_dict[user_id]
+            LOGGER.info(
+                "\033[92m%s:%s removed from active_user_checks_dict (legitimized by %s)\033[0m",
+                user_id,
+                format_username_for_log(user_name),
+                legitimized_by,
+            )
+        
+        # Update baseline status to mark as legit
+        update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
+        
+        log_msg = f"{user_id}:{format_username_for_log(user_name)} marked as legit by {legitimized_by}"
+        if notes:
+            log_msg += f" ({notes})"
+        LOGGER.info(log_msg)
+        
+        return True
+    except Exception as e:
+        LOGGER.error(
+            "Error marking %s:%s as legit: %s",
+            user_id,
+            format_username_for_log(user_name),
+            e,
+        )
+        return False
+
+
 async def perform_intensive_checks(
     user_id: int,
     user_name: str = "!UNDEFINED!",
@@ -4315,12 +4371,15 @@ if __name__ == "__main__":
                             f"@{admin_username}" if admin_username else "!UNDEFINED!",
                         )
                         
-                        # Cancel watchdog
-                        await cancel_named_watchdog(inout_userid, inout_username)
+                        # Use helper to cancel watchdogs and update baseline
+                        await mark_user_as_legit(
+                            inout_userid,
+                            inout_username,
+                            legitimized_by=f"admin_readd:{admin_id}",
+                            notes=f"re-added by @{admin_username}" if admin_username else None,
+                        )
                         
-                        # Remove from dicts
-                        if inout_userid in active_user_checks_dict:
-                            del active_user_checks_dict[inout_userid]
+                        # Also remove from banned_users_dict if present
                         if inout_userid in banned_users_dict:
                             del banned_users_dict[inout_userid]
                         
@@ -11752,49 +11811,23 @@ if __name__ == "__main__":
                 e_send,
             )
 
-        if user_id_legit in active_user_checks_dict:
-            del active_user_checks_dict[user_id_legit]
-            # Mark monitoring as ended and user as legit in baselines DB
-            update_user_baseline_status(CONN, user_id_legit, monitoring_active=False, is_legit=True)
-            
-            # Cancel both regular and intensive watchdogs using cancel_named_watchdog
-            await cancel_named_watchdog(user_id_legit, user_name)
+        # Use helper to cancel watchdogs, remove from active checks, and update baseline
+        was_in_active_checks = user_id_legit in active_user_checks_dict
+        await mark_user_as_legit(
+            user_id_legit,
+            user_name,
+            legitimized_by=f"admin_button:{admin_id}",
+            notes=f"@{button_pressed_by}" if button_pressed_by else None,
+        )
+        
+        if was_in_active_checks:
             LOGGER.info(
-                "%s:%s Watchdog tasks cancelled by admin %s:%s (via cancel_named_watchdog)",
+                "%s:%s Watchdog tasks cancelled by admin %s:%s (via mark_user_as_legit)",
                 user_id_legit,
                 _user_display,
                 admin_id,
                 _admin_display,
             )
-
-            if len(active_user_checks_dict) > 3:
-                active_user_checks_dict_last3_list = list(
-                    active_user_checks_dict.items()
-                )[-3:]
-                active_user_checks_dict_last3_str = ", ".join(
-                    [
-                        f"{uid}: {str(uname.get('username', uname) if isinstance(uname, dict) else uname).lstrip('@')}"
-                        for uid, uname in active_user_checks_dict_last3_list
-                    ]
-                )
-                LOGGER.info(
-                    "\033[92m%s:%s removed from active checks dict by admin %s:%s:\n\t\t\t%s... %d left\033[0m",
-                    user_id_legit,
-                    format_username_for_log(user_name),
-                    admin_id,
-                    format_username_for_log(button_pressed_by),
-                    active_user_checks_dict_last3_str,
-                    len(active_user_checks_dict),
-                )
-            else:
-                LOGGER.info(
-                    "\033[92m%s:%s removed from active checks dict by admin %s:%s:\n\t\t\t%s\033[0m",
-                    user_id_legit,
-                    format_username_for_log(user_name),
-                    admin_id,
-                    format_username_for_log(button_pressed_by),
-                    active_user_checks_dict,
-                )
         else:
             LOGGER.info(
                 "%s:%s was marked legit by %s(%s), but was not found in active_user_checks_dict. Checks might have already completed or been stopped.",

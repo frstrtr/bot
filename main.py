@@ -1773,8 +1773,8 @@ async def handle_autoreports(
     # if message.forward_date:
     #     message_report_date = message.forward_date
     # else:
-    # Use utcnow() because message_timestamp is UTC (server is UTC+4)
-    message_report_date = datetime.utcnow()
+    # Use timezone-aware UTC now
+    message_report_date = datetime.now(timezone.utc)
 
     # Escape the name to prevent HTML injection
     escaped_name = html.escape(
@@ -2923,11 +2923,10 @@ async def perform_checks(
         if start_time:
             # Handle both naive and timezone-aware start_time
             # DB timestamps are UTC (naive=old UTC, aware=new +00:00 format)
-            # Server is UTC+4, so for naive UTC use utcnow()
-            if start_time.tzinfo is not None:
-                elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
-            else:
-                elapsed_seconds = (datetime.utcnow() - start_time).total_seconds()
+            # Convert naive UTC to aware UTC, then compare with aware UTC now
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+            elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
             if elapsed_seconds >= sleep_times[-1]:
                 # Monitoring period already completed
                 LOGGER.info(
@@ -3137,11 +3136,10 @@ async def perform_checks(
                                         joined_at_raw.replace(" ", "T")
                                     )
                                     # All timestamps in DB are UTC (naive=UTC, aware=+00:00)
-                                    # Server is UTC+4, so for naive timestamps use utcnow()
-                                    if joined_dt.tzinfo:
-                                        delta = datetime.now(timezone.utc) - joined_dt
-                                    else:
-                                        delta = datetime.utcnow() - joined_dt
+                                    # Convert naive to aware for comparison
+                                    if joined_dt.tzinfo is None:
+                                        joined_dt = joined_dt.replace(tzinfo=timezone.utc)
+                                    delta = datetime.now(timezone.utc) - joined_dt
                                     # human friendly formatting
                                     days = delta.days
                                     hours, rem = divmod(delta.seconds, 3600)
@@ -4509,11 +4507,10 @@ if __name__ == "__main__":
                                     str(joined_at_raw).replace(" ", "T")
                                 )
                                 # All timestamps in DB are UTC (naive=UTC, aware=+00:00)
-                                # Server is UTC+4, so for naive timestamps use utcnow()
-                                if _jdt.tzinfo:
-                                    _delta = datetime.now(timezone.utc) - _jdt
-                                else:
-                                    _delta = datetime.utcnow() - _jdt
+                                # Convert naive to aware for comparison
+                                if _jdt.tzinfo is None:
+                                    _jdt = _jdt.replace(tzinfo=timezone.utc)
+                                _delta = datetime.now(timezone.utc) - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
                                 _minutes, _seconds = divmod(_rem, 60)
@@ -4941,8 +4938,8 @@ if __name__ == "__main__":
 
         # print('##########----------DEBUG----------##########')
 
-        # Use utcnow() because massage_timestamp is UTC (server is UTC+4)
-        message_report_date = datetime.utcnow()
+        # Use timezone-aware UTC now
+        message_report_date = datetime.now(timezone.utc)
         # avoid html tags in the name
         escaped_name = html.escape(
             f"{message.forward_sender_name or f'{first_name} {last_name}'}"
@@ -6736,8 +6733,9 @@ if __name__ == "__main__":
                                 _jdt = datetime.strptime(
                                     _ja_str, "%Y-%m-%d %H:%M:%S"
                                 )
-                                # Server is UTC+4, timestamps are UTC - use utcnow()
-                                _delta = datetime.utcnow() - _jdt
+                                # Timestamps are naive UTC - add timezone then compare
+                                _jdt = _jdt.replace(tzinfo=timezone.utc)
+                                _delta = datetime.now(timezone.utc) - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
                                 _minutes, _seconds = divmod(_rem, 60)
@@ -7222,12 +7220,10 @@ if __name__ == "__main__":
                         first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
                         # If first message is more than 5 minutes old and not matching current - skip
                         # IMPORTANT: All timestamps in DB are UTC (old=naive UTC, new=aware +00:00)
-                        # Server is UTC+4, so for naive timestamps use utcnow() not now()
-                        if first_msg_dt.tzinfo:
-                            msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
-                        else:
-                            # Naive timestamp = UTC, compare with UTC now
-                            msg_age_seconds = (datetime.utcnow() - first_msg_dt).total_seconds()
+                        # Convert naive to aware for comparison
+                        if first_msg_dt.tzinfo is None:
+                            first_msg_dt = first_msg_dt.replace(tzinfo=timezone.utc)
+                        msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
                         is_recent_first_msg = msg_age_seconds < 300  # 5 minutes
                     except (ValueError, TypeError, AttributeError):
                         is_recent_first_msg = False
@@ -7300,11 +7296,10 @@ if __name__ == "__main__":
                         try:
                             # Handle both formats: with and without timezone
                             _first_msg_dt = datetime.fromisoformat(user_first_message_date[0].replace(" ", "T"))
-                            # All timestamps in DB are UTC - server is UTC+4, use utcnow()
-                            if _first_msg_dt.tzinfo:
-                                _threshold_date = datetime.now(timezone.utc) - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
-                            else:
-                                _threshold_date = datetime.utcnow() - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
+                            # All timestamps in DB are UTC - convert naive to aware
+                            if _first_msg_dt.tzinfo is None:
+                                _first_msg_dt = _first_msg_dt.replace(tzinfo=timezone.utc)
+                            _threshold_date = datetime.now(timezone.utc) - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
                             _first_msg_old_enough = _first_msg_dt < _threshold_date
                         except (ValueError, TypeError) as parse_err:
                             LOGGER.warning(

@@ -3124,8 +3124,8 @@ async def perform_checks(
                                 f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>"
                             )
                             
-                            # Format username for display - show @username if available, nothing if not
-                            _username_display = f"@{_orig_username}" if _orig_username and _orig_username != "!UNDEFINED!" else ""
+                            # Format username for display using the standard helper function
+                            _username_display = format_username_for_log(_orig_username)
                             
                             # Send report to AUTOBAN thread (not AUTOREPORT - these are auto-banned)
                             deleted_report = (

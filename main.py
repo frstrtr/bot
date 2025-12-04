@@ -3088,11 +3088,12 @@ async def perform_checks(
                                     joined_dt = datetime.fromisoformat(
                                         joined_at_raw.replace(" ", "T")
                                     )
-                                    # Use timezone-aware comparison if joined_dt has tzinfo
+                                    # All timestamps in DB are UTC (naive=UTC, aware=+00:00)
+                                    # Server is UTC+4, so for naive timestamps use utcnow()
                                     if joined_dt.tzinfo:
                                         delta = datetime.now(timezone.utc) - joined_dt
                                     else:
-                                        delta = datetime.now() - joined_dt
+                                        delta = datetime.utcnow() - joined_dt
                                     # human friendly formatting
                                     days = delta.days
                                     hours, rem = divmod(delta.seconds, 3600)
@@ -4435,11 +4436,12 @@ if __name__ == "__main__":
                                 _jdt = datetime.fromisoformat(
                                     str(joined_at_raw).replace(" ", "T")
                                 )
-                                # Use timezone-aware comparison if _jdt has tzinfo
+                                # All timestamps in DB are UTC (naive=UTC, aware=+00:00)
+                                # Server is UTC+4, so for naive timestamps use utcnow()
                                 if _jdt.tzinfo:
                                     _delta = datetime.now(timezone.utc) - _jdt
                                 else:
-                                    _delta = datetime.now() - _jdt
+                                    _delta = datetime.utcnow() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
                                 _minutes, _seconds = divmod(_rem, 60)
@@ -6647,14 +6649,15 @@ if __name__ == "__main__":
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
-                                # Strip timezone if present
+                                # All timestamps in DB are UTC - strip tz suffix if present
                                 _ja_str = str(joined_at_raw)
                                 if "+" in _ja_str:
                                     _ja_str = _ja_str.split("+")[0].strip()
                                 _jdt = datetime.strptime(
                                     _ja_str, "%Y-%m-%d %H:%M:%S"
                                 )
-                                _delta = datetime.now() - _jdt
+                                # Server is UTC+4, timestamps are UTC - use utcnow()
+                                _delta = datetime.utcnow() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
                                 _minutes, _seconds = divmod(_rem, 60)
@@ -7138,11 +7141,13 @@ if __name__ == "__main__":
                         # Parse timestamp with timezone, handle both old (no tz) and new (+00:00) formats
                         first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
                         # If first message is more than 5 minutes old and not matching current - skip
-                        # Use timezone-aware comparison if first_msg_dt has tzinfo
+                        # IMPORTANT: All timestamps in DB are UTC (old=naive UTC, new=aware +00:00)
+                        # Server is UTC+4, so for naive timestamps use utcnow() not now()
                         if first_msg_dt.tzinfo:
                             msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
                         else:
-                            msg_age_seconds = (datetime.now() - first_msg_dt).total_seconds()
+                            # Naive timestamp = UTC, compare with UTC now
+                            msg_age_seconds = (datetime.utcnow() - first_msg_dt).total_seconds()
                         is_recent_first_msg = msg_age_seconds < 300  # 5 minutes
                     except (ValueError, TypeError, AttributeError):
                         is_recent_first_msg = False
@@ -7215,7 +7220,11 @@ if __name__ == "__main__":
                         try:
                             # Handle both formats: with and without timezone
                             _first_msg_dt = datetime.fromisoformat(user_first_message_date[0].replace(" ", "T"))
-                            _threshold_date = datetime.now() - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
+                            # All timestamps in DB are UTC - server is UTC+4, use utcnow()
+                            if _first_msg_dt.tzinfo:
+                                _threshold_date = datetime.now(timezone.utc) - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
+                            else:
+                                _threshold_date = datetime.utcnow() - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
                             _first_msg_old_enough = _first_msg_dt < _threshold_date
                         except (ValueError, TypeError) as parse_err:
                             LOGGER.warning(

@@ -1693,6 +1693,9 @@ async def handle_autoreports(
 
     # Handle both formats: with and without timezone
     message_timestamp = datetime.fromisoformat(found_message_data[7].replace(" ", "T"))
+    # Strip timezone for consistent comparison
+    if message_timestamp.tzinfo is not None:
+        message_timestamp = message_timestamp.replace(tzinfo=None)
 
     # Get the username
     username = found_message_data[4]
@@ -2860,7 +2863,11 @@ async def perform_checks(
         elapsed_seconds = 0
         skipped_intervals = []
         if start_time:
-            elapsed_seconds = (datetime.now() - start_time).total_seconds()
+            # Handle both naive and timezone-aware start_time
+            if start_time.tzinfo is not None:
+                elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
+            else:
+                elapsed_seconds = (datetime.now() - start_time).total_seconds()
             if elapsed_seconds >= sleep_times[-1]:
                 # Monitoring period already completed
                 LOGGER.info(
@@ -4417,7 +4424,6 @@ if __name__ == "__main__":
                                     _delta = datetime.now(timezone.utc) - _jdt
                                 else:
                                     _delta = datetime.now() - _jdt
-                                _delta = datetime.now() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
                                 _minutes, _seconds = divmod(_rem, 60)

@@ -6957,6 +6957,18 @@ if __name__ == "__main__":
             # Store message data to DB
             store_message_to_db(CURSOR, CONN, message)
 
+            # Skip duplicate processing for media groups (multi-photo messages) EARLY
+            # This avoids redundant DB queries for join date, spam checks, etc.
+            # Only process the first message in a media group
+            if was_media_group_processed(message):
+                LOGGER.debug(
+                    "%s:%s skipping duplicate media group message (group_id: %s) - early check",
+                    message.from_user.id,
+                    format_username_for_log(message.from_user.username),
+                    message.media_group_id,
+                )
+                return
+
             # Special handling for Telegram's anonymous channel admin (ID 777000)
             # This is when someone posts as the channel name (not as themselves)
             if message.from_user.id == 777000:
@@ -7716,17 +7728,6 @@ if __name__ == "__main__":
             # This is message-level deduplication - each new message can still be checked
             # Note: was_user_autoreported() is checked separately for specific triggers (like 10-sec check)
             autoreport_sent = was_autoreported(message)
-
-            # Skip duplicate processing for media groups (multi-photo messages)
-            # Only process the first message in a media group for ALL spam checks
-            if was_media_group_processed(message):
-                LOGGER.debug(
-                    "%s:%s skipping duplicate media group message (group_id: %s) - early check",
-                    message.from_user.id,
-                    format_username_for_log(message.from_user.username),
-                    message.media_group_id,
-                )
-                return
 
             # Check if user is in the banned list (latency edge case)
             # Note: User may have been banned but message was already in flight

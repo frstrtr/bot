@@ -6237,6 +6237,36 @@ if __name__ == "__main__":
         """Function to store recent messages in the database.
         And check senders for spam records."""
 
+        # Skip service messages (join/leave) - they are handled by handle_service_messages
+        if message.new_chat_members or message.left_chat_member:
+            # Delete service message in small groups (not supergroups)
+            # In supergroups, chat_member updates are used instead
+            try:
+                await message.delete()
+                member_info = ""
+                if message.new_chat_members:
+                    member_info = ", ".join([f"{m.first_name} ({m.id})" for m in message.new_chat_members])
+                    action = "joined"
+                elif message.left_chat_member:
+                    m = message.left_chat_member
+                    member_info = f"{m.first_name} ({m.id})"
+                    action = "left"
+                LOGGER.info(
+                    "\033[94m%s Deleted service message: %s %s in %s\033[0m",
+                    message.message_id,
+                    member_info,
+                    action,
+                    message.chat.title or message.chat.id,
+                )
+            except TelegramBadRequest as e:
+                LOGGER.debug(
+                    "Could not delete service message %s in chat %s: %s",
+                    message.message_id,
+                    message.chat.id,
+                    e,
+                )
+            return  # Don't process service messages as regular messages
+
         # check if message is Channel message and DELETE it and stop processing
         if (
             message.sender_chat

@@ -3069,7 +3069,7 @@ async def perform_checks(
                         _now_empty = not cur_first and not cur_last and not cur_username
                         _is_deleted_account = _had_name and _now_empty
                         
-                        # Handle deleted account separately - ban globally and report to autoreport
+                        # Handle deleted account separately - ban globally and report to autoban
                         if _is_deleted_account:
                             chat_username = _chat_info.get("username")
                             chat_title = _chat_info.get("title") or ""
@@ -3080,6 +3080,31 @@ async def perform_checks(
                             _orig_username = baseline.get("username", "!UNDEFINED!")
                             _orig_first = baseline.get("first_name", "")
                             _orig_last = baseline.get("last_name", "")
+                            
+                            # Get list of other chats user was member of (before banning)
+                            other_chats_info = ""
+                            try:
+                                other_chats = await get_user_other_chats(
+                                    user_id, _chat_id or 0, CHANNEL_IDS, CHANNEL_DICT
+                                )
+                                if other_chats:
+                                    other_chats_links = []
+                                    for oc_id, oc_name, oc_username in other_chats:
+                                        if oc_username:
+                                            other_chats_links.append(
+                                                f"<a href='https://t.me/{oc_username}'>@{oc_username}</a> ({html.escape(oc_name)})"
+                                            )
+                                        else:
+                                            oc_id_str = str(oc_id)[4:] if str(oc_id).startswith("-100") else str(oc_id)
+                                            other_chats_links.append(
+                                                f"<a href='https://t.me/c/{oc_id_str}'>{html.escape(oc_name)}</a>"
+                                            )
+                                    other_chats_list = "\n   • ".join(other_chats_links)
+                                    other_chats_info = (
+                                        f"\n👥 <b>Was member of {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}\n"
+                                    )
+                            except Exception as e:
+                                LOGGER.debug("Failed to get other chats for deleted account %s: %s", user_id, e)
                             
                             # Ban from all chats
                             success_count, fail_count, total_count = await ban_user_from_all_chats(
@@ -3105,7 +3130,8 @@ async def perform_checks(
                                 f"User: {html.escape(_orig_first)} {html.escape(_orig_last)} @{_orig_username} (<code>{user_id}</code>)\n"
                                 f"Chat: {universal_chatlink}\n"
                                 f"Detected at: {_ts}\n"
-                                f"Banned from: {success_count}/{total_count} chats\n\n"
+                                f"Banned from: {success_count}/{total_count} chats"
+                                f"{other_chats_info}\n"
                                 f"{profile_links}"
                             )
                             await safe_send_message(

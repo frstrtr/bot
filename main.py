@@ -3015,6 +3015,14 @@ async def perform_checks(
                             changed.append("username")
                         if baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
                             changed.append("profile photo")
+                        
+                        # Check if account was deleted by Telegram:
+                        # All profile fields become empty when account is deleted
+                        _had_name = baseline.get("first_name", "") or baseline.get("last_name", "")
+                        _now_empty = not cur_first and not cur_last and not cur_username
+                        _is_deleted_account = _had_name and _now_empty
+                        if _is_deleted_account:
+                            changed.append("⚠️ ACCOUNT DELETED")
 
                         if changed:
                             chat_username = _chat_info.get("username")
@@ -4388,6 +4396,14 @@ if __name__ == "__main__":
                         _changed.append("username")
                     if _baseline.get("photo_count", 0) == 0 and cur_photo_count > 0:
                         _changed.append("profile photo")
+                    
+                    # Check if account was deleted by Telegram:
+                    # All profile fields become empty when account is deleted
+                    _had_name = _baseline.get("first_name", "") or _baseline.get("last_name", "")
+                    _now_empty = not cur_first and not cur_last and not cur_username
+                    _is_deleted_account = _had_name and _now_empty
+                    if _is_deleted_account:
+                        _changed.append("⚠️ ACCOUNT DELETED")
 
                     if _changed:
                         _chat_info = _baseline.get("chat", {})

@@ -7196,35 +7196,101 @@ if __name__ == "__main__":
                             # Skip the notification
                             should_notify_missed_join = False
                         
-                        # If established user mentions a bot - delete message, send to AUTOREPORT, and start INTENSIVE monitoring
-                        # Established users don't get banned, but message is still deleted and reported
+                        # If established user mentions a bot - send to SUSPICIOUS and start monitoring
+                        # Established users don't get banned, message NOT deleted (they are trusted)
                         elif _is_established and _has_bot_mention:
                             LOGGER.info(
-                                "\033[93m%s:%s Established user mentioned bot %s - DELETING message and sending to AUTOREPORT\033[0m",
+                                "\033[93m%s:%s Established user mentioned bot %s - sending to SUSPICIOUS (NOT deleting, NOT banning)\033[0m",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                                 _bot_mention_name,
                             )
                             
-                            # Send to AUTOREPORT FIRST (before delete) so message can be forwarded
-                            await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by ESTABLISHED missed join user (NOT banned)")
+                            # Build message link for notification
+                            _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                            if message.chat.username:
+                                _msg_link = f"https://t.me/{message.chat.username}/{message.message_id}"
+                            else:
+                                _chat_id_str = str(message.chat.id)[4:] if message.chat.id < 0 else str(message.chat.id)
+                                _msg_link = f"https://t.me/c/{_chat_id_str}/{message.message_id}"
                             
-                            # Delete the suspicious message
+                            # Build notification message for SUSPICIOUS thread
+                            _established_bot_mention_msg = (
+                                f"⚠️ <b>Bot Mention by Established User</b>\n"
+                                f"User: @{message.from_user.username if message.from_user.username else '!UNDEFINED!'} "
+                                f"(<code>{message.from_user.id}</code>)\n"
+                                f"Name: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')}\n"
+                                f"Chat: {_chat_link_html}\n\n"
+                                f"🤖 <b>Mentioned bot:</b> {_bot_mention_name}\n"
+                                f"📊 <b>User status:</b> ESTABLISHED (msg_count >= {ESTABLISHED_USER_MIN_MESSAGES}, first_msg >= {ESTABLISHED_USER_FIRST_MSG_DAYS} days)\n"
+                                f"⚠️ <b>Action:</b> NOT banned, NOT deleted (monitoring started)\n"
+                                f"🔗 <a href='{_msg_link}'>Message with bot mention</a>\n\n"
+                                f"🔗 <b>Profile links:</b>\n"
+                                f"   ├ <a href='tg://user?id={message.from_user.id}'>ID based profile link</a>\n"
+                                f"   └ <a href='tg://openmessage?user_id={message.from_user.id}'>Android</a>, "
+                                f"<a href='https://t.me/@id{message.from_user.id}'>iOS</a>"
+                            )
+                            
+                            # Build keyboard with actions
+                            _established_kb = make_lols_kb(message.from_user.id)
+                            _established_kb.add(
+                                InlineKeyboardButton(
+                                    text="⚙️ Actions (Ban / Delete) ⚙️",
+                                    callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+                                )
+                            )
+                            _established_kb.add(
+                                InlineKeyboardButton(
+                                    text="✅ Mark as Legit",
+                                    callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                )
+                            )
+                            # Add LOLS check for the mentioned bot
+                            if _bot_mention_name:
+                                _bot_username_clean = _bot_mention_name.lstrip("@")
+                                _established_kb.add(
+                                    InlineKeyboardButton(
+                                        text=f"🔍 Check {_bot_mention_name}",
+                                        url=f"https://t.me/oLolsBot?start=u-{_bot_username_clean}",
+                                    )
+                                )
+                            
+                            # Forward the message to SUSPICIOUS
                             try:
-                                await message.delete()
-                                LOGGER.info(
-                                    "\033[93m%s:%s Message %s deleted (bot mention by established missed join user)\033[0m",
+                                await message.forward(
+                                    ADMIN_GROUP_ID,
+                                    ADMIN_SUSPICIOUS,
+                                    disable_notification=True,
+                                )
+                                LOGGER.debug(
+                                    "\033[93m%s:%s Forwarded bot mention message to ADMIN_SUSPICIOUS\033[0m",
                                     message.from_user.id,
                                     format_username_for_log(message.from_user.username),
-                                    message.message_id,
                                 )
-                            except TelegramBadRequest as del_err:
+                            except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
                                 LOGGER.warning(
-                                    "%s:%s Failed to delete bot mention message: %s",
+                                    "%s:%s Failed to forward bot mention message to SUSPICIOUS: %s",
                                     message.from_user.id,
                                     format_username_for_log(message.from_user.username),
-                                    del_err,
+                                    fwd_err,
                                 )
+                            
+                            # Send notification to SUSPICIOUS thread
+                            await safe_send_message(
+                                BOT,
+                                ADMIN_GROUP_ID,
+                                _established_bot_mention_msg,
+                                LOGGER,
+                                message_thread_id=ADMIN_SUSPICIOUS,
+                                parse_mode="HTML",
+                                disable_web_page_preview=True,
+                                reply_markup=_established_kb.as_markup(),
+                            )
+                            LOGGER.info(
+                                "\033[93m%s:%s Sent bot mention notification to ADMIN_SUSPICIOUS\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                            )
                             
                             # Add to active checks (even though established) because bot mention is suspicious
                             if message.from_user.id not in active_user_checks_dict:
@@ -7278,6 +7344,11 @@ if __name__ == "__main__":
                                 ),
                                 name=str(message.from_user.id),
                             )
+                            LOGGER.debug(
+                                "\033[93m%s:%s Started 24hr monitoring (established user bot mention)\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                            )
                             
                             # ALSO start INTENSIVE checks (15 min frequent checks)
                             await start_intensive_watchdog(
@@ -7286,12 +7357,15 @@ if __name__ == "__main__":
                                 message_chat_id=message.chat.id,
                                 message_id=message.message_id,
                             )
-                            
-                            # Note: Message already sent to AUTOREPORT above (submit_autoreport)
-                            # No need for additional SUSPICIOUS notification
+                            LOGGER.debug(
+                                "\033[93m%s:%s Started INTENSIVE 15-min watchdog (established user bot mention)\033[0m",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                            )
                             
                             missed_join_notification_sent = True
-                            mark_user_autoreported(message.from_user.id)
+                            mark_suspicious_reported(message)  # Prevent duplicate suspicious content report
+                            mark_user_suspicious_reported(message.from_user.id)  # Prevent duplicate user reports
                             should_notify_missed_join = False
                     
                     # Bot was offline when user joined - send suspicious notification

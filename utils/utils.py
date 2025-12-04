@@ -511,8 +511,8 @@ def initialize_logger(log_level="INFO"):
     # Configure logging to use UTF-8 encoding
     logger = logging.getLogger(__name__)
     if not logger.hasHandlers():
-        log_level = getattr(logging, log_level.upper(), logging.INFO)
-        logger.setLevel(log_level)  # Set the logging level based on the argument
+        log_level_value = getattr(logging, log_level.upper(), logging.INFO)
+        logger.setLevel(log_level_value)  # Set the logging level based on the argument
 
         # Create handlers
         stream_handler = logging.StreamHandler(sys.stdout)
@@ -532,6 +532,22 @@ def initialize_logger(log_level="INFO"):
         # Add handlers to the logger
         logger.addHandler(stream_handler)
         logger.addHandler(file_handler)
+        
+        # Also configure the root logger to capture aiogram and other library logs
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level_value)
+        # Add file handler to root logger to capture all library logs (including aiogram exceptions)
+        if not any(isinstance(h, logging.FileHandler) and h.baseFilename.endswith("bancop_BOT.log") for h in root_logger.handlers):
+            root_file_handler = logging.FileHandler("bancop_BOT.log", encoding="utf-8")
+            root_file_handler.setFormatter(formatter)
+            root_logger.addHandler(root_file_handler)
+        
+        # Capture aiogram dispatcher exceptions specifically
+        aiogram_logger = logging.getLogger("aiogram")
+        aiogram_logger.setLevel(log_level_value)
+        if not any(isinstance(h, logging.FileHandler) for h in aiogram_logger.handlers):
+            aiogram_logger.addHandler(file_handler)
+    
     return logger
 
 

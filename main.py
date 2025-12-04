@@ -24,6 +24,8 @@ import html
 import tracemalloc  # for memory usage debugging
 import re
 import ast  # evaluate dictionaries safely
+import sys
+import logging
 
 import aiocron
 from zoneinfo import ZoneInfo
@@ -274,6 +276,23 @@ args = parser.parse_args()
 
 # LOGGER init
 LOGGER = initialize_logger(args.log_level)
+
+# Redirect stderr to logger to capture aiogram dispatcher exceptions
+class StderrToLogger:
+    """Redirect stderr to logger so aiogram exceptions appear in log file."""
+    def __init__(self, logger, level=logging.ERROR):
+        self.logger = logger
+        self.level = level
+        self.linebuf = ""
+    
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.level, "[stderr] %s", line.rstrip())
+    
+    def flush(self):
+        pass
+
+sys.stderr = StderrToLogger(LOGGER, logging.ERROR)
 
 # Log the chosen logging level
 LOGGER.info("Logging level set to: %s", args.log_level)

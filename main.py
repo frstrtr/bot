@@ -7038,6 +7038,34 @@ if __name__ == "__main__":
                         should_notify_missed_join,
                     )
                     
+                    # For established users (old first message, no notification needed):
+                    # Retroactively mark their first message as a join event so future queries find it
+                    if not should_notify_missed_join and not is_first_message_ever:
+                        try:
+                            # Mark the oldest message as new_chat_member = 1
+                            CURSOR.execute(
+                                """
+                                UPDATE recent_messages 
+                                SET new_chat_member = 1 
+                                WHERE user_id = ? AND received_date = ?
+                                """,
+                                (message.from_user.id, first_msg_date_str),
+                            )
+                            CONN.commit()
+                            LOGGER.info(
+                                "%s:%s Retroactively marked first message (%s) as join event - user seen earlier without join record",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                                first_msg_date_str,
+                            )
+                        except sqlite3.Error as db_err:
+                            LOGGER.warning(
+                                "%s:%s Failed to retroactively mark join event: %s",
+                                message.from_user.id,
+                                format_username_for_log(message.from_user.username),
+                                db_err,
+                            )
+                    
                     # Check if this is an established user - skip suspicious banner if so
                     # Established = (messages >= MIN AND first_msg_age >= DAYS) OR any legit marker
                     _skip_missed_join_banner = False

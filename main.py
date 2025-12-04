@@ -7279,12 +7279,14 @@ if __name__ == "__main__":
                         # If missed join user mentions a bot - this is spam! Delete and send to autoreport
                         if _has_bot_mention:
                             LOGGER.info(
-                                "\033[91m%s:%s Missed join user mentioned bot %s - deleting message and sending to AUTOREPORT\033[0m",
+                                "\033[91m%s:%s Missed join user mentioned bot %s - sending to AUTOREPORT and deleting message\033[0m",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                                 _bot_mention_name,
                             )
-                            # Delete the spam message
+                            # Send to autoreport FIRST (before delete) so message can be forwarded
+                            await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by missed join user")
+                            # Now delete the spam message
                             try:
                                 await message.delete()
                                 LOGGER.info(
@@ -7300,8 +7302,6 @@ if __name__ == "__main__":
                                     format_username_for_log(message.from_user.username),
                                     del_err,
                                 )
-                            # Send to autoreport for admin review/ban
-                            await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by missed join user")
                             missed_join_notification_sent = True
                         else:
                             # Regular missed join notification to ADMIN_SUSPICIOUS

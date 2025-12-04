@@ -1705,7 +1705,7 @@ async def handle_autoreports(
 
     # Handle both formats: with and without timezone
     message_timestamp = datetime.fromisoformat(found_message_data[7].replace(" ", "T"))
-    # Strip timezone for consistent comparison
+    # Strip timezone for consistent comparison - timestamp is UTC
     if message_timestamp.tzinfo is not None:
         message_timestamp = message_timestamp.replace(tzinfo=None)
 
@@ -1728,7 +1728,8 @@ async def handle_autoreports(
     # if message.forward_date:
     #     message_report_date = message.forward_date
     # else:
-    message_report_date = datetime.now()
+    # Use utcnow() because message_timestamp is UTC (server is UTC+4)
+    message_report_date = datetime.utcnow()
 
     # Escape the name to prevent HTML injection
     escaped_name = html.escape(
@@ -4845,7 +4846,7 @@ if __name__ == "__main__":
             _ts_str = str(_ts_str).split("+")[0].strip()
         massage_timestamp = datetime.strptime(
             _ts_str, "%Y-%m-%d %H:%M:%S"
-        )  # convert to datetime object
+        )  # convert to datetime object (UTC)
 
         # Get the username
         username = found_message_data[4]
@@ -4865,7 +4866,8 @@ if __name__ == "__main__":
 
         # print('##########----------DEBUG----------##########')
 
-        message_report_date = datetime.now()
+        # Use utcnow() because massage_timestamp is UTC (server is UTC+4)
+        message_report_date = datetime.utcnow()
         # avoid html tags in the name
         escaped_name = html.escape(
             f"{message.forward_sender_name or f'{first_name} {last_name}'}"

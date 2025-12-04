@@ -3124,10 +3124,13 @@ async def perform_checks(
                                 f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>"
                             )
                             
+                            # Format username for display - show @username if available, nothing if not
+                            _username_display = f"@{_orig_username}" if _orig_username and _orig_username != "!UNDEFINED!" else ""
+                            
                             # Send report to AUTOBAN thread (not AUTOREPORT - these are auto-banned)
                             deleted_report = (
                                 f"⚠️ <b>DELETED ACCOUNT DETECTED & BANNED</b>\n\n"
-                                f"User: {html.escape(_orig_first)} {html.escape(_orig_last)} @{_orig_username} (<code>{user_id}</code>)\n"
+                                f"User: {html.escape(_orig_first)} {html.escape(_orig_last)} {_username_display} (<code>{user_id}</code>)\n"
                                 f"Chat: {universal_chatlink}\n"
                                 f"Detected at: {_ts}\n"
                                 f"Banned from: {success_count}/{total_count} chats"

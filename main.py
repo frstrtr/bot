@@ -3099,7 +3099,7 @@ async def perform_checks(
                                 f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, <a href='https://t.me/@id{user_id}'>IOS (Apple)</a>"
                             )
                             
-                            # Send report to AUTOREPORT thread
+                            # Send report to AUTOBAN thread (not AUTOREPORT - these are auto-banned)
                             deleted_report = (
                                 f"⚠️ <b>DELETED ACCOUNT DETECTED & BANNED</b>\n\n"
                                 f"User: {html.escape(_orig_first)} {html.escape(_orig_last)} @{_orig_username} (<code>{user_id}</code>)\n"
@@ -3113,7 +3113,7 @@ async def perform_checks(
                                 ADMIN_GROUP_ID,
                                 deleted_report,
                                 LOGGER,
-                                message_thread_id=ADMIN_AUTOREPORTS,
+                                message_thread_id=ADMIN_AUTOBAN,
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
                             )

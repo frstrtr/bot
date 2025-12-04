@@ -5814,23 +5814,27 @@ if __name__ == "__main__":
             # Add to banned users dict
             banned_users_dict[user_id] = username
 
-            # Create event record
-            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by else "!UNDEFINED!"
-            _user_for_record = f"@{username}" if username else "!UNDEFINED!"
+            # Create event record (include admin ID for traceability)
+            _admin_for_record = f"@{button_pressed_by}" if button_pressed_by and button_pressed_by != "!UNDEFINED!" else "!UNDEFINED!"
+            _user_for_record = f"@{username}" if username and username != "!UNDEFINED!" else "!UNDEFINED!"
             event_record = (
                 f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}: "
                 f"{user_id:<10} "
                 f"❌  {_user_for_record} {first_name} {last_name}            "
                 f" member          --> kicked          in "
-                f"ALL_CHATS                          by {_admin_for_record}\n"
+                f"ALL_CHATS                          by {_admin_for_record} ({_admin_id})\n"
             )
             await save_report_file("inout_", "mbn" + event_record)
 
             # Report to spam servers
             await report_spam_2p2p(user_id, LOGGER, username)
 
+            # Build admin info with ID-based profile link
+            _admin_display = f"@{button_pressed_by}" if button_pressed_by and button_pressed_by != "!UNDEFINED!" else "!UNDEFINED!"
+            _admin_link = f"<a href='tg://user?id={_admin_id}'>{_admin_display}</a>"
+            
             ban_message = (
-                f"Manual ban completed by {_admin_for_record}:\n"
+                f"Manual ban completed by {_admin_link} (<code>{_admin_id}</code>):\n"
                 f"User {_user_for_record} ({first_name} {last_name}) <code>{user_id}</code> "
                 f"banned from all monitored chats and reported to spam servers."
             )

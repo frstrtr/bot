@@ -9346,21 +9346,30 @@ if __name__ == "__main__":
         """Function to delete the message by its link."""
         try:
             command_args = message.text.split()
-            LOGGER.debug("Command arguments received: %s", command_args)
+            admin_id = message.from_user.id
+            LOGGER.debug(
+                "%s:%s /delmsg command args: %s",
+                admin_id,
+                format_username_for_log(message.from_user.username),
+                command_args,
+            )
 
             if len(command_args) < 2:
                 raise ValueError("Please provide the message link to delete.")
 
             message_link = command_args[1]
-            LOGGER.debug("Message link to delete: %s", message_link)
 
-            # Admin_ID
-            admin_id = message.from_user.id
             # Extract the chat ID and message ID from the message link
             chat_username, message_id = extract_chat_name_and_message_id_from_link(
                 message_link
             )
-            LOGGER.debug("Chat ID: %s, Message ID: %d", chat_username, message_id)
+            LOGGER.debug(
+                "%s:%s /delmsg chat: %s, msg_id: %d",
+                admin_id,
+                format_username_for_log(message.from_user.username),
+                chat_username,
+                message_id,
+            )
 
             if not chat_username or not message_id:
                 raise ValueError("Invalid message link provided.")
@@ -9370,7 +9379,8 @@ if __name__ == "__main__":
             deleted_message_user_name = None
             deleted_message_user_first_name = None
             deleted_message_user_last_name = None
-            user_details_log_str = "user details not found in DB"
+            user_details_log_str = "⚠️ Author unknown (service message, not tracked, or DB miss)"
+            user_details_reply_str = "⚠️ Author unknown - this may be a service message (join/leave), a message not tracked by the bot, or not found in DB"
 
             try:
                 CURSOR.execute(
@@ -9398,18 +9408,26 @@ if __name__ == "__main__":
                         f"@{deleted_message_user_name or '!NoName!'} "
                         f"(<code>{deleted_message_user_id}</code>)"
                     )
+                    user_details_reply_str = user_details_log_str
                 else:
-                    LOGGER.warning(
-                        "Could not retrieve user details for message %d in chat %s from the database.",
+                    LOGGER.debug(
+                        "%s:%s /delmsg msg %d in %s - author not in DB (service msg or not tracked)",
+                        admin_id,
+                        format_username_for_log(message.from_user.username),
                         message_id,
                         chat_username,
                     )
             except sqlite3.Error as e_db:
                 LOGGER.error(
-                    "Database error while fetching user details for deleted message: %s",
+                    "%s:%s /delmsg DB error fetching author for msg %d in %s: %s",
+                    admin_id,
+                    format_username_for_log(message.from_user.username),
+                    message_id,
+                    chat_username,
                     e_db,
                 )
                 user_details_log_str = "DB error fetching user details"
+                user_details_reply_str = "⚠️ Database error while fetching author details"
 
             # Forward the command message first (before deleting target)
             # Note: This forwards the /delmsg command itself for audit trail
@@ -9421,27 +9439,31 @@ if __name__ == "__main__":
 
             try:
                 await BOT.delete_message(chat_id=chat_username, message_id=message_id)
+                # Log with deleted message author (if known) or admin who issued command
+                log_user_id = deleted_message_user_id if deleted_message_user_id else admin_id
+                log_username = deleted_message_user_name if deleted_message_user_name else message.from_user.username
                 LOGGER.info(
-                    "%s:%s Message %d deleted from chat %s by admin request. Original message %s",
-                    deleted_message_user_id if deleted_message_user_id else "unknown",
-                    format_username_for_log(deleted_message_user_name),
+                    "%s:%s /delmsg deleted msg %d from %s. %s",
+                    log_user_id,
+                    format_username_for_log(log_username),
                     message_id,
                     chat_username,
                     user_details_log_str.replace("<code>", "")
                     .replace("</code>", "")
                     .replace("<b>", "")
-                    .replace("</b>", ""),
+                    .replace("</b>", "")
+                    .replace("⚠️ ", ""),
                 )
                 await message.reply(
-                    f"Message {message_id} deleted from chat {chat_username}.\n"
-                    f"Original message {user_details_log_str}",
+                    f"✅ Message {message_id} deleted from chat {chat_username}.\n"
+                    f"{user_details_reply_str}",
                     parse_mode="HTML",
                 )
                 await safe_send_message(
                     BOT,
                     TECHNOLOG_GROUP_ID,
                     f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
-                    f"Original message {user_details_log_str}",
+                    f"{user_details_log_str}",
                     LOGGER,
                     parse_mode="HTML",
                 )
@@ -9449,7 +9471,7 @@ if __name__ == "__main__":
                     BOT,
                     ADMIN_GROUP_ID,
                     f"{message_link} Message {message_id} deleted from chat {chat_username} by admin <code>{admin_id}</code> request.\n"
-                    f"Original message {user_details_log_str}",
+                    f"{user_details_log_str}",
                     LOGGER,
                     parse_mode="HTML",
                     message_thread_id=ADMIN_MANBAN,
@@ -9457,13 +9479,16 @@ if __name__ == "__main__":
 
             except TelegramNotFound as e:
                 LOGGER.error(
-                    "Failed to delete message %d in chat %s. Error: %s",
+                    "%s:%s /delmsg failed - msg %d in %s not found: %s",
+                    admin_id,
+                    format_username_for_log(message.from_user.username),
                     message_id,
                     chat_username,
                     e,
                 )
                 await message.reply(
-                    f"Failed to delete message {message_id} in chat {chat_username}. Error: {e}"
+                    f"❌ Failed to delete message {message_id} in chat {chat_username}.\n"
+                    f"Message not found."
                 )
             except TelegramBadRequest as e:
                 error_msg = str(e).lower()
@@ -9477,19 +9502,26 @@ if __name__ == "__main__":
                 else:
                     reason = str(e)
                 LOGGER.error(
-                    "Failed to delete message %d in chat %s. Error: %s",
+                    "%s:%s /delmsg failed - msg %d in %s: %s",
+                    admin_id,
+                    format_username_for_log(message.from_user.username),
                     message_id,
                     chat_username,
                     e,
                 )
                 await message.reply(
-                    f"Failed to delete message {message_id} in chat {chat_username}.\n\n{reason}"
+                    f"❌ Failed to delete message {message_id} in chat {chat_username}.\n\n{reason}"
                 )
 
         except ValueError as ve:
             await message.reply(str(ve))
         except TelegramBadRequest as e:
-            LOGGER.error("Error in delete_message: %s", e)
+            LOGGER.error(
+                "%s:%s /delmsg error: %s",
+                message.from_user.id,
+                format_username_for_log(message.from_user.username),
+                e,
+            )
             await message.reply(f"An error occurred: {e}")
 
     @DP.message(Command("delmsg"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)

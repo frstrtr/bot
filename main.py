@@ -4487,12 +4487,15 @@ if __name__ == "__main__":
                     (inout_userid,),
                 ).fetchall()
                 # Handle both formats: with and without timezone
-                time_diff = (
-                    datetime.fromisoformat(last2_join_left_event[0][0].replace(" ", "T"))
-                    - datetime.fromisoformat(
-                        last2_join_left_event[1][0].replace(" ", "T")
-                    )
-                ).total_seconds()
+                # Parse both timestamps, stripping timezone to avoid naive/aware mismatch
+                _dt0 = datetime.fromisoformat(last2_join_left_event[0][0].replace(" ", "T"))
+                _dt1 = datetime.fromisoformat(last2_join_left_event[1][0].replace(" ", "T"))
+                # Strip timezone info to make both naive for comparison
+                if _dt0.tzinfo is not None:
+                    _dt0 = _dt0.replace(tzinfo=None)
+                if _dt1.tzinfo is not None:
+                    _dt1 = _dt1.replace(tzinfo=None)
+                time_diff = (_dt0 - _dt1).total_seconds()
 
                 if (
                     time_diff <= 30

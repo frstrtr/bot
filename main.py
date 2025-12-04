@@ -13,6 +13,7 @@ except AttributeError:
 
 from datetime import timedelta
 from datetime import datetime
+from datetime import timezone
 import argparse
 import asyncio
 import random
@@ -1589,8 +1590,8 @@ async def handle_autoreports(
     # LOGGER.debug("message object: %s", message)
 
     # Save both the original message_id and the forwarded message's date
-    # Convert UTC message.date to local time string for consistent DB storage
-    received_date = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
+    # Store UTC timestamps with timezone suffix (+00:00) for database portability
+    received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
     # remove -100 from the chat ID if this is a public group
     if message.chat.id < 0:
         report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -1610,8 +1611,8 @@ async def handle_autoreports(
             message.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
-            message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
-            received_date,
+            message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
+            received_date_utc,
             str(found_message_data),
         ),
     )
@@ -2999,11 +3000,15 @@ async def perform_checks(
                             elapsed_line = ""
                             if joined_at_raw:
                                 try:
-                                    # Handle both formats: with and without timezone
+                                    # Handle both formats: with and without timezone (+00:00)
                                     joined_dt = datetime.fromisoformat(
                                         joined_at_raw.replace(" ", "T")
                                     )
-                                    delta = datetime.now() - joined_dt
+                                    # Use timezone-aware comparison if joined_dt has tzinfo
+                                    if joined_dt.tzinfo:
+                                        delta = datetime.now(timezone.utc) - joined_dt
+                                    else:
+                                        delta = datetime.now() - joined_dt
                                     # human friendly formatting
                                     days = delta.days
                                     hours, rem = divmod(delta.seconds, 3600)
@@ -4110,7 +4115,7 @@ if __name__ == "__main__":
                                     inout_username if inout_username != "!UNDEFINED!" else None,
                                     inout_userfirstname,
                                     inout_userlastname if inout_userlastname else None,
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                                     1,
                                     1,
                                 ),
@@ -4211,8 +4216,8 @@ if __name__ == "__main__":
                             "last_name": update.old_chat_member.user.last_name or "",
                             "username": update.old_chat_member.user.username or "",
                             "photo_count": _photo_count,
-                            # Store join timestamp (server local time) to compute elapsed durations later
-                            "joined_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            # Store join timestamp in UTC with timezone suffix for database portability
+                            "joined_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                             "chat": {
                                 "id": update.chat.id,
                                 "username": getattr(update.chat, "username", None),
@@ -4243,8 +4248,8 @@ if __name__ == "__main__":
 
         # record the event in the database if not lols_spam
         if not lols_spam:
-            # Convert UTC update.date to local time for consistent storage
-            update_date_local = update.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if update.date else None
+            # Store UTC timestamps with timezone suffix (+00:00) for database portability
+            update_date_utc = update.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if update.date else None
             CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages
@@ -4260,10 +4265,10 @@ if __name__ == "__main__":
                     getattr(update.old_chat_member.user, "username", ""),
                     getattr(update.old_chat_member.user, "first_name", ""),
                     getattr(update.old_chat_member.user, "last_name", ""),
-                    # Convert datetime to local time string for consistent DB storage
-                    update_date_local,
+                    # Store UTC timestamp with timezone suffix for database portability
+                    update_date_utc,
                     getattr(update.from_user, "id", ""),
-                    update_date_local,
+                    update_date_utc,
                     getattr(update.chat, "title", None),
                     getattr(update.from_user, "id", None),
                     getattr(update.from_user, "username", ""),
@@ -4346,13 +4351,15 @@ if __name__ == "__main__":
                         elapsed_line = ""
                         if joined_at_raw:
                             try:
-                                # Strip timezone if present
-                                _ja_str = str(joined_at_raw)
-                                if "+" in _ja_str:
-                                    _ja_str = _ja_str.split("+")[0].strip()
-                                _jdt = datetime.strptime(
-                                    _ja_str, "%Y-%m-%d %H:%M:%S"
+                                # Handle both formats: with and without timezone (+00:00)
+                                _jdt = datetime.fromisoformat(
+                                    str(joined_at_raw).replace(" ", "T")
                                 )
+                                # Use timezone-aware comparison if _jdt has tzinfo
+                                if _jdt.tzinfo:
+                                    _delta = datetime.now(timezone.utc) - _jdt
+                                else:
+                                    _delta = datetime.now() - _jdt
                                 _delta = datetime.now() - _jdt
                                 _days = _delta.days
                                 _hours, _rem = divmod(_delta.seconds, 3600)
@@ -4690,8 +4697,8 @@ if __name__ == "__main__":
         LOGGER.debug("%s - message data: %s", found_message_data[3], found_message_data)
 
         # Save both the original message_id and the forwarded message's date
-        # Convert UTC message.date to local time string for consistent DB storage
-        received_date = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
+        # Store UTC timestamps with timezone suffix (+00:00) for database portability
+        received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
         # Create a unique report ID based on the chat ID and message ID and remove -100 if public chat
         if message.chat.id < 0:
             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -4718,8 +4725,8 @@ if __name__ == "__main__":
                 message.from_user.username,
                 message.from_user.first_name,
                 message.from_user.last_name,
-                message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None,
-                received_date,
+                message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
+                received_date_utc,
                 str(found_message_data),
             ),
         )
@@ -7018,23 +7025,27 @@ if __name__ == "__main__":
                     # Check if this is the CURRENT message (first time we're seeing this user)
                     # Only send notification if this is the actual first message we stored
                     # This prevents false "RECOVERED" notifications after bot restarts
-                    # IMPORTANT: Convert message.date (UTC) to local time for comparison with DB (stores local time)
-                    current_msg_date_local = message.date.astimezone().replace(tzinfo=None) if message.date else None
-                    current_msg_date_str = current_msg_date_local.strftime("%Y-%m-%d %H:%M:%S") if current_msg_date_local else None
+                    # Database now stores UTC with +00:00 suffix, message.date is also UTC
+                    current_msg_date_utc_str = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
                     first_msg_date_str = user_first_message_date[0] if user_first_message_date else None
                     
                     # STRICT check: Only notify if current message IS the first message in DB
                     # The previous logic with "or not in active_user_checks_dict" caused false positives
                     # after bot restarts for users who posted long ago
-                    is_first_message_ever = (current_msg_date_str == first_msg_date_str)
+                    is_first_message_ever = (current_msg_date_utc_str == first_msg_date_str)
                     
                     # Also consider: if first_msg is from today (within last few minutes), 
                     # and user not in active checks - this might be a missed join we just stored
                     # But if first_msg is days/weeks old - user is established, skip notification
                     try:
+                        # Parse timestamp with timezone, handle both old (no tz) and new (+00:00) formats
                         first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
                         # If first message is more than 5 minutes old and not matching current - skip
-                        msg_age_seconds = (datetime.now() - first_msg_dt.replace(tzinfo=None)).total_seconds()
+                        # Use timezone-aware comparison if first_msg_dt has tzinfo
+                        if first_msg_dt.tzinfo:
+                            msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
+                        else:
+                            msg_age_seconds = (datetime.now() - first_msg_dt).total_seconds()
                         is_recent_first_msg = msg_age_seconds < 300  # 5 minutes
                     except (ValueError, TypeError, AttributeError):
                         is_recent_first_msg = False
@@ -7583,7 +7594,7 @@ if __name__ == "__main__":
                     # No records at all - this is their first interaction we've seen
                     # Treat as unknown (new) - safer to check them
                     user_first_seen_unknown = True
-                    user_join_chat_date_str = (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),)
+                    user_join_chat_date_str = (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),)
                     LOGGER.info(
                         "No records for user %s - first time seen, treating as new",
                         message.from_user.id,
@@ -7599,12 +7610,12 @@ if __name__ == "__main__":
                             """,
                             (
                                 message.chat.id,
-                                int(datetime.now().timestamp()),  # synthetic message_id from timestamp
+                                int(datetime.now(timezone.utc).timestamp()),  # synthetic message_id from timestamp
                                 message.from_user.id,
                                 message.from_user.username if message.from_user.username else None,
                                 message.from_user.first_name if message.from_user.first_name else None,
                                 message.from_user.last_name if message.from_user.last_name else None,
-                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                                 1,  # new_chat_member = 1 (synthetic join)
                                 None,  # left_chat_member = NULL
                             ),
@@ -7619,7 +7630,7 @@ if __name__ == "__main__":
                         # Send NEW join banner to IN thread
                         _new_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
                         _new_msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
-                        _new_join_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        _new_join_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Local time for display
                         _new_banner = (
                             f"🆕 <b>NEW User Detected</b>\n"
                             f"👤 {message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'}\n"

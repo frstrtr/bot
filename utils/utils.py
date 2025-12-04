@@ -975,12 +975,13 @@ def has_spam_entities(spam_triggers, message: types.Message):
 def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message):
     """store message data to DB
     
-    Note: All timestamps are stored in LOCAL TIME for consistency with datetime.now() usage elsewhere.
-    message.date from Telegram is UTC, so we convert it to local time before storing.
+    Note: All timestamps are stored in UTC with timezone suffix (+00:00) for portability.
+    This makes the database timezone-independent and deployable across different servers.
+    Format: ISO 8601 (e.g., "2025-12-04 15:30:00+00:00")
     """
-    # Convert UTC message.date to local time for consistent storage
-    received_date_local = message.date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.date else None
-    forward_date_local = message.forward_date.astimezone().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None
+    # Store UTC timestamps with timezone info for portability
+    received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
+    forward_date_utc = message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
     
     cursor.execute(
         """
@@ -996,9 +997,9 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
             getattr(message.from_user, "username", ""),
             getattr(message.from_user, "first_name", ""),
             getattr(message.from_user, "last_name", ""),
-            forward_date_local,
+            forward_date_utc,
             getattr(message, "forward_sender_name", ""),
-            received_date_local,
+            received_date_utc,
             getattr(message.forward_from_chat, "title", None),
             getattr(message.forward_from, "id", None),
             getattr(message.forward_from, "username", ""),

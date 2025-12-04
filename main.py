@@ -9460,12 +9460,32 @@ if __name__ == "__main__":
                 await message.reply(
                     f"Failed to delete message {message_id} in chat {chat_username}. Error: {e}"
                 )
+            except TelegramBadRequest as e:
+                error_msg = str(e).lower()
+                if "message can't be deleted" in error_msg:
+                    reason = (
+                        "This is likely a service message (join/leave) that is too old to delete, "
+                        "or has already been deleted, or bot lacks delete permission in this chat."
+                    )
+                elif "message to delete not found" in error_msg:
+                    reason = "Message was already deleted or never existed."
+                else:
+                    reason = str(e)
+                LOGGER.error(
+                    "Failed to delete message %d in chat %s. Error: %s",
+                    message_id,
+                    chat_username,
+                    e,
+                )
+                await message.reply(
+                    f"Failed to delete message {message_id} in chat {chat_username}.\n\n{reason}"
+                )
 
         except ValueError as ve:
             await message.reply(str(ve))
         except TelegramBadRequest as e:
             LOGGER.error("Error in delete_message: %s", e)
-            await message.reply("An error occurred while trying to delete the message.")
+            await message.reply(f"An error occurred: {e}")
 
     @DP.message(Command("delmsg"), F.chat.type == ChatType.PRIVATE, F.from_user.id == ADMIN_USER_ID)
     async def delete_message_superadmin(message: Message):

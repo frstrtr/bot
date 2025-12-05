@@ -938,9 +938,14 @@ async def ban_rogue_chat_everywhere(
         return True, rogue_chat_name, rogue_chat_username, []
 
 
-async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bool:
-    """Unban chat sender chat for Rogue channels"""
-    unban_rogue_chat_everywhere_error = None
+async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tuple:
+    """Unban chat sender chat for Rogue channels.
+    
+    Returns:
+        tuple: (success: bool, name: str, username: str, failed_chats: list)
+        failed_chats is a list of tuples: (chat_id, chat_name, error_msg)
+    """
+    failed_chats = []
 
     # Try to get chat information, handle case where bot is not a member
     try:
@@ -960,26 +965,34 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
     for chat_id in chan_list:
         try:
             await BOT.unban_chat_sender_chat(chat_id, rogue_chat_id)
-            # LOGGER.debug("%s  CHANNEL successfully unbanned in %s", rogue_chat_id, chat_id)
             await asyncio.sleep(1)  # pause 1 sec
-        except TelegramBadRequest as e:  # if user were Deleted Account while unbanning
-            # chat_name = get_channel_id_by_name(channel_dict, chat_id)
+        except TelegramBadRequest as e:
+            # Get chat name from CHANNEL_DICT for better error reporting
+            chat_name = get_channel_name_by_id(CHANNEL_DICT, chat_id) or f"Unknown ({chat_id})"
             LOGGER.error(
-                "%s %s @%s - error unbanning in chat (%s): %s. Deleted CHANNEL?",
+                "%s %s @%s - error unbanning in chat %s (%s): %s. Deleted CHANNEL?",
                 rogue_chat_id,
                 rogue_chat_name,
                 rogue_chat_username,
+                chat_name,
                 chat_id,
                 e,
             )
-            unban_rogue_chat_everywhere_error = str(e) + f" in {chat_id}"
+            failed_chats.append((chat_id, chat_name, str(e)))
             continue
 
     # Note:: Remove rogue chat from the p2p server report list?
     # await unreport_spam(rogue_chat_id, LOGGER)
 
-    if unban_rogue_chat_everywhere_error:
-        return False, rogue_chat_name, rogue_chat_username, unban_rogue_chat_everywhere_error
+    if failed_chats:
+        LOGGER.info(
+            "%s @%s(%s) CHANNEL unbanned where possible, %d chat(s) failed",
+            rogue_chat_name,
+            rogue_chat_username,
+            rogue_chat_id,
+            len(failed_chats),
+        )
+        return False, rogue_chat_name, rogue_chat_username, failed_chats
     else:
         LOGGER.info(
             "%s @%s(%s)  CHANNEL successfully unbanned where it was possible",
@@ -989,7 +1002,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
         )
         if rogue_chat_id in banned_users_dict:
             del banned_users_dict[rogue_chat_id]
-        return True, rogue_chat_name, rogue_chat_username, None
+        return True, rogue_chat_name, rogue_chat_username, []
 
 
 async def get_user_other_chats(
@@ -10295,7 +10308,7 @@ if __name__ == "__main__":
                     )
             else:  # action == "unban"
                 try:
-                    result, rogue_chan_name, rogue_chan_username, error_msg = (
+                    result, rogue_chan_name, rogue_chan_username, failed_chats = (
                         await unban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
                     )
                     if result is True:
@@ -10324,10 +10337,18 @@ if __name__ == "__main__":
                             message_thread_id=ADMIN_MANBAN,
                         )
                     else:
+                        # Build informative error message with failed chat details
+                        failed_chats_info = []
+                        for failed_chat_id, failed_chat_name, error_msg in failed_chats:
+                            chat_link = build_chat_link(failed_chat_id, None, failed_chat_name)
+                            failed_chats_info.append(f"  • {chat_link}: {html.escape(error_msg)}")
+                        
+                        failed_list_html = "\n".join(failed_chats_info) if failed_chats_info else "Unknown errors"
                         await message.reply(
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned where possible.\n\n"
-                            f"<b>Some errors occurred:</b> {html.escape(error_msg) if error_msg else 'Unknown'}",
+                            f"<b>Failed in {len(failed_chats)} chat(s):</b>\n{failed_list_html}",
                             parse_mode="HTML",
+                            disable_web_page_preview=True,
                         )
 
                     # Remove the channel from the banned_users_dict

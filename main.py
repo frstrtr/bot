@@ -5096,7 +5096,7 @@ if __name__ == "__main__":
         LOGGER.debug("[FWD_REPORT] _ts_str after timezone strip=%s", _ts_str)
         massage_timestamp = datetime.strptime(
             _ts_str, "%Y-%m-%d %H:%M:%S"
-        )  # convert to datetime object (UTC)
+        ).replace(tzinfo=timezone.utc)  # convert to datetime object (UTC) - make it timezone-aware
         LOGGER.debug("[FWD_REPORT] massage_timestamp=%s", massage_timestamp)
 
         # Get the username

@@ -34,22 +34,26 @@ Functions:
 """
 
 
-import logging
 import asyncio
-import subprocess
-import re
-from datetime import datetime, timezone
-from typing import Optional, Tuple
-from enum import Enum
-
-import sqlite3
-from sqlite3 import Connection, Cursor
-
+import logging
 import os
+import re
+import sqlite3
+import subprocess
 import sys
+from datetime import datetime, timezone
+from enum import Enum
+from sqlite3 import Connection, Cursor
+from typing import Optional, Tuple
+
 import aiohttp
-import pytz
 import emoji
+import pytz
+from aiogram import types
+from aiogram.enums import ChatMemberStatus
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.types import InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 # ============================================================================
@@ -471,12 +475,6 @@ def classify_offense_from_reason(reason: str) -> str:
     
     # Default: return original reason
     return reason
-
-from aiogram import types
-from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
-from aiogram.enums import ChatMemberStatus
 
 
 class KeyboardBuilder(InlineKeyboardBuilder):

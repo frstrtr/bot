@@ -117,7 +117,7 @@ from utils.utils import (
     is_user_banned,
     get_banned_users_count,
     get_banned_users,
-    unban_user as db_unban_user,
+    # unban_user as db_unban_user,  # Available for future admin unban command
     # Whois lookup
     get_user_whois,
     format_whois_response,

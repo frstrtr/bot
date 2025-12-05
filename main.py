@@ -1896,7 +1896,14 @@ async def handle_autoreports(
         )
     except TelegramBadRequest:
         if message:
-            await message.forward(ADMIN_GROUP_ID, ADMIN_AUTOREPORTS)
+            try:
+                await message.forward(ADMIN_GROUP_ID, ADMIN_AUTOREPORTS)
+            except TelegramBadRequest as fwd_err:
+                LOGGER.warning(
+                    "%s autoreport fallback forward also failed: %s",
+                    spammer_id,
+                    fwd_err,
+                )
         else:
             LOGGER.warning("%s autoreported message already DELETED?", spammer_id)
     # Show ban banner with buttons in the admin group to confirm or cancel the ban
@@ -7800,7 +7807,16 @@ if __name__ == "__main__":
                                 _bot_mention_name,
                             )
                             # Send to autoreport FIRST (before delete) so message can be forwarded
-                            await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by missed join user")
+                            # Wrap in try/except to ensure delete/ban always runs even if report fails
+                            try:
+                                await submit_autoreport(message, f"Bot mention ({_bot_mention_name}) by missed join user")
+                            except (TelegramBadRequest, TelegramForbiddenError) as autoreport_err:
+                                LOGGER.warning(
+                                    "%s:%s Autoreport failed (will still delete/ban): %s",
+                                    message.from_user.id,
+                                    format_username_for_log(message.from_user.username),
+                                    autoreport_err,
+                                )
                             # Now delete the spam message
                             try:
                                 await message.delete()

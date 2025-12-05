@@ -1755,11 +1755,11 @@ async def handle_autoreports(
         first_name = found_message_data[5]
         last_name = found_message_data[6]
 
-    # Handle both formats: with and without timezone
+    # Handle both formats: with and without timezone - ensure timezone-aware for arithmetic
     message_timestamp = datetime.fromisoformat(found_message_data[7].replace(" ", "T"))
-    # Strip timezone for consistent comparison - timestamp is UTC
-    if message_timestamp.tzinfo is not None:
-        message_timestamp = message_timestamp.replace(tzinfo=None)
+    # Make timezone-aware (UTC) for consistent comparison with message_report_date
+    if message_timestamp.tzinfo is None:
+        message_timestamp = message_timestamp.replace(tzinfo=timezone.utc)
 
     # Get the username
     username = found_message_data[4]
@@ -4815,9 +4815,6 @@ if __name__ == "__main__":
     @DP.message(is_forwarded_from_unknown_channel_message)
     async def handle_forwarded_reports(message: Message):
         """Function to handle forwarded messages."""
-        LOGGER.debug("[FWD_REPORT] Started handle_forwarded_reports from user %s in chat %s",
-                     message.from_user.id, message.chat.id)
-
         reported_spam = format_spam_report(message)
         # store spam text and caption to the daily_spam file
         await save_report_file("daily_spam_", reported_spam)
@@ -4825,7 +4822,6 @@ if __name__ == "__main__":
         # Check if this is superadmin in private chat or superadmin group - they may be forwarding for /copy or /forward
         # We'll only respond after we verify we can process the report
         is_superadmin_msg = superadmin_filter(message)
-        LOGGER.debug("[FWD_REPORT] is_superadmin_msg=%s", is_superadmin_msg)
 
         # LOGGER.debug("############################################################")
         # LOGGER.debug("                                                            ")
@@ -4837,15 +4833,12 @@ if __name__ == "__main__":
         # Forward the message to the admin group
         technnolog_spam_message_copy = None
         try:
-            LOGGER.debug("[FWD_REPORT] Forwarding to TECHNOLOG_GROUP_ID=%s", TECHNOLOG_GROUP_ID)
             technnolog_spam_message_copy = await BOT.forward_message(
                 TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
             )
-            LOGGER.debug("[FWD_REPORT] TECHNOLOG forward succeeded: msg_id=%s", 
-                        technnolog_spam_message_copy.message_id if technnolog_spam_message_copy else None)
         except TelegramBadRequest as fwd_err:
             LOGGER.warning(
-                "[FWD_REPORT] Failed to forward reported message to TECHNOLOG: %s - continuing with report",
+                "Failed to forward reported message to TECHNOLOG: %s - continuing with report",
                 fwd_err,
             )
         
@@ -5020,11 +5013,8 @@ if __name__ == "__main__":
                 return
 
         if not found_message_data:  # Last resort. Give up.
-            LOGGER.info("[FWD_REPORT] Could not retrieve the author's user ID - giving up.")
+            LOGGER.info("Could not retrieve the author's user ID - giving up.")
             return
-            # pass
-
-        LOGGER.debug("[FWD_REPORT] found_message_data[3]=%s, full data: %s", found_message_data[3], found_message_data)
 
         # Save both the original message_id and the forwarded message's date
         # Store UTC timestamps with timezone suffix (+00:00) for database portability
@@ -5034,8 +5024,6 @@ if __name__ == "__main__":
             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
         else:
             report_id = int(str(message.chat.id) + str(message.message_id))
-
-        LOGGER.debug("[FWD_REPORT] Generated report_id=%s", report_id)
 
         if report_id:
             # send report ID to the reporter
@@ -5064,7 +5052,6 @@ if __name__ == "__main__":
         )
 
         CONN.commit()
-        LOGGER.debug("[FWD_REPORT] DB commit successful")
 
         # Found message data:
         #        0           1           2            3            4        5           6            7
@@ -5075,9 +5062,7 @@ if __name__ == "__main__":
         # found_message_data[2] is not always a channel username since we put date to the DATABASE
         # NOTE add checks if its inout event or previous report (better delete reports?)
 
-        LOGGER.debug("[FWD_REPORT] Calling construct_message_link with found_message_data=%s", found_message_data)
         message_link = construct_message_link(found_message_data)
-        LOGGER.debug("[FWD_REPORT] message_link=%s", message_link)
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         if message.forward_from:
@@ -5086,28 +5071,22 @@ if __name__ == "__main__":
         else:
             first_name = found_message_data[5]
             last_name = found_message_data[6]
-        LOGGER.debug("[FWD_REPORT] first_name=%s, last_name=%s", first_name, last_name)
 
         # Handle both formats: with and without timezone
         _ts_str = found_message_data[7]
-        LOGGER.debug("[FWD_REPORT] _ts_str raw=%s", _ts_str)
         if _ts_str and "+" in str(_ts_str):
             _ts_str = str(_ts_str).split("+")[0].strip()
-        LOGGER.debug("[FWD_REPORT] _ts_str after timezone strip=%s", _ts_str)
         massage_timestamp = datetime.strptime(
             _ts_str, "%Y-%m-%d %H:%M:%S"
         ).replace(tzinfo=timezone.utc)  # convert to datetime object (UTC) - make it timezone-aware
-        LOGGER.debug("[FWD_REPORT] massage_timestamp=%s", massage_timestamp)
 
         # Get the username
         username = found_message_data[4]
         if not username:
             username = "!UNDEFINED!"
-        LOGGER.debug("[FWD_REPORT] username=%s", username)
 
         # Initialize user_id and user_link with default values
         user_id = found_message_data[3]
-        LOGGER.debug("[FWD_REPORT] user_id=%s", user_id)
         # user_id=5338846489
 
         # Build technolog copy link (may be None if forward failed)
@@ -5116,24 +5095,19 @@ if __name__ == "__main__":
                 str(technnolog_spam_message_copy.chat.id)[4:]
             )  # Remove -100 from the chat ID
             technnolog_spam_message_copy_link = f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
-            LOGGER.debug("[FWD_REPORT] technnolog_spam_message_copy_link=%s", technnolog_spam_message_copy_link)
         else:
             technnolog_spam_message_copy_link = "(TECHNOLOG copy not available)"
-            LOGGER.debug("[FWD_REPORT] technnolog_spam_message_copy was None")
         # LOGGER.info('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
 
         # print('##########----------DEBUG----------##########')
 
         # Use timezone-aware UTC now
         message_report_date = datetime.now(timezone.utc)
-        LOGGER.debug("[FWD_REPORT] message_report_date=%s", message_report_date)
         # avoid html tags in the name
         escaped_name = html.escape(
             f"{message.forward_sender_name or f'{first_name} {last_name}'}"
         )
-        LOGGER.debug("[FWD_REPORT] escaped_name=%s", escaped_name)
 
-        LOGGER.debug("[FWD_REPORT] Building technolog_info banner...")
         # Log the information with the link
         technolog_info = (
             f"💡 Report timestamp: {message_report_date}\n"
@@ -5170,7 +5144,6 @@ if __name__ == "__main__":
         # construct lols check link button
         inline_kb = make_lols_kb(user_id)
         # Send the banner to the technolog group
-        LOGGER.debug("[FWD_REPORT] Sending technolog_info banner to TECHNOLOG_GROUP_ID=%s", TECHNOLOG_GROUP_ID)
         technolog_banner_result = await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
@@ -5179,8 +5152,6 @@ if __name__ == "__main__":
             parse_mode="HTML",
             reply_markup=inline_kb.as_markup(),
         )
-        LOGGER.debug("[FWD_REPORT] technolog_banner_result=%s", 
-                    technolog_banner_result.message_id if technolog_banner_result else None)
 
         # Keyboard ban/cancel/confirm buttons
         keyboard = KeyboardBuilder()
@@ -5193,33 +5164,26 @@ if __name__ == "__main__":
             callback_data=f"suspiciousactions_{original_chat_id}_{original_message_id}_{user_id}",
         )
         keyboard.add(actions_btn)
-        LOGGER.debug("[FWD_REPORT] Created keyboard with actions button")
 
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
         # And store published banner message data to provide link to the reportee
         # admin_group_banner_message: Message = None # Type hinting
         try:  # If Topic_closed error
             is_admin_user = await is_admin(message.from_user.id, ADMIN_GROUP_ID)
-            LOGGER.debug("[FWD_REPORT] Checking admin status: is_superadmin_msg=%s, is_admin_user=%s", 
-                        is_superadmin_msg, is_admin_user)
             
             if is_superadmin_msg or is_admin_user:
-                LOGGER.debug("[FWD_REPORT] User is admin/superadmin - forwarding to ADMIN_GROUP_ID=%s", ADMIN_GROUP_ID)
-
                 # Forward reported message to the ADMIN group REPORT thread
                 try:
-                    fwd_result = await BOT.forward_message(
+                    await BOT.forward_message(
                         ADMIN_GROUP_ID,
                         message.chat.id,
                         message.message_id,
                         disable_notification=True,
                     )
-                    LOGGER.debug("[FWD_REPORT] Forward to ADMIN_GROUP succeeded: msg_id=%s", fwd_result.message_id)
                 except TelegramBadRequest as fwd_admin_err:
-                    LOGGER.error("[FWD_REPORT] Failed to forward to ADMIN_GROUP: %s", fwd_admin_err)
+                    LOGGER.error("Failed to forward to ADMIN_GROUP: %s", fwd_admin_err)
                     
                 # Send report banner to the admin group
-                LOGGER.debug("[FWD_REPORT] Sending admin_ban_banner to ADMIN_GROUP")
                 admin_group_banner_message = await safe_send_message(
                     BOT,
                     ADMIN_GROUP_ID,
@@ -5229,11 +5193,8 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
-                LOGGER.debug("[FWD_REPORT] admin_group_banner_message=%s", 
-                            admin_group_banner_message.message_id if admin_group_banner_message else None)
                             
                 # Send report action banner to the reporter
-                LOGGER.debug("[FWD_REPORT] Sending action banner to reporter")
                 admin_action_banner_message = await message.answer(
                     admin_ban_banner,
                     parse_mode="HTML",
@@ -5243,8 +5204,6 @@ if __name__ == "__main__":
                     disable_web_page_preview=False,
                     reply_markup=keyboard.as_markup(),
                 )
-                LOGGER.debug("[FWD_REPORT] admin_action_banner_message=%s", 
-                            admin_action_banner_message.message_id if admin_action_banner_message else None)
 
                 # Store the admin action banner message data
                 set_forwarded_state(

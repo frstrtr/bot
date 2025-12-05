@@ -1600,18 +1600,19 @@ async def handle_autoreports(
     # Send a thank you note to the user we dont need it for the automated reports anymore
     # await message.answer("Thank you for the report. We will investigate it.")
     # Forward the message to the admin group
+    technnolog_spam_message_copy = None
     try:  # if it was already removed earlier
         technnolog_spam_message_copy = await BOT.forward_message(
             TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
         )
-    except TelegramBadRequest:
-        LOGGER.error(
-            "%s:%s Message to forward not found: %s",
+    except TelegramBadRequest as fwd_err:
+        LOGGER.warning(
+            "%s:%s Failed to forward to TECHNOLOG (message may be deleted): %s - will still report to ADMIN",
             spammer_id,
             "!UNDEFINED!",
-            message.message_id,
+            fwd_err,
         )
-        return
+        # Don't return - continue to report to ADMIN group even if TECHNOLOG forward fails
 
     # Serialize message to JSON, handling aiogram Default objects
     try:
@@ -1643,10 +1644,13 @@ async def handle_autoreports(
     # Truncate and add an indicator that the message has been truncated
     if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
         message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-    await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
-    await safe_send_message(
-        BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
-    )
+    
+    # Only send to TECHNOLOG if we successfully forwarded the message
+    if technnolog_spam_message_copy:
+        await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
+        await safe_send_message(
+            BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
+        )
 
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
@@ -1762,12 +1766,16 @@ async def handle_autoreports(
     # Initialize user_id and user_link with default values
     user_id = found_message_data[3]
 
-    technolog_chat_id = int(
-        str(technnolog_spam_message_copy.chat.id)[4:]
-    )  # Remove -100 from the chat ID
-    technnolog_spamMessage_copy_link = (
-        f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
-    )
+    # Build technolog copy link (may be None if forward failed)
+    if technnolog_spam_message_copy:
+        technolog_chat_id = int(
+            str(technnolog_spam_message_copy.chat.id)[4:]
+        )  # Remove -100 from the chat ID
+        technnolog_spamMessage_copy_link = (
+            f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
+        )
+    else:
+        technnolog_spamMessage_copy_link = "(TECHNOLOG copy not available)"
 
     # fix if message not forwarded and autoreported
     # if message.forward_date:

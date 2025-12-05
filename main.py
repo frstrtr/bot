@@ -8448,22 +8448,142 @@ if __name__ == "__main__":
                         reply_markup=_established_kb.as_markup(),
                     )
                     # Don't return - let message stay, don't ban user
-                else:
-                    # Non-established user - use existing ban logic
-                    the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
-                    if await check_n_ban(message, the_reason):
-                        return
+                elif message.from_user.id in active_user_checks_dict:
+                    # User is being actively monitored - delete message, send to AUTOREPORT, don't ban
+                    LOGGER.info(
+                        "\033[93m%s:%s MONITORED user forwarded from unknown source in %s - deleting, sending to AUTOREPORT (NOT banning)\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(message.from_user.username),
+                        message.chat.title,
+                    )
+                    
+                    # Build forward source info
+                    forward_source_info = ""
+                    if message.forward_from:
+                        forward_source_info = f"User: {message.forward_from.first_name or ''} {message.forward_from.last_name or ''} @{message.forward_from.username or '!UNDEFINED!'} (<code>{message.forward_from.id}</code>)"
+                    elif message.forward_from_chat:
+                        forward_source_info = f"Channel: {message.forward_from_chat.title or '!UNDEFINED!'} @{message.forward_from_chat.username or '!UNDEFINED!'} (<code>{message.forward_from_chat.id}</code>)"
                     else:
+                        forward_source_info = "Unknown source (hidden or deleted)"
+                    
+                    # Build message link
+                    _msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                    _chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                    
+                    # Forward to AUTOREPORT thread before deleting
+                    try:
+                        await BOT.forward_message(
+                            ADMIN_GROUP_ID,
+                            message.chat.id,
+                            message.message_id,
+                            message_thread_id=ADMIN_AUTOREPORTS,
+                        )
+                    except TelegramBadRequest as fwd_err:
+                        LOGGER.warning("Failed to forward monitored user's message to AUTOREPORT: %s", fwd_err)
+                    
+                    autoreport_text = (
+                        f"🔍 <b>Forward from Unknown Source by Monitored User</b>\n"
+                        f"User: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')} "
+                        f"@{message.from_user.username or '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
+                        f"Forward from: {forward_source_info}\n"
+                        f"Chat: {_chat_link}\n"
+                        f"Message: {_msg_link}\n\n"
+                        f"📊 <b>User status:</b> IN ACTIVE CHECKS (message DELETED, NOT banned)"
+                    )
+                    
+                    # Send info banner with action buttons
+                    _monitored_kb = make_lols_kb(message.from_user.id)
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        autoreport_text,
+                        LOGGER,
+                        message_thread_id=ADMIN_AUTOREPORTS,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=_monitored_kb.as_markup(),
+                    )
+                    
+                    # Delete the message
+                    try:
+                        await BOT.delete_message(message.chat.id, message.message_id)
                         LOGGER.info(
-                            "\033[93m%s:%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
+                            "%s:%s forwarded message deleted from %s",
                             message.from_user.id,
                             format_username_for_log(message.from_user.username),
                             message.chat.title,
                         )
-                        if not autoreport_sent:
-                            autoreport_sent = True
-                            await submit_autoreport(message, the_reason)
-                            return  # stop further actions for this message since user was banned before
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning("Failed to delete monitored user's forwarded message: %s", del_err)
+                    return
+                else:
+                    # Regular user (not established, not monitored) - delete message, send to SUSPICIOUS, don't ban
+                    LOGGER.info(
+                        "\033[93m%s:%s REGULAR user forwarded from unknown source in %s - deleting, sending to SUSPICIOUS (NOT banning)\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(message.from_user.username),
+                        message.chat.title,
+                    )
+                    
+                    # Build forward source info
+                    forward_source_info = ""
+                    if message.forward_from:
+                        forward_source_info = f"User: {message.forward_from.first_name or ''} {message.forward_from.last_name or ''} @{message.forward_from.username or '!UNDEFINED!'} (<code>{message.forward_from.id}</code>)"
+                    elif message.forward_from_chat:
+                        forward_source_info = f"Channel: {message.forward_from_chat.title or '!UNDEFINED!'} @{message.forward_from_chat.username or '!UNDEFINED!'} (<code>{message.forward_from_chat.id}</code>)"
+                    else:
+                        forward_source_info = "Unknown source (hidden or deleted)"
+                    
+                    # Build message link
+                    _msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                    _chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                    
+                    # Forward to SUSPICIOUS thread before deleting
+                    try:
+                        await BOT.forward_message(
+                            ADMIN_GROUP_ID,
+                            message.chat.id,
+                            message.message_id,
+                            message_thread_id=ADMIN_SUSPICIOUS,
+                        )
+                    except TelegramBadRequest as fwd_err:
+                        LOGGER.warning("Failed to forward regular user's message to SUSPICIOUS: %s", fwd_err)
+                    
+                    suspicious_text = (
+                        f"⚠️ <b>Forward from Unknown Source</b>\n"
+                        f"User: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')} "
+                        f"@{message.from_user.username or '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
+                        f"Forward from: {forward_source_info}\n"
+                        f"Chat: {_chat_link}\n"
+                        f"Message: {_msg_link}\n\n"
+                        f"📊 <b>User status:</b> REGULAR (message DELETED, NOT banned)"
+                    )
+                    
+                    # Send info banner
+                    _regular_kb = make_lols_kb(message.from_user.id)
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        suspicious_text,
+                        LOGGER,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=_regular_kb.as_markup(),
+                    )
+                    
+                    # Delete the message
+                    try:
+                        await BOT.delete_message(message.chat.id, message.message_id)
+                        LOGGER.info(
+                            "%s:%s forwarded message deleted from %s",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
+                            message.chat.title,
+                        )
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning("Failed to delete regular user's forwarded message: %s", del_err)
+                    return
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis

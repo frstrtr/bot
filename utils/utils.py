@@ -38,7 +38,7 @@ import logging
 import asyncio
 import subprocess
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 from enum import Enum
 
@@ -1179,7 +1179,6 @@ def save_user_baseline(
         True if saved successfully, False otherwise
     """
     import json
-    from datetime import timezone
     cursor = conn.cursor()
     # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
@@ -1366,7 +1365,6 @@ def update_user_baseline_status(
     Returns:
         True if updated successfully, False otherwise
     """
-    from datetime import timezone
     cursor = conn.cursor()
     # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
@@ -1487,6 +1485,189 @@ def delete_user_baseline(conn: Connection, user_id: int) -> bool:
     except sqlite3.Error as e:
         logging.getLogger(__name__).error(
             "Error deleting user baseline for %s: %s", user_id, e
+        )
+        return False
+
+
+# ============================================================================
+# Banned Users Helper Functions (Database-backed)
+# ============================================================================
+
+def add_banned_user(
+    conn: Connection,
+    user_id: int,
+    username: str = None,
+    ban_source: str = "autoban",
+    ban_reason: str = None,
+    first_name: str = None,
+    last_name: str = None,
+    banned_by_admin_id: int = None,
+) -> bool:
+    """Add or update a user as banned in the database.
+    
+    This creates/updates the user_baselines record with is_banned=1.
+    Used to replace the in-memory banned_users_dict.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+        username: Telegram username (without @)
+        ban_source: Source of ban (lols/cas/p2p/local/admin/autoreport/deleted_account)
+        ban_reason: Human-readable reason
+        first_name: User's first name
+        last_name: User's last name
+        banned_by_admin_id: Admin who banned (for manual bans)
+    
+    Returns:
+        True if added/updated successfully
+    """
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
+    
+    try:
+        # Check if user exists in baselines
+        cursor.execute("SELECT user_id FROM user_baselines WHERE user_id = ?", (user_id,))
+        exists = cursor.fetchone() is not None
+        
+        if exists:
+            # Update existing record
+            cursor.execute(
+                """UPDATE user_baselines SET 
+                   is_banned = 1, 
+                   monitoring_active = 0,
+                   banned_at = ?,
+                   ban_source = COALESCE(?, ban_source),
+                   ban_reason = COALESCE(?, ban_reason),
+                   banned_by_admin_id = COALESCE(?, banned_by_admin_id),
+                   username = COALESCE(?, username),
+                   first_name = COALESCE(?, first_name),
+                   last_name = COALESCE(?, last_name),
+                   updated_at = ?
+                   WHERE user_id = ?""",
+                (now, ban_source, ban_reason, banned_by_admin_id, username, first_name, last_name, now, user_id),
+            )
+        else:
+            # Create new record
+            cursor.execute(
+                """INSERT INTO user_baselines 
+                   (user_id, username, first_name, last_name, is_banned, monitoring_active,
+                    banned_at, ban_source, ban_reason, banned_by_admin_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?, ?)""",
+                (user_id, username, first_name, last_name, now, ban_source, ban_reason, banned_by_admin_id, now, now),
+            )
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logging.getLogger(__name__).error(
+            "Error adding banned user %s: %s", user_id, e
+        )
+        return False
+
+
+def is_user_banned(conn: Connection, user_id: int) -> bool:
+    """Check if a user is marked as banned in the database.
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+    
+    Returns:
+        True if user is banned, False otherwise
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT is_banned FROM user_baselines WHERE user_id = ? AND is_banned = 1",
+            (user_id,),
+        )
+        return cursor.fetchone() is not None
+    except sqlite3.Error:
+        return False
+
+
+def get_banned_users_count(conn: Connection) -> int:
+    """Get count of banned users in database.
+    
+    Args:
+        conn: Database connection
+    
+    Returns:
+        Number of banned users
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM user_baselines WHERE is_banned = 1")
+        result = cursor.fetchone()
+        return result[0] if result else 0
+    except sqlite3.Error:
+        return 0
+
+
+def get_banned_users(conn: Connection, limit: int = None) -> list:
+    """Get list of banned users from database.
+    
+    Args:
+        conn: Database connection
+        limit: Optional limit on number of results
+    
+    Returns:
+        List of dicts with user_id, username, banned_at, ban_source, ban_reason
+    """
+    cursor = conn.cursor()
+    try:
+        query = """
+            SELECT user_id, username, first_name, last_name, 
+                   banned_at, ban_source, ban_reason
+            FROM user_baselines 
+            WHERE is_banned = 1
+            ORDER BY banned_at DESC
+        """
+        if limit:
+            query += f" LIMIT {int(limit)}"
+        
+        cursor.execute(query)
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                "user_id": row[0],
+                "username": row[1],
+                "first_name": row[2],
+                "last_name": row[3],
+                "banned_at": row[4],
+                "ban_source": row[5],
+                "ban_reason": row[6],
+            })
+        return results
+    except sqlite3.Error as e:
+        logging.getLogger(__name__).error("Error getting banned users: %s", e)
+        return []
+
+
+def unban_user(conn: Connection, user_id: int) -> bool:
+    """Remove ban status from a user (mark as not banned).
+    
+    Args:
+        conn: Database connection
+        user_id: Telegram user ID
+    
+    Returns:
+        True if updated successfully
+    """
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
+    try:
+        cursor.execute(
+            """UPDATE user_baselines SET 
+               is_banned = 0, 
+               updated_at = ?
+               WHERE user_id = ?""",
+            (now, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        logging.getLogger(__name__).error(
+            "Error unbanning user %s: %s", user_id, e
         )
         return False
 

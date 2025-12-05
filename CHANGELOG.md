@@ -27,6 +27,15 @@
   - Fixed unused variable warnings (prefixed with `_`)
 
 ### Changed
+- **Banned users storage migrated to database**: Replaced file-based `banned_users.txt` with database storage
+  - Banned users now stored in `user_baselines` table with `is_banned = 1` flag
+  - `banned_users_dict` kept as runtime cache for performance, populated from DB on startup
+  - Removed file-based persistence on shutdown (database is persistent)
+  - Legacy `banned_users.txt` files auto-migrated to database on first startup
+  - Daily archives still written to `inout/banned_users_DATE.txt` for historical records
+  - Shutdown stats now show both session count and total database count
+  - New helper functions: `add_banned_user()`, `is_user_banned()`, `get_banned_users()`, `get_banned_users_count()`, `unban_user()`
+
 - **Refactored global statements**: Eliminated `global` keyword warnings
   - `main.py`: Introduced `BotState` dataclass to hold `username`, `http_session`, `http_connector`
   - `utils_config.py`: Introduced `BotConfig` dataclass to hold all configuration values

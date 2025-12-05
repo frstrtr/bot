@@ -112,6 +112,12 @@ from utils.utils import (
     get_user_baseline,
     get_active_user_baselines,
     update_user_baseline_status,
+    # Banned users DB functions
+    add_banned_user,
+    is_user_banned,
+    get_banned_users_count,
+    get_banned_users,
+    unban_user as db_unban_user,
     # Whois lookup
     get_user_whois,
     format_whois_response,
@@ -1487,36 +1493,12 @@ async def on_shutdown():
 
     # Database already has the current state - no need to save on shutdown
     # (baselines are saved on join, updated on ban/legit actions)
+    # Banned users are stored in database (user_baselines.is_banned = 1)
     LOGGER.info(
-        "Shutdown: %d active users in monitoring (persisted in database)",
+        "Shutdown: %d active users in monitoring, %d banned users (all persisted in database)",
         len(active_user_checks_dict),
+        get_banned_users_count(CONN),
     )
-
-    # save all banned users to temp file to preserve list after bot restart
-    banned_users_filename = "banned_users.txt"
-
-    # debug
-    if banned_users_dict:
-        LOGGER.debug(
-            "Saving banned users to file...\n\033[93m%s\033[0m", banned_users_dict
-        )
-    # end debug
-
-    if os.path.exists(banned_users_filename) and banned_users_dict:
-        with open(banned_users_filename, "a", encoding="utf-8") as file:
-            for _id, _uname in banned_users_dict.items():
-                file.write(f"{_id}:{repr(_uname)}\n")
-    elif banned_users_dict:
-        with open(banned_users_filename, "w", encoding="utf-8") as file:
-            for _id, _uname in banned_users_dict.items():
-                file.write(f"{_id}:{repr(_uname)}\n")
-
-    # Signal that shutdown tasks are completed
-    # shutdown_event.set()
-    # Example of another coroutine that waits for the shutdown event
-    # async def some_other_coroutine():
-    #     await shutdown_event.wait()  # Wait for the shutdown tasks to complete
-    #     # Continue with the rest of the coroutine
 
     # send message with short stats about previous session
     # bot start time
@@ -1532,6 +1514,7 @@ async def on_shutdown():
     # number of active user checks forwarded to the next session
 
     try:
+        banned_count = get_banned_users_count(CONN)
         await safe_send_message(
             BOT,
             TECHNOLOG_GROUP,
@@ -1539,7 +1522,8 @@ async def on_shutdown():
                 "Runtime session shutdown stats:\n"
                 f"Bot started at: {bot_start_time}\n"
                 f"Current active user checks: {len(active_user_checks_dict)}\n"
-                f"Spammers detected: {len(banned_users_dict)}\n"
+                f"Spammers detected (this session): {len(banned_users_dict)}\n"
+                f"Total banned users (database): {banned_count}\n"
             ),
             LOGGER,
             message_thread_id=TECHNO_RESTART,
@@ -1551,10 +1535,12 @@ async def on_shutdown():
         "\033[93m\nRuntime session shutdown stats:\n"
         "Bot started at: %s\n"
         "Current active user checks: %d\n"
-        "Spammers detected: %d\033[0m",
+        "Spammers detected (this session): %d\n"
+        "Total banned users (database): %d\033[0m",
         bot_start_time,
         len(active_user_checks_dict),
         len(banned_users_dict),
+        get_banned_users_count(CONN),
     )
     
     # Close the global HTTP session used for spam checks
@@ -2195,8 +2181,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             len(banned_users_dict),  # Number of elements left
         )
 
-    # Update baseline to mark monitoring ended (banned, not legit)
-    update_user_baseline_status(CONN, _id, monitoring_active=False, is_legit=False)
+    # Add to database and update baseline status (banned, not legit)
+    add_banned_user(CONN, _id, user_name, ban_source="lols_autoban")
+    update_user_baseline_status(CONN, _id, monitoring_active=False, is_legit=False, is_banned=True)
 
     # Normalize username for logging / notification using consistent normalize_username function
     norm_username = normalize_username(user_name)
@@ -3159,8 +3146,10 @@ async def perform_checks(
                                 del active_user_checks_dict[user_id]
                             banned_users_dict[user_id] = datetime.now(timezone.utc)
                             
-                            # Update baseline to mark monitoring ended (banned)
-                            update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=False)
+                            # Add to database and update baseline status (banned)
+                            add_banned_user(CONN, user_id, _orig_username, ban_source="deleted_account", 
+                                          first_name=_orig_first, last_name=_orig_last)
+                            update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=False, is_banned=True)
                             
                             profile_links = (
                                 f"🔗 <b>Profile links:</b>\n"
@@ -3917,12 +3906,19 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
     os.makedirs("inout", exist_ok=True)
     os.makedirs("daily_spam", exist_ok=True)
 
-    # read current banned users list from the file
+    # Load banned users from database into runtime dict (if not already loaded)
+    # This ensures dict is populated on first daily run
+    db_banned_users = get_banned_users(CONN)
+    for bu in db_banned_users:
+        if bu["user_id"] not in banned_users_dict:
+            banned_users_dict[bu["user_id"]] = bu["username"] or bu["first_name"] or "!UNDEFINED!"
+    
+    # Migrate any legacy banned_users.txt file to database (one-time migration)
     banned_users_filename = "banned_users.txt"
-
     if os.path.exists(banned_users_filename):
+        LOGGER.info("Migrating legacy banned_users.txt to database...")
         with open(banned_users_filename, "r", encoding="utf-8") as file:
-            # append users to the set
+            migrated_count = 0
             for line in file:
                 parts = line.strip().split(":", 1)
                 if len(parts) == 2:
@@ -3931,12 +3927,19 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         user_name = ast.literal_eval(user_name.strip())
                     except (ValueError, SyntaxError):
                         pass  # keep user_name as string if it's not a valid dict
-                    banned_users_dict[int(user_id)] = user_name
-                else:
-                    LOGGER.warning("\033[93mSkipping invalid line: %s\033[0m", line)
-        os.remove(banned_users_filename)  # remove the file after reading
+                    user_id_int = int(user_id)
+                    # Add to DB if not already there
+                    if not is_user_banned(CONN, user_id_int):
+                        username_str = user_name if isinstance(user_name, str) else None
+                        add_banned_user(CONN, user_id_int, username_str, ban_source="legacy_migration")
+                        migrated_count += 1
+                    # Add to runtime dict
+                    banned_users_dict[user_id_int] = user_name
+        # Remove legacy file after migration
+        os.remove(banned_users_filename)
+        LOGGER.info("Migrated %d users from banned_users.txt to database", migrated_count)
 
-    # save banned users list to the file with the current date to the inout folder
+    # Save daily archive of banned users to inout folder (for historical records)
     with open(filename, "w", encoding="utf-8") as file:
         for _id, _username in banned_users_dict.items():
             file.write(f"{_id}:{_username}\n")
@@ -12588,11 +12591,14 @@ if __name__ == "__main__":
             # Cancel watchdog and update tracking dicts
             await cancel_named_watchdog(susp_user_id)
             
-            # Update tracking dicts
+            # Update tracking dicts and database
             if susp_user_id in active_user_checks_dict:
                 banned_users_dict[susp_user_id] = active_user_checks_dict.pop(susp_user_id, None)
             else:
                 banned_users_dict[susp_user_id] = susp_user_name
+            # Add to database
+            add_banned_user(CONN, susp_user_id, susp_user_name, ban_source="admin_globalban",
+                          banned_by_admin_id=callback_query.from_user.id if callback_query.from_user else None)
 
         elif comand == "confirmban":
             # ban user in chat
@@ -12752,12 +12758,15 @@ if __name__ == "__main__":
             # Report to P2P network
             await report_spam_2p2p(susp_user_id, LOGGER, susp_user_name)
             
-            # Cancel watchdog and update tracking dicts
+            # Cancel watchdog and update tracking dicts and database
             await cancel_named_watchdog(susp_user_id)
             if susp_user_id in active_user_checks_dict:
                 banned_users_dict[susp_user_id] = active_user_checks_dict.pop(susp_user_id, None)
             else:
                 banned_users_dict[susp_user_id] = susp_user_name
+            # Add to database
+            add_banned_user(CONN, susp_user_id, susp_user_name, ban_source="admin_confirmban",
+                          banned_by_admin_id=callback_query.from_user.id if callback_query.from_user else None)
                 
         elif comand == "confirmdelmsg":
             callback_answer = "User suspicious message were deleted.\nForward message to the bot to ban user everywhere!"

@@ -14,6 +14,7 @@ except AttributeError:
 from datetime import timedelta
 from datetime import datetime
 from datetime import timezone
+from dataclasses import dataclass
 import argparse
 import asyncio
 import random
@@ -305,6 +306,18 @@ PREDETERMINED_SENTENCES = load_predetermined_sentences("spam_dict.txt", LOGGER)
 bot_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
 
+@dataclass
+class BotState:
+    """Container for app-wide mutable state to avoid global statements."""
+    username: str | None = None
+    http_session: aiohttp.ClientSession | None = None
+    http_connector: aiohttp.TCPConnector | None = None
+
+
+# Single instance of bot state - modify attributes, no global keyword needed
+bot_state = BotState()
+
+
 # Set to keep track of active user IDs
 active_user_checks_dict = dict()
 banned_users_dict = dict()
@@ -312,9 +325,6 @@ banned_users_dict = dict()
 # Cache for chat usernames (chat_id -> username)
 # Populated when processing messages, used for constructing public links
 chat_username_cache: dict[int, str | None] = {}
-
-# Bot username (populated on startup via get_me)
-BOT_USERNAME: str | None = None
 
 # Track messages that have been sent to autoreport to prevent duplicate suspicious notifications
 # Key: (chat_id, message_id) - cleared periodically or on message processing completion
@@ -492,30 +502,24 @@ running_intensive_watchdogs = {}
 # Initialize the event
 shutdown_event = asyncio.Event()
 
-# Global aiohttp session for spam checks (initialized on startup, closed on shutdown)
-_http_session: aiohttp.ClientSession | None = None
-_http_connector: aiohttp.TCPConnector | None = None
-
 
 def get_http_session() -> aiohttp.ClientSession:
-    """Get or create the global HTTP session for spam checks."""
-    global _http_session, _http_connector
-    if _http_session is None or _http_session.closed:
+    """Get or create the HTTP session for spam checks."""
+    if bot_state.http_session is None or bot_state.http_session.closed:
         ssl_context = ssl.create_default_context(cafile=certifi.where())
-        _http_connector = aiohttp.TCPConnector(ssl=ssl_context)
-        _http_session = aiohttp.ClientSession(connector=_http_connector)
-    return _http_session
+        bot_state.http_connector = aiohttp.TCPConnector(ssl=ssl_context)
+        bot_state.http_session = aiohttp.ClientSession(connector=bot_state.http_connector)
+    return bot_state.http_session
 
 
 async def close_http_session():
-    """Close the global HTTP session."""
-    global _http_session, _http_connector
-    if _http_session is not None and not _http_session.closed:
-        await _http_session.close()
-        _http_session = None
-    if _http_connector is not None and not _http_connector.closed:
-        _http_connector.close()
-        _http_connector = None
+    """Close the HTTP session."""
+    if bot_state.http_session is not None and not bot_state.http_session.closed:
+        await bot_state.http_session.close()
+        bot_state.http_session = None
+    if bot_state.http_connector is not None and not bot_state.http_connector.closed:
+        bot_state.http_connector.close()
+        bot_state.http_connector = None
 
 
 # Setting up SQLite Database
@@ -767,17 +771,16 @@ async def submit_autoreport(message: Message, reason):
 
 async def on_startup():
     """Function to handle the bot startup."""
-    global BOT_USERNAME
     _commit_info = get_latest_commit_info(LOGGER)
 
     # Get bot info and store username for command detection
     try:
         bot_info = await BOT.get_me()
-        BOT_USERNAME = bot_info.username
-        LOGGER.info("Bot username: @%s", BOT_USERNAME)
+        bot_state.username = bot_info.username
+        LOGGER.info("Bot username: @%s", bot_state.username)
     except TelegramBadRequest as e:
         LOGGER.error("Failed to get bot info: %s", e)
-        BOT_USERNAME = None
+        bot_state.username = None
 
     # Pre-populate chat username cache for monitored channels
     LOGGER.info("Populating chat username cache for %d monitored channels...", len(CHANNEL_IDS))
@@ -6345,7 +6348,7 @@ if __name__ == "__main__":
         notify the superadmin with detailed user info and provide a button
         to reply with the easter egg response.
         """
-        if not message.text or not BOT_USERNAME:
+        if not message.text or not bot_state.username:
             return
         
         # Check if command is directed at our bot
@@ -6357,7 +6360,7 @@ if __name__ == "__main__":
         command_name = command_match.group(1)
         target_bot = command_match.group(2).lower()
         
-        if target_bot != BOT_USERNAME.lower():
+        if target_bot != bot_state.username.lower():
             # Command is for a different bot, ignore
             return
         
@@ -6370,7 +6373,7 @@ if __name__ == "__main__":
         LOGGER.info(
             "Bot command detected in group: /%s@%s from %s:%s in %s (%s)",
             command_name,
-            BOT_USERNAME,
+            bot_state.username,
             user_id,
             format_username_for_log(user_name),
             message.chat.title,
@@ -6393,7 +6396,7 @@ if __name__ == "__main__":
         notification_text = (
             f"🤖 <b>Bot Command Detected in Group</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"<b>Command:</b> <code>/{command_name}@{BOT_USERNAME}</code>\n"
+            f"<b>Command:</b> <code>/{command_name}@{bot_state.username}</code>\n"
             f"<b>Chat:</b> {html.escape(message.chat.title)} (<code>{message.chat.id}</code>)\n"
             f"<b>Message Link:</b> <code>{message_link}</code>\n\n"
             f"<b>User Info:</b>\n"

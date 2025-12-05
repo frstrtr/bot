@@ -5173,7 +5173,7 @@ if __name__ == "__main__":
         # And store published banner message data to provide link to the reportee
         # admin_group_banner_message: Message = None # Type hinting
         try:  # If Topic_closed error
-            if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+            if is_superadmin_msg or await is_admin(message.from_user.id, ADMIN_GROUP_ID):
 
                 # Forward reported message to the ADMIN group REPORT thread
                 await BOT.forward_message(

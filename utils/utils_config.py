@@ -10,7 +10,7 @@ from typing import List, Dict, Set, Optional
 
 # Try to load dotenv (optional dependency)
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv  # type: ignore[import-unresolved]
     load_dotenv()
     DOTENV_AVAILABLE = True
 except ImportError:

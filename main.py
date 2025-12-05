@@ -4829,9 +4829,17 @@ if __name__ == "__main__":
         if not is_superadmin_msg:
             await message.answer("Thank you for the report. We will investigate it.")
         # Forward the message to the admin group
-        technnolog_spam_message_copy = await BOT.forward_message(
-            TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
-        )
+        technnolog_spam_message_copy = None
+        try:
+            technnolog_spam_message_copy = await BOT.forward_message(
+                TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
+            )
+        except TelegramBadRequest as fwd_err:
+            LOGGER.warning(
+                "Failed to forward reported message to TECHNOLOG: %s - continuing with report",
+                fwd_err,
+            )
+        
         # Serialize message to JSON, handling aiogram Default objects
         try:
             message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
@@ -4840,10 +4848,13 @@ if __name__ == "__main__":
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
             message_as_json = message_as_json[: MAX_TELEGRAM_MESSAGE_LENGTH - 3] + "..."
-        await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
-        await safe_send_message(
-            BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
-        )
+        
+        # Only send JSON to TECHNOLOG if forward succeeded
+        if technnolog_spam_message_copy:
+            await safe_send_message(BOT, TECHNOLOG_GROUP_ID, message_as_json, LOGGER)
+            await safe_send_message(
+                BOT, TECHNOLOG_GROUP_ID, "Please investigate this message.", LOGGER
+            )
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         spammer_id, spammer_first_name, spammer_last_name = extract_spammer_info(
@@ -5079,11 +5090,14 @@ if __name__ == "__main__":
         user_id = found_message_data[3]
         # user_id=5338846489
 
-        # print('##########----------DEBUG----------##########')
-        technolog_chat_id = int(
-            str(technnolog_spam_message_copy.chat.id)[4:]
-        )  # Remove -100 from the chat ID
-        technnolog_spam_message_copy_link = f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
+        # Build technolog copy link (may be None if forward failed)
+        if technnolog_spam_message_copy:
+            technolog_chat_id = int(
+                str(technnolog_spam_message_copy.chat.id)[4:]
+            )  # Remove -100 from the chat ID
+            technnolog_spam_message_copy_link = f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
+        else:
+            technnolog_spam_message_copy_link = "(TECHNOLOG copy not available)"
         # LOGGER.info('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
 
         # print('##########----------DEBUG----------##########')

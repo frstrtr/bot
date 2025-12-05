@@ -1,5 +1,51 @@
 # Changelog
 
+## [2025-12-05]
+
+### Fixed
+- **Timezone mismatch in forwarded reports**: Fixed silent crash when superadmin forwards spam to bot DM
+  - Root cause: `message_report_date` (timezone-aware UTC) minus `massage_timestamp` (timezone-naive) caused `TypeError`
+  - Solution: Added `.replace(tzinfo=timezone.utc)` to make `massage_timestamp` timezone-aware
+  - Same fix applied to `handle_autoreports()` for consistency
+  - Reports now properly show reaction time and send to both TECHNOLOG and ADMIN groups
+
+- **Superadmin forwarded reports missing action buttons**: Fixed reports forwarded to bot DM not getting action buttons
+  - Superadmin forwarding spam message to bot private chat now gets full action banner with Ban/Delete buttons
+  - Fixed condition to check `is_superadmin_msg` in addition to `is_admin()` result
+
+- **Floating @ symbol in deleted account reports**: Fixed display when username is unavailable
+  - Reports for deleted accounts no longer show orphan `@` symbol
+  - Uses `format_username_for_log()` helper for consistent formatting
+
+- **Exception handling in autoreport flow**: Ensured delete/ban operations execute even if reporting fails
+  - TECHNOLOG forward failure no longer prevents ADMIN group report
+  - ADMIN group report failure no longer prevents message deletion or ban
+  - Same fix applied to `handle_forwarded_reports()` for admin DM reports
+
+- **Linting issues resolved**: Fixed 16 code quality issues
+  - Replaced broad `except Exception` with specific exception types
+  - Fixed unused variable warnings (prefixed with `_`)
+
+### Changed
+- **Refactored global statements**: Eliminated `global` keyword warnings
+  - `main.py`: Introduced `BotState` dataclass to hold `username`, `http_session`, `http_connector`
+  - `utils_config.py`: Introduced `BotConfig` dataclass to hold all configuration values
+  - Module-level exports preserved for backward compatibility
+
+- **Watchdog cancellation improvements**:
+  - Cancel both regular and intensive watchdogs when user leaves chat
+  - Cancel all watchdogs when marking user as legit
+  - Cancel all watchdogs when user is manually banned
+
+### Added
+- **`mark_user_as_legit()` helper function**: Consolidated legitimization logic
+  - Removes user from monitoring dictionaries
+  - Updates button text to show "✓ Marked as Legit"
+  - Cancels all watchdog tasks
+  - Used by "Mark as Legit" button handlers
+
+- **Other chats info in reports**: Deleted account autoban reports now show member status in other monitored chats
+
 ## [2025-12-04]
 
 ### Changed

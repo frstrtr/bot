@@ -5144,7 +5144,7 @@ if __name__ == "__main__":
         # construct lols check link button
         inline_kb = make_lols_kb(user_id)
         # Send the banner to the technolog group
-        technolog_banner_result = await safe_send_message(
+        _technolog_banner_result = await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
             technolog_info,

@@ -1070,7 +1070,7 @@ async def is_bot_in_chat(bot_username: str, chat_id: int) -> bool:
         # Bot not in chat or can't check
         LOGGER.debug("is_bot_in_chat: @%s not in chat %s: %s", bot_username, chat_id, e)
         return False
-    except Exception as e:
+    except (TelegramForbiddenError, TelegramNotFound, RuntimeError) as e:
         LOGGER.debug("is_bot_in_chat: Error checking @%s in chat %s: %s", bot_username, chat_id, e)
         return False
 
@@ -1617,7 +1617,7 @@ async def handle_autoreports(
     # Serialize message to JSON, handling aiogram Default objects
     try:
         message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
-    except Exception as ser_err:
+    except (TypeError, ValueError) as ser_err:
         # Fallback: use model_dump without mode="json" and handle non-serializable objects
         LOGGER.warning("Message serialization failed: %s, using fallback", ser_err)
         try:
@@ -1637,7 +1637,7 @@ async def handle_autoreports(
                     except (TypeError, ValueError):
                         return str(obj)
             message_as_json = json.dumps(make_serializable(message_dict), indent=4, ensure_ascii=False)
-        except Exception as fallback_err:
+        except (TypeError, ValueError, AttributeError) as fallback_err:
             LOGGER.error("Fallback serialization also failed: %s", fallback_err)
             message_as_json = f"{{\"error\": \"Could not serialize message\", \"message_id\": {message.message_id}}}"
     
@@ -1879,7 +1879,7 @@ async def handle_autoreports(
             )
 
     # Add buttons for t.me/m/ business chat deeplinks (up to 3)
-    for i, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
+    for _idx, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
         slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
         slug_display = slug[:12] + "..." if len(slug) > 12 else slug
         keyboard.add(
@@ -1887,7 +1887,7 @@ async def handle_autoreports(
         )
 
     # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
-    for i, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
+    for _idx, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
         visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
         keyboard.add(
             InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
@@ -2733,7 +2733,7 @@ async def check_n_ban(message: Message, reason: str):
                 )
 
         # Add buttons for t.me/m/ business chat deeplinks (up to 3)
-        for i, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
+        for _idx, deeplink in enumerate(mention_analysis.get("tme_deeplinks", [])[:3]):
             # Extract slug from URL for button text
             slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
             slug_display = slug[:12] + "..." if len(slug) > 12 else slug
@@ -2742,7 +2742,7 @@ async def check_n_ban(message: Message, reason: str):
             )
 
         # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
-        for i, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
+        for _idx, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
             visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
             inline_kb.add(
                 InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
@@ -3118,11 +3118,11 @@ async def perform_checks(
                                     other_chats_info = (
                                         f"\n👥 <b>Was member of {len(other_chats)} other chat(s):</b>\n   • {other_chats_list}\n"
                                     )
-                            except Exception as e:
+                            except (TelegramBadRequest, TelegramForbiddenError, KeyError) as e:
                                 LOGGER.debug("Failed to get other chats for deleted account %s: %s", user_id, e)
                             
                             # Ban from all chats
-                            success_count, fail_count, total_count = await ban_user_from_all_chats(
+                            success_count, _fail_count, total_count = await ban_user_from_all_chats(
                                 user_id, _orig_username, CHANNEL_IDS, CHANNEL_DICT
                             )
                             
@@ -3505,7 +3505,7 @@ async def mark_user_as_legit(
         LOGGER.info(log_msg)
         
         return True
-    except Exception as e:
+    except (KeyError, RuntimeError, asyncio.CancelledError) as e:
         LOGGER.error(
             "Error marking %s:%s as legit: %s",
             user_id,
@@ -4843,7 +4843,7 @@ if __name__ == "__main__":
         # Serialize message to JSON, handling aiogram Default objects
         try:
             message_as_json = json.dumps(message.model_dump(mode="json"), indent=4, ensure_ascii=False)
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             message_as_json = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
         # Truncate and add an indicator that the message has been truncated
         if len(message_as_json) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
@@ -6711,7 +6711,7 @@ if __name__ == "__main__":
                     formatted_message = json.dumps(
                         message_dict, indent=4, ensure_ascii=False
                     )  # Convert back to a JSON string with indentation and human-readable characters
-                except Exception:
+                except (TypeError, ValueError, AttributeError):
                     formatted_message = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
                 formatted_message_tlgrm: str = None
                 if len(formatted_message) > MAX_TELEGRAM_MESSAGE_LENGTH - 3:
@@ -9657,6 +9657,7 @@ if __name__ == "__main__":
             params = {"author_id": author_id}
             result = CURSOR.execute(query, params).fetchall()
             # delete them one by one
+            user_name = None  # Initialize before loop in case result is empty
             for chat_id, message_id, user_name in result:
                 try:
                     await BOT.delete_message(chat_id=chat_id, message_id=message_id)
@@ -9692,11 +9693,8 @@ if __name__ == "__main__":
             lols_check_kb = KeyboardBuilder().add(
                 InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url)
             )
-            # user_name comes from DB query loop - use a safe default if not defined
-            try:
-                _ban_user_name = user_name if user_name and str(user_name) not in ["None", "0"] else None
-            except NameError:
-                _ban_user_name = None
+            # user_name comes from DB query loop - initialized to None before loop
+            _ban_user_name = user_name if user_name and str(user_name) not in ["None", "0"] else None
             _display_user = f"@{_ban_user_name}" if _ban_user_name else "!UNDEFINED!"
             await message.reply(
                 f"Action taken: User {_display_user} (<code>{author_id}</code>) banned and their messages deleted where applicable.",
@@ -9897,7 +9895,7 @@ if __name__ == "__main__":
                             chat_info = await BOT.get_chat(chat_id)
                             chat_name = chat_info.title or CHANNEL_DICT.get(chat_id, str(chat_id))
                             chat_username = chat_info.username
-                        except Exception:
+                        except (TelegramBadRequest, TelegramForbiddenError):
                             chat_name = CHANNEL_DICT.get(chat_id, str(chat_id))
                             chat_username = get_cached_chat_username(chat_id)
                         admin_in_chats.append({"chat_id": chat_id, "chat_name": chat_name, "chat_username": chat_username})
@@ -10040,7 +10038,7 @@ if __name__ == "__main__":
             # Note: This forwards the /delmsg command itself for audit trail
             try:
                 await message.forward(TECHNOLOG_GROUP_ID)
-            except Exception as e_fwd:
+            except (TelegramBadRequest, TelegramForbiddenError) as e_fwd:
                 # This can fail for service messages or other edge cases - not critical
                 LOGGER.debug("Could not forward /delmsg command to technolog: %s", e_fwd)
 
@@ -11934,7 +11932,7 @@ if __name__ == "__main__":
                 full_formatted_message = json.dumps(
                     message_dict, indent=4, ensure_ascii=False
                 )  # Convert back to a JSON string with indentation and human-readable characters
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 full_formatted_message = f"{{\"message_id\": {message.message_id}, \"error\": \"serialization failed\"}}"
 
             # process unhandled messages

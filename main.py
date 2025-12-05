@@ -5064,6 +5064,7 @@ if __name__ == "__main__":
         )
 
         CONN.commit()
+        LOGGER.debug("[FWD_REPORT] DB commit successful")
 
         # Found message data:
         #        0           1           2            3            4        5           6            7
@@ -5074,7 +5075,9 @@ if __name__ == "__main__":
         # found_message_data[2] is not always a channel username since we put date to the DATABASE
         # NOTE add checks if its inout event or previous report (better delete reports?)
 
+        LOGGER.debug("[FWD_REPORT] Calling construct_message_link with found_message_data=%s", found_message_data)
         message_link = construct_message_link(found_message_data)
+        LOGGER.debug("[FWD_REPORT] message_link=%s", message_link)
 
         # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         if message.forward_from:
@@ -5083,22 +5086,28 @@ if __name__ == "__main__":
         else:
             first_name = found_message_data[5]
             last_name = found_message_data[6]
+        LOGGER.debug("[FWD_REPORT] first_name=%s, last_name=%s", first_name, last_name)
 
         # Handle both formats: with and without timezone
         _ts_str = found_message_data[7]
+        LOGGER.debug("[FWD_REPORT] _ts_str raw=%s", _ts_str)
         if _ts_str and "+" in str(_ts_str):
             _ts_str = str(_ts_str).split("+")[0].strip()
+        LOGGER.debug("[FWD_REPORT] _ts_str after timezone strip=%s", _ts_str)
         massage_timestamp = datetime.strptime(
             _ts_str, "%Y-%m-%d %H:%M:%S"
         )  # convert to datetime object (UTC)
+        LOGGER.debug("[FWD_REPORT] massage_timestamp=%s", massage_timestamp)
 
         # Get the username
         username = found_message_data[4]
         if not username:
             username = "!UNDEFINED!"
+        LOGGER.debug("[FWD_REPORT] username=%s", username)
 
         # Initialize user_id and user_link with default values
         user_id = found_message_data[3]
+        LOGGER.debug("[FWD_REPORT] user_id=%s", user_id)
         # user_id=5338846489
 
         # Build technolog copy link (may be None if forward failed)
@@ -5107,19 +5116,24 @@ if __name__ == "__main__":
                 str(technnolog_spam_message_copy.chat.id)[4:]
             )  # Remove -100 from the chat ID
             technnolog_spam_message_copy_link = f"https://t.me/c/{technolog_chat_id}/{technnolog_spam_message_copy.message_id}"
+            LOGGER.debug("[FWD_REPORT] technnolog_spam_message_copy_link=%s", technnolog_spam_message_copy_link)
         else:
             technnolog_spam_message_copy_link = "(TECHNOLOG copy not available)"
+            LOGGER.debug("[FWD_REPORT] technnolog_spam_message_copy was None")
         # LOGGER.info('Spam Message Technolog Copy: ', technnolog_spamMessage_copy)
 
         # print('##########----------DEBUG----------##########')
 
         # Use timezone-aware UTC now
         message_report_date = datetime.now(timezone.utc)
+        LOGGER.debug("[FWD_REPORT] message_report_date=%s", message_report_date)
         # avoid html tags in the name
         escaped_name = html.escape(
             f"{message.forward_sender_name or f'{first_name} {last_name}'}"
         )
+        LOGGER.debug("[FWD_REPORT] escaped_name=%s", escaped_name)
 
+        LOGGER.debug("[FWD_REPORT] Building technolog_info banner...")
         # Log the information with the link
         technolog_info = (
             f"💡 Report timestamp: {message_report_date}\n"

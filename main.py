@@ -979,7 +979,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
     # await unreport_spam(rogue_chat_id, LOGGER)
 
     if unban_rogue_chat_everywhere_error:
-        return unban_rogue_chat_everywhere_error
+        return False, rogue_chat_name, rogue_chat_username, unban_rogue_chat_everywhere_error
     else:
         LOGGER.info(
             "%s @%s(%s)  CHANNEL successfully unbanned where it was possible",
@@ -989,7 +989,7 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> bo
         )
         if rogue_chat_id in banned_users_dict:
             del banned_users_dict[rogue_chat_id]
-        return True, rogue_chat_name, rogue_chat_username
+        return True, rogue_chat_name, rogue_chat_username, None
 
 
 async def get_user_other_chats(
@@ -10295,7 +10295,7 @@ if __name__ == "__main__":
                     )
             else:  # action == "unban"
                 try:
-                    result, rogue_chan_name, rogue_chan_username = (
+                    result, rogue_chan_name, rogue_chan_username, error_msg = (
                         await unban_rogue_chat_everywhere(rogue_chan_id, CHANNEL_IDS)
                     )
                     if result is True:
@@ -10316,6 +10316,7 @@ if __name__ == "__main__":
                             parse_mode="HTML",
                         )
                         await safe_send_message(
+                            BOT,
                             ADMIN_GROUP_ID,
                             f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
                             LOGGER,
@@ -10324,7 +10325,8 @@ if __name__ == "__main__":
                         )
                     else:
                         await message.reply(
-                            f"Unbanning channel (<code>{rogue_chan_id}</code>) generated error: {result}.",
+                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned where possible.\n\n"
+                            f"<b>Some errors occurred:</b> {html.escape(error_msg) if error_msg else 'Unknown'}",
                             parse_mode="HTML",
                         )
 

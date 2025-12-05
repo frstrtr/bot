@@ -10334,32 +10334,65 @@ if __name__ == "__main__":
                     if rogue_chan_id in banned_users_dict:
                         del banned_users_dict[rogue_chan_id]
                         LOGGER.info(
-                            "\033[91mChannel (%s) unbanned.\033[0m",
+                            "\033[91mChannel (%s) removed from banned_users_dict.\033[0m",
                             rogue_chan_id,
                         )
-                        await message.reply(
-                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned."
-                        )
-                        await safe_send_message(
-                            BOT,
-                            TECHNOLOG_GROUP_ID,
-                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
-                            LOGGER,
-                            parse_mode="HTML",
-                        )
-                        await safe_send_message(
-                            BOT,
-                            ADMIN_GROUP_ID,
-                            f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
-                            LOGGER,
-                            parse_mode="HTML",
-                            message_thread_id=ADMIN_MANBAN,
-                        )
+                    
+                    # Check comprehensive ban status and provide detailed feedback
+                    status_lines = []
+                    
+                    # 1. Check banned_users_dict (runtime)
+                    in_banned_dict = rogue_chan_id in banned_users_dict
+                    status_lines.append(f"• Runtime dict: {'🚫 Banned' if in_banned_dict else '✅ Not banned'}")
+                    
+                    # 2. Check local database
+                    db_banned = is_user_banned(CONN, rogue_chan_id)
+                    status_lines.append(f"• Local DB: {'🚫 Banned' if db_banned else '✅ Not banned'}")
+                    
+                    # 3. Check LOLS/CAS/P2P
+                    spam_status = await spam_check(rogue_chan_id)
+                    if spam_status is True:
+                        status_lines.append("• LOLS/CAS/P2P: 🚫 Flagged as spam")
+                    elif spam_status is False:
+                        status_lines.append("• LOLS/CAS/P2P: ✅ Not flagged")
                     else:
-                        await message.reply(
-                            f"Channel (<code>{rogue_chan_id}</code>) was not banned.",
-                            parse_mode="HTML",
-                        )
+                        status_lines.append("• LOLS/CAS/P2P: ⚠️ Check failed")
+                    
+                    # 4. Try to remove from P2P
+                    try:
+                        p2p_removed = await remove_spam_from_2p2p(rogue_chan_id, LOGGER, rogue_chan_username)
+                        if p2p_removed:
+                            status_lines.append("• P2P removal: ✅ Removed from P2P spam list")
+                        else:
+                            status_lines.append("• P2P removal: ℹ️ Was not in P2P spam list")
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as p2p_e:
+                        status_lines.append(f"• P2P removal: ⚠️ Failed ({p2p_e})")
+                    
+                    status_report = "\n".join(status_lines)
+                    await message.reply(
+                        f"<b>Channel Status Report</b>\n"
+                        f"{rogue_chan_name} @{rogue_chan_username}\n"
+                        f"<code>{rogue_chan_id}</code>\n\n"
+                        f"{status_report}",
+                        parse_mode="HTML",
+                    )
+                    
+                    # Notify admin groups
+                    await safe_send_message(
+                        BOT,
+                        TECHNOLOG_GROUP_ID,
+                        f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                        LOGGER,
+                        parse_mode="HTML",
+                    )
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        f"Channel {rogue_chan_name} @{rogue_chan_username}(<code>{rogue_chan_id}</code>) unbanned by admin {admin_name}(<code>{admin_id}</code>):@{admin_username} request.",
+                        LOGGER,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_MANBAN,
+                    )
                 except TelegramBadRequest as e:
                     LOGGER.error(
                         "Failed to unban channel %d. Error: %s", rogue_chan_id, e

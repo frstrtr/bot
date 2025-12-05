@@ -2027,6 +2027,59 @@ async def spam_check(user_id):
         return None
 
 
+def is_established_user(user_id: int) -> bool:
+    """Check if a user is considered 'established' based on message count and first message age.
+    
+    An established user meets ONE of these criteria:
+    1. Has >= ESTABLISHED_USER_MIN_MESSAGES AND first message is >= ESTABLISHED_USER_FIRST_MSG_DAYS old
+    2. Is marked as legit in the database
+    
+    Args:
+        user_id: The user ID to check
+        
+    Returns:
+        True if user is established, False otherwise
+    """
+    # Count user's messages
+    msg_count = CURSOR.execute(
+        "SELECT COUNT(*) FROM recent_messages WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()[0]
+    
+    # Check if user has any legit marker
+    is_legit = check_user_legit(CURSOR, user_id)
+    if not is_legit:
+        # Also check baseline for is_legit flag
+        user_baseline = get_user_baseline(CONN, user_id)
+        if user_baseline and user_baseline.get("is_legit"):
+            is_legit = True
+    
+    # If legit, they're established
+    if is_legit:
+        return True
+    
+    # Check first message age
+    first_msg = CURSOR.execute(
+        "SELECT received_date FROM recent_messages WHERE user_id = ? ORDER BY received_date ASC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    
+    if not first_msg:
+        return False
+    
+    first_msg_old_enough = False
+    try:
+        first_msg_dt = datetime.fromisoformat(first_msg[0].replace(" ", "T"))
+        if first_msg_dt.tzinfo is None:
+            first_msg_dt = first_msg_dt.replace(tzinfo=timezone.utc)
+        threshold_date = datetime.now(timezone.utc) - timedelta(days=ESTABLISHED_USER_FIRST_MSG_DAYS)
+        first_msg_old_enough = first_msg_dt < threshold_date
+    except (ValueError, TypeError):
+        return False
+    
+    return msg_count >= ESTABLISHED_USER_MIN_MESSAGES and first_msg_old_enough
+
+
 async def save_report_file(file_type, data):
     """Function to create or load the daily spam file.
 
@@ -8338,21 +8391,79 @@ if __name__ == "__main__":
                 and message.forward_from
                 and message.forward_from.id != message.from_user.id
             ):
-                # this is possibly a spam
-                the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
-                if await check_n_ban(message, the_reason):
-                    return
-                else:
+                # Check if user is established - if so, just report to SUSPICIOUS, don't ban/delete
+                if is_established_user(message.from_user.id):
+                    # Established user forwarding from unknown source - report to SUSPICIOUS only
                     LOGGER.info(
-                        "\033[93m%s:%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
+                        "\033[92m%s:%s ESTABLISHED user forwarded from unknown source in %s - sending to SUSPICIOUS (NOT deleting, NOT banning)\033[0m",
                         message.from_user.id,
                         format_username_for_log(message.from_user.username),
                         message.chat.title,
                     )
-                    if not autoreport_sent:
-                        autoreport_sent = True
-                        await submit_autoreport(message, the_reason)
-                        return  # stop further actions for this message since user was banned before
+                    
+                    # Build forward source info
+                    forward_source_info = ""
+                    if message.forward_from:
+                        forward_source_info = f"User: {message.forward_from.first_name or ''} {message.forward_from.last_name or ''} @{message.forward_from.username or '!UNDEFINED!'} (<code>{message.forward_from.id}</code>)"
+                    elif message.forward_from_chat:
+                        forward_source_info = f"Channel: {message.forward_from_chat.title or '!UNDEFINED!'} @{message.forward_from_chat.username or '!UNDEFINED!'} (<code>{message.forward_from_chat.id}</code>)"
+                    else:
+                        forward_source_info = "Unknown source (hidden or deleted)"
+                    
+                    # Build message link
+                    _msg_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+                    _chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                    
+                    suspicious_text = (
+                        f"⚠️ <b>Forward from Unknown Source by Established User</b>\n"
+                        f"User: {html.escape(message.from_user.first_name or '')} {html.escape(message.from_user.last_name or '')} "
+                        f"@{message.from_user.username or '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
+                        f"Forward from: {forward_source_info}\n"
+                        f"Chat: {_chat_link}\n"
+                        f"Message: {_msg_link}\n\n"
+                        f"📊 <b>User status:</b> ESTABLISHED (trusted, message NOT deleted)"
+                    )
+                    
+                    # Forward to SUSPICIOUS thread
+                    try:
+                        await BOT.forward_message(
+                            ADMIN_GROUP_ID,
+                            message.chat.id,
+                            message.message_id,
+                            message_thread_id=ADMIN_SUSPICIOUS,
+                        )
+                    except TelegramBadRequest as fwd_err:
+                        LOGGER.warning("Failed to forward established user's message to SUSPICIOUS: %s", fwd_err)
+                    
+                    # Send info banner
+                    _established_kb = make_lols_kb(message.from_user.id)
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        suspicious_text,
+                        LOGGER,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=_established_kb.as_markup(),
+                    )
+                    # Don't return - let message stay, don't ban user
+                else:
+                    # Non-established user - use existing ban logic
+                    the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} forwarded message from unknown channel or user"
+                    if await check_n_ban(message, the_reason):
+                        return
+                    else:
+                        LOGGER.info(
+                            "\033[93m%s:%s possibly forwarded a spam from unknown channel or user in chat %s\033[0m",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
+                            message.chat.title,
+                        )
+                        if not autoreport_sent:
+                            autoreport_sent = True
+                            await submit_autoreport(message, the_reason)
+                            return  # stop further actions for this message since user was banned before
             elif has_custom_emoji_spam(
                 message
             ):  # check if the message contains spammy custom emojis

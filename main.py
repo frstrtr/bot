@@ -2135,6 +2135,17 @@ async def autoban(_id, user_name="!UNDEFINED!"):
                 _id,
                 format_username_for_log(user_name),
             )
+    
+    # Cancel regular watchdog if running (user is being banned)
+    if _id in running_watchdogs:
+        watchdog_task = running_watchdogs.pop(_id, None)
+        if watchdog_task:
+            watchdog_task.cancel()
+            LOGGER.info(
+                "%s:%s Regular watchdog cancelled during autoban",
+                _id,
+                format_username_for_log(user_name),
+            )
 
     # Delete ALL stored messages for this user BEFORE removing from active_user_checks_dict
     if _id in active_user_checks_dict:
@@ -2183,6 +2194,9 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             last_3_users_str,  # Last 3 elements
             len(banned_users_dict),  # Number of elements left
         )
+
+    # Update baseline to mark monitoring ended (banned, not legit)
+    update_user_baseline_status(CONN, _id, monitoring_active=False, is_legit=False)
 
     # Normalize username for logging / notification using consistent normalize_username function
     norm_username = normalize_username(user_name)
@@ -3129,12 +3143,24 @@ async def perform_checks(
                                 user_id, _orig_username, CHANNEL_IDS, CHANNEL_DICT
                             )
                             
-                            # Remove from active checks
+                            # Cancel intensive watchdog if running (user is being banned)
+                            if user_id in running_intensive_watchdogs:
+                                intensive_task = running_intensive_watchdogs.pop(user_id, None)
+                                if intensive_task:
+                                    intensive_task.cancel()
+                                    LOGGER.info(
+                                        "%s:%s Intensive watchdog cancelled during deleted account ban",
+                                        user_id,
+                                        format_username_for_log(_orig_username),
+                                    )
+                            
+                            # Remove from active checks and add to banned dict
                             if user_id in active_user_checks_dict:
                                 del active_user_checks_dict[user_id]
-                            
-                            # Add to banned users dict
                             banned_users_dict[user_id] = datetime.now(timezone.utc)
+                            
+                            # Update baseline to mark monitoring ended (banned)
+                            update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=False)
                             
                             profile_links = (
                                 f"🔗 <b>Profile links:</b>\n"

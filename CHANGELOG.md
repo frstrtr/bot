@@ -36,6 +36,9 @@
   - Cancel both regular and intensive watchdogs when user leaves chat
   - Cancel all watchdogs when marking user as legit
   - Cancel all watchdogs when user is manually banned
+  - Cancel intensive watchdog when deleted account is detected during periodic checks
+  - `autoban()` now cancels both regular and intensive watchdogs
+  - Updates baseline status to mark monitoring ended after ban
 
 ### Added
 - **`mark_user_as_legit()` helper function**: Consolidated legitimization logic

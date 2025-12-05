@@ -81,6 +81,7 @@ class BotConfig:
     # Constants
     MAX_TELEGRAM_MESSAGE_LENGTH: int = 4096
     TELEGRAM_CHANNEL_BOT_ID: int = 136817688
+    TELEGRAM_ANONYMOUS_ADMIN_ID: int = 777000  # When admin posts as channel
     P2P_SERVER_URL: str = "http://localhost:8081"
     
     # Established user detection settings
@@ -261,6 +262,7 @@ def load_from_env() -> bool:
     config.ALLOWED_UPDATES = ["message", "chat_member", "callback_query"]
 
     config.TELEGRAM_CHANNEL_BOT_ID = 136817688
+    config.TELEGRAM_ANONYMOUS_ADMIN_ID = 777000  # When admin posts as channel
 
     return True
 
@@ -315,6 +317,7 @@ CHANNEL_DICT = config.CHANNEL_DICT
 ALLOWED_CONTENT_TYPES = config.ALLOWED_CONTENT_TYPES
 API_TOKEN = config.API_TOKEN
 TELEGRAM_CHANNEL_BOT_ID = config.TELEGRAM_CHANNEL_BOT_ID
+TELEGRAM_ANONYMOUS_ADMIN_ID = config.TELEGRAM_ANONYMOUS_ADMIN_ID
 P2P_SERVER_URL = config.P2P_SERVER_URL
 ESTABLISHED_USER_MIN_MESSAGES = config.ESTABLISHED_USER_MIN_MESSAGES
 ESTABLISHED_USER_FIRST_MSG_DAYS = config.ESTABLISHED_USER_FIRST_MSG_DAYS

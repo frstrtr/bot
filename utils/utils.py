@@ -2266,8 +2266,11 @@ async def report_spam_from_message(message: types.Message, logger, userid_toexcl
     Args:
         message (types.Message): The message object.
         logger: The logger object.
-        TELEGRAM_CHANNEL_BOT_ID: The ID of the telegram channel bot.
+        userid_toexclude: The ID of the telegram channel bot (136817688) to exclude.
     """
+    # Telegram's anonymous admin ID (777000) - when admin posts as channel
+    TELEGRAM_ANONYMOUS_ADMIN_ID = 777000
+    
     user_id = message.from_user.id if message.from_user else None
     sender_chat_id = message.sender_chat.id if message.sender_chat else None
     forward_from_id = message.forward_from.id if message.forward_from else None
@@ -2276,8 +2279,10 @@ async def report_spam_from_message(message: types.Message, logger, userid_toexcl
     )
 
     if (
-        user_id and user_id != userid_toexclude
-    ):  # prevent banning system TELEGRAM_CHANNEL_BOT_ID
+        user_id 
+        and user_id != userid_toexclude
+        and user_id != TELEGRAM_ANONYMOUS_ADMIN_ID
+    ):  # prevent reporting system TELEGRAM_CHANNEL_BOT_ID and anonymous admin
         await report_spam_2p2p(user_id, logger)
     if sender_chat_id:
         await report_spam_2p2p(sender_chat_id, logger)

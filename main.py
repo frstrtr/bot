@@ -262,6 +262,7 @@ from utils.utils_config import (
     CHANNEL_DICT,
     ALLOWED_CONTENT_TYPES,
     TELEGRAM_CHANNEL_BOT_ID,
+    TELEGRAM_ANONYMOUS_ADMIN_ID,
     P2P_SERVER_URL,
     ESTABLISHED_USER_MIN_MESSAGES,
     ESTABLISHED_USER_FIRST_MSG_DAYS,
@@ -7005,7 +7006,17 @@ if __name__ == "__main__":
         # check if message is from user from active_user_checks_dict
         # and banned_users_dict set
         # Note: Edge case - user in both active checks and banned (race condition)
-        if (
+        # Skip all spam checks for Telegram's anonymous admin ID (777000)
+        # This is when admin posts as channel name, not spam
+        if message.from_user.id == TELEGRAM_ANONYMOUS_ADMIN_ID:
+            _channel_post_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
+            _channel_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+            LOGGER.debug(
+                "777000:ANONYMOUS_ADMIN Posted as channel in %s | msg: %s - skipping spam checks",
+                _channel_chat_link,
+                _channel_post_link,
+            )
+        elif (
             message.from_user.id in active_user_checks_dict
             and message.from_user.id in banned_users_dict
         ):
@@ -7361,7 +7372,7 @@ if __name__ == "__main__":
 
             # Special handling for Telegram's anonymous channel admin (ID 777000)
             # This is when someone posts as the channel name (not as themselves)
-            if message.from_user.id == 777000:
+            if message.from_user.id == TELEGRAM_ANONYMOUS_ADMIN_ID:
                 _channel_post_link = construct_message_link([message.chat.id, message.message_id, message.chat.username])
                 _channel_chat_link = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
                 LOGGER.info(

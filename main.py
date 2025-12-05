@@ -4815,6 +4815,8 @@ if __name__ == "__main__":
     @DP.message(is_forwarded_from_unknown_channel_message)
     async def handle_forwarded_reports(message: Message):
         """Function to handle forwarded messages."""
+        LOGGER.debug("[FWD_REPORT] Started handle_forwarded_reports from user %s in chat %s",
+                     message.from_user.id, message.chat.id)
 
         reported_spam = format_spam_report(message)
         # store spam text and caption to the daily_spam file
@@ -4823,6 +4825,7 @@ if __name__ == "__main__":
         # Check if this is superadmin in private chat or superadmin group - they may be forwarding for /copy or /forward
         # We'll only respond after we verify we can process the report
         is_superadmin_msg = superadmin_filter(message)
+        LOGGER.debug("[FWD_REPORT] is_superadmin_msg=%s", is_superadmin_msg)
 
         # LOGGER.debug("############################################################")
         # LOGGER.debug("                                                            ")
@@ -4834,12 +4837,15 @@ if __name__ == "__main__":
         # Forward the message to the admin group
         technnolog_spam_message_copy = None
         try:
+            LOGGER.debug("[FWD_REPORT] Forwarding to TECHNOLOG_GROUP_ID=%s", TECHNOLOG_GROUP_ID)
             technnolog_spam_message_copy = await BOT.forward_message(
                 TECHNOLOG_GROUP_ID, message.chat.id, message.message_id
             )
+            LOGGER.debug("[FWD_REPORT] TECHNOLOG forward succeeded: msg_id=%s", 
+                        technnolog_spam_message_copy.message_id if technnolog_spam_message_copy else None)
         except TelegramBadRequest as fwd_err:
             LOGGER.warning(
-                "Failed to forward reported message to TECHNOLOG: %s - continuing with report",
+                "[FWD_REPORT] Failed to forward reported message to TECHNOLOG: %s - continuing with report",
                 fwd_err,
             )
         
@@ -5014,11 +5020,11 @@ if __name__ == "__main__":
                 return
 
         if not found_message_data:  # Last resort. Give up.
-            LOGGER.info("           Could not retrieve the author's user ID.")
+            LOGGER.info("[FWD_REPORT] Could not retrieve the author's user ID - giving up.")
             return
             # pass
 
-        LOGGER.debug("%s - message data: %s", found_message_data[3], found_message_data)
+        LOGGER.debug("[FWD_REPORT] found_message_data[3]=%s, full data: %s", found_message_data[3], found_message_data)
 
         # Save both the original message_id and the forwarded message's date
         # Store UTC timestamps with timezone suffix (+00:00) for database portability
@@ -5028,6 +5034,8 @@ if __name__ == "__main__":
             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
         else:
             report_id = int(str(message.chat.id) + str(message.message_id))
+
+        LOGGER.debug("[FWD_REPORT] Generated report_id=%s", report_id)
 
         if report_id:
             # send report ID to the reporter
@@ -5148,7 +5156,8 @@ if __name__ == "__main__":
         # construct lols check link button
         inline_kb = make_lols_kb(user_id)
         # Send the banner to the technolog group
-        await safe_send_message(
+        LOGGER.debug("[FWD_REPORT] Sending technolog_info banner to TECHNOLOG_GROUP_ID=%s", TECHNOLOG_GROUP_ID)
+        technolog_banner_result = await safe_send_message(
             BOT,
             TECHNOLOG_GROUP_ID,
             technolog_info,
@@ -5156,6 +5165,8 @@ if __name__ == "__main__":
             parse_mode="HTML",
             reply_markup=inline_kb.as_markup(),
         )
+        LOGGER.debug("[FWD_REPORT] technolog_banner_result=%s", 
+                    technolog_banner_result.message_id if technolog_banner_result else None)
 
         # Keyboard ban/cancel/confirm buttons
         keyboard = KeyboardBuilder()
@@ -5168,21 +5179,33 @@ if __name__ == "__main__":
             callback_data=f"suspiciousactions_{original_chat_id}_{original_message_id}_{user_id}",
         )
         keyboard.add(actions_btn)
+        LOGGER.debug("[FWD_REPORT] Created keyboard with actions button")
 
         # Show ban banner with buttons in the admin group to confirm or cancel the ban
         # And store published banner message data to provide link to the reportee
         # admin_group_banner_message: Message = None # Type hinting
         try:  # If Topic_closed error
-            if is_superadmin_msg or await is_admin(message.from_user.id, ADMIN_GROUP_ID):
+            is_admin_user = await is_admin(message.from_user.id, ADMIN_GROUP_ID)
+            LOGGER.debug("[FWD_REPORT] Checking admin status: is_superadmin_msg=%s, is_admin_user=%s", 
+                        is_superadmin_msg, is_admin_user)
+            
+            if is_superadmin_msg or is_admin_user:
+                LOGGER.debug("[FWD_REPORT] User is admin/superadmin - forwarding to ADMIN_GROUP_ID=%s", ADMIN_GROUP_ID)
 
                 # Forward reported message to the ADMIN group REPORT thread
-                await BOT.forward_message(
-                    ADMIN_GROUP_ID,
-                    message.chat.id,
-                    message.message_id,
-                    disable_notification=True,
-                )
+                try:
+                    fwd_result = await BOT.forward_message(
+                        ADMIN_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                        disable_notification=True,
+                    )
+                    LOGGER.debug("[FWD_REPORT] Forward to ADMIN_GROUP succeeded: msg_id=%s", fwd_result.message_id)
+                except TelegramBadRequest as fwd_admin_err:
+                    LOGGER.error("[FWD_REPORT] Failed to forward to ADMIN_GROUP: %s", fwd_admin_err)
+                    
                 # Send report banner to the admin group
+                LOGGER.debug("[FWD_REPORT] Sending admin_ban_banner to ADMIN_GROUP")
                 admin_group_banner_message = await safe_send_message(
                     BOT,
                     ADMIN_GROUP_ID,
@@ -5192,7 +5215,11 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
+                LOGGER.debug("[FWD_REPORT] admin_group_banner_message=%s", 
+                            admin_group_banner_message.message_id if admin_group_banner_message else None)
+                            
                 # Send report action banner to the reporter
+                LOGGER.debug("[FWD_REPORT] Sending action banner to reporter")
                 admin_action_banner_message = await message.answer(
                     admin_ban_banner,
                     parse_mode="HTML",
@@ -5202,6 +5229,8 @@ if __name__ == "__main__":
                     disable_web_page_preview=False,
                     reply_markup=keyboard.as_markup(),
                 )
+                LOGGER.debug("[FWD_REPORT] admin_action_banner_message=%s", 
+                            admin_action_banner_message.message_id if admin_action_banner_message else None)
 
                 # Store the admin action banner message data
                 set_forwarded_state(

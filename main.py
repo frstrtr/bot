@@ -12720,7 +12720,7 @@ if __name__ == "__main__":
             try:
                 # Guard: skip deletion if message_id looks synthetic (epoch seconds or constructed report id)
                 # Heuristic: if length >= 13 (milliseconds-like) or > 4_000_000_000 treat as synthetic
-                if len(str(susp_message_id)) < 13 and susp_message_id < 4_000_000_000:
+                if len(str(susp_message_id)) < 13 and 0 < susp_message_id < 4_000_000_000:
                     await BOT.delete_message(susp_chat_id, susp_message_id)
                 else:
                     LOGGER.debug(
@@ -12753,18 +12753,21 @@ if __name__ == "__main__":
                     for _c, _m in rows:
                         try:
                             # Skip obviously synthetic ids as above
-                            if len(str(_m)) < 13 and _m < 4_000_000_000:
+                            if len(str(_m)) < 13 and 0 < _m < 4_000_000_000:
                                 await BOT.delete_message(_c, _m)
                                 deleted_cnt += 1
                         except TelegramBadRequest as _e_del:
-                            LOGGER.debug(
-                                "%s:%s Unable to delete message %s in chat %s for global ban cleanup: %s",
-                                susp_user_id,
-                                format_username_for_log(susp_user_name),
-                                _m,
-                                _c,
-                                _e_del,
-                            )
+                            if "message to delete not found" in str(_e_del):
+                                pass
+                            else:
+                                LOGGER.debug(
+                                    "%s:%s Unable to delete message %s in chat %s for global ban cleanup: %s",
+                                    susp_user_id,
+                                    format_username_for_log(susp_user_name),
+                                    _m,
+                                    _c,
+                                    _e_del,
+                                )
                     # Also inspect active_user_checks_dict entry for any extra message references not in DB
                     try:
                         _active_entry = active_user_checks_dict.get(susp_user_id)
@@ -12941,16 +12944,19 @@ if __name__ == "__main__":
                 chat_db_ids = set(_mid for (_mid,) in rows)
                 for (_mid,) in rows:
                     try:
-                        if len(str(_mid)) < 13 and _mid < 4_000_000_000:
+                        if len(str(_mid)) < 13 and 0 < _mid < 4_000_000_000:
                             await BOT.delete_message(susp_chat_id, _mid)
                             chat_deleted += 1
                     except TelegramBadRequest as _e_del:
-                        LOGGER.debug(
-                            "Unable to delete message %s in chat %s for local ban cleanup: %s",
-                            _mid,
-                            susp_chat_id,
-                            _e_del,
-                        )
+                        if "message to delete not found" in str(_e_del):
+                            pass
+                        else:
+                            LOGGER.debug(
+                                "Unable to delete message %s in chat %s for local ban cleanup: %s",
+                                _mid,
+                                susp_chat_id,
+                                _e_del,
+                            )
                 # Active user checks extra messages possibly not flushed to DB
                 try:
                     _active_entry = active_user_checks_dict.get(susp_user_id)
@@ -13203,6 +13209,8 @@ if __name__ == "__main__":
                 # Optionally, you can delete the mapping after the reply is processed
                 # del unhandled_messages[message.reply_to_message.message_id]
 
+        except TelegramForbiddenError:
+            await message.reply("❌ User has blocked the bot. Cannot send reply.")
         except TelegramBadRequest as e:
             LOGGER.error("Error in handle_admin_reply function: %s", e)
             await message.reply(f"Error: {e}")

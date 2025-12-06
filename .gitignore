@@ -31,4 +31,4 @@ test.py
 !utils/utils.py
 .venv/
 .github/copilot.txt
-.github/copilot.txt
+.github/copilot-instructions.md

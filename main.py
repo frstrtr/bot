@@ -12719,8 +12719,9 @@ if __name__ == "__main__":
             # First, try to delete the original suspicious message (non-blocking)
             try:
                 # Guard: skip deletion if message_id looks synthetic (epoch seconds or constructed report id)
-                # Heuristic: if length >= 13 (milliseconds-like) or > 4_000_000_000 treat as synthetic
-                if len(str(susp_message_id)) < 13 and 0 < susp_message_id < 4_000_000_000:
+                # Heuristic: if > 1_000_000_000 treat as synthetic (timestamp)
+                # Real message IDs are assumed to be < 1 billion. Timestamps (seconds) are > 1.7 billion.
+                if 0 < susp_message_id < 1_000_000_000:
                     await BOT.delete_message(susp_chat_id, susp_message_id)
                 else:
                     LOGGER.debug(
@@ -12753,7 +12754,7 @@ if __name__ == "__main__":
                     for _c, _m in rows:
                         try:
                             # Skip obviously synthetic ids as above
-                            if len(str(_m)) < 13 and 0 < _m < 4_000_000_000:
+                            if 0 < _m < 1_000_000_000:
                                 await BOT.delete_message(_c, _m)
                                 deleted_cnt += 1
                         except TelegramBadRequest as _e_del:
@@ -12944,7 +12945,7 @@ if __name__ == "__main__":
                 chat_db_ids = set(_mid for (_mid,) in rows)
                 for (_mid,) in rows:
                     try:
-                        if len(str(_mid)) < 13 and 0 < _mid < 4_000_000_000:
+                        if 0 < _mid < 1_000_000_000:
                             await BOT.delete_message(susp_chat_id, _mid)
                             chat_deleted += 1
                     except TelegramBadRequest as _e_del:

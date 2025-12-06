@@ -994,8 +994,9 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
     Format: ISO 8601 (e.g., "2025-12-04 15:30:00+00:00")
     """
     # Store UTC timestamps with timezone info for portability
-    received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
-    forward_date_utc = message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
+    # Ensure timestamps are converted to UTC before formatting
+    received_date_utc = message.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
+    forward_date_utc = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
     
     cursor.execute(
         """

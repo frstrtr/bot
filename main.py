@@ -739,7 +739,7 @@ async def submit_autoreport(message: Message, reason):
     # forward_date = message.forward_date if message.forward_date else datetime.now()
     # Convert to string format to avoid Python 3.12+ sqlite3 DeprecationWarning
     # about default datetime adapter being deprecated
-    tobot_forward_date = message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else None
+    tobot_forward_date = message.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
 
     # DEBUG
     # LOGGER.debug("DEBUG")
@@ -1658,7 +1658,7 @@ async def handle_autoreports(
     if not found_message_data:
         if forward_sender_name == "Deleted Account":
             # Convert datetime to string to avoid Python 3.12+ sqlite3 DeprecationWarning
-            _forward_date_str = message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None
+            _forward_date_str = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
             found_message_data = get_spammer_details(
                 spammer_id,
                 spammer_first_name,
@@ -1712,7 +1712,7 @@ async def handle_autoreports(
 
     # Save both the original message_id and the forwarded message's date
     # Store UTC timestamps with timezone suffix (+00:00) for database portability
-    received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
+    received_date_utc = message.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
     # remove -100 from the chat ID if this is a public group
     if message.chat.id < 0:
         report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -1732,7 +1732,7 @@ async def handle_autoreports(
             message.from_user.username,
             message.from_user.first_name,
             message.from_user.last_name,
-            message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
+            message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
             received_date_utc,
             str(found_message_data),
         ),
@@ -4649,7 +4649,7 @@ if __name__ == "__main__":
         # record the event in the database if not lols_spam
         if not lols_spam:
             # Store UTC timestamps with timezone suffix (+00:00) for database portability
-            update_date_utc = update.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if update.date else None
+            update_date_utc = update.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if update.date else None
             CURSOR.execute(
                 """
                 INSERT OR REPLACE INTO recent_messages
@@ -5114,7 +5114,7 @@ if __name__ == "__main__":
 
         # Save both the original message_id and the forwarded message's date
         # Store UTC timestamps with timezone suffix (+00:00) for database portability
-        received_date_utc = message.date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
+        received_date_utc = message.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
         # Create a unique report ID based on the chat ID and message ID and remove -100 if public chat
         if message.chat.id < 0:
             report_id = int(str(message.chat.id)[4:] + str(message.message_id))
@@ -5141,7 +5141,7 @@ if __name__ == "__main__":
                 message.from_user.username,
                 message.from_user.first_name,
                 message.from_user.last_name,
-                message.forward_date.strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
+                message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None,
                 received_date_utc,
                 str(found_message_data),
             ),
@@ -7498,11 +7498,21 @@ if __name__ == "__main__":
                         first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
                         # If first message is more than 5 minutes old and not matching current - skip
                         # IMPORTANT: All timestamps in DB are UTC (old=naive UTC, new=aware +00:00)
+                        # BUT legacy data might be naive Mauritius time (UTC+4) due to TZ setting
                         # Convert naive to aware for comparison
                         if first_msg_dt.tzinfo is None:
-                            first_msg_dt = first_msg_dt.replace(tzinfo=timezone.utc)
+                            # Assume naive timestamps are Mauritius time (legacy behavior)
+                            # Convert them to aware Mauritius time, then to UTC
+                            # This fixes the issue where naive Mauritius time (e.g. 14:00) was treated as UTC (14:00)
+                            # which is 4 hours ahead of actual UTC (10:00), causing negative age
+                            mauritius_tz = ZoneInfo("Indian/Mauritius")
+                            first_msg_dt = first_msg_dt.replace(tzinfo=mauritius_tz).astimezone(timezone.utc)
+                        
                         msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
-                        is_recent_first_msg = msg_age_seconds < 300  # 5 minutes
+                        
+                        # Check if message is recent (less than 5 minutes old)
+                        # Allow small clock skew (e.g. -60s) but reject large negative values
+                        is_recent_first_msg = -60 < msg_age_seconds < 300
                     except (ValueError, TypeError, AttributeError):
                         is_recent_first_msg = False
                     
@@ -12013,7 +12023,7 @@ if __name__ == "__main__":
                         user_name if user_name != "!UNDEFINED!" else None,
                         None,
                         None,
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                         1,
                         1,
                     ),
@@ -12226,7 +12236,7 @@ if __name__ == "__main__":
                     user_name if user_name != "!UNDEFINED!" else None,
                     None,
                     None,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00"),
                     1,
                     1,
                 ),

@@ -8035,7 +8035,7 @@ if __name__ == "__main__":
                             
                             missed_join_notification_sent = True
                         else:
-                            # Regular missed join notification to ADMIN_SUSPICIOUS
+                            # Regular missed join notification to TECHNOLOG
                             # Use actual message_id since we have a message to link to
                             _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
                             _first_seen_date = user_first_message_date[0]
@@ -8116,8 +8116,8 @@ if __name__ == "__main__":
                             # Forward the message first
                             try:
                                 await message.forward(
-                                    ADMIN_GROUP_ID,
-                                    ADMIN_SUSPICIOUS,
+                                    TECHNOLOG_GROUP_ID,
+                                    message_thread_id=TECHNO_IN,
                                     disable_notification=True,
                                 )
                             except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
@@ -8125,10 +8125,10 @@ if __name__ == "__main__":
                             
                             await safe_send_message(
                                 BOT,
-                                ADMIN_GROUP_ID,
+                                TECHNOLOG_GROUP_ID,
                                 _missed_join_message,
                                 LOGGER,
-                                message_thread_id=ADMIN_SUSPICIOUS,
+                                message_thread_id=TECHNO_IN,
                                 parse_mode="HTML",
                                 disable_web_page_preview=True,
                                 reply_markup=_missed_join_kb.as_markup(),
@@ -8139,7 +8139,7 @@ if __name__ == "__main__":
                             # Also mark as autoreported to prevent this same message going to AUTOREPORT
                             autoreported_messages.add((message.chat.id, message.message_id))
                             LOGGER.info(
-                                "%s:%s Sent missed join notification to ADMIN_SUSPICIOUS",
+                                "%s:%s Sent missed join notification to TECHNOLOG (TECHNO_IN)",
                                 message.from_user.id,
                                 format_username_for_log(message.from_user.username),
                             )

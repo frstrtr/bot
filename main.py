@@ -801,18 +801,6 @@ async def on_startup():
             LOGGER.warning("Could not get chat info for %s: %s", chat_id, e)
     LOGGER.info("Chat username cache populated with %d entries", len(chat_username_cache))
 
-    # Populate banned_users_dict from database on startup
-    # This prevents re-banning channels/users that are already banned
-    try:
-        db_banned_users = get_banned_users(CONN)
-        for bu in db_banned_users:
-            # Use username or first_name or ID as display name
-            display_name = bu["username"] or bu["first_name"] or str(bu["user_id"])
-            banned_users_dict[bu["user_id"]] = display_name
-        LOGGER.info("Populated banned_users_dict with %d entries from database", len(banned_users_dict))
-    except Exception as e:
-        LOGGER.error("Failed to populate banned_users_dict from database: %s", e)
-
     bot_start_log_message = (
         f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
@@ -7265,8 +7253,8 @@ if __name__ == "__main__":
                 else ""
             )
             if rogue_chan_id and (
-                message.from_user.id in banned_users_dict
-                or rogue_chan_id in banned_users_dict
+                is_user_banned(CONN, message.from_user.id)
+                or is_user_banned(CONN, rogue_chan_id)
                 or await spam_check(message.from_user.id)
             ):
                 try:
@@ -7308,12 +7296,12 @@ if __name__ == "__main__":
                         lols_spam=True,
                         message_to_delete=None,
                     )
-                    # ban channel in the rest of chats
+                    # ban channel in the rest of chats - check database first
                     ban_rogue_chan_task = None
                     if rogue_chan_id:
-                        if rogue_chan_id in banned_users_dict:
+                        if is_user_banned(CONN, rogue_chan_id):
                             LOGGER.info(
-                                "Channel %s (%s) is already banned, skipping ban_rogue_chat_everywhere",
+                                "Channel %s (%s) is already banned (DB check), skipping ban_rogue_chat_everywhere",
                                 rogue_chan_id,
                                 rogue_chan_username,
                             )
@@ -7322,8 +7310,6 @@ if __name__ == "__main__":
                                 rogue_chan_id,
                                 CHANNEL_IDS,
                             )
-                            # Add to banned_users_dict immediately
-                            banned_users_dict[rogue_chan_id] = rogue_chan_username or rogue_chan_name or "!UNDEFINED!"
 
                     tasks = [
                         ban_member_task,

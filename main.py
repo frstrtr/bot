@@ -3973,13 +3973,6 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
     os.makedirs("inout", exist_ok=True)
     os.makedirs("daily_spam", exist_ok=True)
 
-    # Load banned users from database into runtime dict (if not already loaded)
-    # This ensures dict is populated on first daily run
-    db_banned_users = get_banned_users(CONN)
-    for bu in db_banned_users:
-        if bu["user_id"] not in banned_users_dict:
-            banned_users_dict[bu["user_id"]] = bu["username"] or bu["first_name"] or "!UNDEFINED!"
-    
     # Migrate any legacy banned_users.txt file to database (one-time migration)
     banned_users_filename = "banned_users.txt"
     if os.path.exists(banned_users_filename):
@@ -4000,16 +3993,20 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                         username_str = user_name if isinstance(user_name, str) else None
                         add_banned_user(CONN, user_id_int, username_str, ban_source="legacy_migration")
                         migrated_count += 1
-                    # Add to runtime dict
-                    banned_users_dict[user_id_int] = user_name
         # Remove legacy file after migration
         os.remove(banned_users_filename)
         LOGGER.info("Migrated %d users from banned_users.txt to database", migrated_count)
 
     # Save daily archive of banned users to inout folder (for historical records)
+    # Query database directly instead of using in-memory dict
+    db_banned_users = get_banned_users(CONN)
     with open(filename, "w", encoding="utf-8") as file:
-        for _id, _username in banned_users_dict.items():
+        for bu in db_banned_users:
+            _id = bu["user_id"]
+            _username = bu["username"] or bu["first_name"] or "!UNDEFINED!"
             file.write(f"{_id}:{_username}\n")
+    
+    LOGGER.info("Saved daily archive of %d banned users to %s", len(db_banned_users), filename)
 
     # move yesterday's daily_spam file to the daily_spam folder
     daily_spam_filename = get_daily_spam_filename()
@@ -4037,10 +4034,11 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
                 for k, v in uname.items():
                     if k != "username" and isinstance(v, str) and v.startswith("http"):
                         active_user_checks_list.append(v)
-        # Create a list for banned users with user_id as key and user_name as value
+        # Create a list for banned users by querying database
+        db_banned_users = get_banned_users(CONN)
         banned_users_list = [
-            f"<code>{user_id}</code>  {extract_username(user_name)}"
-            for user_id, user_name in banned_users_dict.items()
+            f"<code>{bu['user_id']}</code>  {extract_username(bu['username'] or bu['first_name'] or '!UNDEFINED!')}"
+            for bu in db_banned_users
         ]
 
         # Split lists into chunks
@@ -4086,9 +4084,9 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
         if banned_user_chunks:
             for i, chunk in enumerate(banned_user_chunks):
                 header = (
-                    f"Banned users dict ({len(banned_users_dict)}):\n"
+                    f"Banned users (from DB) ({len(db_banned_users)}):\n"
                     if i == 0
-                    else "Banned users dict (continued):\n"
+                    else "Banned users (continued):\n"
                 )
                 try:
                     await safe_send_message(

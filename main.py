@@ -801,6 +801,18 @@ async def on_startup():
             LOGGER.warning("Could not get chat info for %s: %s", chat_id, e)
     LOGGER.info("Chat username cache populated with %d entries", len(chat_username_cache))
 
+    # Populate banned_users_dict from database on startup
+    # This prevents re-banning channels/users that are already banned
+    try:
+        db_banned_users = get_banned_users(CONN)
+        for bu in db_banned_users:
+            # Use username or first_name or ID as display name
+            display_name = bu["username"] or bu["first_name"] or str(bu["user_id"])
+            banned_users_dict[bu["user_id"]] = display_name
+        LOGGER.info("Populated banned_users_dict with %d entries from database", len(banned_users_dict))
+    except Exception as e:
+        LOGGER.error("Failed to populate banned_users_dict from database: %s", e)
+
     bot_start_log_message = (
         f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
         f"Commit info: {_commit_info}\n"
@@ -7297,31 +7309,21 @@ if __name__ == "__main__":
                         message_to_delete=None,
                     )
                     # ban channel in the rest of chats
-                    ban_rogue_chan_task = await ban_rogue_chat_everywhere(
-                        rogue_chan_id,
-                        CHANNEL_IDS,
-                    )
-                    # add rogue channel to banned_users_dict
-                    if (
-                        message.sender_chat
-                        and message.sender_chat.id not in banned_users_dict
-                    ):
-                        banned_users_dict[message.sender_chat.id] = (
-                            getattr(message.sender_chat, "username", None)
-                            or message.sender_chat.title
-                        )
-                    elif (
-                        message.forward_from_chat
-                        and message.forward_from_chat.id not in banned_users_dict
-                    ):
-                        banned_users_dict[message.forward_from_chat.id] = (
-                            getattr(message.forward_from_chat, "username", None)
-                            or message.forward_from_chat.title
-                        )
-                    elif rogue_chan_id in banned_users_dict:
-                        ban_rogue_chan_task = (
-                            None  # Prevent banning already banned channel
-                        )
+                    ban_rogue_chan_task = None
+                    if rogue_chan_id:
+                        if rogue_chan_id in banned_users_dict:
+                            LOGGER.info(
+                                "Channel %s (%s) is already banned, skipping ban_rogue_chat_everywhere",
+                                rogue_chan_id,
+                                rogue_chan_username,
+                            )
+                        else:
+                            ban_rogue_chan_task = await ban_rogue_chat_everywhere(
+                                rogue_chan_id,
+                                CHANNEL_IDS,
+                            )
+                            # Add to banned_users_dict immediately
+                            banned_users_dict[rogue_chan_id] = rogue_chan_username or rogue_chan_name or "!UNDEFINED!"
 
                     tasks = [
                         ban_member_task,

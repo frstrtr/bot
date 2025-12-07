@@ -10796,47 +10796,34 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            # Parse command: /say [-t <seconds>] <target> <message>
-            parts = message.text.split()
-            
-            # Check for timeout flag
+            # Parse optional -t timeout for auto-delete
             delete_after = None
-            if len(parts) >= 4 and parts[1] == "-t":
-                try:
-                    delete_after = int(parts[2])
-                    if delete_after < 1 or delete_after > 86400:  # Max 24 hours
-                        await message.reply("Timeout must be between 1 and 86400 seconds (24 hours).")
-                        return
-                    # Re-parse with timeout removed
-                    remaining = message.text.split(maxsplit=3)
-                    if len(remaining) < 4:
-                        await message.reply("Please provide target and message after timeout.")
-                        return
-                    target = remaining[3].split(maxsplit=1)[0]
-                    text_to_send = remaining[3].split(maxsplit=1)[1] if len(remaining[3].split(maxsplit=1)) > 1 else ""
-                except (ValueError, IndexError):
-                    await message.reply("Invalid timeout format. Use: <code>/say -t &lt;seconds&gt; &lt;target&gt; message</code>", parse_mode="HTML")
-                    return
-            else:
-                # Standard parsing without timeout
-                parts = message.text.split(maxsplit=2)
-                if len(parts) < 3:
-                    await message.reply(
-                        "Usage: <code>/say &lt;target&gt; message</code>\n"
-                        "Usage: <code>/say -t &lt;seconds&gt; &lt;target&gt; message</code> (auto-delete)\n"
-                        "Examples:\n"
-                        "  <code>/say -1001234567890 Hello!</code>\n"
-                        "  <code>/say -1001234567890:123 Hello to topic!</code>\n"
-                        "  <code>/say @chatusername Hello!</code>\n"
-                        "  <code>/say t.me/chatname Hello!</code>\n"
-                        "  <code>/say t.me/chatname/456 Hello to topic!</code>\n"
-                        "  <code>/say t.me/chatname/1/9221 Reply to message!</code>\n"
-                        "  <code>/say -t 60 @chat Message deleted in 60s!</code>",
-                        parse_mode="HTML",
-                    )
-                    return
-                target = parts[1]
-                text_to_send = parts[2]
+            remaining_text = message.text
+            if " -t " in remaining_text:
+                match = re.search(r'-t\s+(\d+)', remaining_text)
+                if match:
+                    delete_after = int(match.group(1))
+                    remaining_text = re.sub(r'-t\s+\d+\s*', '', remaining_text)
+
+            parts = remaining_text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/say &lt;target&gt; message</code>\n"
+                    "Usage: <code>/say -t &lt;seconds&gt; &lt;target&gt; message</code> (auto-delete)\n"
+                    "Examples:\n"
+                    "  <code>/say -1001234567890 Hello!</code>\n"
+                    "  <code>/say -1001234567890:123 Hello to topic!</code>\n"
+                    "  <code>/say @chatusername Hello!</code>\n"
+                    "  <code>/say t.me/chatname Hello!</code>\n"
+                    "  <code>/say t.me/chatname/456 Hello to topic!</code>\n"
+                    "  <code>/say t.me/chatname/1/9221 Reply to message!</code>\n"
+                    "  <code>/say -t 60 @chat Message deleted in 60s!</code>",
+                    parse_mode="HTML",
+                )
+                return
+            
+            target = parts[1]
+            text_to_send = parts[2]
             
             thread_id = None  # For forum topics
             reply_to_msg_id = None  # For replying to specific message
@@ -11054,7 +11041,9 @@ if __name__ == "__main__":
         """Reply to a specific message in a chat as the bot.
         
         Usage: /reply <message_link> <reply_text>
+        Usage: /reply -t <seconds> <message_link> <reply_text>  (auto-delete)
         Example: /reply https://t.me/chatname/123 Thanks for your message!
+        Example: /reply -t 60 https://t.me/chatname/123 This disappears in 60s!
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
@@ -11065,12 +11054,23 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
+            # Parse optional -t timeout for auto-delete
+            delete_timeout = None
+            remaining_text = message.text
+            if " -t " in remaining_text:
+                match = re.search(r'-t\s+(\d+)', remaining_text)
+                if match:
+                    delete_timeout = int(match.group(1))
+                    remaining_text = re.sub(r'-t\s+\d+\s*', '', remaining_text)
+
             # Parse command: /reply <link> <text>
-            parts = message.text.split(maxsplit=2)
+            parts = remaining_text.split(maxsplit=2)
             if len(parts) < 3:
                 await message.reply(
                     "Usage: <code>/reply &lt;message_link&gt; reply_text</code>\n"
-                    "Example: <code>/reply https://t.me/chatname/123 Thanks!</code>",
+                    "Usage: <code>/reply -t &lt;seconds&gt; &lt;message_link&gt; reply_text</code>\n"
+                    "Example: <code>/reply https://t.me/chatname/123 Thanks!</code>\n"
+                    "Example: <code>/reply -t 60 https://t.me/chatname/123 Temporary reply!</code>",
                     parse_mode="HTML",
                 )
                 return
@@ -11105,6 +11105,17 @@ if __name__ == "__main__":
             )
 
             if sent_msg:
+                # Schedule auto-delete if timeout specified
+                if delete_timeout and delete_timeout > 0:
+                    async def auto_delete():
+                        await asyncio.sleep(delete_timeout)
+                        try:
+                            await BOT.delete_message(chat_id, sent_msg.message_id)
+                            LOGGER.info("Auto-deleted reply message %s in %s after %ds", sent_msg.message_id, chat_id, delete_timeout)
+                        except TelegramBadRequest as del_err:
+                            LOGGER.warning("Failed to auto-delete reply message %s in %s: %s", sent_msg.message_id, chat_id, del_err)
+                    asyncio.create_task(auto_delete())
+
                 # Build link to sent reply
                 if isinstance(chat_id, str) and chat_id.startswith("@"):
                     msg_link = f"https://t.me/{chat_id[1:]}/{sent_msg.message_id}"
@@ -11112,19 +11123,26 @@ if __name__ == "__main__":
                     chat_id_str = str(chat_id)[4:] if str(chat_id).startswith("-100") else str(chat_id)
                     msg_link = f"https://t.me/c/{chat_id_str}/{sent_msg.message_id}"
 
-                await message.reply(
+                reply_msg = (
                     f"✅ Reply sent to message in <code>{chat_id}</code>\n"
-                    f"🔗 <a href='{msg_link}'>View reply</a>",
+                    f"🔗 <a href='{msg_link}'>View reply</a>"
+                )
+                if delete_timeout:
+                    reply_msg += f"\n⏱ Auto-delete in {delete_timeout} seconds"
+
+                await message.reply(
+                    reply_msg,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
 
                 LOGGER.info(
-                    "%s:%s replied to message %s in chat %s",
+                    "%s:%s replied to message %s in chat %s (timeout=%s)",
                     message.from_user.id,
                     f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     target_message_id,
                     chat_id,
+                    delete_timeout,
                 )
             else:
                 await message.reply(f"❌ Failed to reply to message in {chat_id}")
@@ -11204,34 +11222,28 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            # Check for timeout flag
-            parts = message.text.split()
+            # Parse optional -t timeout for auto-delete
             delete_after = None
+            remaining_text = message.text
+            if " -t " in remaining_text:
+                match = re.search(r'-t\s+(\d+)', remaining_text)
+                if match:
+                    delete_after = int(match.group(1))
+                    remaining_text = re.sub(r'-t\s+\d+\s*', '', remaining_text)
+
+            parts = remaining_text.split(maxsplit=2)
+            if len(parts) < 3:
+                await message.reply(
+                    "Usage: <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n"
+                    "Usage: <code>/forward -t &lt;seconds&gt; &lt;link&gt; &lt;target&gt;</code> (auto-delete)\n"
+                    "Example: <code>/forward https://t.me/source/123 -1001234567890</code>\n"
+                    "Example: <code>/forward -t 60 https://t.me/source/123 @chat</code>",
+                    parse_mode="HTML",
+                )
+                return
             
-            if len(parts) >= 5 and parts[1] == "-t":
-                try:
-                    delete_after = int(parts[2])
-                    if delete_after < 1 or delete_after > 86400:
-                        await message.reply("Timeout must be between 1 and 86400 seconds.")
-                        return
-                    message_link = parts[3]
-                    target = parts[4]
-                except (ValueError, IndexError):
-                    await message.reply("Invalid timeout format. Use: <code>/forward -t &lt;seconds&gt; &lt;link&gt; &lt;target&gt;</code>", parse_mode="HTML")
-                    return
-            else:
-                parts = message.text.split(maxsplit=2)
-                if len(parts) < 3:
-                    await message.reply(
-                        "Usage: <code>/forward &lt;message_link&gt; &lt;target&gt;</code>\n"
-                        "Usage: <code>/forward -t &lt;seconds&gt; &lt;link&gt; &lt;target&gt;</code> (auto-delete)\n"
-                        "Example: <code>/forward https://t.me/source/123 -1001234567890</code>\n"
-                        "Example: <code>/forward -t 60 https://t.me/source/123 @chat</code>",
-                        parse_mode="HTML",
-                    )
-                    return
-                message_link = parts[1]
-                target = parts[2]
+            message_link = parts[1]
+            target = parts[2]
 
             # Extract source chat and message ID
             try:
@@ -11550,6 +11562,7 @@ if __name__ == "__main__":
         """Copy a message and send it as a reply to another message.
         
         Usage: /copyreply <source_link> <target_link>
+        Usage: /copyreply -t <seconds> <source_link> <target_link> (auto-delete)
         Example: /copyreply https://t.me/source/123 https://t.me/target/456
         
         This copies the message from source_link and sends it as a reply
@@ -11564,10 +11577,20 @@ if __name__ == "__main__":
             message.chat.id,
         )
         try:
-            parts = message.text.split(maxsplit=2)
+            # Parse optional -t timeout for auto-delete
+            delete_timeout = None
+            remaining_text = message.text
+            if " -t " in remaining_text:
+                match = re.search(r'-t\s+(\d+)', remaining_text)
+                if match:
+                    delete_timeout = int(match.group(1))
+                    remaining_text = re.sub(r'-t\s+\d+\s*', '', remaining_text)
+
+            parts = remaining_text.split(maxsplit=2)
             if len(parts) < 3:
                 await message.reply(
                     "Usage: <code>/copyreply &lt;source_link&gt; &lt;target_link&gt;</code>\n"
+                    "Usage: <code>/copyreply -t &lt;seconds&gt; &lt;source_link&gt; &lt;target_link&gt;</code>\n"
                     "Example: <code>/copyreply https://t.me/source/123 https://t.me/target/456</code>\n\n"
                     "💡 Copies message from source and sends as reply to target message",
                     parse_mode="HTML",
@@ -11616,6 +11639,17 @@ if __name__ == "__main__":
             )
 
             if copied:
+                # Schedule auto-delete if timeout specified
+                if delete_timeout and delete_timeout > 0:
+                    async def auto_delete():
+                        await asyncio.sleep(delete_timeout)
+                        try:
+                            await BOT.delete_message(target_chat_id, copied.message_id)
+                            LOGGER.info("Auto-deleted copyreply message %s in %s after %ds", copied.message_id, target_chat_id, delete_timeout)
+                        except TelegramBadRequest as del_err:
+                            LOGGER.warning("Failed to auto-delete copyreply message %s in %s: %s", copied.message_id, target_chat_id, del_err)
+                    asyncio.create_task(auto_delete())
+
                 # Build link to copied message
                 if isinstance(target_chat_id, str) and target_chat_id.startswith("@"):
                     msg_link = f"https://t.me/{target_chat_id[1:]}/{copied.message_id}"
@@ -11623,17 +11657,23 @@ if __name__ == "__main__":
                     chat_id_str = str(target_chat_id)[4:] if str(target_chat_id).startswith("-100") else str(target_chat_id)
                     msg_link = f"https://t.me/c/{chat_id_str}/{copied.message_id}"
 
-                await message.reply(
+                reply_msg = (
                     f"✅ Message copied and sent as reply\n"
                     f"📤 Source: <code>{source_chat}</code> msg {source_msg_id}\n"
                     f"📥 Target: <code>{target_chat_id}</code> (reply to msg {target_msg_id})\n"
-                    f"🔗 <a href='{msg_link}'>View reply</a>",
+                    f"🔗 <a href='{msg_link}'>View reply</a>"
+                )
+                if delete_timeout:
+                    reply_msg += f"\n⏱ Auto-delete in {delete_timeout} seconds"
+
+                await message.reply(
+                    reply_msg,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
 
                 LOGGER.info(
-                    "%s:%s copyreply: copied msg %s from %s as reply to msg %s in %s -> new msg %s",
+                    "%s:%s copyreply: copied msg %s from %s as reply to msg %s in %s -> new msg %s (timeout=%s)",
                     message.from_user.id,
                     f"@{message.from_user.username}" if message.from_user.username else "!UNDEFINED!",
                     source_msg_id,
@@ -11641,6 +11681,7 @@ if __name__ == "__main__":
                     target_msg_id,
                     target_chat_id,
                     copied.message_id,
+                    delete_timeout,
                 )
             else:
                 await message.reply("❌ Failed to copy message as reply")
@@ -11676,8 +11717,10 @@ if __name__ == "__main__":
         
         Usage: /broadcast <message>              - Send to ALL monitored chats
         Usage: /broadcast -list chat1,chat2 <message> - Send to specific chats
+        Usage: /broadcast -t <seconds> <message> - Auto-delete after timeout
         Example: /broadcast Hello everyone!
         Example: /broadcast -list -1001234,-1005678 Hello!
+        Example: /broadcast -t 3600 Temporary announcement!
         
         NOTE: Only available to superadmin in private chat or superadmin group.
         """
@@ -11689,6 +11732,14 @@ if __name__ == "__main__":
         )
         try:
             text = message.text
+            
+            # Parse optional -t timeout for auto-delete
+            delete_timeout = None
+            if " -t " in text:
+                match = re.search(r'-t\s+(\d+)', text)
+                if match:
+                    delete_timeout = int(match.group(1))
+                    text = re.sub(r'-t\s+\d+\s*', '', text)
             
             # Check for -list flag
             if " -list " in text:
@@ -11723,7 +11774,8 @@ if __name__ == "__main__":
                 if len(parts) < 2:
                     await message.reply(
                         "Usage: <code>/broadcast message</code> - Send to all monitored chats\n"
-                        "Usage: <code>/broadcast -list chat1,chat2 message</code> - Send to specific chats\n\n"
+                        "Usage: <code>/broadcast -list chat1,chat2 message</code> - Send to specific chats\n"
+                        "Usage: <code>/broadcast -t &lt;seconds&gt; message</code> - Auto-delete\n\n"
                         f"📋 Monitored chats ({len(CHANNEL_IDS)}):\n" +
                         "\n".join([f"  • <code>{cid}</code> - {CHANNEL_DICT.get(cid, 'Unknown')}" for cid in CHANNEL_IDS[:10]]) +
                         (f"\n  ... and {len(CHANNEL_IDS) - 10} more" if len(CHANNEL_IDS) > 10 else ""),
@@ -11737,41 +11789,33 @@ if __name__ == "__main__":
             # Confirm before broadcasting to all
             if len(target_chats) == len(CHANNEL_IDS) and len(target_chats) > 3:
                 confirm_kb = KeyboardBuilder()
-                # Store broadcast text temporarily in callback data (limited to 64 bytes)
-                # For longer messages, we'll need a different approach
-                if len(broadcast_text) > 40:
-                    # Store in a temp dict for retrieval
-                    broadcast_id = int(datetime.now().timestamp())
-                    if not hasattr(DP, 'pending_broadcasts'):
-                        DP.pending_broadcasts = {}
-                    DP.pending_broadcasts[broadcast_id] = {
-                        "text": broadcast_text,
-                        "chats": target_chats,
-                        "admin_id": message.from_user.id,
-                    }
-                    confirm_kb.add(
-                        InlineKeyboardButton(text="✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
-                        InlineKeyboardButton(text="❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
-                    )
-                else:
-                    # Short message - encode directly (not recommended, but as fallback)
-                    broadcast_id = int(datetime.now().timestamp())
-                    if not hasattr(DP, 'pending_broadcasts'):
-                        DP.pending_broadcasts = {}
-                    DP.pending_broadcasts[broadcast_id] = {
-                        "text": broadcast_text,
-                        "chats": target_chats,
-                        "admin_id": message.from_user.id,
-                    }
-                    confirm_kb.add(
-                        InlineKeyboardButton(text="✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
-                        InlineKeyboardButton(text="❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
-                    )
                 
-                await message.reply(
+                broadcast_id = int(datetime.now().timestamp())
+                if not hasattr(DP, 'pending_broadcasts'):
+                    DP.pending_broadcasts = {}
+                DP.pending_broadcasts[broadcast_id] = {
+                    "text": broadcast_text,
+                    "chats": target_chats,
+                    "admin_id": message.from_user.id,
+                    "timeout": delete_timeout,
+                }
+                confirm_kb.add(
+                    InlineKeyboardButton(text="✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
+                    InlineKeyboardButton(text="❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
+                )
+                
+                confirm_msg = (
                     f"⚠️ <b>Broadcast Confirmation</b>\n\n"
                     f"You are about to send a message to <b>{len(target_chats)}</b> chats.\n\n"
-                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>",
+                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>\n"
+                )
+                if delete_timeout:
+                    confirm_msg += f"⏱ Auto-delete: {delete_timeout}s\n"
+                
+                confirm_msg += "\nAre you sure?"
+
+                await message.reply(
+                    confirm_msg,
                     parse_mode="HTML",
                     reply_markup=confirm_kb.as_markup(),
                 )
@@ -11786,7 +11830,7 @@ if __name__ == "__main__":
 
             for chat_id in target_chats:
                 try:
-                    await safe_send_message(
+                    sent = await safe_send_message(
                         BOT,
                         chat_id,
                         broadcast_text,
@@ -11794,11 +11838,27 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                    success_count += 1
+                    if sent:
+                        success_count += 1
+                        # Schedule auto-delete
+                        if delete_timeout and delete_timeout > 0:
+                            async def auto_delete(cid=chat_id, mid=sent.message_id):
+                                await asyncio.sleep(delete_timeout)
+                                try:
+                                    await BOT.delete_message(cid, mid)
+                                except (TelegramBadRequest, TelegramForbiddenError):
+                                    pass
+                            asyncio.create_task(auto_delete())
+                    else:
+                        fail_count += 1
+                        failed_chats.append(f"{chat_id}: Failed to send")
                 except TelegramBadRequest as e:
                     fail_count += 1
                     failed_chats.append(f"{chat_id}: {str(e)[:30]}")
                     LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
+                
+                # Small delay to avoid flood limits
+                await asyncio.sleep(0.1)
 
             # Update status message
             result_text = (
@@ -11806,6 +11866,9 @@ if __name__ == "__main__":
                 f"Sent: {success_count}/{len(target_chats)}\n"
                 f"Failed: {fail_count}"
             )
+            if delete_timeout:
+                result_text += f"\n⏱ Auto-delete in {delete_timeout}s"
+            
             if failed_chats and len(failed_chats) <= 5:
                 result_text += "\n\nFailed chats:\n" + "\n".join([f"  • {fc}" for fc in failed_chats])
             elif failed_chats:
@@ -11856,8 +11919,9 @@ if __name__ == "__main__":
                 # First level confirmation passed - now require text confirmation
                 target_chats = broadcast_data["chats"]
                 broadcast_text = broadcast_data["text"]
+                delete_timeout = broadcast_data.get("timeout")
                 
-                # Mark as awaiting final confirmation
+                # Mark as awaiting text confirmation
                 broadcast_data["awaiting_text_confirm"] = True
                 
                 cancel_kb = KeyboardBuilder()
@@ -11865,14 +11929,23 @@ if __name__ == "__main__":
                     InlineKeyboardButton(text="❌ Cancel Broadcast", callback_data=f"broadcast_cancel_{broadcast_id}")
                 )
                 
-                await callback_query.message.edit_text(
+                msg_text = (
                     f"⚠️ <b>FINAL CONFIRMATION REQUIRED</b>\n\n"
                     f"You are about to send a message to <b>{len(target_chats)}</b> chats.\n\n"
-                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⚠️ To confirm, type exactly:\n"
-                    f"<code>CONFIRM BROADCAST {broadcast_id}</code>\n\n"
-                    f"Or click Cancel below.",
+                    f"<b>Message preview:</b>\n<i>{html.escape(broadcast_text[:200])}{'...' if len(broadcast_text) > 200 else ''}</i>\n"
+                )
+                if delete_timeout:
+                    msg_text += f"⏱ Auto-delete: {delete_timeout}s\n"
+                
+                msg_text += (
+                    "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ To confirm, type exactly:\n"
+                    "<code>CONFIRM BROADCAST</code>\n\n"
+                    "Or click Cancel below."
+                )
+                
+                await callback_query.message.edit_text(
+                    msg_text,
                     parse_mode="HTML",
                     reply_markup=cancel_kb.as_markup(),
                 )
@@ -11886,40 +11959,39 @@ if __name__ == "__main__":
             LOGGER.error("Error in handle_broadcast_callback: %s", e)
             await callback_query.answer(f"Error: {e}", show_alert=True)
 
-    @DP.message(lambda m: superadmin_filter(m) and m.text and m.text.startswith("CONFIRM BROADCAST"))
+    @DP.message(lambda m: superadmin_filter(m) and m.text and m.text.strip() == "CONFIRM BROADCAST")
     async def handle_broadcast_text_confirm(message: Message):
         """Handle text confirmation for broadcast."""
         try:
-            # Parse: CONFIRM BROADCAST <broadcast_id>
-            parts = message.text.split()
-            if len(parts) != 3:
-                await message.reply("Invalid confirmation format.")
+            if not hasattr(DP, 'pending_broadcasts') or not DP.pending_broadcasts:
+                await message.reply("No pending broadcasts found.")
                 return
+
+            # Find pending broadcast for this user
+            broadcast_id = None
+            broadcast_data = None
             
-            try:
-                broadcast_id = int(parts[2])
-            except ValueError:
-                await message.reply("Invalid broadcast ID.")
+            # Iterate to find the most recent pending broadcast for this user
+            # We sort by ID (timestamp) descending to get the latest
+            sorted_ids = sorted(DP.pending_broadcasts.keys(), reverse=True)
+            for bid in sorted_ids:
+                data = DP.pending_broadcasts[bid]
+                if data["admin_id"] == message.from_user.id and data.get("awaiting_text_confirm"):
+                    broadcast_id = bid
+                    broadcast_data = data
+                    break
+            
+            if not broadcast_data:
+                await message.reply("No pending broadcast confirmation found for you.")
                 return
 
-            if not hasattr(DP, 'pending_broadcasts') or broadcast_id not in DP.pending_broadcasts:
-                await message.reply("Broadcast expired or not found. Start a new /broadcast command.")
-                return
-
-            broadcast_data = DP.pending_broadcasts.pop(broadcast_id)
-
-            # Verify admin and that text confirmation was requested
-            if message.from_user.id != broadcast_data["admin_id"]:
-                await message.reply("You are not authorized to confirm this broadcast.")
-                return
-
-            if not broadcast_data.get("awaiting_text_confirm"):
-                await message.reply("This broadcast was not awaiting text confirmation.")
-                return
+            # Remove from pending
+            DP.pending_broadcasts.pop(broadcast_id)
 
             # Execute broadcast
             target_chats = broadcast_data["chats"]
             broadcast_text = broadcast_data["text"]
+            delete_timeout = broadcast_data.get("timeout")
 
             status_msg = await message.reply(f"📤 Broadcasting to {len(target_chats)} chats...")
 
@@ -11929,7 +12001,7 @@ if __name__ == "__main__":
 
             for chat_id in target_chats:
                 try:
-                    await safe_send_message(
+                    sent = await safe_send_message(
                         BOT,
                         chat_id,
                         broadcast_text,
@@ -11937,11 +12009,27 @@ if __name__ == "__main__":
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                    success_count += 1
+                    if sent:
+                        success_count += 1
+                        # Schedule auto-delete
+                        if delete_timeout and delete_timeout > 0:
+                            async def auto_delete(cid=chat_id, mid=sent.message_id):
+                                await asyncio.sleep(delete_timeout)
+                                try:
+                                    await BOT.delete_message(cid, mid)
+                                except (TelegramBadRequest, TelegramForbiddenError):
+                                    pass
+                            asyncio.create_task(auto_delete())
+                    else:
+                        fail_count += 1
+                        failed_chats.append(f"{chat_id}: Failed to send")
                 except TelegramBadRequest as e:
                     fail_count += 1
                     failed_chats.append(f"{chat_id}: {str(e)[:30]}")
                     LOGGER.error("Broadcast failed to %s: %s", chat_id, e)
+                
+                # Small delay to avoid flood limits
+                await asyncio.sleep(0.1)
 
             # Update with results
             result_text = (
@@ -11949,6 +12037,9 @@ if __name__ == "__main__":
                 f"Sent: {success_count}/{len(target_chats)}\n"
                 f"Failed: {fail_count}"
             )
+            if delete_timeout:
+                result_text += f"\n⏱ Auto-delete in {delete_timeout}s"
+                
             if failed_chats and len(failed_chats) <= 5:
                 result_text += "\n\nFailed chats:\n" + "\n".join([f"  • {fc}" for fc in failed_chats])
             elif failed_chats:

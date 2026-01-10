@@ -7422,6 +7422,202 @@ if __name__ == "__main__":
                 )
                 return
 
+            # =====================================================
+            # NEW SPAM DETECTION: Forwarded from channel + bot mention/link
+            # If message is forwarded from a channel AND contains a bot mention or t.me/...bot link
+            # This is a common spam pattern - auto-delete and ban immediately
+            # =====================================================
+            if message.forward_from_chat:
+                _fwd_has_bot_mention = False
+                _fwd_bot_mention_name = None
+                
+                # Check for @botname mentions in entities
+                if message.entities and message.text:
+                    for entity in message.entities:
+                        entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                        offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                        length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                        
+                        if entity_type == "mention":
+                            mention = message.text[offset:offset + length].lower()
+                            if mention.endswith("bot"):
+                                _fwd_has_bot_mention = True
+                                _fwd_bot_mention_name = message.text[offset:offset + length]
+                                break
+                        
+                        elif entity_type == "url":
+                            # Check for t.me/...bot links
+                            url = message.text[offset:offset + length].lower()
+                            if ("t.me/" in url or "telegram.me/" in url) and url.rstrip("/").endswith("bot"):
+                                _fwd_has_bot_mention = True
+                                _fwd_bot_mention_name = message.text[offset:offset + length]
+                                break
+                        
+                        elif entity_type == "text_link":
+                            # Check hidden URLs that point to bots
+                            url = entity.get("url") if isinstance(entity, dict) else getattr(entity, "url", "")
+                            if url:
+                                url_lower = url.lower()
+                                if ("t.me/" in url_lower or "telegram.me/" in url_lower) and url_lower.rstrip("/").endswith("bot"):
+                                    _fwd_has_bot_mention = True
+                                    _fwd_bot_mention_name = url
+                                    break
+                
+                # Also check caption entities for media messages
+                if not _fwd_has_bot_mention and message.caption_entities and message.caption:
+                    for entity in message.caption_entities:
+                        entity_type = entity.get("type") if isinstance(entity, dict) else getattr(entity, "type", None)
+                        offset = entity.get("offset") if isinstance(entity, dict) else getattr(entity, "offset", 0)
+                        length = entity.get("length") if isinstance(entity, dict) else getattr(entity, "length", 0)
+                        
+                        if entity_type == "mention":
+                            mention = message.caption[offset:offset + length].lower()
+                            if mention.endswith("bot"):
+                                _fwd_has_bot_mention = True
+                                _fwd_bot_mention_name = message.caption[offset:offset + length]
+                                break
+                        
+                        elif entity_type == "url":
+                            url = message.caption[offset:offset + length].lower()
+                            if ("t.me/" in url or "telegram.me/" in url) and url.rstrip("/").endswith("bot"):
+                                _fwd_has_bot_mention = True
+                                _fwd_bot_mention_name = message.caption[offset:offset + length]
+                                break
+                        
+                        elif entity_type == "text_link":
+                            url = entity.get("url") if isinstance(entity, dict) else getattr(entity, "url", "")
+                            if url:
+                                url_lower = url.lower()
+                                if ("t.me/" in url_lower or "telegram.me/" in url_lower) and url_lower.rstrip("/").endswith("bot"):
+                                    _fwd_has_bot_mention = True
+                                    _fwd_bot_mention_name = url
+                                    break
+                
+                if _fwd_has_bot_mention:
+                    LOGGER.info(
+                        "\033[91m%s:%s SPAM DETECTED: Forwarded from channel %s with bot mention/link: %s\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(message.from_user.username),
+                        message.forward_from_chat.title,
+                        _fwd_bot_mention_name,
+                    )
+                    
+                    # Forward to ADMIN_AUTOBAN before deleting
+                    try:
+                        await BOT.forward_message(
+                            ADMIN_GROUP_ID,
+                            message.chat.id,
+                            message.message_id,
+                            message_thread_id=ADMIN_AUTOBAN,
+                            disable_notification=True,
+                        )
+                    except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
+                        LOGGER.debug("Could not forward spam message to admin: %s", fwd_err)
+                    
+                    # Delete the message
+                    try:
+                        await message.delete()
+                        LOGGER.info(
+                            "\033[91m%s:%s Message %s deleted (forwarded channel spam with bot mention)\033[0m",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
+                            message.message_id,
+                        )
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning(
+                            "%s:%s Failed to delete forwarded channel spam: %s",
+                            message.from_user.id,
+                            format_username_for_log(message.from_user.username),
+                            del_err,
+                        )
+                    
+                    # Ban the user who forwarded the spam
+                    _user_name = message.from_user.username if message.from_user.username else "!UNDEFINED!"
+                    _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
+                        message.from_user.id,
+                        _user_name,
+                        CHANNEL_IDS,
+                        CHANNEL_DICT,
+                    )
+                    
+                    # Also ban the source channel
+                    _fwd_chan_id = message.forward_from_chat.id
+                    _fwd_chan_name = message.forward_from_chat.title or "!UNDEFINED!"
+                    _fwd_chan_username = getattr(message.forward_from_chat, "username", None) or "!UNDEFINED!"
+                    
+                    if not is_user_banned(CONN, _fwd_chan_id):
+                        await ban_rogue_chat_everywhere(_fwd_chan_id, CHANNEL_IDS)
+                        # Add to banned users in DB
+                        add_banned_user(
+                            CONN,
+                            _fwd_chan_id,
+                            _fwd_chan_username,
+                            first_name=_fwd_chan_name,
+                            ban_source="forwarded_channel_bot_spam",
+                            ban_reason=f"Forwarded spam with bot mention: {_fwd_bot_mention_name}",
+                        )
+                    
+                    # Add user to banned_users_dict and remove from active checks
+                    if message.from_user.id in active_user_checks_dict:
+                        banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                    else:
+                        banned_users_dict[message.from_user.id] = _user_name
+                    
+                    # Add to DB
+                    add_banned_user(
+                        CONN,
+                        message.from_user.id,
+                        _user_name,
+                        first_name=message.from_user.first_name,
+                        last_name=message.from_user.last_name,
+                        ban_source="forwarded_channel_bot_spam",
+                        ban_reason=f"Forwarded spam from {_fwd_chan_name} with bot mention: {_fwd_bot_mention_name}",
+                    )
+                    
+                    # Send notification to ADMIN_AUTOBAN
+                    _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                    _fwd_chan_link = build_chat_link(_fwd_chan_id, _fwd_chan_username if _fwd_chan_username != "!UNDEFINED!" else None, _fwd_chan_name)
+                    _escaped_name = html.escape(message.from_user.first_name or "")
+                    if message.from_user.last_name:
+                        _escaped_name += f" {html.escape(message.from_user.last_name)}"
+                    
+                    _autoban_kb = make_lols_kb(message.from_user.id)
+                    _autoban_notification = (
+                        f"🚫 <b>AUTO-BAN: Forwarded channel spam with bot mention</b>\n\n"
+                        f"User: {_escaped_name} @{_user_name} (<code>{message.from_user.id}</code>)\n"
+                        f"Forwarded from: {_fwd_chan_link} (<code>{_fwd_chan_id}</code>)\n"
+                        f"Bot mentioned: <b>{html.escape(_fwd_bot_mention_name or '')}</b>\n"
+                        f"In chat: {_chat_link_html}\n\n"
+                        f"✅ User banned in {_success_count}/{_total_count} chats\n"
+                        f"✅ Channel banned everywhere"
+                    )
+                    if _fail_count > 0:
+                        _autoban_notification += f" (⚠️ {_fail_count} failed)"
+                    
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        _autoban_notification,
+                        LOGGER,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_AUTOBAN,
+                        disable_web_page_preview=True,
+                        reply_markup=_autoban_kb.as_markup(),
+                    )
+                    
+                    LOGGER.info(
+                        "\033[91m%s:%s BANNED in %d/%d chats (forwarded channel spam with bot mention)\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(message.from_user.username),
+                        _success_count,
+                        _total_count,
+                    )
+                    
+                    return  # Stop processing - spam handled
+            # =====================================================
+            # END: Forwarded from channel + bot mention detection
+            # =====================================================
+
             # Special handling for Telegram's anonymous channel admin (ID 777000)
             # This is when someone posts as the channel name (not as themselves)
             if message.from_user.id == TELEGRAM_ANONYMOUS_ADMIN_ID:

@@ -856,6 +856,87 @@ async def on_startup():
 
     # Call the function to load and start checks
     asyncio.create_task(load_and_start_checks())
+    
+    # Start periodic cleanup task for stale monitoring entries
+    asyncio.create_task(periodic_stale_monitoring_cleanup())
+
+
+async def periodic_stale_monitoring_cleanup():
+    """Periodically clean up stale monitoring entries.
+    
+    This task runs every hour and checks for users in the database with
+    monitoring_active=1 where the record hasn't been updated in over MONITORING_DURATION_HOURS.
+    
+    Uses updated_at instead of joined_at to handle cases where monitoring is
+    restarted manually (e.g., by admin command or triggered by unusual user activity).
+    
+    This handles edge cases where perform_checks() tasks may have crashed or
+    been interrupted while the bot was running, leaving orphaned entries.
+    """
+    CLEANUP_INTERVAL_HOURS = 1  # Run cleanup every hour
+    
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_HOURS * 3600)
+        
+        try:
+            # Get all active baselines from DB
+            baselines = get_active_user_baselines(CONN)
+            stale_count = 0
+            now_utc = datetime.now(timezone.utc)
+            
+            for baseline in baselines:
+                user_id = baseline["user_id"]
+                # Use updated_at to handle restarted monitoring; fall back to joined_at
+                timestamp_str = baseline.get("updated_at") or baseline.get("joined_at")
+                
+                if not timestamp_str:
+                    continue
+                
+                try:
+                    record_time = datetime.fromisoformat(timestamp_str.replace(" ", "T"))
+                    # Handle naive timestamps (legacy UTC data)
+                    if record_time.tzinfo is None:
+                        record_time = record_time.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+                
+                elapsed_hours = (now_utc - record_time).total_seconds() / 3600
+                
+                # If monitoring should have completed (24hrs + 1hr grace period)
+                if elapsed_hours > MONITORING_DURATION_HOURS + 1:
+                    username = baseline.get("username") or "!UNDEFINED!"
+                    
+                    # Check if there's actually a running task for this user
+                    has_running_task = user_id in running_watchdogs and not running_watchdogs[user_id].done()
+                    
+                    if not has_running_task:
+                        LOGGER.warning(
+                            "\033[93mSTALE CLEANUP: %s:%s has been in monitoring for %.1f hrs "
+                            "(last updated %.1f hrs ago) with no running task - marking as complete\033[0m",
+                            user_id,
+                            format_username_for_log(username),
+                            (now_utc - datetime.fromisoformat(
+                                (baseline.get("joined_at") or timestamp_str).replace(" ", "T")
+                            ).replace(tzinfo=timezone.utc)).total_seconds() / 3600 if baseline.get("joined_at") else elapsed_hours,
+                            elapsed_hours,
+                        )
+                        
+                        # Remove from active_user_checks_dict if present
+                        if user_id in active_user_checks_dict:
+                            del active_user_checks_dict[user_id]
+                        
+                        # Mark monitoring as ended in database
+                        update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
+                        stale_count += 1
+            
+            if stale_count > 0:
+                LOGGER.info(
+                    "\033[93mSTALE CLEANUP: Cleaned up %d stale monitoring entries\033[0m",
+                    stale_count,
+                )
+                
+        except Exception as e:
+            LOGGER.error("Error in periodic_stale_monitoring_cleanup: %s", e)
 
 
 async def ban_rogue_chat_everywhere(

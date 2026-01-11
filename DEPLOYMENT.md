@@ -2,13 +2,13 @@
 
 ## Quick Deployment (Recommended)
 
-### Single Command Deployment
+### Two-Command Deployment
 ```bash
-cd ~/bot && ./deploy_update.sh
+cd ~/bot && git pull && ./deploy_update.sh
 ```
 
 This will:
-1. Pull latest code from git
+1. Pull latest code and scripts from git
 2. Upgrade dependencies (aiogram 3.24.0, pydantic 2.12.5)
 3. Verify code integrity
 4. Gracefully shutdown old bot (10s timeout)

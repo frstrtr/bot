@@ -20,14 +20,14 @@ cd "$BOT_DIR" || {
     exit 1
 }
 
-# Step 1: Pull latest changes
-echo "📥 Step 1/5: Pulling latest code from git..."
-git pull
-echo "✓ Code updated"
+# Verify we're on latest code (user should have already pulled)
+CURRENT_COMMIT=$(git rev-parse --short HEAD)
+echo "📍 Current commit: $CURRENT_COMMIT"
+echo "   (Ensure you ran 'git pull' before this script)"
 echo ""
 
-# Step 2: Update dependencies
-echo "📦 Step 2/5: Updating dependencies..."
+# Step 1: Update dependencies
+echo "📦 Step 1/4: Updating dependencies..."
 if [ -d ".venv" ]; then
     source .venv/bin/activate
     pip install --upgrade -r requirements.txt
@@ -38,14 +38,14 @@ else
 fi
 echo ""
 
-# Step 3: Verify code integrity
-echo "🔍 Step 3/5: Verifying code integrity..."
+# Step 2: Verify code integrity
+echo "🔍 Step 2/4: Verifying code integrity..."
 python -m py_compile main.py
 python -c "import aiogram; import pydantic; print(f'✓ Versions OK: aiogram {aiogram.__version__}, pydantic {pydantic.__version__}')"
 echo ""
 
-# Step 4: Graceful bot shutdown
-echo "🔄 Step 4/5: Shutting down old bot instance..."
+# Step 3: Graceful bot shutdown
+echo "🔄 Step 3/4: Shutting down old bot instance..."
 if screen -list | grep -q "$SCREEN_NAME"; then
     echo "Sending shutdown signal to screen session..."
     screen -S "$SCREEN_NAME" -X quit
@@ -71,7 +71,7 @@ fi
 echo ""
 
 # Step 5: Start new bot instance using start_bot.sh
-echo "🚀 Step 5/5: Starting new bot instance..."
+echo "🚀 Step 4/4: Starting new bot instance..."
 if [ -f "$BOT_DIR/start_bot.sh" ]; then
     echo "Using start_bot.sh to start the bot..."
     # Run start_bot.sh non-interactively (auto-kill any remaining sessions)

@@ -3185,17 +3185,41 @@ async def perform_checks(
                 start_time = start_time.replace(tzinfo=timezone.utc)
             elapsed_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
             if elapsed_seconds >= sleep_times[-1]:
-                # Monitoring period already completed
+                # Monitoring period already completed - perform final check before cleanup
                 LOGGER.info(
-                    "%s:%s monitoring period already completed (%.1f hrs elapsed), removing from checks",
+                    "%s:%s monitoring period already completed (%.1f hrs elapsed), performing final check",
                     user_id,
                     format_username_for_log(user_name),
                     elapsed_seconds / 3600,
                 )
-                if user_id in active_user_checks_dict:
-                    del active_user_checks_dict[user_id]
-                # Mark monitoring as ended in database
-                update_user_baseline_status(CONN, user_id, monitoring_active=False)
+                # Perform the final spam check that was missed
+                lols_spam = await spam_check(user_id)
+                
+                # Get the color code based on the value of lols_spam
+                color_code = color_map.get(lols_spam, "\033[93m")
+                
+                # Log the final check result
+                LOGGER.debug(
+                    "%s%s:%s FINAL check (missed) lols_cas_spam: %s\033[0m",
+                    color_code,
+                    user_id,
+                    format_username_for_log(user_name),
+                    lols_spam,
+                )
+                
+                # Perform autoban check if user is spam
+                if await check_and_autoban(
+                    event_record,
+                    user_id,
+                    inout_logmessage,
+                    user_name,
+                    lols_spam=lols_spam,
+                    message_to_delete=message_to_delete,
+                ):
+                    return
+                
+                # If not banned, clean up normally (will be marked as legit in finally block)
+                # The finally block will handle the cleanup, so just return here
                 return
             # Collect skipped intervals for single log line
             for st in sleep_times:

@@ -811,12 +811,17 @@ def extract_status_change(
 def message_sent_during_night(message: types.Message):
     """Function to check if the message was sent during the night.
     
-    Night hours are configurable via NIGHT_START_HOUR and NIGHT_END_HOUR env vars.
-    Default: 1 AM to 6 AM (exclusive) in local timezone.
+    Night time is configurable via env vars:
+    - NIGHT_START_HOUR, NIGHT_START_MINUTE (default: 1:00 AM)
+    - NIGHT_END_HOUR, NIGHT_END_MINUTE (default: 6:00 AM)
+    
+    Returns True if message time is >= start AND < end (in local timezone).
     """
-    # Get configurable night hours from environment (defaults: 1-6 AM)
-    night_start = int(os.getenv("NIGHT_START_HOUR", "1"))
-    night_end = int(os.getenv("NIGHT_END_HOUR", "6"))
+    # Get configurable night time from environment
+    night_start_hour = int(os.getenv("NIGHT_START_HOUR", "1"))
+    night_start_minute = int(os.getenv("NIGHT_START_MINUTE", "0"))
+    night_end_hour = int(os.getenv("NIGHT_END_HOUR", "6"))
+    night_end_minute = int(os.getenv("NIGHT_END_MINUTE", "0"))
     
     # Assume message.date is already a datetime object in UTC
     message_time = message.date
@@ -825,11 +830,13 @@ def message_sent_during_night(message: types.Message):
     user_timezone = pytz.timezone("Indian/Mauritius")
     user_time = message_time.astimezone(user_timezone)
 
-    # Get the current time in the user's timezone
-    user_hour = user_time.hour
+    # Convert to total minutes for easy comparison
+    user_total_minutes = user_time.hour * 60 + user_time.minute
+    night_start_total = night_start_hour * 60 + night_start_minute
+    night_end_total = night_end_hour * 60 + night_end_minute
 
     # Check if the message was sent during the night
-    return night_start <= user_hour < night_end
+    return night_start_total <= user_total_minutes < night_end_total
 
 
 def check_message_for_emojis(message: types.Message):

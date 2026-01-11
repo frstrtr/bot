@@ -89,9 +89,11 @@ class BotConfig:
     ESTABLISHED_USER_FIRST_MSG_DAYS: int = 90
     HIGH_USER_ID_THRESHOLD: int = 8_400_000_000
     
-    # Night time detection (hours in local timezone)
-    NIGHT_START_HOUR: int = 1  # Inclusive: messages from this hour are "night"
-    NIGHT_END_HOUR: int = 6    # Exclusive: messages before this hour are "night"
+    # Night time detection (hours/minutes in local timezone)
+    NIGHT_START_HOUR: int = 1    # Inclusive: messages from this hour:minute are "night"
+    NIGHT_START_MINUTE: int = 0
+    NIGHT_END_HOUR: int = 6      # Exclusive: messages before this hour:minute are "night"
+    NIGHT_END_MINUTE: int = 0
 
 
 # Single config instance - modify attributes, no global keyword needed
@@ -253,9 +255,11 @@ def load_from_env() -> bool:
     # High user ID threshold for new accounts
     config.HIGH_USER_ID_THRESHOLD = _get_env_int("HIGH_USER_ID_THRESHOLD", 8_400_000_000) or 8_400_000_000
 
-    # Night time detection hours (local timezone)
+    # Night time detection hours/minutes (local timezone)
     config.NIGHT_START_HOUR = _get_env_int("NIGHT_START_HOUR", 1) or 1
+    config.NIGHT_START_MINUTE = _get_env_int("NIGHT_START_MINUTE", 0) or 0
     config.NIGHT_END_HOUR = _get_env_int("NIGHT_END_HOUR", 6) or 6
+    config.NIGHT_END_MINUTE = _get_env_int("NIGHT_END_MINUTE", 0) or 0
 
     # Content types
     config.ALLOWED_CONTENT_TYPES = _get_allowed_content_types()
@@ -331,4 +335,6 @@ ESTABLISHED_USER_MIN_MESSAGES = config.ESTABLISHED_USER_MIN_MESSAGES
 ESTABLISHED_USER_FIRST_MSG_DAYS = config.ESTABLISHED_USER_FIRST_MSG_DAYS
 HIGH_USER_ID_THRESHOLD = config.HIGH_USER_ID_THRESHOLD
 NIGHT_START_HOUR = config.NIGHT_START_HOUR
+NIGHT_START_MINUTE = config.NIGHT_START_MINUTE
 NIGHT_END_HOUR = config.NIGHT_END_HOUR
+NIGHT_END_MINUTE = config.NIGHT_END_MINUTE

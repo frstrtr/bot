@@ -268,7 +268,9 @@ from utils.utils_config import (
     ESTABLISHED_USER_FIRST_MSG_DAYS,
     HIGH_USER_ID_THRESHOLD,
     NIGHT_START_HOUR,
+    NIGHT_START_MINUTE,
     NIGHT_END_HOUR,
+    NIGHT_END_MINUTE,
 )
 
 # Parse command line arguments
@@ -7899,7 +7901,7 @@ if __name__ == "__main__":
                         first_name=message.from_user.first_name,
                         last_name=message.from_user.last_name,
                         ban_source="forwarded_channel_night_media_spam",
-                        ban_reason=f"Forwarded {_media_type} from {_fwd_chan_name} during night ({NIGHT_START_HOUR}-{NIGHT_END_HOUR} AM)",
+                        ban_reason=f"Forwarded {_media_type} from {_fwd_chan_name} during night ({NIGHT_START_HOUR}:{NIGHT_START_MINUTE:02d}-{NIGHT_END_HOUR}:{NIGHT_END_MINUTE:02d})",
                     )
                     
                     # Send notification to ADMIN_AUTOBAN

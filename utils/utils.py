@@ -809,7 +809,15 @@ def extract_status_change(
 
 
 def message_sent_during_night(message: types.Message):
-    """Function to check if the message was sent during the night."""
+    """Function to check if the message was sent during the night.
+    
+    Night hours are configurable via NIGHT_START_HOUR and NIGHT_END_HOUR env vars.
+    Default: 1 AM to 6 AM (exclusive) in local timezone.
+    """
+    # Get configurable night hours from environment (defaults: 1-6 AM)
+    night_start = int(os.getenv("NIGHT_START_HOUR", "1"))
+    night_end = int(os.getenv("NIGHT_END_HOUR", "6"))
+    
     # Assume message.date is already a datetime object in UTC
     message_time = message.date
 
@@ -821,7 +829,7 @@ def message_sent_during_night(message: types.Message):
     user_hour = user_time.hour
 
     # Check if the message was sent during the night
-    return 1 <= user_hour < 6
+    return night_start <= user_hour < night_end
 
 
 def check_message_for_emojis(message: types.Message):
@@ -1179,7 +1187,7 @@ def save_user_baseline(
     """
     import json
     cursor = conn.cursor()
-    # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
+    # Use UTC for all timestamps (DB convention is UTC)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
     metadata_json = json.dumps(metadata) if metadata else None
     
@@ -1365,7 +1373,7 @@ def update_user_baseline_status(
         True if updated successfully, False otherwise
     """
     cursor = conn.cursor()
-    # Use UTC for all timestamps (server is UTC+4, DB convention is UTC)
+    # Use UTC for all timestamps (DB convention is UTC)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
     
     updates = ["updated_at = ?"]

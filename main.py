@@ -1,6 +1,6 @@
 """Yet Another Telegram Bot for Spammers Detection and Reporting"""
 
-# Force process timezone to Indian/Mauritius as early as possible
+# Force process timezone as early as possible
 import os
 
 os.environ.setdefault("TZ", "Indian/Mauritius")
@@ -267,6 +267,8 @@ from utils.utils_config import (
     ESTABLISHED_USER_MIN_MESSAGES,
     ESTABLISHED_USER_FIRST_MSG_DAYS,
     HIGH_USER_ID_THRESHOLD,
+    NIGHT_START_HOUR,
+    NIGHT_END_HOUR,
 )
 
 # Parse command line arguments
@@ -433,6 +435,91 @@ def was_media_group_processed(message: Message) -> bool:
     # Mark as processed
     processed_media_groups[key] = current_time
     return False  # First message in group, process it
+
+
+async def send_json_to_technolog(message: Message, reason: str, logger=None):
+    """Send message JSON to TECHNOLOG_GROUP TECHNO_IN thread with proper formatting.
+    
+    Splits long JSON into multiple messages to avoid truncation.
+    Uses <code> tags for proper formatting.
+    
+    Args:
+        message: The aiogram Message object to serialize
+        reason: Short description of why this message is being logged (e.g., "forwarded_channel_bot_spam")
+        logger: Optional logger instance for error logging
+    """
+    _logger = logger or LOGGER
+    
+    # Serialize message to JSON
+    try:
+        message_dict = message.model_dump(mode="json")
+        message_json = json.dumps(message_dict, indent=2, ensure_ascii=False)
+    except (TypeError, ValueError) as ser_err:
+        _logger.warning("Message serialization failed: %s, using fallback", ser_err)
+        try:
+            message_dict = message.model_dump()
+            def make_serializable(obj):
+                if isinstance(obj, dict):
+                    return {k: make_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [make_serializable(item) for item in obj]
+                elif hasattr(obj, '__class__') and 'Default' in obj.__class__.__name__:
+                    return f"<{obj.__class__.__name__}>"
+                else:
+                    try:
+                        json.dumps(obj)
+                        return obj
+                    except (TypeError, ValueError):
+                        return str(obj)
+            message_json = json.dumps(make_serializable(message_dict), indent=2, ensure_ascii=False)
+        except (TypeError, ValueError, AttributeError) as fallback_err:
+            _logger.error("Fallback serialization also failed: %s", fallback_err)
+            message_json = f'{{"error": "Could not serialize message", "message_id": {message.message_id}}}'
+    
+    # Header with reason
+    header = f"📋 <b>Message JSON ({html.escape(reason)})</b>\n"
+    
+    # Max length for <code> content per message (account for tags and header)
+    # <pre><code class="language-json">...</code></pre> adds ~40 chars, header can be ~100 chars, leave buffer
+    max_content_per_msg = MAX_TELEGRAM_MESSAGE_LENGTH - 200
+    
+    # Split JSON into chunks if needed
+    if len(message_json) <= max_content_per_msg:
+        # Single message
+        formatted_msg = f"{header}<pre><code class=\"language-json\">{html.escape(message_json)}</code></pre>"
+        await safe_send_message(
+            BOT,
+            TECHNOLOG_GROUP_ID,
+            formatted_msg,
+            _logger,
+            parse_mode="HTML",
+            message_thread_id=TECHNO_IN,
+            disable_web_page_preview=True,
+        )
+    else:
+        # Multiple messages needed
+        chunks = []
+        current_pos = 0
+        while current_pos < len(message_json):
+            chunks.append(message_json[current_pos:current_pos + max_content_per_msg])
+            current_pos += max_content_per_msg
+        
+        total_parts = len(chunks)
+        for i, chunk in enumerate(chunks, 1):
+            part_header = f"📋 <b>Message JSON ({html.escape(reason)}) [{i}/{total_parts}]</b>\n"
+            formatted_msg = f"{part_header}<pre><code class=\"language-json\">{html.escape(chunk)}</code></pre>"
+            await safe_send_message(
+                BOT,
+                TECHNOLOG_GROUP_ID,
+                formatted_msg,
+                _logger,
+                parse_mode="HTML",
+                message_thread_id=TECHNO_IN,
+                disable_web_page_preview=True,
+            )
+            # Small delay between messages to avoid rate limiting
+            if i < total_parts:
+                await asyncio.sleep(0.3)
 
 
 def move_user_to_banned(
@@ -7694,9 +7781,172 @@ if __name__ == "__main__":
                         _total_count,
                     )
                     
+                    # Log message JSON to TECHNOLOG for analysis
+                    await send_json_to_technolog(message, "forwarded_channel_bot_spam")
+                    
                     return  # Stop processing - spam handled
             # =====================================================
             # END: Forwarded from channel + bot mention detection
+            # =====================================================
+            
+            # =====================================================
+            # NEW SPAM DETECTION: Forwarded from channel + media + night time
+            # If message is forwarded from a channel AND contains media AND sent during night
+            # (configurable via NIGHT_START_HOUR and NIGHT_END_HOUR in .env)
+            # This is a suspicious pattern - auto-delete and ban immediately
+            # =====================================================
+            if message.forward_from_chat:
+                _has_media = bool(
+                    message.photo or message.video or message.animation or
+                    message.document or message.audio or message.voice or
+                    message.video_note or message.sticker
+                )
+                _is_night = message_sent_during_night(message)
+                
+                if _has_media and _is_night:
+                    _fwd_chan_id = message.forward_from_chat.id
+                    _fwd_chan_name = message.forward_from_chat.title or "!UNDEFINED!"
+                    _fwd_chan_username = getattr(message.forward_from_chat, "username", None) or "!UNDEFINED!"
+                    _user_name = message.from_user.username if message.from_user.username else "!UNDEFINED!"
+                    
+                    # Determine media type for logging
+                    _media_type = "unknown"
+                    if message.photo:
+                        _media_type = "photo"
+                    elif message.video:
+                        _media_type = "video"
+                    elif message.animation:
+                        _media_type = "animation/GIF"
+                    elif message.document:
+                        _media_type = "document"
+                    elif message.audio:
+                        _media_type = "audio"
+                    elif message.voice:
+                        _media_type = "voice"
+                    elif message.video_note:
+                        _media_type = "video_note"
+                    elif message.sticker:
+                        _media_type = "sticker"
+                    
+                    LOGGER.info(
+                        "\033[91m%s:%s SPAM DETECTED: Forwarded from channel %s with %s during night\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(_user_name),
+                        _fwd_chan_name,
+                        _media_type,
+                    )
+                    
+                    # Forward to ADMIN_AUTOBAN before deleting
+                    try:
+                        await BOT.forward_message(
+                            ADMIN_GROUP_ID,
+                            message.chat.id,
+                            message.message_id,
+                            message_thread_id=ADMIN_AUTOBAN,
+                            disable_notification=True,
+                        )
+                    except (TelegramBadRequest, TelegramForbiddenError) as fwd_err:
+                        LOGGER.debug("Could not forward spam message to admin: %s", fwd_err)
+                    
+                    # Delete the message
+                    try:
+                        await message.delete()
+                        LOGGER.info(
+                            "\033[91m%s:%s Message %s deleted (forwarded channel media spam during night)\033[0m",
+                            message.from_user.id,
+                            format_username_for_log(_user_name),
+                            message.message_id,
+                        )
+                    except TelegramBadRequest as del_err:
+                        LOGGER.warning(
+                            "%s:%s Failed to delete forwarded channel spam: %s",
+                            message.from_user.id,
+                            format_username_for_log(_user_name),
+                            del_err,
+                        )
+                    
+                    # Ban the user who forwarded the spam
+                    _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
+                        message.from_user.id,
+                        _user_name,
+                        CHANNEL_IDS,
+                        CHANNEL_DICT,
+                    )
+                    
+                    # Also ban the source channel
+                    if not is_user_banned(CONN, _fwd_chan_id):
+                        await ban_rogue_chat_everywhere(_fwd_chan_id, CHANNEL_IDS)
+                        add_banned_user(
+                            CONN,
+                            _fwd_chan_id,
+                            _fwd_chan_username,
+                            first_name=_fwd_chan_name,
+                            ban_source="forwarded_channel_night_media_spam",
+                            ban_reason=f"Forwarded {_media_type} spam during night",
+                        )
+                    
+                    # Add user to banned_users_dict and remove from active checks
+                    if message.from_user.id in active_user_checks_dict:
+                        banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                    else:
+                        banned_users_dict[message.from_user.id] = _user_name
+                    
+                    # Add to DB
+                    add_banned_user(
+                        CONN,
+                        message.from_user.id,
+                        _user_name,
+                        first_name=message.from_user.first_name,
+                        last_name=message.from_user.last_name,
+                        ban_source="forwarded_channel_night_media_spam",
+                        ban_reason=f"Forwarded {_media_type} from {_fwd_chan_name} during night ({NIGHT_START_HOUR}-{NIGHT_END_HOUR} AM)",
+                    )
+                    
+                    # Send notification to ADMIN_AUTOBAN
+                    _chat_link_html = build_chat_link(message.chat.id, message.chat.username, message.chat.title)
+                    _fwd_chan_link = build_chat_link(_fwd_chan_id, _fwd_chan_username if _fwd_chan_username != "!UNDEFINED!" else None, _fwd_chan_name)
+                    _escaped_name = html.escape(message.from_user.first_name or "")
+                    if message.from_user.last_name:
+                        _escaped_name += f" {html.escape(message.from_user.last_name)}"
+                    
+                    _autoban_kb = make_lols_kb(message.from_user.id)
+                    _autoban_notification = (
+                        f"🌙 <b>AUTO-BAN: Forwarded channel media spam during night</b>\n\n"
+                        f"User: {_escaped_name} @{_user_name} (<code>{message.from_user.id}</code>)\n"
+                        f"Forwarded from: {_fwd_chan_link} (<code>{_fwd_chan_id}</code>)\n"
+                        f"Media type: <b>{_media_type}</b>\n"
+                        f"In chat: {_chat_link_html}\n\n"
+                        f"✅ User banned in {_success_count}/{_total_count} chats\n"
+                        f"✅ Channel banned everywhere"
+                    )
+                    if _fail_count > 0:
+                        _autoban_notification += f" (⚠️ {_fail_count} failed)"
+                    
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        _autoban_notification,
+                        LOGGER,
+                        parse_mode="HTML",
+                        message_thread_id=ADMIN_AUTOBAN,
+                        disable_web_page_preview=True,
+                        reply_markup=_autoban_kb.as_markup(),
+                    )
+                    
+                    LOGGER.info(
+                        "\033[91m%s:%s BANNED in %d/%d chats (forwarded channel media spam during night)\033[0m",
+                        message.from_user.id,
+                        format_username_for_log(_user_name),
+                        _success_count,
+                        _total_count,
+                    )
+                    
+                    # Log message JSON to TECHNOLOG for analysis
+                    await send_json_to_technolog(message, "forwarded_channel_night_media_spam")
+                    
+                    return  # Stop processing - spam handled
+            # =====================================================
+            # END: Forwarded from channel + media + night detection
             # =====================================================
 
             # Special handling for Telegram's anonymous channel admin (ID 777000)
@@ -7761,15 +8011,14 @@ if __name__ == "__main__":
                         first_msg_dt = datetime.fromisoformat(first_msg_date_str.replace(" ", "T"))
                         # If first message is more than 5 minutes old and not matching current - skip
                         # IMPORTANT: All timestamps in DB are UTC (old=naive UTC, new=aware +00:00)
-                        # BUT legacy data might be naive Mauritius time (UTC+4) due to TZ setting
+                        # BUT legacy data might be naive local time due to TZ setting
                         # Convert naive to aware for comparison
                         if first_msg_dt.tzinfo is None:
-                            # Assume naive timestamps are Mauritius time (legacy behavior)
-                            # Convert them to aware Mauritius time, then to UTC
-                            # This fixes the issue where naive Mauritius time (e.g. 14:00) was treated as UTC (14:00)
-                            # which is 4 hours ahead of actual UTC (10:00), causing negative age
-                            mauritius_tz = ZoneInfo("Indian/Mauritius")
-                            first_msg_dt = first_msg_dt.replace(tzinfo=mauritius_tz).astimezone(timezone.utc)
+                            # Assume naive timestamps are local time (legacy behavior)
+                            # Convert them to aware local time, then to UTC
+                            # This fixes the issue where naive local time was treated as UTC
+                            local_tz = ZoneInfo("Indian/Mauritius")
+                            first_msg_dt = first_msg_dt.replace(tzinfo=local_tz).astimezone(timezone.utc)
                         
                         msg_age_seconds = (datetime.now(timezone.utc) - first_msg_dt).total_seconds()
                         
@@ -9453,11 +9702,11 @@ if __name__ == "__main__":
                             suspicious_items["emails"].append(email)
 
             # Additional regex-based phone number detection for local numbers
-            # Detect Mauritius numbers: +230, 00230, or plain 230 followed by digits
+            # Detect local numbers: +XXX, 00XXX country codes followed by digits
             phone_patterns = [
-                r"\+230\s*\d{6,8}",  # +230 followed by 6-8 digits
-                r"00230\s*\d{6,8}",  # 00230 followed by 6-8 digits
-                r"(?<!\d)230\s*\d{6,8}",  # 230 followed by 6-8 digits (not preceded by digit)
+                r"\+230\s*\d{6,8}",  # Local country code followed by 6-8 digits
+                r"00230\s*\d{6,8}",  # International prefix + local code followed by 6-8 digits
+                r"(?<!\d)230\s*\d{6,8}",  # Local code followed by 6-8 digits (not preceded by digit)
                 r"\+\d{10,15}",  # International format +XXXXXXXXXXX
                 r"(?<!\d)\d{3}[-\s]?\d{3}[-\s]?\d{4}(?!\d)",  # Format: 123-456-7890 or 123 456 7890
             ]

@@ -120,7 +120,7 @@ gcloud compute ssh bancop4 --zone=africa-south1-b --project=multichat-bot-396516
 
 ## Verification Checklist
 
-- [ ] Bot responds in admin group (Admins of Mauritius)
+- [ ] Bot responds in admin group
 - [ ] Bot logs show successful startup
 - [ ] No errors in first 5 minutes of logs
 - [ ] `/whois` command works
@@ -193,7 +193,7 @@ gcloud compute disks create bancop3-restored \
 
 ## Contact / Notes
 
-- Admin Group: Admins of Mauritius (-1001986200930)
-- Technolog Group: technobot_log (-1001902317320)
-- Bot: @bancop_bot
-- Admin User ID: 44816530
+- Admin Group: (configure in .env)
+- Technolog Group: (configure in .env)
+- Bot: (configure in .env)
+- Admin User ID: (configure in .env)

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-01-11]
+
+### Changed
+- **Callback prefixes shortened for 64-byte limit compliance**: Telegram limits callback_data to 64 bytes.
+  With format `{prefix}_{chat_id}_{message_id}_{user_id}_{fwd_channel_id}`, long prefixes could exceed limit.
+  - `suspiciousactions_` → `sa_`
+  - `suspiciousglobalban_` → `sgb_`
+  - `suspiciousban_` → `sb_`
+  - `suspiciousdelmsg_` → `sdm_`
+  - `suspiciouscancel_` → `sc_`
+  - Legacy long prefixes still supported for backwards compatibility
+
+### Added
+- **"Ban Forwarded Channel" button** in suspicious actions menu for messages forwarded from channels
+  - Uses existing `banchannelconfirm_` callback handler
+  - Only shown when `fwd_channel_id != 0`
+
 ## [2025-12-05]
 
 ### Fixed

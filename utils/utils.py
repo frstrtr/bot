@@ -2189,10 +2189,24 @@ def create_inline_keyboard(_message_link, lols_link, message: types.Message):
 
     Note: "View Original Message" button removed since the original message is always
     forwarded above this notification, and buttons don't work when forwarding reports.
-    
-    The callback data format is:
-    sa_{chat_id}_{message_id}_{user_id}_{fwd_channel_id}
-    where sa_ = suspiciousactions (shortened to fit 64-byte callback limit).
+
+    Callback Naming Convention:
+    ---------------------------
+    Telegram limits callback_data to 64 bytes. With format:
+        {prefix}_{chat_id}_{message_id}_{user_id}_{fwd_channel_id}
+    IDs can be up to ~14 digits each, so prefixes must be short.
+
+    Short prefixes (current):
+        sa_   = suspiciousactions  (expand actions menu)
+        sgb_  = suspiciousglobalban (global ban user)
+        sb_   = suspiciousban (ban user in current chat)
+        sdm_  = suspiciousdelmsg (delete message only)
+        sc_   = suspiciouscancel (close/cancel menu)
+
+    Legacy prefixes (supported for backwards compatibility):
+        suspiciousactions_, suspiciousglobalban_, suspiciousban_,
+        suspiciousdelmsg_, suspiciouscancel_
+
     fwd_channel_id is 0 if message is not forwarded from a channel.
     """
     # Check if message is forwarded from a channel

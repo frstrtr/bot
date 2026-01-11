@@ -2032,9 +2032,10 @@ async def handle_autoreports(
         )
     )
     # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
+    _fwd_chan_id = message.forward_from_chat.id if message.forward_from_chat else 0
     actions_btn = InlineKeyboardButton(
         text="⚙️ Actions (Ban / Delete) ⚙️",
-        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{spammer_id}",
+        callback_data=f"sa_{message.chat.id}_{message.message_id}_{spammer_id}_{_fwd_chan_id}",
     )
     keyboard.add(actions_btn)
 
@@ -2953,7 +2954,7 @@ async def check_n_ban(message: Message, reason: str):
         inline_kb.add(
             InlineKeyboardButton(
                 text="⚙️ Actions (Unban / Review) ⚙️",
-                callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+                callback_data=f"sa_{message.chat.id}_{message.message_id}_{message.from_user.id}_{message.forward_from_chat.id if message.forward_from_chat else 0}",
             )
         )
 
@@ -3437,7 +3438,7 @@ async def perform_checks(
                             kb.add(
                                 InlineKeyboardButton(
                                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                                    callback_data=f"suspiciousactions_{_chat_id_for_gban}_0_{user_id}",
+                                    callback_data=f"sa_{_chat_id_for_gban}_0_{user_id}_0",
                                 )
                             )
 
@@ -4583,7 +4584,7 @@ if __name__ == "__main__":
             _high_id_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                    callback_data=f"suspiciousactions_{update.chat.id}_0_{inout_userid}",
+                    callback_data=f"sa_{update.chat.id}_0_{inout_userid}_0",
                 )
             )
             _high_id_kb.add(
@@ -4915,7 +4916,7 @@ if __name__ == "__main__":
                         _kb.add(
                             InlineKeyboardButton(
                                 text="⚙️ Actions (Ban / Delete) ⚙️",
-                                callback_data=f"suspiciousactions_{update.chat.id}_0_{inout_userid}",
+                                callback_data=f"sa_{update.chat.id}_0_{inout_userid}_0",
                             )
                         )
                         # Elapsed time since join if available
@@ -5425,7 +5426,7 @@ if __name__ == "__main__":
         original_message_id = found_message_data[1]
         actions_btn = InlineKeyboardButton(
             text="⚙️ Actions (Ban / Delete) ⚙️",
-            callback_data=f"suspiciousactions_{original_chat_id}_{original_message_id}_{user_id}",
+            callback_data=f"sa_{original_chat_id}_{original_message_id}_{user_id}_0",
         )
         keyboard.add(actions_btn)
 
@@ -7119,7 +7120,7 @@ if __name__ == "__main__":
                         kb.add(
                             InlineKeyboardButton(
                                 text="⚙️ Actions (Ban / Delete) ⚙️",
-                                callback_data=f"suspiciousactions_{message.chat.id}_0_{_uid}",
+                                callback_data=f"sa_{message.chat.id}_0_{_uid}_{message.forward_from_chat.id if message.forward_from_chat else 0}",
                             )
                         )
 
@@ -8262,7 +8263,7 @@ if __name__ == "__main__":
                             _established_kb.add(
                                 InlineKeyboardButton(
                                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                                    callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+                                    callback_data=f"sa_{message.chat.id}_{message.message_id}_{message.from_user.id}_{message.forward_from_chat.id if message.forward_from_chat else 0}",
                                 )
                             )
                             _established_kb.add(
@@ -8580,7 +8581,7 @@ if __name__ == "__main__":
                             _missed_join_kb.add(
                                 InlineKeyboardButton(
                                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                                    callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+                                    callback_data=f"sa_{message.chat.id}_{message.message_id}_{message.from_user.id}_{message.forward_from_chat.id if message.forward_from_chat else 0}",
                                 )
                             )
                             _missed_join_kb.add(
@@ -10250,7 +10251,7 @@ if __name__ == "__main__":
                 inline_kb.add(
                     InlineKeyboardButton(
                         text="⚙️ Actions (Ban / Delete) ⚙️",
-                        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{user_id}",
+                        callback_data=f"sa_{message.chat.id}_{message.message_id}_{user_id}_{message.forward_from_chat.id if message.forward_from_chat else 0}",
                     )
                 )
                 inline_kb.add(
@@ -10740,7 +10741,7 @@ if __name__ == "__main__":
                 keyboard.add(
                     InlineKeyboardButton(
                         text="⚙️ Actions (Ban / Delete)",
-                        callback_data=f"suspiciousactions_{message.chat.id}_0_{found_user_id}",
+                        callback_data=f"sa_{message.chat.id}_0_{found_user_id}_0",
                     )
                 )
         # Note: LOLS check link is already included in the message text,
@@ -13106,12 +13107,20 @@ if __name__ == "__main__":
         await callback_query.answer()
 
     @DP.callback_query(
-        # MODIFIED: Renamed callback prefixes and adjusted lambda
-        lambda c: c.data.startswith("suspiciousglobalban_")
-        or c.data.startswith("suspiciousban_")
-        or c.data.startswith("suspiciousdelmsg_")
-        or c.data.startswith("suspiciousactions_")
-        or c.data.startswith("suspiciouscancel_")
+        # Shortened callback prefixes to fit 64-byte limit:
+        # sa_=suspiciousactions, sgb_=suspiciousglobalban, sb_=suspiciousban
+        # sdm_=suspiciousdelmsg, sc_=suspiciouscancel
+        # Also support legacy long prefixes for backwards compatibility
+        lambda c: c.data.startswith("sa_")
+        or c.data.startswith("sgb_")
+        or c.data.startswith("sb_")
+        or c.data.startswith("sdm_")
+        or c.data.startswith("sc_")
+        or c.data.startswith("suspiciousglobalban_")  # legacy
+        or c.data.startswith("suspiciousban_")  # legacy
+        or c.data.startswith("suspiciousdelmsg_")  # legacy
+        or c.data.startswith("suspiciousactions_")  # legacy
+        or c.data.startswith("suspiciouscancel_")  # legacy
         or c.data.startswith("confirmdelmsg_")
         or c.data.startswith("canceldelmsg_")
         or c.data.startswith("confirmban_")
@@ -13120,29 +13129,55 @@ if __name__ == "__main__":
         or c.data.startswith("cancelglobalban_")
     )
     async def handle_suspicious_sender(callback_query: CallbackQuery):
-        """Function to handle the suspicious sender."""
-        # MODIFIED: Adjusted parsing for single-word prefixes and data extraction
+        """Function to handle the suspicious sender.
+        
+        Callback format: {prefix}_{chat_id}_{message_id}_{user_id}_{fwd_channel_id}
+        
+        Short prefixes (new, fits 64-byte limit):
+        - sa_ = suspiciousactions
+        - sgb_ = suspiciousglobalban  
+        - sb_ = suspiciousban
+        - sdm_ = suspiciousdelmsg
+        - sc_ = suspiciouscancel
+        
+        Long prefixes (legacy, for backwards compatibility):
+        - suspiciousactions_, suspiciousglobalban_, suspiciousban_, etc.
+        """
         data = callback_query.data
         parts = data.split("_")
 
+        # Map short prefixes to their action names
+        prefix_map = {
+            "sa": "suspiciousactions",
+            "sgb": "suspiciousglobalban",
+            "sb": "suspiciousban",
+            "sdm": "suspiciousdelmsg",
+            "sc": "suspiciouscancel",
+        }
+        
         action_prefix = parts[0]
+        # Convert short prefix to full action name if needed
+        action_name = prefix_map.get(action_prefix, action_prefix)
+        
         susp_chat_id_str = parts[1]
         susp_message_id_str = parts[2]
         susp_user_id_str = parts[3]
+        # Get forwarded channel ID if present (new format), default to 0
+        fwd_channel_id = int(parts[4]) if len(parts) > 4 else 0
 
         susp_user_id = int(susp_user_id_str)
         susp_message_id = int(susp_message_id_str)
         susp_chat_id = int(susp_chat_id_str)
 
         # If user pressed global cancel/close in expanded actions menu, collapse back to original single Actions button layout
-        if action_prefix == "suspiciouscancel":
+        if action_name == "suspiciouscancel":
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             collapsed_kb = KeyboardBuilder()
             collapsed_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
             collapsed_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                    callback_data=f"suspiciousactions_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sa_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 )
             )
             collapsed_kb.add(
@@ -13163,7 +13198,7 @@ if __name__ == "__main__":
             return
 
         # If the consolidated actions button was pressed, expand available actions and return
-        if action_prefix == "suspiciousactions":
+        if action_name == "suspiciousactions":
             susp_user_id = int(susp_user_id_str)
             susp_message_id = int(susp_message_id_str)
             susp_chat_id = int(susp_chat_id_str)
@@ -13173,24 +13208,32 @@ if __name__ == "__main__":
             expand_kb.row(
                 InlineKeyboardButton(
                     text="🌐 Global Ban",
-                    callback_data=f"suspiciousglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sgb_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 ),
                 InlineKeyboardButton(
                     text="🚫 Chat Ban",
-                    callback_data=f"suspiciousban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sb_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 ),
             )
             expand_kb.add(
                 InlineKeyboardButton(
                     text="🗑 Delete Msg",
-                    callback_data=f"suspiciousdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sdm_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 )
             )
+            # Add "Ban Channel" button if message was forwarded from a channel
+            if fwd_channel_id != 0:
+                expand_kb.add(
+                    InlineKeyboardButton(
+                        text="📢 Ban Forwarded Channel",
+                        callback_data=f"banchannelconfirm_{fwd_channel_id}_{susp_chat_id}",
+                    )
+                )
             # Global cancel button to revert view
             expand_kb.add(
                 InlineKeyboardButton(
                     text="🔙 Cancel / Close",
-                    callback_data=f"suspiciouscancel_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sc_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 )
             )
             try:
@@ -13204,13 +13247,13 @@ if __name__ == "__main__":
             await callback_query.answer()
             return
 
-        # Determine 'comand' (action) based on the prefix
+        # Determine 'comand' (action) based on the action_name (already normalized from short/long prefix)
         comand = ""
-        if action_prefix == "suspiciousglobalban":
+        if action_name == "suspiciousglobalban":
             comand = "globalban"
-        elif action_prefix == "suspiciousban":
+        elif action_name == "suspiciousban":
             comand = "ban"
-        elif action_prefix == "suspiciousdelmsg":
+        elif action_name == "suspiciousdelmsg":
             comand = "delmsg"
         elif action_prefix == "confirmglobalban":
             comand = "confirmglobalban"
@@ -13730,7 +13773,7 @@ if __name__ == "__main__":
             collapsed_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
-                    callback_data=f"suspiciousactions_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    callback_data=f"sa_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
                 )
             )
             collapsed_kb.add(

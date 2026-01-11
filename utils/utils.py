@@ -2189,7 +2189,17 @@ def create_inline_keyboard(_message_link, lols_link, message: types.Message):
 
     Note: "View Original Message" button removed since the original message is always
     forwarded above this notification, and buttons don't work when forwarding reports.
+    
+    The callback data format is:
+    sa_{chat_id}_{message_id}_{user_id}_{fwd_channel_id}
+    where sa_ = suspiciousactions (shortened to fit 64-byte callback limit).
+    fwd_channel_id is 0 if message is not forwarded from a channel.
     """
+    # Check if message is forwarded from a channel
+    fwd_channel_id = 0
+    if message.forward_from_chat and message.forward_from_chat.id:
+        fwd_channel_id = message.forward_from_chat.id
+    
     inline_kb = KeyboardBuilder()
     inline_kb.add(InlineKeyboardButton(text="ℹ️ Check LOLS Data ℹ️", url=lols_link))
     inline_kb.add(InlineKeyboardButton(
@@ -2198,7 +2208,7 @@ def create_inline_keyboard(_message_link, lols_link, message: types.Message):
     ))
     inline_kb.add(InlineKeyboardButton(
         text="⚙️ Actions (Ban / Delete) ⚙️",
-        callback_data=f"suspiciousactions_{message.chat.id}_{message.message_id}_{message.from_user.id}",
+        callback_data=f"sa_{message.chat.id}_{message.message_id}_{message.from_user.id}_{fwd_channel_id}",
     ))
     return inline_kb
 

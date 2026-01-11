@@ -18,6 +18,8 @@ test.py
 !.github/*
 !p2spm.py
 !parse_spam.py
+!deploy_update.sh
+!start_bot.sh
 !server/
 !server/main.py
 !server/api.py

@@ -9521,7 +9521,7 @@ if __name__ == "__main__":
                         await safe_send_message(
                             BOT,
                             ADMIN_GROUP_ID,
-                            f"WARNING! User @{message.from_user.username if message.from_user.username else 'UNDEFINED'} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}.\n🔗 <a href='{message_link}'>Original message</a>\nPlease check it out!",
+                            f"WARNING! User {format_username_for_log(message.from_user.username)} (<code>{message.from_user.id}</code>) sent a SUSPICIOUS message in {_chat_link_html} after {human_readable_time}.\n🔗 <a href='{message_link}'>Original message</a>\nPlease check it out!",
                             LOGGER,
                             message_thread_id=ADMIN_SUSPICIOUS,
                             reply_markup=inline_kb.as_markup(),
@@ -9977,7 +9977,7 @@ if __name__ == "__main__":
                     # Build the full message
                     full_message = (
                         f"⚠️ <b>Suspicious Content Detected</b>\n"
-                        f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
+                        f"From: {format_username_for_log(message.from_user.username)} "
                         f"(<code>{message.from_user.id}</code>)\n"
                         f"Chat: {_chat_link_html}\n"
                         f"🔗 <a href='{message_link}'>Original message</a>\n\n"
@@ -9994,7 +9994,7 @@ if __name__ == "__main__":
                         )
                         full_message = (
                             f"⚠️ <b>Suspicious Content Detected</b>\n"
-                            f"From: @{message.from_user.username if message.from_user.username else 'UNDEFINED'} "
+                            f"From: {format_username_for_log(message.from_user.username)} "
                             f"(<code>{message.from_user.id}</code>)\n"
                             f"Chat: {_chat_link_html}\n"
                             f"🔗 <a href='{message_link}'>Original message</a>\n\n"

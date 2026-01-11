@@ -70,26 +70,19 @@ else
 fi
 echo ""
 
-# Step 5: Start new bot instance
+# Step 5: Start new bot instance using start_bot.sh
 echo "🚀 Step 5/5: Starting new bot instance..."
-if [ -d ".venv" ]; then
-    PYTHON_CMD="source $BOT_DIR/.venv/bin/activate && python"
-else
-    PYTHON_CMD="python3"
-fi
-
-screen -dmS "$SCREEN_NAME" bash -c "$PYTHON_CMD main.py --log-level $LOG_LEVEL 2>&1 | tee -a bancop_BOT.log"
-
-# Wait and verify startup
-sleep 3
-if ps aux | grep -v grep | grep "python.*main.py" > /dev/null; then
+if [ -f "$BOT_DIR/start_bot.sh" ]; then
+    echo "Using start_bot.sh to start the bot..."
+    # Run start_bot.sh non-interactively (auto-kill any remaining sessions)
+    export REPLY="y"
+    bash "$BOT_DIR/start_bot.sh" "$LOG_LEVEL"
+    
     echo ""
     echo "==================================="
     echo "✅ DEPLOYMENT SUCCESSFUL!"
     echo "==================================="
     echo "Time: $(date)"
-    echo "Screen session: $SCREEN_NAME"
-    echo "Log level: $LOG_LEVEL"
     echo ""
     echo "📊 Monitor commands:"
     echo "  • Live logs:     tail -f $BOT_DIR/bancop_BOT.log"
@@ -101,11 +94,22 @@ if ps aux | grep -v grep | grep "python.*main.py" > /dev/null; then
     echo "  • Restart:       ./deploy_update.sh"
     echo ""
 else
-    echo ""
-    echo "==================================="
-    echo "❌ DEPLOYMENT FAILED!"
-    echo "==================================="
-    echo "Bot process not detected. Check logs:"
-    echo "  tail -n 100 $BOT_DIR/bancop_BOT.log"
-    exit 1
+    # Fallback: start directly if start_bot.sh not found
+    echo "start_bot.sh not found, starting directly..."
+    if [ -d ".venv" ]; then
+        PYTHON_CMD="source $BOT_DIR/.venv/bin/activate && python"
+    else
+        PYTHON_CMD="python3"
+    fi
+    
+    screen -dmS "$SCREEN_NAME" bash -c "$PYTHON_CMD main.py --log-level $LOG_LEVEL 2>&1 | tee -a bancop_BOT.log"
+    sleep 3
+    
+    if ps aux | grep -v grep | grep "python.*main.py" > /dev/null; then
+        echo "✅ Bot started successfully!"
+    else
+        echo "❌ Failed to start bot. Check logs:"
+        echo "  tail -n 100 $BOT_DIR/bancop_BOT.log"
+        exit 1
+    fi
 fi

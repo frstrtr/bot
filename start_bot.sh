@@ -17,8 +17,11 @@ cd "$BOT_DIR" || {
 # Check if screen session already exists
 if screen -list | grep -q "$SCREEN_NAME"; then
     echo "Screen session '$SCREEN_NAME' already exists."
-    read -p "Do you want to kill it and restart? (y/n) " -n 1 -r
-    echo
+    # Check if running in non-interactive mode (set by deploy script)
+    if [ -z "$REPLY" ]; then
+        read -p "Do you want to kill it and restart? (y/n) " -n 1 -r
+        echo
+    fi
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "Killing existing screen session..."
         screen -S "$SCREEN_NAME" -X quit

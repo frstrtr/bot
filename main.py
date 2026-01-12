@@ -6485,10 +6485,13 @@ if __name__ == "__main__":
     @DP.callback_query(lambda c: c.data.startswith("banchannelconfirm_"))
     async def ban_channel_confirm(callback_query: CallbackQuery):
         """Function to show confirmation buttons for channel ban."""
-        # Parse channel_id and source_chat_id from callback data
+        # Parse channel_id, source_chat_id, message_id, user_id from callback data
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
+        # For backwards compatibility with old format (3 parts), default to 0
+        susp_message_id = int(parts[3]) if len(parts) > 3 else 0
+        susp_user_id = int(parts[4]) if len(parts) > 4 else 0
 
         # Answer callback immediately
         try:
@@ -6501,11 +6504,11 @@ if __name__ == "__main__":
         confirm_kb.row(
             InlineKeyboardButton(
                 text="✅ Confirm Ban",
-                callback_data=f"banchannelexecute_{channel_id}_{source_chat_id}",
+                callback_data=f"banchannelexecute_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
             ),
             InlineKeyboardButton(
                 text="❌ Cancel",
-                callback_data=f"banchannelcancel_{channel_id}_{source_chat_id}",
+                callback_data=f"banchannelcancel_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
             ),
         )
 
@@ -6522,10 +6525,13 @@ if __name__ == "__main__":
     @DP.callback_query(lambda c: c.data.startswith("banchannelexecute_"))
     async def ban_channel_execute(callback_query: CallbackQuery):
         """Function to execute the channel ban."""
-        # Parse channel_id from callback data
+        # Parse channel_id, source_chat_id, message_id, user_id from callback data
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         _source_chat_id = int(parts[2])
+        # For backwards compatibility
+        _susp_message_id = int(parts[3]) if len(parts) > 3 else 0
+        _susp_user_id = int(parts[4]) if len(parts) > 4 else 0
 
         admin_username = callback_query.from_user.username
         admin_id = callback_query.from_user.id
@@ -6601,11 +6607,14 @@ if __name__ == "__main__":
 
     @DP.callback_query(lambda c: c.data.startswith("banchannelcancel_"))
     async def ban_channel_cancel(callback_query: CallbackQuery):
-        """Function to cancel the channel ban."""
-        # Parse channel_id from callback data
+        """Function to cancel the channel ban and restore expanded actions menu."""
+        # Parse channel_id, source_chat_id, message_id, user_id from callback data
         parts = callback_query.data.split("_")
         channel_id = int(parts[1])
         source_chat_id = int(parts[2])
+        # For backwards compatibility
+        susp_message_id = int(parts[3]) if len(parts) > 3 else 0
+        susp_user_id = int(parts[4]) if len(parts) > 4 else 0
 
         # Answer callback immediately
         try:
@@ -6613,20 +6622,57 @@ if __name__ == "__main__":
         except (InvalidQueryID, BadRequest) as answer_error:
             LOGGER.debug("Could not answer callback: %s", answer_error)
 
-        # Restore original button
-        channel_ban_kb = KeyboardBuilder()
-        channel_ban_kb.add(
-            InlineKeyboardButton(
-                text="🚫 Ban Channel",
-                callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}",
+        # Restore full expanded actions menu (if we have the required data)
+        if susp_user_id != 0 and susp_message_id != 0:
+            lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
+            expand_kb = KeyboardBuilder()
+            expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            expand_kb.row(
+                InlineKeyboardButton(
+                    text="🌐 Global Ban",
+                    callback_data=f"sgb_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🚫 Chat Ban",
+                    callback_data=f"sb_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                ),
             )
-        )
+            expand_kb.add(
+                InlineKeyboardButton(
+                    text="🗑 Delete Msg",
+                    callback_data=f"sdm_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                )
+            )
+            # Add "Ban Channel" button back
+            if channel_id != 0:
+                expand_kb.add(
+                    InlineKeyboardButton(
+                        text="📢 Ban Forwarded Channel",
+                        callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
+                    )
+                )
+            # Global cancel button
+            expand_kb.add(
+                InlineKeyboardButton(
+                    text="🔙 Cancel / Close",
+                    callback_data=f"sc_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                )
+            )
+        else:
+            # Fallback to simple channel ban button for old format callbacks
+            expand_kb = KeyboardBuilder()
+            expand_kb.add(
+                InlineKeyboardButton(
+                    text="🚫 Ban Channel",
+                    callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}",
+                )
+            )
 
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
-                reply_markup=channel_ban_kb.as_markup(),
+                reply_markup=expand_kb.as_markup(),
             )
         except (MessageNotModified, InvalidQueryID, BadRequest) as e:
             LOGGER.debug("Could not restore buttons: %s", e)
@@ -13250,7 +13296,7 @@ if __name__ == "__main__":
                 expand_kb.add(
                     InlineKeyboardButton(
                         text="📢 Ban Forwarded Channel",
-                        callback_data=f"banchannelconfirm_{fwd_channel_id}_{susp_chat_id}",
+                        callback_data=f"banchannelconfirm_{fwd_channel_id}_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
                     )
                 )
             # Global cancel button to revert view

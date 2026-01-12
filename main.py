@@ -6543,22 +6543,26 @@ if __name__ == "__main__":
             # Query might be too old, but continue with ban anyway
             LOGGER.debug("Could not answer callback query: %s", answer_error)
 
+        # Remove Confirm/Cancel buttons IMMEDIATELY, keep LOLS check link for reference
+        # This prevents confusion when banning takes time across multiple chats
+        lols_link = f"https://t.me/oLolsBot?start={channel_id}"
+        processing_kb = KeyboardBuilder()
+        processing_kb.add(InlineKeyboardButton(text="ℹ️ Check Channel Data ℹ️", url=lols_link))
+        try:
+            await BOT.edit_message_reply_markup(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=processing_kb.as_markup(),
+            )
+        except (MessageNotModified, InvalidQueryID, BadRequest) as edit_error:
+            # Ignore errors when trying to remove buttons (already removed, message too old, etc.)
+            LOGGER.debug("Could not remove buttons: %s", edit_error)
+
         try:
             # Ban channel from all monitored chats
             success, channel_name, channel_username, failed_chats = await ban_rogue_chat_everywhere(
                 channel_id, CHANNEL_IDS
             )
-
-            # Remove buttons from message
-            try:
-                await BOT.edit_message_reply_markup(
-                    chat_id=callback_query.message.chat.id,
-                    message_id=callback_query.message.message_id,
-                    reply_markup=None,
-                )
-            except (MessageNotModified, InvalidQueryID, BadRequest) as edit_error:
-                # Ignore errors when trying to remove buttons (already removed, message too old, etc.)
-                LOGGER.debug("Could not remove buttons: %s", edit_error)
 
             if success:
                 _admin_display = f"@{admin_username}" if admin_username else "!UNDEFINED!"
@@ -13425,11 +13429,14 @@ if __name__ == "__main__":
             )
             return
 
-        # remove buttons from the admin group
+        # Remove Confirm/Cancel buttons immediately when user confirms, keep LOLS check link
+        # This prevents confusion during potentially long operations (global ban, etc.)
+        inline_kb_processing = KeyboardBuilder()
+        inline_kb_processing.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
-            reply_markup=inline_kb.as_markup(),
+            reply_markup=inline_kb_processing.as_markup(),
         )
 
         if comand == "confirmglobalban":

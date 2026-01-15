@@ -694,13 +694,17 @@ def get_spammer_details(
     forwarded_from_id=None,
     forwarded_from_chat_id=None,
     froward_sender_chat_id=None,
+    via_bot_id=None,
 ):
     """Function to get chat ID and message ID by sender name and date
     or if the message is a forward of a forward then using
     forwarded_from_id and message_forward_date.
     forwarded_from_username, forwarded_from_first_name,
     forward_from_last_name are used only for forwarded forwarded messages
-    and reserved for future use
+    and reserved for future use.
+    
+    via_bot_id: If the original message was sent via an inline bot (e.g., @postbot),
+    this helps identify the sender even when forward privacy is enabled.
     """
 
     spammer_id = spammer_id or None
@@ -713,7 +717,7 @@ def get_spammer_details(
         "\t\t\tfirstName : %s : lastName : %s,\n"
         "\t\t\tmessageForwardDate: %s, forwardedFromChatTitle: %s,\n"
         "\t\t\tforwardSenderName: %s, forwardedFromID: %s,\n"
-        "\t\t\tforwardedFromChatID: %s, forwardSenderChatID: %s\033[0m",
+        "\t\t\tforwardedFromChatID: %s, forwardSenderChatID: %s, viaBotID: %s\033[0m",
         spammer_id_str,
         spammer_first_name,
         spammer_last_name,
@@ -723,6 +727,7 @@ def get_spammer_details(
         forwarded_from_id,
         forwarded_from_chat_id,
         froward_sender_chat_id,
+        via_bot_id,
     )
 
     # Common SQL and parameters for both cases
@@ -740,6 +745,7 @@ def get_spammer_details(
         "from_chat_title": forward_from_chat_title,
         "user_id": spammer_id,
         "forward_sender_name": forward_sender_name,
+        "via_bot_id": via_bot_id,
     }
 
     if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
@@ -751,6 +757,11 @@ def get_spammer_details(
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
             " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
         )
+        # Add via_bot_id condition for inline bot messages (e.g., @postbot)
+        if via_bot_id:
+            condition += " OR (via_bot_id = :via_bot_id AND received_date = :message_forward_date)"
+            # Also try matching by via_bot_id + first_name (name from forward_sender_name)
+            condition += " OR (via_bot_id = :via_bot_id AND user_first_name = :sender_first_name)"
     elif forward_sender_name == "Deleted Account":
         # Manage Deleted Account by message date only
         condition = "received_date = :message_forward_date"
@@ -1024,8 +1035,10 @@ async def periodic_stale_monitoring_cleanup():
                     stale_count,
                 )
                 
-        except Exception as e:
-            LOGGER.error("Error in periodic_stale_monitoring_cleanup: %s", e)
+        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+            LOGGER.error("Database error in periodic_stale_monitoring_cleanup: %s", e)
+        except (KeyError, TypeError, AttributeError) as e:
+            LOGGER.error("Data error in periodic_stale_monitoring_cleanup: %s", e)
 
 
 async def ban_rogue_chat_everywhere(
@@ -5168,6 +5181,9 @@ if __name__ == "__main__":
             else spammer_first_name
         )
 
+        # Get via_bot_id for inline bot messages (e.g., @postbot)
+        via_bot_id = message.via_bot.id if message.via_bot else None
+        
         # message forwarded from a user or forwarded forward from a user
         # Convert datetime to string to avoid Python 3.12+ sqlite3 DeprecationWarning
         _forward_date_str = message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None
@@ -5187,6 +5203,7 @@ if __name__ == "__main__":
                 froward_sender_chat_id=(
                     message.sender_chat.id if message.sender_chat else None
                 ),
+                via_bot_id=via_bot_id,
             )
 
         # For users with open profiles, or if previous fetch didn't work.
@@ -5205,6 +5222,7 @@ if __name__ == "__main__":
                 froward_sender_chat_id=(
                     message.sender_chat.id if message.sender_chat else None
                 ),
+                via_bot_id=via_bot_id,
             )
 
         # Try getting details for forwarded messages from channels.
@@ -5222,6 +5240,7 @@ if __name__ == "__main__":
                 froward_sender_chat_id=(
                     message.sender_chat.id if message.sender_chat else None
                 ),
+                via_bot_id=via_bot_id,
             )
 
         if not found_message_data:
@@ -5241,6 +5260,7 @@ if __name__ == "__main__":
                     froward_sender_chat_id=(
                         message.sender_chat.id if message.sender_chat else None
                     ),
+                    via_bot_id=via_bot_id,
                 )
                 LOGGER.debug(
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
@@ -5248,6 +5268,151 @@ if __name__ == "__main__":
                 await message.answer(
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
                 )
+            elif via_bot_id:
+                # Message sent via inline bot (e.g., @postbot) but we couldn't find the original
+                # This happens when the message was sent before we started tracking via_bot_id
+                LOGGER.info(
+                    "User %s:%s forwarded inline bot message (via_bot_id=%s) - could not find original sender",
+                    message.from_user.id,
+                    format_username_for_log(message.from_user.username),
+                    via_bot_id,
+                )
+                via_bot_username = message.via_bot.username if message.via_bot else "unknown"
+                
+                # Get original message location for deletion
+                original_chat_id = message.forward_from_chat.id if message.forward_from_chat else None
+                original_message_id = message.forward_from_message_id if message.forward_from_message_id else None
+                
+                # Forward to ADMIN_SUSPICIOUS thread with action buttons for manual review
+                try:
+                    # Forward the original message first
+                    await BOT.forward_message(
+                        ADMIN_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                    )
+                    
+                    # Build message link if we have the info
+                    original_msg_link = None
+                    if original_chat_id and original_message_id:
+                        if message.forward_from_chat.username:
+                            original_msg_link = f"https://t.me/{message.forward_from_chat.username}/{original_message_id}"
+                        else:
+                            chat_id_str = str(original_chat_id)
+                            if chat_id_str.startswith("-100"):
+                                chat_id_str = chat_id_str[4:]
+                            original_msg_link = f"https://t.me/c/{chat_id_str}/{original_message_id}"
+                    
+                    # Build notification message
+                    inline_bot_report_msg = (
+                        f"⚠️ <b>Inline Bot Message Report</b>\n\n"
+                        f"<b>Reported by:</b> {html.escape(message.from_user.first_name or '')} "
+                        f"(@{message.from_user.username or '!UNDEFINED!'}, <code>{message.from_user.id}</code>)\n"
+                        f"<b>Sent via:</b> @{html.escape(via_bot_username)} (ID: <code>{via_bot_id}</code>)\n"
+                        f"<b>Forward sender name:</b> {html.escape(forward_sender_name or 'Unknown')}\n"
+                    )
+                    
+                    if original_chat_id and original_message_id:
+                        chat_title = html.escape(message.forward_from_chat.title or 'Chat') if message.forward_from_chat else 'Unknown'
+                        inline_bot_report_msg += (
+                            f"<b>Original chat:</b> {chat_title} (<code>{original_chat_id}</code>)\n"
+                            f"<b>Original message ID:</b> <code>{original_message_id}</code>\n"
+                        )
+                        if original_msg_link:
+                            inline_bot_report_msg += f"<b>Link:</b> <a href='{original_msg_link}'>Open message</a>\n"
+                    
+                    inline_bot_report_msg += (
+                        "\n⚠️ <i>Original sender not found in DB - manual action required</i>\n"
+                        "<i>The message may have been sent before via_bot tracking was enabled.</i>"
+                    )
+                    
+                    # Create keyboard with available actions
+                    inline_bot_kb = KeyboardBuilder()
+                    
+                    # Add DELETE button if we have original message location
+                    if original_chat_id and original_message_id:
+                        inline_bot_kb.add(
+                            InlineKeyboardButton(
+                                text="🗑️ Delete Original Message",
+                                callback_data=f"delinline_{original_chat_id}_{original_message_id}",
+                            )
+                        )
+                    
+                    # Add LOLS check for the inline bot itself (might be useful)
+                    inline_bot_kb.add(
+                        InlineKeyboardButton(
+                            text=f"🤖 Check @{via_bot_username}",
+                            url=f"https://t.me/{via_bot_username}",
+                        )
+                    )
+                    
+                    # If we have forward_origin info with chat, add link to original chat
+                    if message.forward_from_chat:
+                        chat_link = f"https://t.me/c/{str(message.forward_from_chat.id)[4:]}" if str(message.forward_from_chat.id).startswith("-100") else None
+                        if message.forward_from_chat.username:
+                            chat_link = f"https://t.me/{message.forward_from_chat.username}"
+                        if chat_link:
+                            inline_bot_kb.add(
+                                InlineKeyboardButton(
+                                    text=f"📢 Source: {message.forward_from_chat.title or 'Chat'}",
+                                    url=chat_link,
+                                )
+                            )
+                    
+                    # Add dismiss button
+                    inline_bot_kb.add(
+                        InlineKeyboardButton(
+                            text="✅ Dismiss (No Action)",
+                            callback_data=f"dismiss_inline_report_{message.message_id}",
+                        )
+                    )
+                    
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        inline_bot_report_msg,
+                        LOGGER,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=inline_bot_kb.as_markup(),
+                    )
+                    
+                except TelegramBadRequest as admin_err:
+                    LOGGER.warning("Failed to forward inline bot message to ADMIN_SUSPICIOUS: %s", admin_err)
+                
+                # Also notify technolog for logging purposes
+                try:
+                    await BOT.forward_message(
+                        TECHNOLOG_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                        message_thread_id=TECHNO_UNHANDLED,
+                    )
+                    await safe_send_message(
+                        BOT,
+                        TECHNOLOG_GROUP_ID,
+                        f"⚠️ Inline bot message report from {message.from_user.id}:@{message.from_user.username or '!UNDEFINED!'}\n"
+                        f"Message was sent via @{via_bot_username} (ID: {via_bot_id})\n"
+                        f"Forward sender name: {forward_sender_name}\n"
+                        f"Original location: chat {original_chat_id}, msg {original_message_id}\n"
+                        f"Could not find original sender in DB (message may predate via_bot tracking)\n"
+                        f"→ Forwarded to ADMIN_SUSPICIOUS for review",
+                        LOGGER,
+                        message_thread_id=TECHNO_UNHANDLED,
+                    )
+                except TelegramBadRequest as log_err:
+                    LOGGER.warning("Failed to log inline bot message to technolog: %s", log_err)
+                
+                # Inform the reporter
+                await message.answer(
+                    f"⚠️ This message was sent via an inline bot (@{via_bot_username}).\n\n"
+                    "The bot couldn't find the original sender in its database. "
+                    "This may happen if the message was sent before tracking inline bot messages.\n\n"
+                    "The report has been forwarded to admins for manual review."
+                )
+                return
             else:
                 # Message forwarded from chat without bot, or sender data hidden
                 # Different behavior based on who forwarded the message:
@@ -6457,6 +6622,131 @@ if __name__ == "__main__":
                 parse_mode="HTML",
                 message_thread_id=TECHNO_ADMIN,
             )
+
+    @DP.callback_query(lambda c: c.data.startswith("dismiss_inline_report_"))
+    async def dismiss_inline_report(callback_query: CallbackQuery):
+        """Function to dismiss an inline bot report (no action taken)."""
+        # Parse message_id from callback data
+        parts = callback_query.data.split("_")
+        original_msg_id = parts[3] if len(parts) > 3 else "unknown"
+        
+        # Get admin info
+        admin_id = callback_query.from_user.id
+        admin_username = callback_query.from_user.username or "!UNDEFINED!"
+        
+        # Update the message to show it was dismissed
+        try:
+            # Get the original message text and append dismissed status
+            original_text = callback_query.message.text or callback_query.message.caption or ""
+            dismissed_text = (
+                f"{original_text}\n\n"
+                f"✅ <b>Dismissed</b> by @{admin_username} (<code>{admin_id}</code>)"
+            )
+            
+            await BOT.edit_message_text(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                text=dismissed_text,
+                parse_mode="HTML",
+                reply_markup=None,  # Remove buttons
+            )
+            
+            LOGGER.info(
+                "Inline bot report %s dismissed by %s:%s",
+                original_msg_id,
+                admin_id,
+                admin_username,
+            )
+            
+            await callback_query.answer("Report dismissed.", show_alert=False)
+            
+        except TelegramBadRequest as e:
+            LOGGER.warning("Failed to dismiss inline report: %s", e)
+            await callback_query.answer(f"Error: {e}", show_alert=True)
+
+    @DP.callback_query(lambda c: c.data.startswith("delinline_"))
+    async def delete_inline_bot_message(callback_query: CallbackQuery):
+        """Function to delete an inline bot message from its original chat."""
+        # Parse chat_id and message_id from callback data: delinline_{chat_id}_{message_id}
+        parts = callback_query.data.split("_")
+        if len(parts) < 3:
+            await callback_query.answer("Invalid callback data", show_alert=True)
+            return
+        
+        try:
+            original_chat_id = int(parts[1])
+            original_message_id = int(parts[2])
+        except ValueError:
+            await callback_query.answer("Invalid chat/message ID", show_alert=True)
+            return
+        
+        # Get admin info
+        admin_id = callback_query.from_user.id
+        admin_username = callback_query.from_user.username or "!UNDEFINED!"
+        
+        # Try to delete the original message
+        try:
+            await BOT.delete_message(original_chat_id, original_message_id)
+            
+            # Update the notification message to show deletion was successful
+            original_text = callback_query.message.text or callback_query.message.caption or ""
+            updated_text = (
+                f"{original_text}\n\n"
+                f"🗑️ <b>Message deleted</b> by @{admin_username} (<code>{admin_id}</code>)"
+            )
+            
+            # Remove the delete button but keep others
+            await BOT.edit_message_text(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                text=updated_text,
+                parse_mode="HTML",
+                reply_markup=None,  # Remove all buttons after deletion
+            )
+            
+            LOGGER.info(
+                "Inline bot message %s in chat %s deleted by %s:%s",
+                original_message_id,
+                original_chat_id,
+                admin_id,
+                admin_username,
+            )
+            
+            await callback_query.answer("Message deleted successfully!", show_alert=False)
+            
+        except TelegramBadRequest as e:
+            error_msg = str(e)
+            if "message to delete not found" in error_msg.lower():
+                # Message was already deleted
+                original_text = callback_query.message.text or callback_query.message.caption or ""
+                updated_text = (
+                    f"{original_text}\n\n"
+                    f"ℹ️ <b>Message already deleted</b> (confirmed by @{admin_username})"
+                )
+                await BOT.edit_message_text(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    text=updated_text,
+                    parse_mode="HTML",
+                    reply_markup=None,
+                )
+                await callback_query.answer("Message was already deleted.", show_alert=False)
+            else:
+                LOGGER.warning(
+                    "Failed to delete inline bot message %s in chat %s: %s",
+                    original_message_id,
+                    original_chat_id,
+                    e,
+                )
+                await callback_query.answer(f"Error: {e}", show_alert=True)
+        except TelegramForbiddenError as e:
+            LOGGER.warning(
+                "No permission to delete message %s in chat %s: %s",
+                original_message_id,
+                original_chat_id,
+                e,
+            )
+            await callback_query.answer("Bot doesn't have permission to delete in that chat.", show_alert=True)
 
     @DP.callback_query(lambda c: c.data.startswith("cancelbanuser_"))
     async def cancel_user_ban(callback_query: CallbackQuery):

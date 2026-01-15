@@ -1012,12 +1012,14 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
     # Ensure timestamps are converted to UTC before formatting
     received_date_utc = message.date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.date else None
     forward_date_utc = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
+    # Store via_bot_id for messages sent via inline bots (e.g., @postbot)
+    via_bot_id = message.via_bot.id if message.via_bot else None
     
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 
-        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member, via_bot_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             getattr(message.chat, "id", None),
@@ -1037,6 +1039,7 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
             getattr(message.forward_from, "last_name", ""),
             None,
             None,
+            via_bot_id,
         ),
     )
     conn.commit()
@@ -1074,6 +1077,7 @@ def db_init(cursor: Cursor, conn: Connection):
         left_chat_member BOOL,
         membership_status TEXT,
         deletion_reason TEXT,
+        via_bot_id INTEGER,
         PRIMARY KEY (chat_id, message_id)
     )
     """
@@ -1090,6 +1094,13 @@ def db_init(cursor: Cursor, conn: Connection):
     # Add membership_status column if it doesn't exist (for existing databases)
     try:
         cursor.execute("ALTER TABLE recent_messages ADD COLUMN membership_status TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Add via_bot_id column if it doesn't exist (for inline bot message tracking)
+    try:
+        cursor.execute("ALTER TABLE recent_messages ADD COLUMN via_bot_id INTEGER")
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists

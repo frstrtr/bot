@@ -50,7 +50,7 @@ import aiohttp
 import emoji
 import pytz
 from aiogram import types
-from aiogram.enums import ChatMemberStatus
+from aiogram.enums import ButtonStyle, ChatMemberStatus
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -589,7 +589,7 @@ def make_lols_kb(user_id: int) -> KeyboardBuilder:
     """
     lols_url = build_lols_url(user_id)
     builder = KeyboardBuilder()
-    builder.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
+    builder.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url, style=ButtonStyle.PRIMARY))
     return builder
 
 
@@ -2226,10 +2226,11 @@ def create_inline_keyboard(_message_link, lols_link, message: types.Message):
         fwd_channel_id = message.forward_from_chat.id
     
     inline_kb = KeyboardBuilder()
-    inline_kb.add(InlineKeyboardButton(text="ℹ️ Check LOLS Data ℹ️", url=lols_link))
+    inline_kb.add(InlineKeyboardButton(text="ℹ️ Check LOLS Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
     inline_kb.add(InlineKeyboardButton(
         text="🟢 Seems legit, STOP checks 🟢",
         callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+        style=ButtonStyle.SUCCESS,
     ))
     inline_kb.add(InlineKeyboardButton(
         text="⚙️ Actions (Ban / Delete) ⚙️",

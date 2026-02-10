@@ -64,6 +64,7 @@ RetryAfter = TelegramRetryAfter
 # from PIL import Image
 # from io import BytesIO
 # from io import BytesIO
+from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -2035,13 +2036,14 @@ async def handle_autoreports(
     keyboard = KeyboardBuilder()
     # Add LOLS check button
     lols_link = f"https://t.me/oLolsBot?start={user_id}"
-    keyboard.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+    keyboard.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
     # Add legitimization button to stop further checks
     # Use actual message_id for linking (not report_id which is for DB storage)
     keyboard.add(
         InlineKeyboardButton(
             text="✅ Mark as Legit",
             callback_data=f"stopchecks_{spammer_id}_{message.chat.id}_{message.message_id}",
+            style=ButtonStyle.SUCCESS,
         )
     )
     # Consolidated actions button (expands to Ban / Global Ban / Delete on click)
@@ -2057,12 +2059,12 @@ async def handle_autoreports(
         if mention_type == "username":
             mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
             keyboard.add(
-                InlineKeyboardButton(text=f"🔍 Check mentioned @{mention_value}", url=mention_lols_link)
+                InlineKeyboardButton(text=f"🔍 Check mentioned @{mention_value}", url=mention_lols_link, style=ButtonStyle.PRIMARY)
             )
         elif mention_type == "user_id":
             mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
             keyboard.add(
-                InlineKeyboardButton(text=f"🔍 Check mentioned ID:{mention_value} ({display_name})", url=mention_lols_link)
+                InlineKeyboardButton(text=f"🔍 Check mentioned ID:{mention_value} ({display_name})", url=mention_lols_link, style=ButtonStyle.PRIMARY)
             )
 
     # Add buttons for t.me/m/ business chat deeplinks (up to 3)
@@ -2070,14 +2072,14 @@ async def handle_autoreports(
         slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
         slug_display = slug[:12] + "..." if len(slug) > 12 else slug
         keyboard.add(
-            InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+            InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink, style=ButtonStyle.PRIMARY)
         )
 
     # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
     for _idx, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
         visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
         keyboard.add(
-            InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+            InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"], style=ButtonStyle.PRIMARY)
         )
 
     try:
@@ -2960,6 +2962,7 @@ async def check_n_ban(message: Message, reason: str):
             InlineKeyboardButton(
                 text="ℹ️ Check Spam Data ℹ️",
                 url=f"https://t.me/oLolsBot?start={message.from_user.id}",
+                style=ButtonStyle.PRIMARY,
             )
         )
         # Add Actions button for manual review/unban
@@ -2979,12 +2982,12 @@ async def check_n_ban(message: Message, reason: str):
             if mention_type == "username":
                 mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
                 inline_kb.add(
-                    InlineKeyboardButton(text=f"🔍 Check @{mention_value}", url=mention_lols_link)
+                    InlineKeyboardButton(text=f"🔍 Check @{mention_value}", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                 )
             elif mention_type == "user_id":
                 mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
                 inline_kb.add(
-                    InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
+                    InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                 )
 
         # Add buttons for t.me/m/ business chat deeplinks (up to 3)
@@ -2993,14 +2996,14 @@ async def check_n_ban(message: Message, reason: str):
             slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
             slug_display = slug[:12] + "..." if len(slug) > 12 else slug
             inline_kb.add(
-                InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+                InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink, style=ButtonStyle.PRIMARY)
             )
 
         # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
         for _idx, fake in enumerate(mention_analysis.get("fake_mentions", [])[:2]):
             visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
             inline_kb.add(
-                InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+                InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"], style=ButtonStyle.PRIMARY)
             )
 
         chat_link = (
@@ -4489,11 +4492,13 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
                     callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_0",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
             inline_kb.add(
                 InlineKeyboardButton(
-                    text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}"
+                    text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}",
+                    style=ButtonStyle.DANGER,
                 )
             )
 
@@ -4504,7 +4509,8 @@ if __name__ == "__main__":
             if lols_spam is not True:  # Don't duplicate if already detected as spammer
                 inline_kb.add(
                     InlineKeyboardButton(
-                        text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}"
+                        text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}",
+                        style=ButtonStyle.DANGER,
                     )
                 )
             
@@ -4628,6 +4634,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
                     callback_data=f"stopchecks_{inout_userid}_{update.chat.id}_0",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
             await safe_send_message(
@@ -5068,7 +5075,7 @@ if __name__ == "__main__":
                     )
                     lols_url = build_lols_url(inout_userid)
                     inline_kb = KeyboardBuilder().add(
-                        InlineKeyboardButton(text="Check user profile", url=lols_url)
+                        InlineKeyboardButton(text="Check user profile", url=lols_url, style=ButtonStyle.PRIMARY)
                     )
                     joinleft_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                     await safe_send_message(
@@ -5336,6 +5343,7 @@ if __name__ == "__main__":
                             InlineKeyboardButton(
                                 text="🗑️ Delete Original Message",
                                 callback_data=f"delinline_{original_chat_id}_{original_message_id}",
+                                style=ButtonStyle.DANGER,
                             )
                         )
                     
@@ -5344,6 +5352,7 @@ if __name__ == "__main__":
                         InlineKeyboardButton(
                             text=f"🤖 Check @{via_bot_username}",
                             url=f"https://t.me/{via_bot_username}",
+                            style=ButtonStyle.PRIMARY,
                         )
                     )
                     
@@ -5357,6 +5366,7 @@ if __name__ == "__main__":
                                 InlineKeyboardButton(
                                     text=f"📢 Source: {message.forward_from_chat.title or 'Chat'}",
                                     url=chat_link,
+                                    style=ButtonStyle.PRIMARY,
                                 )
                             )
                     
@@ -5365,6 +5375,7 @@ if __name__ == "__main__":
                         InlineKeyboardButton(
                             text="✅ Dismiss (No Action)",
                             callback_data=f"dismiss_inline_report_{message.message_id}",
+                            style=ButtonStyle.SUCCESS,
                         )
                     )
                     
@@ -5775,10 +5786,12 @@ if __name__ == "__main__":
         confirm_btn = InlineKeyboardButton(
             text="🟢 Confirm",
             callback_data=f"doban_{spammer_user_id_str}_{report_id_to_ban_str}",
+            style=ButtonStyle.DANGER,
         )
         cancel_btn = InlineKeyboardButton(
             text="🔴 Cancel",
             callback_data=f"resetban_{spammer_user_id_str}_{report_id_to_ban_str}",
+            style=ButtonStyle.SUCCESS,
         )
 
         keyboard.row(confirm_btn, cancel_btn)
@@ -6456,10 +6469,12 @@ if __name__ == "__main__":
 
         keyboard = KeyboardBuilder()
         confirm_btn = InlineKeyboardButton(
-            text="✅ Yes, Ban", callback_data=f"confirmbanuser_{user_id_str}"
+            text="✅ Yes, Ban", callback_data=f"confirmbanuser_{user_id_str}",
+            style=ButtonStyle.DANGER,
         )
         cancel_btn = InlineKeyboardButton(
-            text="❌ No, Cancel", callback_data=f"cancelbanuser_{user_id_str}"
+            text="❌ No, Cancel", callback_data=f"cancelbanuser_{user_id_str}",
+            style=ButtonStyle.SUCCESS,
         )
         keyboard.row(confirm_btn, cancel_btn)
 
@@ -6492,7 +6507,7 @@ if __name__ == "__main__":
         lols_check_and_banned_kb = make_lols_kb(user_id)
         api_url = f"https://api.lols.bot/account?id={user_id}"
         lols_check_and_banned_kb.add(
-            InlineKeyboardButton(text="💀💀💀 B.A.N.N.E.D. 💀💀💀", url=api_url)
+            InlineKeyboardButton(text="💀💀💀 B.A.N.N.E.D. 💀💀💀", url=api_url, style=ButtonStyle.DANGER)
         )
 
         # Remove buttons
@@ -6759,9 +6774,9 @@ if __name__ == "__main__":
         # Restore original buttons
         lols_url = f"https://t.me/oLolsBot?start={user_id}"
         inline_kb = KeyboardBuilder()
-        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url))
+        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url, style=ButtonStyle.PRIMARY))
         inline_kb.add(
-            InlineKeyboardButton(text="🚫 Global Ban", callback_data=f"banuser_{user_id_str}")
+            InlineKeyboardButton(text="🚫 Global Ban", callback_data=f"banuser_{user_id_str}", style=ButtonStyle.DANGER)
         )
 
         await BOT.edit_message_reply_markup(
@@ -6795,10 +6810,12 @@ if __name__ == "__main__":
             InlineKeyboardButton(
                 text="✅ Confirm Ban",
                 callback_data=f"banchannelexecute_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
+                style=ButtonStyle.DANGER,
             ),
             InlineKeyboardButton(
                 text="❌ Cancel",
                 callback_data=f"banchannelcancel_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
+                style=ButtonStyle.SUCCESS,
             ),
         )
 
@@ -6837,7 +6854,7 @@ if __name__ == "__main__":
         # This prevents confusion when banning takes time across multiple chats
         lols_link = f"https://t.me/oLolsBot?start={channel_id}"
         processing_kb = KeyboardBuilder()
-        processing_kb.add(InlineKeyboardButton(text="ℹ️ Check Channel Data ℹ️", url=lols_link))
+        processing_kb.add(InlineKeyboardButton(text="ℹ️ Check Channel Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
         try:
             await BOT.edit_message_reply_markup(
                 chat_id=callback_query.message.chat.id,
@@ -6920,21 +6937,24 @@ if __name__ == "__main__":
         if susp_user_id != 0 and susp_message_id != 0:
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             expand_kb = KeyboardBuilder()
-            expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
             expand_kb.row(
                 InlineKeyboardButton(
                     text="🌐 Global Ban",
                     callback_data=f"sgb_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                    style=ButtonStyle.DANGER,
                 ),
                 InlineKeyboardButton(
                     text="🚫 Chat Ban",
                     callback_data=f"sb_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                    style=ButtonStyle.DANGER,
                 ),
             )
             expand_kb.add(
                 InlineKeyboardButton(
                     text="🗑 Delete Msg",
                     callback_data=f"sdm_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                    style=ButtonStyle.DANGER,
                 )
             )
             # Add "Ban Channel" button back
@@ -6943,6 +6963,7 @@ if __name__ == "__main__":
                     InlineKeyboardButton(
                         text="📢 Ban Forwarded Channel",
                         callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}_{susp_message_id}_{susp_user_id}",
+                        style=ButtonStyle.DANGER,
                     )
                 )
             # Global cancel button
@@ -6950,6 +6971,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="🔙 Cancel / Close",
                     callback_data=f"sc_{source_chat_id}_{susp_message_id}_{susp_user_id}_{channel_id}",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
         else:
@@ -6959,6 +6981,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="🚫 Ban Channel",
                     callback_data=f"banchannelconfirm_{channel_id}_{source_chat_id}",
+                    style=ButtonStyle.DANGER,
                 )
             )
 
@@ -7049,6 +7072,7 @@ if __name__ == "__main__":
             InlineKeyboardButton(
                 text="ℹ️ Check LOLS",
                 url=f"https://t.me/oLolsBot?start={user_id}",
+                style=ButtonStyle.PRIMARY,
             )
         )
         if user_name:
@@ -7056,6 +7080,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text=f"🔍 Check @{user_name}",
                     url=f"https://t.me/oLolsBot?start=u-{user_name}",
+                    style=ButtonStyle.PRIMARY,
                 )
             )
         inline_kb.add(
@@ -7198,6 +7223,7 @@ if __name__ == "__main__":
                         InlineKeyboardButton(
                             text="ℹ️ Check LOLS",
                             url=f"https://t.me/oLolsBot?start={user_id}",
+                            style=ButtonStyle.PRIMARY,
                         )
                     )
                     await BOT.edit_message_text(
@@ -7298,12 +7324,13 @@ if __name__ == "__main__":
                 # Add LOLS check button for the channel
                 lols_url = f"https://t.me/oLolsBot?start={message.sender_chat.id}"
                 channel_ban_kb.add(
-                    InlineKeyboardButton(text="ℹ️ Check Channel Data ℹ️", url=lols_url)
+                    InlineKeyboardButton(text="ℹ️ Check Channel Data ℹ️", url=lols_url, style=ButtonStyle.PRIMARY)
                 )
                 channel_ban_kb.add(
                     InlineKeyboardButton(
                         text="🚫 Ban Channel",
                         callback_data=f"banchannelconfirm_{message.sender_chat.id}_{message.chat.id}",
+                        style=ButtonStyle.DANGER,
                     )
                 )
 
@@ -7705,6 +7732,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="ℹ️ Check Spam Data ℹ️",
                     url=f"https://t.me/oLolsBot?start={message.from_user.id}",
+                    style=ButtonStyle.PRIMARY,
                 )
             )
             # Add LOLS check buttons for mentioned users in the spam message (up to 3)
@@ -7723,7 +7751,7 @@ if __name__ == "__main__":
                             username_clean = mention.lstrip("@")
                             mention_lols_link = f"https://t.me/oLolsBot?start=u-{username_clean}"
                             autoban_kb.add(
-                                InlineKeyboardButton(text=f"🔍 Check {mention}", url=mention_lols_link)
+                                InlineKeyboardButton(text=f"🔍 Check {mention}", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                             )
                             mention_buttons_added += 1
                     elif entity_type == "text_mention":
@@ -7735,7 +7763,7 @@ if __name__ == "__main__":
                                 first_name = user.get("first_name", "") if isinstance(user, dict) else getattr(user, "first_name", "")
                                 display = first_name[:15] + "..." if len(first_name) > 15 else first_name
                                 autoban_kb.add(
-                                    InlineKeyboardButton(text=f"🔍 Check ID:{user_id} ({display})", url=mention_lols_link)
+                                    InlineKeyboardButton(text=f"🔍 Check ID:{user_id} ({display})", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                                 )
                                 mention_buttons_added += 1
 
@@ -8634,6 +8662,7 @@ if __name__ == "__main__":
                                 InlineKeyboardButton(
                                     text="✅ Mark as Legit",
                                     callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                    style=ButtonStyle.SUCCESS,
                                 )
                             )
                             # Add LOLS check for the mentioned bot
@@ -8643,6 +8672,7 @@ if __name__ == "__main__":
                                     InlineKeyboardButton(
                                         text=f"🔍 Check {_bot_mention_name}",
                                         url=f"https://t.me/oLolsBot?start=u-{_bot_username_clean}",
+                                        style=ButtonStyle.PRIMARY,
                                     )
                                 )
                             
@@ -8952,6 +8982,7 @@ if __name__ == "__main__":
                                 InlineKeyboardButton(
                                     text="✅ Mark as Legit",
                                     callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                    style=ButtonStyle.SUCCESS,
                                 )
                             )
                             
@@ -8961,12 +8992,12 @@ if __name__ == "__main__":
                                 if mention_type == "username":
                                     mention_lols_link = f"https://t.me/oLolsBot?start=u-{mention_value}"
                                     _missed_join_kb.add(
-                                        InlineKeyboardButton(text=f"🔍 Check @{mention_value}", url=mention_lols_link)
+                                        InlineKeyboardButton(text=f"🔍 Check @{mention_value}", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                                     )
                                 elif mention_type == "user_id":
                                     mention_lols_link = f"https://t.me/oLolsBot?start={mention_value}"
                                     _missed_join_kb.add(
-                                        InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link)
+                                        InlineKeyboardButton(text=f"🔍 Check ID:{mention_value} ({display_name})", url=mention_lols_link, style=ButtonStyle.PRIMARY)
                                     )
                             
                             # Add buttons for t.me/m/ business chat deeplinks (up to 3)
@@ -8974,14 +9005,14 @@ if __name__ == "__main__":
                                 slug = deeplink.split("/m/")[-1] if "/m/" in deeplink else "profile"
                                 slug_display = slug[:12] + "..." if len(slug) > 12 else slug
                                 _missed_join_kb.add(
-                                    InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink)
+                                    InlineKeyboardButton(text=f"👤 Open t.me/m/{slug_display}", url=deeplink, style=ButtonStyle.PRIMARY)
                                 )
 
                             # Add buttons for fake mentions (deceptive links with t.me/m/ hidden)
                             for fake in mention_analysis.get("fake_mentions", [])[:2]:
                                 visible = fake["visible_text"][:10] + "..." if len(fake["visible_text"]) > 10 else fake["visible_text"]
                                 _missed_join_kb.add(
-                                    InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"])
+                                    InlineKeyboardButton(text=f"🎭 Fake '{visible}'", url=fake["hidden_url"], style=ButtonStyle.PRIMARY)
                                 )
                             
                             # Add mention info to message if needed
@@ -9067,12 +9098,14 @@ if __name__ == "__main__":
                                     InlineKeyboardButton(
                                         text="✅ Mark as Legit",
                                         callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                        style=ButtonStyle.SUCCESS,
                                     )
                                 )
                                 _recovered_kb.add(
                                     InlineKeyboardButton(
                                         text="🚫 Global Ban",
                                         callback_data=f"banuser_{message.from_user.id}",
+                                        style=ButtonStyle.DANGER,
                                     )
                                 )
                                 await safe_send_message(
@@ -9151,12 +9184,14 @@ if __name__ == "__main__":
                             InlineKeyboardButton(
                                 text="✅ Mark as Legit",
                                 callback_data=f"stopchecks_{message.from_user.id}_{message.chat.id}_{message.message_id}",
+                                style=ButtonStyle.SUCCESS,
                             )
                         )
                         _new_kb.add(
                             InlineKeyboardButton(
                                 text="🚫 Global Ban",
                                 callback_data=f"banuser_{message.from_user.id}",
+                                style=ButtonStyle.DANGER,
                             )
                         )
                         await safe_send_message(
@@ -10177,6 +10212,7 @@ if __name__ == "__main__":
                                 InlineKeyboardButton(
                                     text=button_text,
                                     url=mention_lols_link,
+                                    style=ButtonStyle.PRIMARY,
                                 )
                             )
 
@@ -10610,8 +10646,8 @@ if __name__ == "__main__":
                 
                 # Build keyboard
                 inline_kb = KeyboardBuilder()
-                inline_kb.add(InlineKeyboardButton(text="ℹ️ Check User Data ℹ️", url=lols_link))
-                inline_kb.add(InlineKeyboardButton(text="🔗 Go to message", url=message_link))
+                inline_kb.add(InlineKeyboardButton(text="ℹ️ Check User Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
+                inline_kb.add(InlineKeyboardButton(text="🔗 Go to message", url=message_link, style=ButtonStyle.PRIMARY))
                 inline_kb.add(
                     InlineKeyboardButton(
                         text="⚙️ Actions (Ban / Delete) ⚙️",
@@ -10622,6 +10658,7 @@ if __name__ == "__main__":
                     InlineKeyboardButton(
                         text="✅ Mark as Legit",
                         callback_data=f"stopchecks_{user_id}_{message.chat.id}_{message.message_id}",
+                        style=ButtonStyle.SUCCESS,
                     )
                 )
                 
@@ -10869,7 +10906,7 @@ if __name__ == "__main__":
 
             lols_url = f"https://t.me/oLolsBot?start={author_id}"
             lols_check_kb = KeyboardBuilder().add(
-                InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url)
+                InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url, style=ButtonStyle.PRIMARY)
             )
             # user_name comes from DB query loop - initialized to None before loop
             _ban_user_name = user_name if user_name and str(user_name) not in ["None", "0"] else None
@@ -11097,6 +11134,7 @@ if __name__ == "__main__":
                     InlineKeyboardButton(
                         text="👁 Start Monitoring",
                         callback_data=f"startcheck_{found_user_id}",
+                        style=ButtonStyle.PRIMARY,
                     )
                 )
             # Add ban button if not banned
@@ -12679,8 +12717,8 @@ if __name__ == "__main__":
                     "timeout": delete_timeout,
                 }
                 confirm_kb.add(
-                    InlineKeyboardButton(text="✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}"),
-                    InlineKeyboardButton(text="❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}"),
+                    InlineKeyboardButton(text="✅ Confirm", callback_data=f"broadcast_confirm_{broadcast_id}", style=ButtonStyle.SUCCESS),
+                    InlineKeyboardButton(text="❌ Cancel", callback_data=f"broadcast_cancel_{broadcast_id}", style=ButtonStyle.DANGER),
                 )
                 
                 confirm_msg = (
@@ -12805,7 +12843,7 @@ if __name__ == "__main__":
                 
                 cancel_kb = KeyboardBuilder()
                 cancel_kb.add(
-                    InlineKeyboardButton(text="❌ Cancel Broadcast", callback_data=f"broadcast_cancel_{broadcast_id}")
+                    InlineKeyboardButton(text="❌ Cancel Broadcast", callback_data=f"broadcast_cancel_{broadcast_id}", style=ButtonStyle.DANGER)
                 )
                 
                 msg_text = (
@@ -13106,7 +13144,7 @@ if __name__ == "__main__":
         lols_link = f"https://t.me/oLolsBot?start={user_id_legit}"
 
         inline_kb = KeyboardBuilder()
-        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
 
         try:
             await BOT.edit_message_reply_markup(
@@ -13537,7 +13575,7 @@ if __name__ == "__main__":
         if action_name == "suspiciouscancel":
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             collapsed_kb = KeyboardBuilder()
-            collapsed_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            collapsed_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
             collapsed_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
@@ -13548,6 +13586,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
                     callback_data=f"stopchecks_{susp_user_id}_{susp_chat_id}_{susp_message_id}",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
             try:
@@ -13568,21 +13607,24 @@ if __name__ == "__main__":
             susp_chat_id = int(susp_chat_id_str)
             lols_link = f"https://t.me/oLolsBot?start={susp_user_id}"
             expand_kb = KeyboardBuilder()
-            expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            expand_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
             expand_kb.row(
                 InlineKeyboardButton(
                     text="🌐 Global Ban",
                     callback_data=f"sgb_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
+                    style=ButtonStyle.DANGER,
                 ),
                 InlineKeyboardButton(
                     text="🚫 Chat Ban",
                     callback_data=f"sb_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
+                    style=ButtonStyle.DANGER,
                 ),
             )
             expand_kb.add(
                 InlineKeyboardButton(
                     text="🗑 Delete Msg",
                     callback_data=f"sdm_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
+                    style=ButtonStyle.DANGER,
                 )
             )
             # Add "Ban Channel" button if message was forwarded from a channel
@@ -13591,6 +13633,7 @@ if __name__ == "__main__":
                     InlineKeyboardButton(
                         text="📢 Ban Forwarded Channel",
                         callback_data=f"banchannelconfirm_{fwd_channel_id}_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                        style=ButtonStyle.DANGER,
                     )
                 )
             # Global cancel button to revert view
@@ -13598,6 +13641,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="🔙 Cancel / Close",
                     callback_data=f"sc_{susp_chat_id}_{susp_message_id}_{susp_user_id}_{fwd_channel_id}",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
             try:
@@ -13662,17 +13706,19 @@ if __name__ == "__main__":
 
         # Create the inline keyboard
         inline_kb = KeyboardBuilder()
-        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+        inline_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
 
         if comand == "globalban":
             inline_kb.row(
                 InlineKeyboardButton(
                     text="✅ Confirm global ban",
                     callback_data=f"confirmglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.DANGER,
                 ),
                 InlineKeyboardButton(
                     text="❌ Cancel global ban",
                     callback_data=f"cancelglobalban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.SUCCESS,
                 ),
             )
             # remove buttons from the admin group and add cancel/confirm buttons
@@ -13687,10 +13733,12 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Confirm ban",
                     callback_data=f"confirmban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.DANGER,
                 ),
                 InlineKeyboardButton(
                     text="❌ Cancel ban",
                     callback_data=f"cancelban_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.SUCCESS,
                 ),
             )
             # remove buttons from the admin group and add cancel/confirm buttons
@@ -13705,10 +13753,12 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Confirm delmsg",
                     callback_data=f"confirmdelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.DANGER,
                 ),
                 InlineKeyboardButton(
                     text="❌ Cancel delmsg",
                     callback_data=f"canceldelmsg_{susp_chat_id}_{susp_message_id}_{susp_user_id}",
+                    style=ButtonStyle.SUCCESS,
                 ),
             )
             # remove buttons from the admin group and add cancel/confirm buttons
@@ -13722,7 +13772,7 @@ if __name__ == "__main__":
         # Remove Confirm/Cancel buttons immediately when user confirms, keep LOLS check link
         # This prevents confusion during potentially long operations (global ban, etc.)
         inline_kb_processing = KeyboardBuilder()
-        inline_kb_processing.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+        inline_kb_processing.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
             message_id=callback_query.message.message_id,
@@ -14136,7 +14186,7 @@ if __name__ == "__main__":
             callback_answer = "Action cancelled."
             # Restore the collapsed keyboard with all buttons
             collapsed_kb = KeyboardBuilder()
-            collapsed_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link))
+            collapsed_kb.add(InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_link, style=ButtonStyle.PRIMARY))
             collapsed_kb.add(
                 InlineKeyboardButton(
                     text="⚙️ Actions (Ban / Delete) ⚙️",
@@ -14147,6 +14197,7 @@ if __name__ == "__main__":
                 InlineKeyboardButton(
                     text="✅ Mark as Legit",
                     callback_data=f"stopchecks_{susp_user_id}_{susp_chat_id}_{susp_message_id}",
+                    style=ButtonStyle.SUCCESS,
                 )
             )
             try:

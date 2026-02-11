@@ -4697,8 +4697,10 @@ if __name__ == "__main__":
                 inout_username_log,
             )
 
-        # Check if user left during night hours - suspicious behavior
-        if is_leaving:
+        # Check if user joined or left during night hours - suspicious behavior
+        # All events are checked (including admin actions - compromised admin accounts are also suspicious)
+        # Skip bot-initiated actions (kicks/bans by the bot itself are not suspicious)
+        if not (update.from_user and update.from_user.is_bot):
             # Check night time using update.date (same logic as message_sent_during_night)
             _event_time = update.date
             if _event_time:
@@ -4708,12 +4710,14 @@ if __name__ == "__main__":
                 _night_start = NIGHT_START_HOUR * 60 + NIGHT_START_MINUTE
                 _night_end = NIGHT_END_HOUR * 60 + NIGHT_END_MINUTE
                 if _night_start <= _total_min < _night_end:
+                    _night_action = "Left" if is_leaving else "Joined"
                     _night_leave_message = (
-                        f"🌙 <b>User Left During Night Hours</b>\n"
+                        f"🌙 <b>User {_night_action} During Night Hours</b>\n"
                         f"Name: {html.escape(inout_userfirstname)} {html.escape(inout_userlastname)}\n"
                         f"Username: @{inout_username}\n"
                         f"User ID: <code>{inout_userid}</code>\n"
                         f"Status: {inout_status}\n"
+                        f"{by_user if by_user else ''}"
                         f"Chat: {universal_chatlink}\n"
                         f"🕔 {greet_timestamp}\n\n"
                         f"🔗 <b>Profile links:</b>\n"
@@ -4739,9 +4743,10 @@ if __name__ == "__main__":
                         reply_markup=_night_kb.as_markup(),
                     )
                     LOGGER.warning(
-                        "\033[93m%s:%s left chat %s during night hours (%02d:%02d) - flagged as suspicious\033[0m",
+                        "\033[93m%s:%s %s chat %s during night hours (%02d:%02d) - flagged as suspicious\033[0m",
                         inout_userid,
                         inout_username_log,
+                        _night_action.lower(),
                         inout_chattitle,
                         _local_time.hour,
                         _local_time.minute,

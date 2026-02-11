@@ -87,7 +87,7 @@ class BotConfig:
     # Established user detection settings
     ESTABLISHED_USER_MIN_MESSAGES: int = 10
     ESTABLISHED_USER_FIRST_MSG_DAYS: int = 90
-    HIGH_USER_ID_THRESHOLD: int = 8_400_000_000
+    HIGH_USER_ID_THRESHOLD: int = 8_000_000_000
     
     # Night time detection (hours/minutes in local timezone)
     NIGHT_START_HOUR: int = 1    # Inclusive: messages from this hour:minute are "night"
@@ -253,7 +253,7 @@ def load_from_env() -> bool:
     config.ESTABLISHED_USER_FIRST_MSG_DAYS = _get_env_int("ESTABLISHED_USER_FIRST_MSG_DAYS", 90) or 90
 
     # High user ID threshold for new accounts
-    config.HIGH_USER_ID_THRESHOLD = _get_env_int("HIGH_USER_ID_THRESHOLD", 8_400_000_000) or 8_400_000_000
+    config.HIGH_USER_ID_THRESHOLD = _get_env_int("HIGH_USER_ID_THRESHOLD", 8_000_000_000) or 8_000_000_000
 
     # Night time detection hours/minutes (local timezone)
     config.NIGHT_START_HOUR = _get_env_int("NIGHT_START_HOUR", 1) or 1

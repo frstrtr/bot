@@ -4629,7 +4629,7 @@ if __name__ == "__main__":
             _chat_link_html = build_chat_link(update.chat.id, update.chat.username, update.chat.title)
             _high_id_message = (
                 f"🆕 <b>Very New Account Joined</b>\n"
-                f"User ID: <code>{inout_userid}</code> (> 8.2B)\n"
+                f"User ID: <code>{inout_userid}</code> (> 8B)\n"
                 f"Name: {html.escape(inout_userfirstname)} {html.escape(inout_userlastname)}\n"
                 f"Username: @{inout_username}\n"
                 f"Chat: {_chat_link_html}\n\n"
@@ -4663,7 +4663,7 @@ if __name__ == "__main__":
                 reply_markup=_high_id_kb.as_markup(),
             )
             LOGGER.warning(
-                "\033[93m%s:%s has very high user ID (>8.2B) - flagged as suspicious on join\033[0m",
+                "\033[93m%s:%s has very high user ID (>8B) - flagged as suspicious on join\033[0m",
                 inout_userid,
                 inout_username_log,
             )
@@ -10361,7 +10361,7 @@ if __name__ == "__main__":
                             )
 
                     if suspicious_items["high_user_id"]:
-                        content_details.insert(0, "<b>🆕 Very New Account (ID &gt; 8.2B)</b>")
+                        content_details.insert(0, "<b>🆕 Very New Account (ID &gt; 8B)</b>")
 
                     content_report = "\n".join(content_details)
 
@@ -14349,7 +14349,7 @@ if __name__ == "__main__":
     # Spam detection improvements:
     # Note:: Hash banned spam messages and check signature for autoreport
     # Note:: Extract and store links/channels from banned messages for auto-blacklist matching
-    # NOTE: Messages from users with IDs > 8.2B are flagged as suspicious (very new accounts)
+    # NOTE: Messages from users with IDs > 8B are flagged as suspicious (very new accounts)
     # Note:: Check for message edits and name changes after joining
     # Note:: Check profile photo date/DC location - warn if just uploaded
     #

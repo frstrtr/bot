@@ -1995,6 +1995,7 @@ async def handle_autoreports(
     )
 
     admin_ban_banner = (
+        f"🕔 {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n"
         f"💡 Reaction time: {message_report_date - message_timestamp}\n"
         f"💔 {reason}\n"
         f"ℹ️ <a href='{message_link}'>Link to the reported message</a>\n"
@@ -5609,6 +5610,7 @@ if __name__ == "__main__":
         # LOGGER.debug(log_info)
 
         admin_ban_banner = (
+            f"🕔 {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n"
             f"💡 Reaction time: {message_report_date - massage_timestamp}\n"
             f"💔 Reported by admin <a href='tg://user?id={message.from_user.id}'></a>"
             f"@{message.from_user.username or '!UNDEFINED!'}\n"
@@ -9426,7 +9428,8 @@ if __name__ == "__main__":
                         f"@{message.from_user.username or '!UNDEFINED!'} (<code>{message.from_user.id}</code>)\n"
                         f"Forward from: {forward_source_info}\n"
                         f"Chat: {_chat_link}\n"
-                        f"Message: {_msg_link}\n\n"
+                        f"Message: {_msg_link}\n"
+                        f"🕔 {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n\n"
                         f"📊 <b>User status:</b> IN ACTIVE CHECKS (message DELETED, NOT banned)"
                     )
                     

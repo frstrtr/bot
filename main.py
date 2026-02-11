@@ -4501,6 +4501,21 @@ if __name__ == "__main__":
                     style=ButtonStyle.DANGER,
                 )
             )
+            # If someone (non-admin) added this user, add a LOLS check button for the inviter
+            if update.from_user.id != inout_userid:
+                try:
+                    _inviter_is_admin = await is_admin(update.from_user.id, update.chat.id)
+                except TelegramBadRequest:
+                    _inviter_is_admin = False
+                if not _inviter_is_admin:
+                    _inviter_name = update.from_user.username or update.from_user.first_name or str(update.from_user.id)
+                    inline_kb.add(
+                        InlineKeyboardButton(
+                            text=f"🔍 Check inviter @{_inviter_name}",
+                            url=f"https://t.me/oLolsBot?start={update.from_user.id}",
+                            style=ButtonStyle.PRIMARY,
+                        )
+                    )
 
         # Check if leaving user is still in other monitored chats
         other_chats_info = ""

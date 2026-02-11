@@ -1535,13 +1535,41 @@ async def load_active_user_checks():
         
         user_name_display = username if username and username != "None" else "!UNDEFINED!"
         
+        # Build informative banner matching greet_chat_members format
+        _first = html.escape(baseline.get("first_name") or "")
+        _last = html.escape(baseline.get("last_name") or "")
+        _uname_display = f"@{username}" if username and username != "!UNDEFINED!" else ""
+        _chat_title = baseline.get("join_chat_title") or "!UNKNOWN!"
+        _chat_id = baseline.get("join_chat_id")
+        _chat_username = baseline.get("join_chat_username")
+        _chat_link = build_chat_link(_chat_id, _chat_username, _chat_title) if _chat_id else html.escape(_chat_title)
+        _joined_ts = ""
+        if joined_at_str:
+            try:
+                _jdt = datetime.fromisoformat(joined_at_str.replace(" ", "T"))
+                _joined_ts = _jdt.strftime("%d-%m-%Y %H:%M:%S")
+            except ValueError:
+                _joined_ts = joined_at_str
+        _now_ts = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        
+        startup_logmessage = (
+            f"{_first} {_last} {_uname_display} (<code>{user_id}</code>)\n"
+            f"🔄 on_startup resumed monitoring\n"
+            f"💬 {_chat_link}\n"
+            f"🕔 joined {_joined_ts} → checked {_now_ts}\n"
+            f"🔗 <b>profile links:</b>\n"
+            f"   ├ <b><a href='tg://user?id={user_id}'>id based profile link</a></b>\n"
+            f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, "
+            f"<a href='https://t.me/@id{user_id}'>IOS (Apple)</a>\n"
+        )
+        
         # Start the check NON-BLOCKING
         asyncio.create_task(
             perform_checks(
                 user_id=user_id,
                 user_name=user_name_display,
                 event_record=event_message,
-                inout_logmessage=f"(<code>{user_id}</code>) banned using data loaded on_startup event",
+                inout_logmessage=startup_logmessage,
                 start_time=start_time,
             )
         )

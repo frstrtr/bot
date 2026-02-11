@@ -4697,6 +4697,56 @@ if __name__ == "__main__":
                 inout_username_log,
             )
 
+        # Check if user left during night hours - suspicious behavior
+        if is_leaving:
+            # Check night time using update.date (same logic as message_sent_during_night)
+            _event_time = update.date
+            if _event_time:
+                _user_tz = ZoneInfo("Indian/Mauritius")
+                _local_time = _event_time.astimezone(_user_tz)
+                _total_min = _local_time.hour * 60 + _local_time.minute
+                _night_start = NIGHT_START_HOUR * 60 + NIGHT_START_MINUTE
+                _night_end = NIGHT_END_HOUR * 60 + NIGHT_END_MINUTE
+                if _night_start <= _total_min < _night_end:
+                    _night_leave_message = (
+                        f"🌙 <b>User Left During Night Hours</b>\n"
+                        f"Name: {html.escape(inout_userfirstname)} {html.escape(inout_userlastname)}\n"
+                        f"Username: @{inout_username}\n"
+                        f"User ID: <code>{inout_userid}</code>\n"
+                        f"Status: {inout_status}\n"
+                        f"Chat: {universal_chatlink}\n"
+                        f"🕔 {greet_timestamp}\n\n"
+                        f"🔗 <b>Profile links:</b>\n"
+                        f"   ├ <a href='tg://user?id={inout_userid}'>ID based profile link</a>\n"
+                        f"   └ <a href='tg://openmessage?user_id={inout_userid}'>Android</a>, "
+                        f"<a href='https://t.me/@id{inout_userid}'>iOS</a>"
+                    )
+                    _night_kb = make_lols_kb(inout_userid)
+                    _night_kb.add(
+                        InlineKeyboardButton(
+                            text="🚫 Global Ban", callback_data=f"banuser_{inout_userid}",
+                            style=ButtonStyle.DANGER,
+                        )
+                    )
+                    await safe_send_message(
+                        BOT,
+                        ADMIN_GROUP_ID,
+                        _night_leave_message,
+                        LOGGER,
+                        message_thread_id=ADMIN_SUSPICIOUS,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=_night_kb.as_markup(),
+                    )
+                    LOGGER.warning(
+                        "\033[93m%s:%s left chat %s during night hours (%02d:%02d) - flagged as suspicious\033[0m",
+                        inout_userid,
+                        inout_username_log,
+                        inout_chattitle,
+                        _local_time.hour,
+                        _local_time.minute,
+                    )
+
         # Check lols after user join/leave event and ban if spam
         if (
             inout_status == ChatMemberStatus.KICKED

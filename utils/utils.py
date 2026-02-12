@@ -35,6 +35,7 @@ Functions:
 
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
@@ -1001,6 +1002,23 @@ def has_spam_entities(spam_triggers, message: types.Message):
     return None
 
 
+def compute_message_hash(text: str) -> str | None:
+    """Compute SHA-256 hash of message content for privacy-preserving lookup.
+    
+    The hash allows precise sender identification when an admin forwards
+    a spam message back to the bot, without storing the actual message text.
+    
+    Args:
+        text: Message text or caption content.
+        
+    Returns:
+        Hex-encoded SHA-256 hash string, or None if text is empty/None.
+    """
+    if not text:
+        return None
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message):
     """store message data to DB
     
@@ -1014,12 +1032,14 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
     forward_date_utc = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
     # Store via_bot_id for messages sent via inline bots (e.g., @postbot)
     via_bot_id = message.via_bot.id if message.via_bot else None
+    # Compute content hash for privacy-preserving lookup (text or caption, not both)
+    content_hash = compute_message_hash(message.text or message.caption)
     
     cursor.execute(
         """
         INSERT OR REPLACE INTO recent_messages 
-        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member, via_bot_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (chat_id, chat_username, message_id, user_id, user_name, user_first_name, user_last_name, forward_date, forward_sender_name, received_date, from_chat_title, forwarded_from_id, forwarded_from_username, forwarded_from_first_name, forwarded_from_last_name, new_chat_member, left_chat_member, via_bot_id, message_content_hash) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             getattr(message.chat, "id", None),
@@ -1040,6 +1060,7 @@ def store_message_to_db(cursor: Cursor, conn: Connection, message: types.message
             None,
             None,
             via_bot_id,
+            content_hash,
         ),
     )
     conn.commit()
@@ -1094,6 +1115,13 @@ def db_init(cursor: Cursor, conn: Connection):
     # Add membership_status column if it doesn't exist (for existing databases)
     try:
         cursor.execute("ALTER TABLE recent_messages ADD COLUMN membership_status TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Add message_content_hash column for privacy-preserving content lookup
+    try:
+        cursor.execute("ALTER TABLE recent_messages ADD COLUMN message_content_hash TEXT")
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists

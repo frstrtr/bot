@@ -95,6 +95,7 @@ from utils.utils import (
     load_predetermined_sentences,
     # get_spammer_details,  # Add this line
     store_message_to_db,
+    compute_message_hash,
     db_init,
     create_inline_keyboard,
     check_user_legit,
@@ -106,6 +107,7 @@ from utils.utils import (
     make_lols_kb,
     build_lols_url,
     set_forwarded_state,
+    get_forwarded_state,
     safe_send_message,
     normalize_username,
     # User baselines DB functions
@@ -696,6 +698,7 @@ def get_spammer_details(
     forwarded_from_chat_id=None,
     froward_sender_chat_id=None,
     via_bot_id=None,
+    message_content_hash=None,
 ):
     """Function to get chat ID and message ID by sender name and date
     or if the message is a forward of a forward then using
@@ -706,6 +709,11 @@ def get_spammer_details(
     
     via_bot_id: If the original message was sent via an inline bot (e.g., @postbot),
     this helps identify the sender even when forward privacy is enabled.
+    
+    message_content_hash: SHA-256 hash of the message text/caption for
+    privacy-preserving content-based lookup. When the spammer has a hidden profile
+    and no user ID is available, this hash allows precise matching without storing
+    the actual message content.
     """
 
     spammer_id = spammer_id or None
@@ -747,6 +755,7 @@ def get_spammer_details(
         "user_id": spammer_id,
         "forward_sender_name": forward_sender_name,
         "via_bot_id": via_bot_id,
+        "message_content_hash": message_content_hash,
     }
 
     if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
@@ -759,6 +768,9 @@ def get_spammer_details(
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
             " OR (forward_sender_name = :forward_sender_name AND REPLACE(forward_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', ''))"
         )
+        # Add content hash condition for precise matching (privacy-preserving)
+        if message_content_hash:
+            condition += " OR (message_content_hash = :message_content_hash)"
         # Add via_bot_id condition for inline bot messages (e.g., @postbot)
         if via_bot_id:
             condition += " OR (via_bot_id = :via_bot_id AND REPLACE(received_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', ''))"
@@ -770,6 +782,10 @@ def get_spammer_details(
         params = {
             "message_forward_date": message_forward_date,
         }
+        # Also try content hash for Deleted Accounts
+        if message_content_hash:
+            condition += " OR (message_content_hash = :message_content_hash)"
+            params["message_content_hash"] = message_content_hash
     elif spammer_id:
         # This is a forwarded forwarded message with known user_id
         condition = (
@@ -792,6 +808,16 @@ def get_spammer_details(
 
     query = base_query.format(condition=condition)
     result = CURSOR.execute(query, params).fetchone()
+
+    # Hash-only fallback: if no result and we have a content hash, try matching by hash alone
+    if result is None and message_content_hash:
+        hash_query = base_query.format(condition="message_content_hash = :message_content_hash")
+        result = CURSOR.execute(hash_query, {"message_content_hash": message_content_hash}).fetchone()
+        if result:
+            LOGGER.info(
+                "\033[92mFound sender via content hash fallback (hash=%s...)\033[0m",
+                message_content_hash[:16],
+            )
 
     # Ensure result is not None before accessing its elements
     if result is None:
@@ -820,6 +846,45 @@ def get_spammer_details(
     )
 
     return result
+
+
+def get_duplicate_messages_by_hash(content_hash: str, user_id: int = None) -> list:
+    """Find all messages with the same content hash (same text sent multiple times).
+    
+    Spammers often send the same message multiple times to evade single-message deletion.
+    This function finds all such duplicates for batch deletion.
+    
+    Args:
+        content_hash: SHA-256 hash of the message content.
+        user_id: If known, restrict to messages from this user only (safer).
+        
+    Returns:
+        List of tuples (chat_id, message_id, chat_username) for all matching messages.
+        Empty list if no hash provided or no matches found.
+    """
+    if not content_hash:
+        return []
+    
+    if user_id:
+        query = """
+            SELECT chat_id, message_id, chat_username
+            FROM recent_messages
+            WHERE message_content_hash = :hash AND user_id = :user_id
+                AND new_chat_member IS NULL AND left_chat_member IS NULL
+            ORDER BY received_date DESC
+        """
+        results = CURSOR.execute(query, {"hash": content_hash, "user_id": user_id}).fetchall()
+    else:
+        query = """
+            SELECT chat_id, message_id, chat_username
+            FROM recent_messages
+            WHERE message_content_hash = :hash
+                AND new_chat_member IS NULL AND left_chat_member IS NULL
+            ORDER BY received_date DESC
+        """
+        results = CURSOR.execute(query, {"hash": content_hash}).fetchall()
+    
+    return results
 
 
 async def submit_autoreport(message: Message, reason):
@@ -5295,6 +5360,9 @@ if __name__ == "__main__":
         # Convert datetime to string with UTC timezone suffix to match DB format (stored as +00:00)
         _forward_date_str = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
         
+        # Compute content hash from forwarded message for privacy-preserving DB lookup
+        _content_hash = compute_message_hash(message.text or message.caption)
+        
         if spammer_id:
             found_message_data = get_spammer_details(
                 spammer_id,
@@ -5311,6 +5379,7 @@ if __name__ == "__main__":
                     message.sender_chat.id if message.sender_chat else None
                 ),
                 via_bot_id=via_bot_id,
+                message_content_hash=_content_hash,
             )
 
         # For users with open profiles, or if previous fetch didn't work.
@@ -5330,6 +5399,7 @@ if __name__ == "__main__":
                     message.sender_chat.id if message.sender_chat else None
                 ),
                 via_bot_id=via_bot_id,
+                message_content_hash=_content_hash,
             )
 
         # Try getting details for forwarded messages from channels.
@@ -5348,6 +5418,7 @@ if __name__ == "__main__":
                     message.sender_chat.id if message.sender_chat else None
                 ),
                 via_bot_id=via_bot_id,
+                message_content_hash=_content_hash,
             )
 
         if not found_message_data:
@@ -5368,6 +5439,7 @@ if __name__ == "__main__":
                         message.sender_chat.id if message.sender_chat else None
                     ),
                     via_bot_id=via_bot_id,
+                    message_content_hash=_content_hash,
                 )
                 LOGGER.debug(
                     "The requested data associated with the Deleted Account has been retrieved. Please verify the accuracy of this information, as it cannot be guaranteed due to the account's deletion."
@@ -5533,7 +5605,8 @@ if __name__ == "__main__":
                     f"  • Name: <code>{html.escape(forward_sender_name or 'None')}</code>\n"
                     f"  • User ID: <code>{spammer_id or 'hidden'}</code>\n"
                     f"  • Forward date: <code>{_forward_date_str or 'None'}</code>\n"
-                    f"  • Chat title: <code>{html.escape(forward_from_chat_title or 'None')}</code>\n\n"
+                    f"  • Chat title: <code>{html.escape(forward_from_chat_title or 'None')}</code>\n"
+                    f"  • Content hash: <code>{(_content_hash[:16] + '...') if _content_hash else 'no text'}</code>\n\n"
                     f"<b>Possible reasons:</b>\n"
                     f"  1. Sender has privacy settings hiding their profile\n"
                     f"  2. Message is from a chat where the bot is not present\n"
@@ -5639,7 +5712,20 @@ if __name__ == "__main__":
 
         message_link = construct_message_link(found_message_data)
 
-        # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
+        # Find duplicate messages (same content sent multiple times by the spammer)
+        user_id = found_message_data[3]
+        duplicate_messages = get_duplicate_messages_by_hash(_content_hash, user_id)
+        # Exclude the primary message we already found from the duplicates list
+        primary_key = (found_message_data[0], found_message_data[1])
+        duplicate_messages = [
+            (cid, mid, cusername) for cid, mid, cusername in duplicate_messages
+            if (cid, mid) != primary_key
+        ]
+        if duplicate_messages:
+            LOGGER.info(
+                "Found %d duplicate message(s) with same content hash (hash=%s...) by user %s",
+                len(duplicate_messages), (_content_hash or "")[:16], user_id,
+            )        # Get the username, first name, and last name of the user who forwarded the message and handle the cases where they're not available
         if message.forward_from:
             first_name = message.forward_from.first_name or ""
             last_name = message.forward_from.last_name or ""
@@ -5700,6 +5786,16 @@ if __name__ == "__main__":
             f"ℹ️ <a href='{technnolog_spam_message_copy_link}'>Technolog copy</a>\n"
             f"❌ <b>Use <code>/ban {report_id}</code></b> to take action.\n"
         )
+        # Append duplicate messages info if found
+        if duplicate_messages:
+            dup_links = []
+            for dup_cid, dup_mid, dup_cusername in duplicate_messages:
+                dup_links.append(construct_message_link([dup_cid, dup_mid, dup_cusername]))
+            technolog_info += (
+                f"\n🔄 <b>Duplicate messages detected: {len(duplicate_messages)}</b>\n"
+                + "\n".join(f"   ├ <a href='{link}'>Duplicate #{i+1}</a>" for i, link in enumerate(dup_links))
+                + "\n   └ Will be auto-deleted with /ban\n"
+            )
         # LOGGER.debug("Report banner content:")
         # LOGGER.debug(log_info)
 
@@ -5716,6 +5812,9 @@ if __name__ == "__main__":
             f"   └ <a href='tg://openmessage?user_id={user_id}'>Android</a>, "
             f"<a href='https://t.me/@id{user_id}'>iOS</a>\n"
         )
+        # Append duplicate messages info to admin banner
+        if duplicate_messages:
+            admin_ban_banner += f"\n🔄 <b>{len(duplicate_messages)} duplicate(s) will be auto-deleted with /ban</b>\n"
 
         # construct lols check link button
         inline_kb = make_lols_kb(user_id)
@@ -5868,6 +5967,8 @@ if __name__ == "__main__":
                         "admin_group_banner_message": admin_group_banner_message,
                         "action_banner_message": admin_action_banner_message,  # BUG if report sent by non-admin user - there is no admin action banner message
                         "report_chat_id": message.chat.id,
+                        "duplicate_messages": duplicate_messages,  # list of (chat_id, message_id, chat_username) for same-content duplicates
+                        "content_hash": _content_hash,
                     },
                 )
 
@@ -11016,6 +11117,28 @@ if __name__ == "__main__":
                 author_id,
             )
 
+            # Also delete any duplicate messages found by content hash (multi-message spam scheme)
+            # This catches duplicates that might be missed by user_id query (e.g., different user_id in DB)
+            _report_state = get_forwarded_state(DP, report_msg_id)
+            if _report_state and _report_state.get("duplicate_messages"):
+                _dup_deleted = 0
+                for dup_cid, dup_mid, _ in _report_state["duplicate_messages"]:
+                    try:
+                        await BOT.delete_message(chat_id=dup_cid, message_id=dup_mid)
+                        _dup_deleted += 1
+                    except TelegramBadRequest:
+                        pass  # Already deleted by user_id query or expired
+                if _dup_deleted:
+                    LOGGER.info(
+                        "%s: deleted %d additional duplicate message(s) by content hash",
+                        author_id, _dup_deleted,
+                    )
+                    await safe_send_message(
+                        BOT, TECHNOLOG_GROUP_ID,
+                        f"🔄 Deleted {_dup_deleted} duplicate message(s) by content hash for user <code>{author_id}</code>.",
+                        LOGGER, parse_mode="HTML",
+                    )
+
             lols_url = f"https://t.me/oLolsBot?start={author_id}"
             lols_check_kb = KeyboardBuilder().add(
                 InlineKeyboardButton(text="ℹ️ Check Spam Data ℹ️", url=lols_url, style=ButtonStyle.PRIMARY)
@@ -14279,6 +14402,33 @@ if __name__ == "__main__":
                     susp_message_id,
                     susp_chat_id,
                 )
+                # Also delete duplicate messages with the same content hash (multi-message spam)
+                try:
+                    _hash_row = CURSOR.execute(
+                        "SELECT message_content_hash FROM recent_messages WHERE chat_id = ? AND message_id = ?",
+                        (susp_chat_id, susp_message_id),
+                    ).fetchone()
+                    _msg_hash = _hash_row[0] if _hash_row else None
+                    if _msg_hash:
+                        _dup_msgs = get_duplicate_messages_by_hash(_msg_hash, susp_user_id)
+                        _dup_deleted = 0
+                        for _dup_cid, _dup_mid, _ in _dup_msgs:
+                            if (_dup_cid, _dup_mid) == (susp_chat_id, susp_message_id):
+                                continue  # skip the primary message already deleted above
+                            try:
+                                if 0 < _dup_mid < 1_000_000_000:
+                                    await BOT.delete_message(chat_id=_dup_cid, message_id=_dup_mid)
+                                    _dup_deleted += 1
+                            except TelegramBadRequest:
+                                pass  # Already deleted or expired
+                        if _dup_deleted:
+                            LOGGER.info(
+                                "%s:%s delmsg: deleted %d duplicate(s) by content hash in addition to primary message",
+                                susp_user_id, format_username_for_log(susp_user_name), _dup_deleted,
+                            )
+                            callback_answer = f"Message + {_dup_deleted} duplicate(s) deleted.\nForward message to the bot to ban user everywhere!"
+                except (sqlite3.Error, Exception) as _e_dup:
+                    LOGGER.debug("Duplicate deletion during delmsg failed: %s", _e_dup)
                 await log_profile_change(
                     user_id=susp_user_id,
                     username=susp_user_name,

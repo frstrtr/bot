@@ -4722,9 +4722,10 @@ if __name__ == "__main__":
             # User is joining and has very high ID - send alert to suspicious thread
             # Use 0 for message_id to indicate this is a join event (no message to link to)
             _chat_link_html = build_chat_link(update.chat.id, update.chat.username, update.chat.title)
+            _threshold_display = f"{HIGH_USER_ID_THRESHOLD / 1_000_000_000:.1f}B"
             _high_id_message = (
                 f"🆕 <b>Very New Account Joined</b>\n"
-                f"User ID: <code>{inout_userid}</code> (> 8B)\n"
+                f"User ID: <code>{inout_userid}</code> (> {_threshold_display})\n"
                 f"Name: {html.escape(inout_userfirstname)} {html.escape(inout_userlastname)}\n"
                 f"Username: @{inout_username}\n"
                 f"Chat: {_chat_link_html}\n\n"
@@ -4758,9 +4759,10 @@ if __name__ == "__main__":
                 reply_markup=_high_id_kb.as_markup(),
             )
             LOGGER.warning(
-                "\033[93m%s:%s has very high user ID (>8B) - flagged as suspicious on join\033[0m",
+                "\033[93m%s:%s has very high user ID (>%s) - flagged as suspicious on join\033[0m",
                 inout_userid,
                 inout_username_log,
+                _threshold_display,
             )
 
         # Check if user joined or left during night hours - suspicious behavior
@@ -10559,7 +10561,8 @@ if __name__ == "__main__":
                             )
 
                     if suspicious_items["high_user_id"]:
-                        content_details.insert(0, "<b>🆕 Very New Account (ID &gt; 8B)</b>")
+                        _threshold_display = f"{HIGH_USER_ID_THRESHOLD / 1_000_000_000:.1f}B"
+                        content_details.insert(0, f"<b>🆕 Very New Account (ID &gt; {_threshold_display})</b>")
 
                     content_report = "\n".join(content_details)
 

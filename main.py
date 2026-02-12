@@ -751,21 +751,22 @@ def get_spammer_details(
 
     if (not forwarded_from_id) and (forward_sender_name != "Deleted Account"):
         # This is not a forwarded forwarded message
+        # Use REPLACE to strip +00:00 for compatibility with old DB records stored without timezone
         condition = (
-            "(user_first_name = :sender_first_name AND received_date = :message_forward_date)"
+            "(user_first_name = :sender_first_name AND REPLACE(received_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', ''))"
             " OR (user_id = :user_id)"
             " OR (from_chat_title = :from_chat_title)"
             " OR (user_id = :user_id AND user_first_name = :sender_first_name AND user_last_name = :sender_last_name)"
-            " OR (forward_sender_name = :forward_sender_name AND forward_date = :message_forward_date)"
+            " OR (forward_sender_name = :forward_sender_name AND REPLACE(forward_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', ''))"
         )
         # Add via_bot_id condition for inline bot messages (e.g., @postbot)
         if via_bot_id:
-            condition += " OR (via_bot_id = :via_bot_id AND received_date = :message_forward_date)"
+            condition += " OR (via_bot_id = :via_bot_id AND REPLACE(received_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', ''))"
             # Also try matching by via_bot_id + first_name (name from forward_sender_name)
             condition += " OR (via_bot_id = :via_bot_id AND user_first_name = :sender_first_name)"
     elif forward_sender_name == "Deleted Account":
         # Manage Deleted Account by message date only
-        condition = "received_date = :message_forward_date"
+        condition = "REPLACE(received_date, '+00:00', '') = REPLACE(:message_forward_date, '+00:00', '')"
         params = {
             "message_forward_date": message_forward_date,
         }
@@ -780,7 +781,7 @@ def get_spammer_details(
     else:
         # This is a forwarded forwarded message
         condition = (
-            "forwarded_from_id = :forwarded_from_id AND forward_date = :forward_date"
+            "forwarded_from_id = :forwarded_from_id AND REPLACE(forward_date, '+00:00', '') = REPLACE(:forward_date, '+00:00', '')"
         )
         params.update(
             {
@@ -5291,8 +5292,8 @@ if __name__ == "__main__":
         via_bot_id = message.via_bot.id if message.via_bot else None
         
         # message forwarded from a user or forwarded forward from a user
-        # Convert datetime to string to avoid Python 3.12+ sqlite3 DeprecationWarning
-        _forward_date_str = message.forward_date.strftime("%Y-%m-%d %H:%M:%S") if message.forward_date else None
+        # Convert datetime to string with UTC timezone suffix to match DB format (stored as +00:00)
+        _forward_date_str = message.forward_date.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00") if message.forward_date else None
         
         if spammer_id:
             found_message_data = get_spammer_details(
@@ -5525,27 +5526,37 @@ if __name__ == "__main__":
                 return
             else:
                 # Message forwarded from chat without bot, or sender data hidden
-                # Different behavior based on who forwarded the message:
+                # Provide verbose feedback to superadmins and admins
+                _search_summary = (
+                    f"⚠️ <b>Report lookup failed</b>\n\n"
+                    f"<b>Searched for:</b>\n"
+                    f"  • Name: <code>{html.escape(forward_sender_name or 'None')}</code>\n"
+                    f"  • User ID: <code>{spammer_id or 'hidden'}</code>\n"
+                    f"  • Forward date: <code>{_forward_date_str or 'None'}</code>\n"
+                    f"  • Chat title: <code>{html.escape(forward_from_chat_title or 'None')}</code>\n\n"
+                    f"<b>Possible reasons:</b>\n"
+                    f"  1. Sender has privacy settings hiding their profile\n"
+                    f"  2. Message is from a chat where the bot is not present\n"
+                    f"  3. The original message was deleted before the bot could store it\n\n"
+                    f"💡 <i>Try using /delmsg with a direct message link instead, "
+                    f"or forward from a user with an open profile.</i>"
+                )
                 
-                # 1. Superadmin in private chat or superadmin group - stay silent (they may use /copy or /forward)
+                # 1. Superadmin - reply with verbose search details
                 if is_superadmin_msg:
-                    LOGGER.debug(
-                        "Superadmin forwarded message from unknown source - staying silent for potential /copy or /forward use"
+                    await message.answer(_search_summary, parse_mode="HTML")
+                    LOGGER.warning(
+                        "Superadmin forwarded message from unknown source (name=%s, id=%s, date=%s) - replied with search details",
+                        forward_sender_name, spammer_id, _forward_date_str,
                     )
                     return
                 
-                # 2. Admins from admin group - inform them bot can't help
+                # 2. Admins from admin group - reply with verbose search details
                 if await is_admin(message.from_user.id, ADMIN_GROUP_ID):
-                    await message.answer(
-                        "⚠️ This message is forwarded from a chat where the bot is not present, "
-                        "or sender data was hidden.\n\n"
-                        "The bot cannot retrieve the original message details.\n"
-                        "Please ensure the message is from a monitored chat and "
-                        "sender information is preserved when forwarding."
-                    )
-                    LOGGER.debug(
-                        "Admin %s forwarded message from unknown source - informed them",
-                        message.from_user.id,
+                    await message.answer(_search_summary, parse_mode="HTML")
+                    LOGGER.warning(
+                        "Admin %s forwarded message from unknown source (name=%s, id=%s, date=%s) - replied with search details",
+                        message.from_user.id, forward_sender_name, spammer_id, _forward_date_str,
                     )
                     return
                 
@@ -14451,7 +14462,6 @@ if __name__ == "__main__":
     # Note:: Manage forwards from banned users as spam
     #
     # Other:
-    # Note:: Fix message_forward_date consistency in get_spammer_details and store_recent_messages
     # Note:: Implement scheduler for chat closure at night
     # NOTE: Admin can reply/send messages via /say, /reply, /broadcast commands
 

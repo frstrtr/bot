@@ -23,9 +23,40 @@ if screen -list | grep -q "$SCREEN_NAME"; then
         echo
     fi
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Killing existing screen session..."
-        screen -S "$SCREEN_NAME" -X quit
-        sleep 2
+        # Get the exact PID of the bot process before sending signal
+        BOT_PID=$(pgrep -f "python3 main.py" | head -1)
+
+        if [ -n "$BOT_PID" ]; then
+            echo "Bot process found (PID: $BOT_PID). Sending Ctrl+C for graceful shutdown..."
+            # Send SIGINT (Ctrl+C) to the bot process inside screen
+            screen -S "$SCREEN_NAME" -X stuff $'\003'
+
+            # Wait for process to exit using kill -0 (instant syscall, no grep overhead)
+            # Poll every 0.1s — no timeout, wait as long as needed for graceful shutdown
+            ELAPSED=0
+            while kill -0 "$BOT_PID" 2>/dev/null; do
+                sleep 0.1
+                ELAPSED=$((ELAPSED + 1))
+                # Progress indicator every 5 seconds
+                if [ $((ELAPSED % 50)) -eq 0 ]; then
+                    ELAPSED_SEC=$(echo "scale=1; $ELAPSED / 10" | bc)
+                    echo "  Still waiting... (${ELAPSED_SEC}s)"
+                fi
+            done
+
+            # Calculate actual time taken
+            ELAPSED_SEC=$(echo "scale=1; $ELAPSED / 10" | bc)
+            echo "Bot exited gracefully after ${ELAPSED_SEC}s."
+        else
+            echo "No running bot process found, cleaning up screen session..."
+        fi
+
+        # Clean up the screen session
+        if screen -list | grep -q "$SCREEN_NAME"; then
+            screen -S "$SCREEN_NAME" -X quit 2>/dev/null
+            sleep 0.5
+        fi
+        echo "Old session cleaned up."
     else
         echo "Aborted. Use 'screen -r $SCREEN_NAME' to attach to existing session."
         exit 0

@@ -9258,10 +9258,12 @@ if __name__ == "__main__":
                                 reply_markup=_missed_join_kb.as_markup(),
                             )
                             missed_join_notification_sent = True
-                            mark_suspicious_reported(message)  # Prevent duplicate suspicious content report
-                            mark_user_suspicious_reported(message.from_user.id)  # Prevent duplicate user reports
-                            # Also mark as autoreported to prevent this same message going to AUTOREPORT
-                            autoreported_messages.add((message.chat.id, message.message_id))
+                            # NOTE: Do NOT set mark_suspicious_reported / mark_user_suspicious_reported /
+                            # autoreported_messages here. The TECHNO_IN banner is informational only.
+                            # Downstream security checks (10sec, URL entity, has_suspicious_content)
+                            # must still fire to send alerts to ADMIN_AUTOREPORTS / ADMIN_SUSPICIOUS.
+                            # See: user 7347724916 incident 2026-02-16 where URL spam was detected
+                            # but submit_autoreport was suppressed by these dedup flags.
                             LOGGER.info(
                                 "%s:%s Sent missed join notification to TECHNOLOG (TECHNO_IN)",
                                 message.from_user.id,

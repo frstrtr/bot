@@ -120,7 +120,8 @@ from utils.utils import (
     is_user_banned,
     get_banned_users_count,
     get_banned_users,
-    # unban_user as db_unban_user,  # Available for future admin unban command
+    get_banned_user_ids,
+    unban_user as db_unban_user,
     # Whois lookup
     get_user_whois,
     format_whois_response,
@@ -334,7 +335,12 @@ bot_state = BotState()
 
 # Set to keep track of active user IDs
 active_user_checks_dict = dict()
-banned_users_dict = dict()
+# Persistent set of banned user IDs, loaded from DB at startup.
+# Only IDs are needed for O(1) lookups.
+# The DB (user_baselines.is_banned) is the authoritative store for ban details.
+banned_user_ids: set[int] = set()
+# Session counter for stats - how many bans happened since last daily reset
+session_ban_count = 0
 
 # Cache for chat usernames (chat_id -> username)
 # Populated when processing messages, used for constructing public links
@@ -568,8 +574,11 @@ def move_user_to_banned(
         first_message_text: The offending message (truncated)
         detected_by_*: Which systems flagged the user
     """
+    global session_ban_count
     if user_id in active_user_checks_dict:
-        banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+        active_user_checks_dict.pop(user_id, None)
+    banned_user_ids.add(user_id)
+    session_ban_count += 1
     # Update database with full ban details
     update_user_baseline_status(
         CONN, user_id,
@@ -1120,6 +1129,7 @@ async def ban_rogue_chat_everywhere(
         - channel_username: Username of the rogue channel
         - failed_chats: List of (chat_id, error_message) tuples for failed bans
     """
+    global session_ban_count
     failed_chats = []  # List of (chat_id, error) tuples
     success_count = 0
 
@@ -1184,7 +1194,8 @@ async def ban_rogue_chat_everywhere(
             rogue_chat_name,
             success_count,
         )
-        banned_users_dict[rogue_chat_id] = rogue_chat_username
+        banned_user_ids.add(rogue_chat_id)
+        session_ban_count += 1
         return True, rogue_chat_name, rogue_chat_username, []
 
 
@@ -1250,8 +1261,8 @@ async def unban_rogue_chat_everywhere(rogue_chat_id: int, chan_list: list) -> tu
             rogue_chat_username,
             rogue_chat_id,
         )
-        if rogue_chat_id in banned_users_dict:
-            del banned_users_dict[rogue_chat_id]
+        if rogue_chat_id in banned_user_ids:
+            banned_user_ids.discard(rogue_chat_id)
         return True, rogue_chat_name, rogue_chat_username, []
 
 
@@ -1523,26 +1534,40 @@ def analyze_mentions_in_message(message) -> dict:
 
 
 async def load_banned_users():
-    """Coroutine to load banned users from file"""
+    """Load banned user IDs from database into the in-memory set for fast lookups.
+    
+    Also handles one-time migration of legacy banned_users.txt if it exists.
+    """
+    global banned_user_ids
+    
+    # Migrate legacy file if it exists (one-time)
     banned_users_filename = "banned_users.txt"
-
-    if not os.path.exists(banned_users_filename):
-        LOGGER.error("File not found: %s", banned_users_filename)
-        return
-
-    with open(banned_users_filename, "r", encoding="utf-8") as file:
-        for line in file:
-            user_id, user_name_repr = (
-                int(line.strip().split(":", 1)[0]),
-                line.strip().split(":", 1)[1],
-            )
-            user_name = ast.literal_eval(user_name_repr)
-            banned_users_dict[user_id] = user_name
-        LOGGER.info(
-            "\033[91mBanned users dict (%s) loaded from file: %s\033[0m",
-            len(banned_users_dict),
-            dict(banned_users_dict),
-        )
+    if os.path.exists(banned_users_filename):
+        LOGGER.info("Migrating legacy banned_users.txt to database...")
+        migrated_count = 0
+        with open(banned_users_filename, "r", encoding="utf-8") as file:
+            for line in file:
+                parts = line.strip().split(":", 1)
+                if len(parts) == 2:
+                    try:
+                        user_id = int(parts[0])
+                        user_name = ast.literal_eval(parts[1].strip()) if parts[1].strip() else None
+                    except (ValueError, SyntaxError):
+                        user_name = parts[1].strip()
+                        user_id = int(parts[0])
+                    if not is_user_banned(CONN, user_id):
+                        username_str = user_name if isinstance(user_name, str) else None
+                        add_banned_user(CONN, user_id, username_str, ban_source="legacy_migration")
+                        migrated_count += 1
+        os.rename(banned_users_filename, banned_users_filename + ".migrated")
+        LOGGER.info("Migrated %d users from banned_users.txt to database", migrated_count)
+    
+    # Load all banned IDs from DB
+    banned_user_ids = get_banned_user_ids(CONN)
+    LOGGER.info(
+        "\033[91mBanned user IDs loaded from database: %d users\033[0m",
+        len(banned_user_ids),
+    )
 
 
 async def load_active_user_checks():
@@ -1814,7 +1839,7 @@ async def on_shutdown():
                 "Runtime session shutdown stats:\n"
                 f"Bot started at: {bot_start_time}\n"
                 f"Current active user checks: {len(active_user_checks_dict)}\n"
-                f"Spammers detected (this session): {len(banned_users_dict)}\n"
+                f"Spammers detected (this session): {session_ban_count}\n"
                 f"Total banned users (database): {banned_count}\n"
             ),
             LOGGER,
@@ -1831,7 +1856,7 @@ async def on_shutdown():
         "Total banned users (database): %d\033[0m",
         bot_start_time,
         len(active_user_checks_dict),
-        len(banned_users_dict),
+        session_ban_count,
         get_banned_users_count(CONN),
     )
     
@@ -2459,6 +2484,7 @@ async def autoban(_id, user_name="!UNDEFINED!"):
     """Function to ban a user from all chats using lols's data.
     id: int: The ID of the user to ban."""
 
+    global session_ban_count
     # Cancel intensive watchdog if running (user is being banned)
     if _id in running_intensive_watchdogs:
         intensive_task = running_intensive_watchdogs.pop(_id, None)
@@ -2493,41 +2519,23 @@ async def autoban(_id, user_name="!UNDEFINED!"):
             )
 
     if _id in active_user_checks_dict:
-        banned_users_dict[_id] = active_user_checks_dict.pop(
-            _id, None
-        )  # add and remove the user to the banned_users_dict
+        active_user_checks_dict.pop(_id, None)
+    banned_user_ids.add(_id)
+    session_ban_count += 1
 
-        # remove user from all known chats first
-        _, _, _ = await ban_user_from_all_chats(
-            _id, user_name, CHANNEL_IDS, CHANNEL_DICT
-        )
+    # remove user from all known chats first
+    _, _, _ = await ban_user_from_all_chats(
+        _id, user_name, CHANNEL_IDS, CHANNEL_DICT
+    )
 
-        last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
-        last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
-        LOGGER.info(
-            "\033[91m%s:%s removed from active_user_checks_dict during lols_autoban:\n\t\t\t%s... %d totally\033[0m",
-            _id,
-            format_username_for_log(user_name),
-            last_3_users_str,  # Last 3 elements
-            len(active_user_checks_dict),  # Number of elements left
-        )
-    else:
-        banned_users_dict[_id] = user_name
-
-        # remove user from all known chats first
-        _, _, _ = await ban_user_from_all_chats(
-            _id, user_name, CHANNEL_IDS, CHANNEL_DICT
-        )
-
-        last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
-        last_3_users_str = ", ".join([f"{uid}: {uname}" for uid, uname in last_3_users])
-        LOGGER.info(
-            "\033[91m%s:%s added to banned_users_dict during lols_autoban: %s... %d totally\033[0m",
-            _id,
-            format_username_for_log(user_name),
-            last_3_users_str,  # Last 3 elements
-            len(banned_users_dict),  # Number of elements left
-        )
+    LOGGER.info(
+        "\033[91m%s:%s banned during lols_autoban (active_checks: %d, banned_ids: %d, session: %d)\033[0m",
+        _id,
+        format_username_for_log(user_name),
+        len(active_user_checks_dict),
+        len(banned_user_ids),
+        session_ban_count,
+    )
 
     # Add to database and update baseline status (banned, not legit)
     add_banned_user(CONN, _id, user_name, ban_source="lols_autoban")
@@ -2718,14 +2726,13 @@ async def check_and_autoban(
     inline_kb = make_lols_kb(user_id)
 
     if lols_spam is True:  # not Timeout exaclty
-        if user_id not in banned_users_dict:
+        if user_id not in banned_user_ids:
             await autoban(user_id, user_name)
-            # banned_users_dict[user_id] = user_name
             action = "added to"
         else:
             action = "is already added to"
-        # if len(banned_users_dict) > 3:  # prevent spamming the log
-        #     last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
+        # if session_ban_count > 3:  # prevent spamming the log
+        #     last_3_users = list(banned_user_ids.items())[-3:]  # Last 3 elements
         #     last_3_users_str = ", ".join(
         #         [f"{uid}: {uname}" for uid, uname in last_3_users]
         #     )
@@ -2735,11 +2742,11 @@ async def check_and_autoban(
         #         user_name if user_name else "!UNDEFINED!",
         #         action,
         #         last_3_users_str,  # Last 3 elements as string
-        #         len(banned_users_dict),  # Total number of elements
+        #         session_ban_count,  # Total number of elements
         #     )
         # else:  # less than 3 banned users
         #     all_users_str = ", ".join(
-        #         [f"{uid}: {uname}" for uid, uname in banned_users_dict.items()]
+        #         [f"{uid}: {uname}" for uid, uname in banned_user_ids.items()]
         #     )
         #     LOGGER.info(
         #         "\033[93m%s:@%s %s runtime banned users list: %s\033[0m",
@@ -2971,10 +2978,11 @@ async def check_n_ban(message: Message, reason: str):
 
     reason: str: The reason for the check.
     """
+    global session_ban_count
     lolscheck = await spam_check(message.from_user.id)
     # Temporarily check if channel already banned
     channel_spam_check = (
-        message.forward_from_chat.id in banned_users_dict
+        message.forward_from_chat.id in banned_user_ids
         if message.forward_from_chat
         else False
     )
@@ -2991,39 +2999,19 @@ async def check_n_ban(message: Message, reason: str):
         time_passed = reason.split("...")[0].split()[-1]
         # delete id from the active_user_checks_dict
         if message.from_user.id in active_user_checks_dict:
-            banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(
-                message.from_user.id, None
+            active_user_checks_dict.pop(message.from_user.id, None)
+            LOGGER.info(
+                "\033[91m%s:%s removed from active_user_checks_dict in check_n_ban (%d remaining)\033[0m",
+                message.from_user.id,
+                format_username_for_log(message.from_user.username),
+                len(active_user_checks_dict),
             )
-
-            if len(active_user_checks_dict) > 3:
-                active_user_checks_dict_last3_list = list(
-                    active_user_checks_dict.items()
-                )[-3:]
-                active_user_checks_dict_last3_str = ", ".join(
-                    [
-                        f"{uid}: {uname}"
-                        for uid, uname in active_user_checks_dict_last3_list
-                    ]
-                )
-                LOGGER.info(
-                    "\033[91m%s:%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s... %d totally\033[0m",
-                    message.from_user.id,
-                    format_username_for_log(message.from_user.username),
-                    active_user_checks_dict_last3_str,  # Last 3 elements
-                    len(active_user_checks_dict),  # Number of elements left
-                )
-            else:
-                banned_users_dict[message.from_user.id] = message.from_user.username
-                LOGGER.info(
-                    "\033[91m%s:%s removed from the active_user_checks_dict in check_n_ban:\n\t\t\t%s\033[0m",
-                    message.from_user.id,
-                    format_username_for_log(message.from_user.username),
-                    active_user_checks_dict,
-                )
-            # stop the perform_checks coroutine if it is running for author_id
-            for task in asyncio.all_tasks():
-                if task.get_name() == str(message.from_user.id):
-                    task.cancel()
+        banned_user_ids.add(message.from_user.id)
+        session_ban_count += 1
+        # stop the perform_checks coroutine if it is running for author_id
+        for task in asyncio.all_tasks():
+            if task.get_name() == str(message.from_user.id):
+                task.cancel()
         # forward the telefragged message to the admin group
         try:
             if message is not None:
@@ -3195,30 +3183,17 @@ async def check_n_ban(message: Message, reason: str):
         await save_report_file("daily_spam_", reported_spam)
         await save_report_file("inout_", "cnb" + event_record)
 
-        # add the user to the banned users list
-        if message.from_user.id not in banned_users_dict:
-            banned_users_dict[message.from_user.id] = (
-                message.from_user.username or "!UNDEFINED!"
+        # add the user to the banned users set
+        if message.from_user.id not in banned_user_ids:
+            banned_user_ids.add(message.from_user.id)
+            session_ban_count += 1
+            LOGGER.info(
+                "\033[93m%s:%s added to banned_user_ids in check_n_ban (total: %d, session: %d)\033[0m",
+                message.from_user.id,
+                format_username_for_log(message.from_user.username),
+                len(banned_user_ids),
+                session_ban_count,
             )
-            if len(banned_users_dict) > 3:
-                last_3_users = list(banned_users_dict.items())[-3:]  # Last 3 elements
-                last_3_users_str = ", ".join(
-                    [f"{uid}: {uname}" for uid, uname in last_3_users]
-                )
-                LOGGER.info(
-                    "\033[93m%s:%s added to banned users list in check_n_ban: %s... %d totally\033[0m",
-                    message.from_user.id,
-                    format_username_for_log(message.from_user.username),
-                    last_3_users_str,  # First 2 elements
-                    len(banned_users_dict),  # Number of elements left
-                )
-            else:
-                LOGGER.info(
-                    "\033[93m%s:%s added to banned users list in check_n_ban: %s\033[0m",
-                    message.from_user.id,
-                    format_username_for_log(message.from_user.username),
-                    banned_users_dict,
-                )
 
         # Note: Message may already be deleted by another bot or process
         # Note: shift to delete_messages in aiogram 3.0
@@ -3255,6 +3230,7 @@ async def perform_checks(
     param start_time: datetime: When monitoring started (to resume after bot restart).
     """
 
+    global session_ban_count
     # immediate check
     # lols_spam = await lols_check(user_id)
     # if await check_and_autoban(user_id, inout_logmessage,lols_spam=lols_spam):
@@ -3514,10 +3490,11 @@ async def perform_checks(
                                         format_username_for_log(_orig_username),
                                     )
                             
-                            # Remove from active checks and add to banned dict
+                            # Remove from active checks and add to banned set
                             if user_id in active_user_checks_dict:
                                 del active_user_checks_dict[user_id]
-                            banned_users_dict[user_id] = datetime.now(timezone.utc)
+                            banned_user_ids.add(user_id)
+                            session_ban_count += 1
                             
                             # Add to database and update baseline status (banned)
                             add_banned_user(CONN, user_id, _orig_username, ban_source="deleted_account", 
@@ -3727,10 +3704,12 @@ async def perform_checks(
                 return
 
     except asyncio.exceptions.CancelledError:
-        # Shutdown in progress - move user to banned_users_dict for persistence
+        # Shutdown in progress - persist ban state
         # Don't spam logs - on_shutdown will log summary
         if user_id in active_user_checks_dict:
-            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+            active_user_checks_dict.pop(user_id, None)
+            banned_user_ids.add(user_id)
+            session_ban_count += 1
         # Re-raise to let caller know task was cancelled
         raise
 
@@ -3786,6 +3765,7 @@ async def perform_checks(
 
 async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
     """Cancels a running watchdog task for a given user ID (also cancels intensive watchdog if running)."""
+    global session_ban_count
     # Also cancel intensive watchdog if running
     if user_id in running_intensive_watchdogs:
         intensive_task = running_intensive_watchdogs.pop(user_id, None)
@@ -3803,9 +3783,11 @@ async def cancel_named_watchdog(user_id: int, user_name: str = "!UNDEFINED!"):
                 pass
     
     if user_id in running_watchdogs:
-        # Try to remove from active_checks dict and add to banned_users_dict
+        # Try to remove from active_checks and mark as banned
         try:
-            banned_users_dict[user_id] = active_user_checks_dict.pop(user_id, None)
+            active_user_checks_dict.pop(user_id, None)
+            banned_user_ids.add(user_id)
+            session_ban_count += 1
         except KeyError:
             LOGGER.warning(
                 "%s not found in active_user_checks_dict during cancel_named_watchdog.",
@@ -4259,9 +4241,9 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
     """
 
     LOGGER.info(
-        "\033[93m%s banned users dict: %s\033[0m",
-        len(banned_users_dict),
-        banned_users_dict,
+        "\033[93mSession bans: %d, Total banned IDs in memory: %d\033[0m",
+        session_ban_count,
+        len(banned_user_ids),
     )
     LOGGER.info(
         "\033[93m%s Active user checks dict: %s\033[0m",
@@ -4279,32 +4261,8 @@ async def log_lists(group=TECHNOLOG_GROUP_ID, msg_thread_id=TECHNO_ADMIN):
     os.makedirs("inout", exist_ok=True)
     os.makedirs("daily_spam", exist_ok=True)
 
-    # Migrate any legacy banned_users.txt file to database (one-time migration)
-    banned_users_filename = "banned_users.txt"
-    if os.path.exists(banned_users_filename):
-        LOGGER.info("Migrating legacy banned_users.txt to database...")
-        with open(banned_users_filename, "r", encoding="utf-8") as file:
-            migrated_count = 0
-            for line in file:
-                parts = line.strip().split(":", 1)
-                if len(parts) == 2:
-                    user_id, user_name = parts
-                    try:
-                        user_name = ast.literal_eval(user_name.strip())
-                    except (ValueError, SyntaxError):
-                        pass  # keep user_name as string if it's not a valid dict
-                    user_id_int = int(user_id)
-                    # Add to DB if not already there
-                    if not is_user_banned(CONN, user_id_int):
-                        username_str = user_name if isinstance(user_name, str) else None
-                        add_banned_user(CONN, user_id_int, username_str, ban_source="legacy_migration")
-                        migrated_count += 1
-        # Remove legacy file after migration
-        os.remove(banned_users_filename)
-        LOGGER.info("Migrated %d users from banned_users.txt to database", migrated_count)
-
     # Save daily archive of banned users to inout folder (for historical records)
-    # Query database directly instead of using in-memory dict
+    # Query database directly
     db_banned_users = get_banned_users(CONN)
     with open(filename, "w", encoding="utf-8") as file:
         for bu in db_banned_users:
@@ -4497,7 +4455,7 @@ if __name__ == "__main__":
         # await get_photo_details(update.from_user.id)  # Disabled for now
 
         if (
-            update.old_chat_member.user.id in banned_users_dict
+            update.old_chat_member.user.id in banned_user_ids
         ):  # prevent double actions if user already banned by other process
             LOGGER.info(
                 "%s:%s already banned - skipping actions.",
@@ -4851,7 +4809,7 @@ if __name__ == "__main__":
                 and is_member
                 and not was_member
                 and update.from_user.id != inout_userid  # Someone else added the user
-                and (inout_userid in banned_users_dict or inout_userid in active_user_checks_dict)
+                and (inout_userid in banned_user_ids or inout_userid in active_user_checks_dict)
             ):
                 # Check if the person who added the user is an admin in that chat
                 try:
@@ -4876,9 +4834,9 @@ if __name__ == "__main__":
                             notes=f"re-added by @{admin_username}" if admin_username else None,
                         )
                         
-                        # Also remove from banned_users_dict if present
-                        if inout_userid in banned_users_dict:
-                            del banned_users_dict[inout_userid]
+                        # Also remove from banned_user_ids if present
+                        if inout_userid in banned_user_ids:
+                            banned_user_ids.discard(inout_userid)
                         
                         # Mark as legit in database
                         try:
@@ -6100,6 +6058,7 @@ if __name__ == "__main__":
     async def handle_ban(callback_query: CallbackQuery):
         """Function to ban the user and delete all known to bot messages."""
 
+        global session_ban_count
         # remove buttons from the admin group first
         await BOT.edit_message_reply_markup(
             chat_id=callback_query.message.chat.id,
@@ -6139,7 +6098,8 @@ if __name__ == "__main__":
                 _success_count, _fail_count, _total_count = await ban_user_from_all_chats(
                     author_id, None, CHANNEL_IDS, CHANNEL_DICT
                 )
-                banned_users_dict[author_id] = "!UNDEFINED!"
+                banned_user_ids.add(author_id)
+                session_ban_count += 1
                 # cancel watchdog if running
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):
@@ -6238,35 +6198,14 @@ if __name__ == "__main__":
                 return
             # remove userid from the active_user_checks_dict
             if author_id in active_user_checks_dict:
-                banned_users_dict[author_id] = active_user_checks_dict.pop(
-                    author_id, None
+                active_user_checks_dict.pop(author_id, None)
+                LOGGER.info(
+                    "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin (%s): %d remaining\033[0m",
+                    author_id,
+                    format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
+                    button_pressed_by,
+                    len(active_user_checks_dict),
                 )
-                if len(active_user_checks_dict) > 3:
-                    active_user_checks_dict_last3_list = list(
-                        active_user_checks_dict.items()
-                    )[-3:]
-                    active_user_checks_dict_last3_str = ", ".join(
-                        [
-                            f"{uid}: {uname}"
-                            for uid, uname in active_user_checks_dict_last3_list
-                        ]
-                    )
-                    LOGGER.info(
-                        "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s... %d totally",
-                        author_id,
-                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
-                        button_pressed_by,
-                        active_user_checks_dict_last3_str,  # Last 3 elements
-                        len(active_user_checks_dict),  # Number of elements left
-                    )
-                else:
-                    LOGGER.info(
-                        "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin (%s):\n\t\t\t\033[0m %s",
-                        author_id,
-                        format_username_for_log(forwarded_message_data[4] if forwarded_message_data[4] not in [0, "0", None] else None),
-                        button_pressed_by,
-                        active_user_checks_dict,
-                    )
                 # stop the perform_checks coroutine if it is running for author_id
                 for task in asyncio.all_tasks():
                     if task.get_name() == str(author_id):
@@ -6290,11 +6229,8 @@ if __name__ == "__main__":
             await save_report_file("inout_", "hbn" + event_record)
 
             # add to the banned users set
-            banned_users_dict[int(author_id)] = (
-                forwarded_message_data[4]
-                if forwarded_message_data[4] not in [0, "0", None]
-                else "!UNDEFINED!"
-            )
+            banned_user_ids.add(int(author_id))
+            session_ban_count += 1
 
             # Select all messages from the user in chats with usernames
             # Note: Private chats are excluded (chat_username IS NOT NULL) since they don't have public usernames
@@ -6556,20 +6492,15 @@ if __name__ == "__main__":
                     parse_mode="HTML",
                     message_thread_id=TECHNO_NAMES,
                 )
-            banned_users_dict[author_id] = (
-                forwarded_message_data[4]
-                if forwarded_message_data[4] not in [0, "0", None]
-                else "!UNDEFINED!"
-            )
+            banned_user_ids.add(author_id)
+            session_ban_count += 1
             if forwarded_message_data[3] in active_user_checks_dict:
-                banned_users_dict[forwarded_message_data[3]] = (
-                    active_user_checks_dict.pop(forwarded_message_data[3], None)
-                )
+                active_user_checks_dict.pop(forwarded_message_data[3], None)
                 LOGGER.info(
-                    "\033[91m%s:%s removed from active_user_checks_dict and stored to banned_users_dict during handle_ban by admin:\n\t\t\t%s\033[0m",
+                    "\033[91m%s:%s removed from active_user_checks_dict during handle_ban by admin: %d remaining\033[0m",
                     forwarded_message_data[3],
                     format_username_for_log(user_name),
-                    active_user_checks_dict,
+                    len(active_user_checks_dict),
                 )
             LOGGER.info(
                 "\033[95m%s:%s Report <code>%s</code> action taken by @%s: User @%s banned and their messages deleted where applicable.\033[0m",
@@ -6707,6 +6638,7 @@ if __name__ == "__main__":
     @DP.callback_query(lambda c: c.data.startswith("confirmbanuser_"))
     async def handle_user_inout_ban(callback_query: CallbackQuery):
         """Function to ban the user from all chats."""
+        global session_ban_count
         # Parse user_id from callback data
         parts = callback_query.data.split("_")
         user_id_str = parts[1]
@@ -6760,8 +6692,9 @@ if __name__ == "__main__":
                 user_id, username, CHANNEL_IDS, CHANNEL_DICT
             )
 
-            # Add to banned users dict
-            banned_users_dict[user_id] = username
+            # Add to banned users set
+            banned_user_ids.add(user_id)
+            session_ban_count += 1
 
             # Create event record (include admin ID for traceability)
             _admin_for_record = f"@{button_pressed_by}" if button_pressed_by else f"({_admin_id})"
@@ -7462,6 +7395,8 @@ if __name__ == "__main__":
         """Function to store recent messages in the database.
         And check senders for spam records."""
 
+        global session_ban_count
+
         # Skip service messages (join/leave) - they are handled by handle_service_messages
         if message.new_chat_members or message.left_chat_member:
             # Delete service message in small groups (not supergroups)
@@ -7844,7 +7779,7 @@ if __name__ == "__main__":
 
         ### AUTOBAHN MESSAGE CHECKING ###
         # check if message is from user from active_user_checks_dict
-        # and banned_users_dict set
+        # and banned_user_ids set
         # Note: Edge case - user in both active checks and banned (race condition)
         # Skip all spam checks for Telegram's anonymous admin ID (777000)
         # This is when admin posts as channel name, not spam
@@ -7858,10 +7793,10 @@ if __name__ == "__main__":
             )
         elif (
             message.from_user.id in active_user_checks_dict
-            and message.from_user.id in banned_users_dict
+            and message.from_user.id in banned_user_ids
         ):
             LOGGER.warning(
-                "\033[47m\033[34m%s is in both active_user_checks_dict and banned_users_dict, check the message %s in the chat %s (%s)\033[0m",
+                "\033[47m\033[34m%s is in both active_user_checks_dict and banned_user_ids, check the message %s in the chat %s (%s)\033[0m",
                 message.from_user.id,
                 message.message_id,
                 message.chat.title,
@@ -7869,41 +7804,41 @@ if __name__ == "__main__":
             )
         elif (
             (
-                message.from_user.id in banned_users_dict
+                message.from_user.id in banned_user_ids
                 or await spam_check(message.from_user.id) is True
             )
             or (
                 message.forward_from_chat
                 and (
-                    message.forward_from_chat.id in banned_users_dict
+                    message.forward_from_chat.id in banned_user_ids
                     or await spam_check(message.forward_from_chat.id) is True
                 )
             )
             or (
                 message.forward_from
                 and (
-                    message.forward_from.id in banned_users_dict
+                    message.forward_from.id in banned_user_ids
                     or await spam_check(message.forward_from.id) is True
                 )
             )
         ):
             if (
-                message.from_user and message.from_user.id in banned_users_dict
+                message.from_user and message.from_user.id in banned_user_ids
             ):  # user_id BANNED
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is in banned_user_ids, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             # elif (
-            #     message.sender_chat and message.sender_chat.id in banned_users_dict
+            #     message.sender_chat and message.sender_chat.id in banned_user_ids
             # ):  # sender_chat_id BANNED
-            #     logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+            #     logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} SENDER CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_user_ids, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             elif (
                 message.forward_from_chat
-                and message.forward_from_chat.id in banned_users_dict
+                and message.forward_from_chat.id in banned_user_ids
             ):  # forward_from_chat_id BANNED
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM CHAT: {message.forward_from_chat.id}:@{getattr(message.forward_from_chat, 'username', None) or message.forward_from_chat.title} is in banned_user_ids, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             elif (
-                message.forward_from and message.forward_from.id in banned_users_dict
+                message.forward_from and message.forward_from.id in banned_user_ids
             ):  # forward_from.id BANNED
-                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM USER: {message.forward_from.id}:@{getattr(message.forward_from, 'username', None) or message.forward_from.first_name} is in banned_users_dict, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
+                logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} FORWARDED FROM USER: {message.forward_from.id}:@{getattr(message.forward_from, 'username', None) or message.forward_from.first_name} is in banned_user_ids, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
             else:  # marked as a SPAM by P2P server
                 logger_text = f"\033[41m\033[37m{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is marked as SPAMMER by spam_check, DELETING the message {message.message_id} in the chat {message.chat.title} ({message.chat.id})\033[0m"
 
@@ -8334,11 +8269,14 @@ if __name__ == "__main__":
                             ban_reason=f"Forwarded spam with bot mention: {_fwd_bot_mention_name}",
                         )
                     
-                    # Add user to banned_users_dict and remove from active checks
+                    # Add user to banned_user_ids and remove from active checks
                     if message.from_user.id in active_user_checks_dict:
-                        banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                        active_user_checks_dict.pop(message.from_user.id, None)
+                        banned_user_ids.add(message.from_user.id)
+                        session_ban_count += 1
                     else:
-                        banned_users_dict[message.from_user.id] = _user_name
+                        banned_user_ids.add(message.from_user.id)
+                        session_ban_count += 1
                     
                     # Add to DB
                     add_banned_user(
@@ -8494,11 +8432,14 @@ if __name__ == "__main__":
                             ban_reason=f"Forwarded {_media_type} spam during night",
                         )
                     
-                    # Add user to banned_users_dict and remove from active checks
+                    # Add user to banned_user_ids and remove from active checks
                     if message.from_user.id in active_user_checks_dict:
-                        banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                        active_user_checks_dict.pop(message.from_user.id, None)
+                        banned_user_ids.add(message.from_user.id)
+                        session_ban_count += 1
                     else:
-                        banned_users_dict[message.from_user.id] = _user_name
+                        banned_user_ids.add(message.from_user.id)
+                        session_ban_count += 1
                     
                     # Add to DB
                     add_banned_user(
@@ -9109,11 +9050,14 @@ if __name__ == "__main__":
                                 CHANNEL_DICT,
                             )
                             
-                            # Add to banned_users_dict and remove from active checks
+                            # Add to banned_user_ids and remove from active checks
                             if message.from_user.id in active_user_checks_dict:
-                                banned_users_dict[message.from_user.id] = active_user_checks_dict.pop(message.from_user.id, None)
+                                active_user_checks_dict.pop(message.from_user.id, None)
+                                banned_user_ids.add(message.from_user.id)
+                                session_ban_count += 1
                             else:
-                                banned_users_dict[message.from_user.id] = _user_name
+                                banned_user_ids.add(message.from_user.id)
+                                session_ban_count += 1
                             
                             # Cancel watchdog task if running
                             for task in asyncio.all_tasks():
@@ -9502,7 +9446,7 @@ if __name__ == "__main__":
 
             # Check if user is in the banned list (latency edge case)
             # Note: User may have been banned but message was already in flight
-            if message.from_user.id in banned_users_dict:
+            if message.from_user.id in banned_user_ids:
                 the_reason = f"{message.from_user.id}:@{message.from_user.username if message.from_user.username else '!UNDEFINED!'} is banned before sending a message, but squizzed due to latency..."
                 latency_message_link = construct_message_link(
                     [
@@ -10752,7 +10696,7 @@ if __name__ == "__main__":
             return
         
         # Skip if user is already banned
-        if message.from_user.id in banned_users_dict:
+        if message.from_user.id in banned_user_ids:
             return
         
         # Skip if user is flagged as legit
@@ -10933,6 +10877,7 @@ if __name__ == "__main__":
     # NOTE: Manual typing command ban - useful if ban were postponed
     async def ban(message: Message):
         """Function to ban the user and delete all known to bot messages using '/ban reportID' text command."""
+        global session_ban_count
         try:
             # logger.debug("ban triggered.")
 
@@ -10998,9 +10943,9 @@ if __name__ == "__main__":
 
             # remove userid from the active_user_checks_dict
             if author_id in active_user_checks_dict:
-                banned_users_dict[author_id] = active_user_checks_dict.pop(
-                    author_id, None
-                )
+                active_user_checks_dict.pop(author_id, None)
+                banned_user_ids.add(author_id)
+                session_ban_count += 1
                 if len(active_user_checks_dict) > 3:
                     active_user_checks_dict_last3_list = list(
                         active_user_checks_dict.items()
@@ -11031,9 +10976,8 @@ if __name__ == "__main__":
                         task.cancel()
 
             # add to the banned users set
-            banned_users_dict[int(author_id)] = (
-                forwarded_message_data[4] if forwarded_message_data[4] else "NoUserName"
-            )
+            banned_user_ids.add(int(author_id))
+            session_ban_count += 1
 
             # Attempting to ban user from channels
             for chat_id in CHANNEL_IDS:
@@ -11626,7 +11570,7 @@ if __name__ == "__main__":
                 return  # stop processing command
 
             if action == "ban":
-                if rogue_chan_id in banned_users_dict:
+                if rogue_chan_id in banned_user_ids:
                     LOGGER.debug(
                         "\033[93mRogue channel ID to ban: %s already banned. Skipping actions.\033[0m",
                         rogue_chan_id,
@@ -11749,19 +11693,19 @@ if __name__ == "__main__":
                             disable_web_page_preview=True,
                         )
 
-                    # Remove the channel from the banned_users_dict
-                    if rogue_chan_id in banned_users_dict:
-                        del banned_users_dict[rogue_chan_id]
+                    # Remove the channel from the banned_user_ids
+                    if rogue_chan_id in banned_user_ids:
+                        banned_user_ids.discard(rogue_chan_id)
                         LOGGER.info(
-                            "\033[91mChannel (%s) removed from banned_users_dict.\033[0m",
+                            "\033[91mChannel (%s) removed from banned_user_ids.\033[0m",
                             rogue_chan_id,
                         )
                     
                     # Check comprehensive ban status and provide detailed feedback
                     status_lines = []
                     
-                    # 1. Check banned_users_dict (runtime)
-                    in_banned_dict = rogue_chan_id in banned_users_dict
+                    # 1. Check banned_user_ids (runtime)
+                    in_banned_dict = rogue_chan_id in banned_user_ids
                     status_lines.append(f"• Runtime dict: {'🚫 Banned' if in_banned_dict else '✅ Not banned'}")
                     
                     # 2. Check local database
@@ -13230,8 +13174,8 @@ if __name__ == "__main__":
             user_id = int(command_args[1])
             LOGGER.debug("%d - User ID to unban", user_id)
 
-            # Get username before removing from dicts
-            user_name_data = active_user_checks_dict.get(user_id) or banned_users_dict.get(user_id)
+            # Get username from active checks or DB
+            user_name_data = active_user_checks_dict.get(user_id) or get_user_baseline(CONN, user_id)
             user_name = "!UNDEFINED!"
             if isinstance(user_name_data, dict):
                 user_name = str(user_name_data.get("username", "!UNDEFINED!")).lstrip("@")
@@ -13248,8 +13192,8 @@ if __name__ == "__main__":
             # remove from banned and checks dicts
             if user_id in active_user_checks_dict:
                 del active_user_checks_dict[user_id]
-            if user_id in banned_users_dict:
-                del banned_users_dict[user_id]
+            banned_user_ids.discard(user_id)
+            db_unban_user(CONN, user_id)
 
             # Mark monitoring as ended and user as legit in baselines DB
             update_user_baseline_status(CONN, user_id, monitoring_active=False, is_legit=True)
@@ -13785,6 +13729,7 @@ if __name__ == "__main__":
         Long prefixes (legacy, for backwards compatibility):
         - suspiciousactions_, suspiciousglobalban_, suspiciousban_, etc.
         """
+        global session_ban_count
         data = callback_query.data
         parts = data.split("_")
 
@@ -14210,9 +14155,12 @@ if __name__ == "__main__":
             
             # Update tracking dicts and database
             if susp_user_id in active_user_checks_dict:
-                banned_users_dict[susp_user_id] = active_user_checks_dict.pop(susp_user_id, None)
+                active_user_checks_dict.pop(susp_user_id, None)
+                banned_user_ids.add(susp_user_id)
+                session_ban_count += 1
             else:
-                banned_users_dict[susp_user_id] = susp_user_name
+                banned_user_ids.add(susp_user_id)
+                session_ban_count += 1
             # Add to database
             add_banned_user(CONN, susp_user_id, susp_user_name, ban_source="admin_globalban",
                           banned_by_admin_id=callback_query.from_user.id if callback_query.from_user else None)
@@ -14381,9 +14329,12 @@ if __name__ == "__main__":
             # Cancel watchdog and update tracking dicts and database
             await cancel_named_watchdog(susp_user_id)
             if susp_user_id in active_user_checks_dict:
-                banned_users_dict[susp_user_id] = active_user_checks_dict.pop(susp_user_id, None)
+                active_user_checks_dict.pop(susp_user_id, None)
+                banned_user_ids.add(susp_user_id)
+                session_ban_count += 1
             else:
-                banned_users_dict[susp_user_id] = susp_user_name
+                banned_user_ids.add(susp_user_id)
+                session_ban_count += 1
             # Add to database
             add_banned_user(CONN, susp_user_id, susp_user_name, ban_source="admin_confirmban",
                           banned_by_admin_id=callback_query.from_user.id if callback_query.from_user else None)
@@ -14585,10 +14536,14 @@ if __name__ == "__main__":
     # scheduler to run the log_lists function daily at 04:00
     @aiocron.crontab("0 4 * * *", tz=ZoneInfo("Indian/Mauritius"))
     async def scheduled_log():
-        """Function to schedule the log_lists function to run daily at 00:00."""
+        """Daily log rotation and session counter reset at 04:00."""
+        global banned_user_ids, session_ban_count
         await log_lists()
-        # empty banned_users_dict
-        banned_users_dict.clear()
+        # Reset session counter (banned_user_ids persists - no protection gap!)
+        session_ban_count = 0
+        # Refresh from DB in case of any external changes
+        banned_user_ids = get_banned_user_ids(CONN)
+        LOGGER.info("Daily reset: session_ban_count=0, reloaded %d banned IDs from DB", len(banned_user_ids))
 
     # NOTE: Night message check happens twice intentionally:
     #   1. First check (line ~5500) triggers perform_checks watchdog for new users

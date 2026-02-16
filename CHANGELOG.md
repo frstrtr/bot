@@ -46,7 +46,7 @@
 ### Changed
 - **Banned users storage migrated to database**: Replaced file-based `banned_users.txt` with database storage
   - Banned users now stored in `user_baselines` table with `is_banned = 1` flag
-  - `banned_users_dict` kept as runtime cache for performance, populated from DB on startup
+  - `banned_user_ids` set kept as runtime cache for performance, populated from DB on startup
   - Removed file-based persistence on shutdown (database is persistent)
   - Legacy `banned_users.txt` files auto-migrated to database on first startup
   - Daily archives still written to `inout/banned_users_DATE.txt` for historical records

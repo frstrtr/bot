@@ -1559,7 +1559,7 @@ def add_banned_user(
     """Add or update a user as banned in the database.
     
     This creates/updates the user_baselines record with is_banned=1.
-    Used to replace the in-memory banned_users_dict.
+    Used by the in-memory banned_user_ids set cache.
     
     Args:
         conn: Database connection
@@ -1694,6 +1694,28 @@ def get_banned_users(conn: Connection, limit: int = None) -> list:
     except sqlite3.Error as e:
         logging.getLogger(__name__).error("Error getting banned users: %s", e)
         return []
+
+
+def get_banned_user_ids(conn: Connection) -> set[int]:
+    """Load all banned user IDs from database as a set for fast in-memory lookups.
+    
+    The set is kept in memory for O(1)
+    membership checks on every incoming message, while the DB remains the
+    authoritative store for ban details.
+    
+    Args:
+        conn: Database connection
+    
+    Returns:
+        Set of banned user IDs
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT user_id FROM user_baselines WHERE is_banned = 1")
+        return {row[0] for row in cursor.fetchall()}
+    except sqlite3.Error as e:
+        logging.getLogger(__name__).error("Error loading banned user IDs: %s", e)
+        return set()
 
 
 def unban_user(conn: Connection, user_id: int) -> bool:

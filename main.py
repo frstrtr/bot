@@ -994,10 +994,10 @@ async def on_startup():
             LOGGER.warning("Could not get chat info for %s: %s", chat_id, e)
     LOGGER.info("Chat username cache populated with %d entries", len(chat_username_cache))
 
+    _commit_summary = _commit_info.splitlines()[0] if _commit_info else "N/A"
     bot_start_log_message = (
-        f"\033[95m\nBot restarted at {bot_start_time}\n{'-' * 40}\n"
-        f"Commit info: {_commit_info}\n"
-        "Финальная битва между людьми и роботами...\033[0m\n"
+        f"Bot restarted at {bot_start_time} | commit: {_commit_summary} | "
+        "Финальная битва между людьми и роботами..."
     )
     bot_start_message = (
         f"Bot restarted at {bot_start_time}\n{'-' * 40}\n"

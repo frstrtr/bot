@@ -509,9 +509,11 @@ def initialize_logger(log_level="INFO"):
 
     # Configure logging to use UTF-8 encoding
     logger = logging.getLogger(__name__)
+    log_level_value = getattr(logging, log_level.upper(), logging.INFO)
+    logger.setLevel(log_level_value)  # Set the logging level based on the argument
+    logger.propagate = False
+
     if not logger.hasHandlers():
-        log_level_value = getattr(logging, log_level.upper(), logging.INFO)
-        logger.setLevel(log_level_value)  # Set the logging level based on the argument
 
         # Create handlers
         stream_handler = logging.StreamHandler(sys.stdout)
@@ -541,11 +543,10 @@ def initialize_logger(log_level="INFO"):
             root_file_handler.setFormatter(formatter)
             root_logger.addHandler(root_file_handler)
         
-        # Capture aiogram dispatcher exceptions specifically
+        # Capture aiogram dispatcher exceptions via root logger handlers
         aiogram_logger = logging.getLogger("aiogram")
         aiogram_logger.setLevel(log_level_value)
-        if not any(isinstance(h, logging.FileHandler) for h in aiogram_logger.handlers):
-            aiogram_logger.addHandler(file_handler)
+        aiogram_logger.propagate = True
     
     return logger
 

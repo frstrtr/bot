@@ -79,7 +79,7 @@ fi
 
 # Start bot in screen session
 echo "Starting bot in screen session '$SCREEN_NAME'..."
-screen -dmS "$SCREEN_NAME" bash -c "$PYTHON_CMD main.py --log-level $LOG_LEVEL 2>&1 | tee -a $LOG_FILE"
+screen -dmS "$SCREEN_NAME" bash -c "$PYTHON_CMD main.py --log-level $LOG_LEVEL"
 
 # Wait a moment for the bot to start
 sleep 3
